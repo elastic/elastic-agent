@@ -4278,7 +4278,9 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	config := DefaultRuntimeConfig()
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
-	assert.Equal(t, "", config.DynamicInputs)
+	assert.Equal(t, DefaultDynamicInputsConfig(), config.DynamicInputs)
+	assert.Equal(t, "", config.DynamicInputs.Default)
+	assert.Empty(t, config.DynamicInputs.StaticVariables)
 	assert.Equal(t, "otel", config.Auditbeat.Default)
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
@@ -4708,12 +4710,47 @@ func TestRuntimeConfig_UCFGUnpack(t *testing.T) {
 				c.Metricbeat.Default = "process"
 			},
 		},
-		"set_dynamic_inputs": {
+		"set_dynamic_inputs_legacy_scalar": {
 			input: map[string]interface{}{
 				"dynamic_inputs": "otel",
 			},
 			mutate: func(c *RuntimeConfig) {
-				c.DynamicInputs = "otel"
+				c.DynamicInputs.Default = "otel"
+			},
+		},
+		"set_dynamic_inputs_default": {
+			input: map[string]interface{}{
+				"dynamic_inputs": map[string]interface{}{
+					"default": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.DynamicInputs.Default = "process"
+			},
+		},
+		"set_dynamic_inputs_per_beat_and_input_type": {
+			input: map[string]interface{}{
+				"dynamic_inputs": map[string]interface{}{
+					"default": "process",
+					"filebeat": map[string]interface{}{
+						"default":    "process",
+						"filestream": "otel",
+					},
+					"metricbeat": map[string]interface{}{
+						"default": "otel",
+					},
+					"static_variables": []interface{}{
+						"local_dynamic.group",
+						"kubernetes.node",
+					},
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.DynamicInputs.Default = "process"
+				c.DynamicInputs.Filebeat.Default = "process"
+				c.DynamicInputs.Filebeat.InputType["filestream"] = "otel"
+				c.DynamicInputs.Metricbeat.Default = "otel"
+				c.DynamicInputs.StaticVariables = []string{"local_dynamic.group", "kubernetes.node"}
 			},
 		},
 	}
@@ -4730,6 +4767,235 @@ func TestRuntimeConfig_UCFGUnpack(t *testing.T) {
 			tt.mutate(expected)
 
 			assert.Equal(t, expected, cfg)
+		})
+	}
+}
+
+func TestDynamicInputsConfig_Unpack(t *testing.T) {
+	t.Run("legacy scalar form sets the default", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack("process"))
+
+		expected := DefaultDynamicInputsConfig()
+		expected.Default = "process"
+		assert.Equal(t, expected, cfg)
+	})
+
+	t.Run("empty scalar keeps the feature disabled", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack(""))
+		assert.Equal(t, DefaultDynamicInputsConfig(), cfg)
+	})
+
+	t.Run("nil value leaves the configuration untouched", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		cfg.Default = "process"
+		require.NoError(t, cfg.Unpack(nil))
+		assert.Equal(t, "process", cfg.Default)
+	})
+
+	t.Run("map form unpacks all fields", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack(map[string]interface{}{
+			"default": "process",
+			"filebeat": map[string]interface{}{
+				"default":    "process",
+				"filestream": "otel",
+			},
+			"static_variables": []interface{}{"local_dynamic.group"},
+		}))
+
+		expected := DefaultDynamicInputsConfig()
+		expected.Default = "process"
+		expected.Filebeat.Default = "process"
+		expected.Filebeat.InputType["filestream"] = "otel"
+		expected.StaticVariables = []string{"local_dynamic.group"}
+		assert.Equal(t, expected, cfg)
+	})
+
+	t.Run("trailing dots are trimmed from static variables", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack(map[string]interface{}{
+			"static_variables": []interface{}{"kubernetes.node.", "local_dynamic.group"},
+		}))
+		assert.Equal(t, []string{"kubernetes.node", "local_dynamic.group"}, cfg.StaticVariables)
+	})
+
+	t.Run("unsupported type is rejected", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		assert.Error(t, cfg.Unpack(true))
+	})
+}
+
+func TestDynamicInputsConfig_UnmarshalYAML(t *testing.T) {
+	t.Run("legacy scalar form", func(t *testing.T) {
+		var cfg struct {
+			DynamicInputs DynamicInputsConfig `yaml:"dynamic_inputs"`
+		}
+		cfg.DynamicInputs = DefaultDynamicInputsConfig()
+		require.NoError(t, yaml.Unmarshal([]byte("dynamic_inputs: process\n"), &cfg))
+		assert.Equal(t, "process", cfg.DynamicInputs.Default)
+	})
+
+	t.Run("map form", func(t *testing.T) {
+		var cfg struct {
+			DynamicInputs DynamicInputsConfig `yaml:"dynamic_inputs"`
+		}
+		cfg.DynamicInputs = DefaultDynamicInputsConfig()
+		require.NoError(t, yaml.Unmarshal([]byte(`dynamic_inputs:
+  default: process
+  metricbeat:
+    default: otel
+  static_variables:
+    - kubernetes.node.
+`), &cfg))
+		assert.Equal(t, "process", cfg.DynamicInputs.Default)
+		assert.Equal(t, "otel", cfg.DynamicInputs.Metricbeat.Default)
+		// trailing dots are trimmed from static variables
+		assert.Equal(t, []string{"kubernetes.node"}, cfg.DynamicInputs.StaticVariables)
+	})
+}
+
+func TestDynamicInputsConfig_RuntimeManagerForDynamicInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    DynamicInputsConfig
+		beatName  string
+		inputType string
+		want      RuntimeManager
+	}{
+		{
+			name:      "disabled by default",
+			config:    DefaultDynamicInputsConfig(),
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      "",
+		},
+		{
+			name:      "global default applies to every beat",
+			config:    DynamicInputsConfig{Default: string(ProcessRuntimeManager)},
+			beatName:  "metricbeat",
+			inputType: "system/metrics",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "per beat default overrides the global default",
+			config: DynamicInputsConfig{
+				Default:    string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{Default: string(OtelRuntimeManager)},
+			},
+			beatName:  "metricbeat",
+			inputType: "system/metrics",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "per beat default doesn't affect other beats",
+			config: DynamicInputsConfig{
+				Default:    string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{Default: string(OtelRuntimeManager)},
+			},
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "per input type overrides the per beat default",
+			config: DynamicInputsConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default:   string(OtelRuntimeManager),
+					InputType: map[string]string{"filestream": string(ProcessRuntimeManager)},
+				},
+			},
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "per input type doesn't affect other input types of the same beat",
+			config: DynamicInputsConfig{
+				Filebeat: BeatRuntimeConfig{
+					InputType: map[string]string{"filestream": string(ProcessRuntimeManager)},
+				},
+			},
+			beatName:  "filebeat",
+			inputType: "log",
+			want:      "",
+		},
+		{
+			name: "per input type only needs the beat section",
+			config: DynamicInputsConfig{
+				Filebeat: BeatRuntimeConfig{
+					InputType: map[string]string{"filestream": string(ProcessRuntimeManager)},
+				},
+			},
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "unknown beat falls back to the global default",
+			config: DynamicInputsConfig{
+				Default:  string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{Default: string(OtelRuntimeManager)},
+			},
+			beatName:  "",
+			inputType: "endpoint",
+			want:      ProcessRuntimeManager,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.config.RuntimeManagerForDynamicInput(tt.beatName, tt.inputType))
+		})
+	}
+}
+
+func TestRuntimeConfig_ValidateDynamicInputs(t *testing.T) {
+	tests := map[string]struct {
+		dynamicInputs func(*DynamicInputsConfig)
+		wantErr       bool
+	}{
+		"valid default": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Default = string(ProcessRuntimeManager) },
+		},
+		"empty default is allowed": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Default = "" },
+		},
+		"invalid default": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Default = "nonsense" },
+			wantErr:       true,
+		},
+		"invalid per beat default": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Filebeat.Default = "nonsense" },
+			wantErr:       true,
+		},
+		"invalid per input type": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Metricbeat.InputType["system/metrics"] = "nonsense" },
+			wantErr:       true,
+		},
+		"valid static variables": {
+			dynamicInputs: func(c *DynamicInputsConfig) {
+				c.StaticVariables = []string{"kubernetes.node", "local_dynamic.group"}
+			},
+		},
+		"empty static variable": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.StaticVariables = []string{"kubernetes.node", "  "} },
+			wantErr:       true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := DefaultRuntimeConfig()
+			tt.dynamicInputs(&cfg.DynamicInputs)
+			err := cfg.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

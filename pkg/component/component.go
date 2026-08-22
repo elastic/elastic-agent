@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/go-ucfg"
 )
 
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
@@ -38,16 +39,16 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default                 string            `yaml:"default" config:"default" json:"default"`
-	Auditbeat               BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
-	Filebeat                BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Heartbeat               BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
-	Metricbeat              BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	Osquerybeat             BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
-	Packetbeat              BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
-	DynamicInputs           string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output                  map[string]string `yaml:"output" config:"output" json:"output"`
-	OtelPartialConfigReload bool              `yaml:"otel_partial_config_reload" config:"otel_partial_config_reload" json:"otel_partial_config_reload"`
+	Default                 string              `yaml:"default" config:"default" json:"default"`
+	Auditbeat               BeatRuntimeConfig   `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat                BeatRuntimeConfig   `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat               BeatRuntimeConfig   `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat              BeatRuntimeConfig   `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat             BeatRuntimeConfig   `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat              BeatRuntimeConfig   `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	DynamicInputs           DynamicInputsConfig `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output                  map[string]string   `yaml:"output" config:"output" json:"output"`
+	OtelPartialConfigReload bool                `yaml:"otel_partial_config_reload" config:"otel_partial_config_reload" json:"otel_partial_config_reload"`
 }
 
 type BeatRuntimeConfig struct {
@@ -55,10 +56,156 @@ type BeatRuntimeConfig struct {
 	InputType map[string]string `yaml:",inline,omitempty" config:",inline,omitempty" json:",inline,omitempty"`
 }
 
+// DynamicInputsConfig controls the runtime used by components that contain dynamic inputs,
+// that is, inputs rendered from a dynamic variable provider. Such components can cause
+// frequent configuration reloads, which are expensive for the otel collector, so they can be
+// moved to a different runtime.
+//
+// The resolved value is the runtime a dynamic component running under the otel runtime should
+// be moved to. An empty value means the feature is disabled and components are left alone.
+//
+// For backwards compatibility the configuration also accepts the legacy scalar form
+// (`dynamic_inputs: process`), which is equivalent to setting only `default`.
+type DynamicInputsConfig struct {
+	Default     string            `yaml:"default" config:"default" json:"default"`
+	Auditbeat   BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat    BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat   BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat  BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat  BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	// StaticVariables lists dynamic provider variables that cannot change at runtime, and
+	// therefore don't make an input dynamic. Entries match a variable name exactly or as a
+	// '.'-separated path prefix, so `kubernetes.node` covers `kubernetes.node.name` but not
+	// `kubernetes.nodename`. Trailing '.' characters are trimmed when the configuration is
+	// read, so `kubernetes.node.` is equivalent to `kubernetes.node`.
+	StaticVariables []string `yaml:"static_variables" config:"static_variables" json:"static_variables"`
+}
+
+// dynamicInputsConfigFields mirrors DynamicInputsConfig, but without the custom unpacking
+// methods, so it can be used as the unpack target without recursing forever.
+type dynamicInputsConfigFields DynamicInputsConfig
+
+// Unpack implements the go-ucfg Unpacker interface. It accepts both the legacy scalar form
+// (`dynamic_inputs: process`), which sets Default, and the full map form.
+func (d *DynamicInputsConfig) Unpack(value interface{}) error {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case string:
+		d.Default = v
+		return nil
+	case map[string]interface{}:
+		cfg, err := ucfg.NewFrom(v)
+		if err != nil {
+			return fmt.Errorf("failed to read dynamic_inputs configuration: %w", err)
+		}
+		// start from the current value so defaults set by DefaultRuntimeConfig are preserved
+		fields := dynamicInputsConfigFields(*d)
+		if err := cfg.Unpack(&fields); err != nil {
+			return fmt.Errorf("failed to unpack dynamic_inputs configuration: %w", err)
+		}
+		*d = DynamicInputsConfig(fields)
+		d.normalize()
+		return nil
+	default:
+		return fmt.Errorf("dynamic_inputs must be a string or an object, got %T", value)
+	}
+}
+
+// UnmarshalYAML mirrors Unpack for the yaml code path, so that both the legacy scalar form
+// and the map form are accepted when the runtime configuration is read from YAML directly.
+func (d *DynamicInputsConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var str string
+	if err := unmarshal(&str); err == nil {
+		d.Default = str
+		return nil
+	}
+	// start from the current value so defaults set by DefaultRuntimeConfig are preserved
+	fields := dynamicInputsConfigFields(*d)
+	if err := unmarshal(&fields); err != nil {
+		return err
+	}
+	*d = DynamicInputsConfig(fields)
+	d.normalize()
+	return nil
+}
+
+// normalize cleans up configuration values after unpacking. Trailing '.' characters are
+// trimmed from static variable entries, so `kubernetes.node.` matches the same variables
+// as `kubernetes.node`.
+func (d *DynamicInputsConfig) normalize() {
+	for i, static := range d.StaticVariables {
+		d.StaticVariables[i] = strings.TrimRight(static, ".")
+	}
+}
+
+// beatRuntimeConfig returns the per-beat configuration for beatName, or nil for an unknown beat.
+func (d *DynamicInputsConfig) beatRuntimeConfig(beatName string) *BeatRuntimeConfig {
+	switch beatName {
+	case "auditbeat":
+		return &d.Auditbeat
+	case "filebeat":
+		return &d.Filebeat
+	case "heartbeat":
+		return &d.Heartbeat
+	case "metricbeat":
+		return &d.Metricbeat
+	case "osquerybeat":
+		return &d.Osquerybeat
+	case "packetbeat":
+		return &d.Packetbeat
+	default:
+		return nil
+	}
+}
+
+// RuntimeManagerForDynamicInput returns the runtime manager that components with dynamic
+// inputs should be moved to, or "" if they should be left alone.
+//
+// The precedence is: the beat's per-input-type value, the beat's default, the top-level
+// default, disabled.
+func (d *DynamicInputsConfig) RuntimeManagerForDynamicInput(beatName string, inputType string) RuntimeManager {
+	if beatConfig := d.beatRuntimeConfig(beatName); beatConfig != nil {
+		if manager, ok := beatConfig.InputType[inputType]; ok && manager != "" {
+			return RuntimeManager(manager)
+		}
+		if beatConfig.Default != "" {
+			return RuntimeManager(beatConfig.Default)
+		}
+	}
+	return RuntimeManager(d.Default)
+}
+
+// validate checks that the configured runtime managers and static variables are valid.
+// It is intentionally unexported so that go-ucfg doesn't pick it up as a Validator; it is
+// called from RuntimeConfig.Validate instead.
+func (d *DynamicInputsConfig) validate() error {
+	if err := validateRuntimeManager(d.Default, true); err != nil {
+		return err
+	}
+	for _, beatConfig := range []BeatRuntimeConfig{d.Auditbeat, d.Filebeat, d.Heartbeat, d.Metricbeat, d.Osquerybeat, d.Packetbeat} {
+		if err := validateRuntimeManager(beatConfig.Default, true); err != nil {
+			return err
+		}
+		for _, val := range beatConfig.InputType {
+			if err := validateRuntimeManager(val, false); err != nil {
+				return err
+			}
+		}
+	}
+	for _, static := range d.StaticVariables {
+		if strings.TrimSpace(static) == "" {
+			return errors.New("static_variables entries must not be empty")
+		}
+	}
+	return nil
+}
+
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:                 string(DefaultRuntimeManager),
-		DynamicInputs:           "",
+		DynamicInputs:           DefaultDynamicInputsConfig(),
 		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),
@@ -92,31 +239,54 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 	}
 }
 
-func (r *RuntimeConfig) Validate() error {
-	validateRuntime := func(val string, allowEmpty bool) error {
-		if allowEmpty && val == "" {
-			return nil
-		}
-		switch RuntimeManager(val) {
-		case "", OtelRuntimeManager, ProcessRuntimeManager:
-			return nil
-		default:
-			return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
-				val, OtelRuntimeManager, ProcessRuntimeManager)
-		}
+// DefaultDynamicInputsConfig returns the default dynamic inputs configuration, which leaves
+// the feature disabled.
+func DefaultDynamicInputsConfig() DynamicInputsConfig {
+	return DynamicInputsConfig{
+		Default: "",
+		// go-ucfg sets the inline maps while unpacking, having them in the default makes
+		// testing easier
+		Auditbeat:   BeatRuntimeConfig{InputType: make(map[string]string)},
+		Filebeat:    BeatRuntimeConfig{InputType: make(map[string]string)},
+		Heartbeat:   BeatRuntimeConfig{InputType: make(map[string]string)},
+		Metricbeat:  BeatRuntimeConfig{InputType: make(map[string]string)},
+		Osquerybeat: BeatRuntimeConfig{InputType: make(map[string]string)},
+		Packetbeat:  BeatRuntimeConfig{InputType: make(map[string]string)},
 	}
-	if err := validateRuntime(r.Default, false); err != nil {
+}
+
+// validateRuntimeManager checks that val names a supported runtime manager. When allowEmpty
+// is true an empty value means "not set at this level" and is accepted.
+func validateRuntimeManager(val string, allowEmpty bool) error {
+	if allowEmpty && val == "" {
+		return nil
+	}
+	switch RuntimeManager(val) {
+	case "", OtelRuntimeManager, ProcessRuntimeManager:
+		return nil
+	default:
+		return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
+			val, OtelRuntimeManager, ProcessRuntimeManager)
+	}
+}
+
+func (r *RuntimeConfig) Validate() error {
+	if err := validateRuntimeManager(r.Default, false); err != nil {
 		return err
 	}
 	for _, beatConfig := range []BeatRuntimeConfig{r.Auditbeat, r.Filebeat, r.Heartbeat, r.Metricbeat, r.Osquerybeat, r.Packetbeat} {
-		if err := validateRuntime(beatConfig.Default, true); err != nil {
+		if err := validateRuntimeManager(beatConfig.Default, true); err != nil {
 			return err
 		}
 		for _, val := range beatConfig.InputType {
-			if err := validateRuntime(val, false); err != nil {
+			if err := validateRuntimeManager(val, false); err != nil {
 				return err
 			}
 		}
+	}
+
+	if err := r.DynamicInputs.validate(); err != nil {
+		return fmt.Errorf("invalid dynamic_inputs configuration: %w", err)
 	}
 
 	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
@@ -124,7 +294,7 @@ func (r *RuntimeConfig) Validate() error {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
 		}
-		if err := validateRuntime(runtime, false); err != nil {
+		if err := validateRuntimeManager(runtime, false); err != nil {
 			return err
 		}
 	}
