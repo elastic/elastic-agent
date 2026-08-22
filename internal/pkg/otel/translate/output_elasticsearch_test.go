@@ -8,6 +8,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -20,6 +21,26 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 )
+
+func TestGetRetryConfig(t *testing.T) {
+	escfg := defaultOptions
+	expectedRequestStatuses := defaultRetryOnStatus()
+	expectedDocumentStatuses := defaultRetryOnDocumentStatus
+
+	retryConfig := getRetryConfig(escfg)
+
+	assert.Equal(t,
+		expectedRequestStatuses,
+		retryConfig["retry_on_status"],
+		"the defaults for 'retry_on_status' must be preserved",
+	)
+	assert.Equal(
+		t,
+		expectedDocumentStatuses,
+		retryConfig["retry_on_document_status"],
+		"the defaults for 'retry_on_document_status' must be preserved",
+	)
+}
 
 func TestToOtelConfig(t *testing.T) {
 	logger := logptest.NewTestingLogger(t, "")
@@ -57,6 +78,8 @@ retry:
   max_interval: 7m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -116,6 +139,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -172,6 +197,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -217,7 +244,6 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 ssl.certificate_authorities: "/not/a/real/path/ca.pem"
 ssl.supported_protocols: "TLSv1.3"
 ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
-
 `
 
 		OTelCfg := `
@@ -232,6 +258,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -293,6 +321,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -365,6 +395,8 @@ retry:
   max_interval: 5m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -479,6 +511,8 @@ retry:
   max_interval: 7m0s
   max_retries: 5
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -602,6 +636,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -678,11 +714,22 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 
 func newFromYamlString(t *testing.T, input string) *confmap.Conf {
 	t.Helper()
+	input = strings.ReplaceAll(input, "__REQUEST_RETRY_STATUSES__", requestRetryStatusesYAML())
 	var rawConf map[string]any
 	err := yaml.Unmarshal([]byte(input), &rawConf)
 	require.NoError(t, err)
 
 	return confmap.NewFromStringMap(rawConf)
+}
+
+func requestRetryStatusesYAML() string {
+	statuses := defaultRetryOnStatus()
+	lines := make([]string, len(statuses))
+	for i, status := range statuses {
+		lines[i] = fmt.Sprintf("  - %d", status)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *confmap.Conf) {
