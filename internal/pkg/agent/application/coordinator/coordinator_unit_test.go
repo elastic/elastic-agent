@@ -2617,7 +2617,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
 
 	mockUpgradeManager := &mockUpgradeManager{
-		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrDiskSpaceFull),
 	}
 
 	initialState := State{
@@ -2659,7 +2659,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 
 	err := coord.Upgrade(t.Context(), "", "", nil)
 	require.Error(t, err)
-	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
+	require.Equal(t, err, upgradeErrors.ErrDiskSpaceFull)
 
 	wg.Wait()
 
@@ -2676,7 +2676,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 			State:         details.StateFailed,
 			Metadata: details.Metadata{
 				FailedState: details.StateRequested,
-				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
+				ErrorMsg:    upgradeErrors.ErrDiskSpaceFull.Error(),
 			},
 		},
 	}, upgradeDetails)
