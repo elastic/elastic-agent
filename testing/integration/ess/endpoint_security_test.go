@@ -130,8 +130,8 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	})
 }
 
-func getEndpointVersion(t *testing.T) string {
-	cmd := exec.Command("sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
+func getEndpointVersion(t *testing.T, ctx context.Context) string {
+	cmd := exec.CommandContext(ctx, "sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err)
 	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
@@ -174,7 +174,8 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 			return
 		}
 
-		out, err := exec.Command("sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
+		cleanupCtx := context.WithoutCancel(t.Context())
+		out, err := exec.CommandContext(cleanupCtx, "sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
 		if err != nil {
 			t.Log(string(out))
 			t.Logf("error while stopping Elastic Endpoint: %s", err.Error())
@@ -185,7 +186,7 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 			return
 		}
 
-		uninstallContext, uninstallCancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		uninstallContext, uninstallCancel := context.WithTimeout(cleanupCtx, 5*time.Minute)
 		defer uninstallCancel()
 
 		t.Logf("Uninstalling endpoint with the following uninstall token: %s", uninstallToken)
@@ -232,6 +233,7 @@ func installFirstAgent(ctx context.Context, t *testing.T, info *define.Info, isP
 
 	t.Log("Updating the policy to set \"is_protected\" to true")
 	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
+	require.NoError(t, err, "failed to update policy is_protected")
 
 	t.Log("Get the policy uninstall token")
 	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
@@ -272,7 +274,7 @@ func testUnprotectedInstallUpgrade(
 
 	installFirstAgent(ctx, t, info, false, packageFormat, upgradeFromVersion.String())
 
-	initEndpointVersion := getEndpointVersion(t)
+	initEndpointVersion := getEndpointVersion(t, ctx)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
 	t.Log("Setup agent fixture with the test build")
@@ -308,7 +310,7 @@ func testUnprotectedInstallUpgrade(
 	)
 
 	t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
-	upgradedEndpointVersion := getEndpointVersion(t)
+	upgradedEndpointVersion := getEndpointVersion(t, ctx)
 	t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
 	startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
@@ -321,7 +323,7 @@ func testUnprotectedInstallUpgrade(
 	require.True(t, startEndpointVersion.Less(*parsedUpgradedVersion))
 
 	t.Log("trying to uninstall without token, not expecting error")
-	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
+	out, err = exec.CommandContext(ctx, "sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
 	t.Log(string(out))
 	require.NoError(t, err)
 
@@ -343,19 +345,19 @@ func testTamperProtectedInstallUpgrade(
 
 	fixture, uninstallToken := installFirstAgent(ctx, t, info, true, packageFormat, initialVersion)
 
-	initEndpointVersion := getEndpointVersion(t)
+	initEndpointVersion := getEndpointVersion(t, ctx)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
 	// Optionally stop the endpoint service before upgrade
 	if stopEndpointBeforeUpgrade {
 		t.Log("Stopping endpoint service before upgrade as requested")
-		out, err := exec.Command("sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
+		out, err := exec.CommandContext(ctx, "sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
 		t.Log(string(out))
 		require.NoError(t, err, "failed to stop ElasticEndpoint before upgrade")
 	}
 
 	// try to uninstall the agent without a token and assert failure
-	out, err := exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
+	out, err := exec.CommandContext(ctx, "sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
 	t.Log(string(out))
 	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
 	t.Log("Tamper protection for the initial installation of the agent is enabled")
@@ -396,7 +398,7 @@ func testTamperProtectedInstallUpgrade(
 
 	if checkVersionUpgrade {
 		t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
-		upgradedEndpointVersion := getEndpointVersion(t)
+		upgradedEndpointVersion := getEndpointVersion(t, ctx)
 		t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
 		startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
@@ -411,14 +413,14 @@ func testTamperProtectedInstallUpgrade(
 
 	// try to uninstall the agent without token and assert that endpoint is not removed
 	t.Log("trying to uninstall without token, expecting error")
-	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
+	out, err = exec.CommandContext(ctx, "sudo", "elastic-agent", "uninstall", "-f").CombinedOutput()
 	t.Log(string(out))
 	require.Error(t, err, "uninstalling agent without a token should fail because of tamper protection")
 	t.Log("tamper protection for the upgraded agent is enabled")
 
 	// uninstall with the token and assert that endpoint is indeed removed.
 	t.Log("trying to uninstall with token, not expecting any error")
-	out, err = exec.Command("sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
+	out, err = exec.CommandContext(ctx, "sudo", "elastic-agent", "uninstall", "-f", "--uninstall-token", uninstallToken).CombinedOutput()
 	t.Log(string(out))
 	require.NoError(t, err, string(out))
 
@@ -571,7 +573,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
@@ -750,16 +752,6 @@ func testInstallWithEndpointSecurityAndRemoveEndpointIntegration(t *testing.T, i
 				strings.Join(dirEntries, ", "))
 		}
 	}
-}
-
-// This is a subset of kibana.AgentPolicyUpdateRequest, using until elastic-agent-libs PR https://github.com/elastic/elastic-agent-libs/pull/141 is merged
-// TODO: replace with the elastic-agent-libs when available
-type agentPolicyUpdateRequest struct {
-	// Name of the policy. Required in an update request.
-	Name string `json:"name"`
-	// Namespace of the policy. Required in an update request.
-	Namespace   string `json:"namespace"`
-	IsProtected bool   `json:"is_protected"`
 }
 
 // Tests that install of Elastic Defend fails if Agent is installed in a base
@@ -1026,7 +1018,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
@@ -1100,7 +1092,7 @@ func checkDiagnosticsForEndpointFiles(t *testing.T, diagsPath string, endpointCo
 
 	t.Logf("---- Contents of diagnostics archive")
 	for _, file := range zipReader.File {
-		t.Logf("%q - %+v", file.Name, file.FileHeader.FileInfo())
+		t.Logf("%q - %+v", file.Name, file.FileInfo())
 	}
 	t.Logf("---- End contents of diagnostics archive")
 	// check there are files under the components/ directory
@@ -1223,7 +1215,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
@@ -1473,7 +1465,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 
 					got, err := f.ExecInspect(ctx)
 					if err != nil {
-						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						fmt.Fprintf(buff, "error running inspect cmd: %v", err)
 						return false
 					}
 
@@ -1509,7 +1501,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 
 					got, err := f.ExecInspect(ctx)
 					if err != nil {
-						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						fmt.Fprintf(buff, "error running inspect cmd: %v", err)
 						return false
 					}
 
@@ -1546,7 +1538,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 
 					got, err := f.ExecInspect(ctx)
 					if err != nil {
-						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						fmt.Fprintf(buff, "error running inspect cmd: %v", err)
 						return false
 					}
 
@@ -1578,7 +1570,7 @@ func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 
 					got, err := f.ExecInspect(ctx)
 					if err != nil {
-						buff.WriteString(fmt.Sprintf("error running inspect cmd: %v", err))
+						fmt.Fprintf(buff, "error running inspect cmd: %v", err)
 						return false
 					}
 
@@ -1700,6 +1692,7 @@ func generateMTLSCerts(t *testing.T, name string) certificatePaths {
 	// all the configs, including the certificates, which would be gone if the
 	// directory is deleted.
 	tmpDir, err := os.MkdirTemp(os.TempDir(), t.Name()+"-"+name)
+	require.NoError(t, err, "failed to create temp dir for certificates")
 	t.Logf("[%s] certificates saved on: %s", name, tmpDir)
 
 	proxyCAKey, proxyCACert, proxyCAPair, err := certutil.NewRSARootCA(
@@ -1801,3 +1794,171 @@ type certificatePaths struct {
 	clientCertKeyEncPath  string
 	clientCertKeyPassPath string
 }
+<<<<<<< HEAD
+=======
+
+// TestPolicyReassignWithTamperProtectedEndpoint creates a policy with Elastic Defend (i.e. Endpoint)
+// in it, making sure it has tamper protection enabled, and enrolls an Agent to this policy.  A second
+// policy, also with Elastic Defend and tamper protection enabled is created, and the Agent is reassigned
+// to this policy. Endpoint should not be uninstalled and reinstalled as a result of this policy reassignment
+// but should be running the new policy.
+func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.FleetEndpointSecurity,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	err = fixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	t.Log("Creating the first policy and enrollment token")
+	firstPolicy := createBasicPolicy()
+	policyResp, enrollKeyResp := createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, firstPolicy)
+
+	t.Log("Install Elastic Defend")
+	pkgPolicyResp, err := installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	t.Log("Updating the first policy to add tamper protection")
+	isProtected := true
+	updateReq := kibana.AgentPolicyUpdateRequest{
+		Name:        firstPolicy.Name,
+		Namespace:   firstPolicy.Namespace,
+		IsProtected: &isProtected,
+	}
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
+	require.NoError(t, err)
+
+	t.Log("Install and enroll Elastic Agent with the first policy")
+	opts := atesting.InstallOpts{
+		NonInteractive: true,
+		Force:          true,
+		Privileged:     true,
+	}
+	agentID, err := tools.InstallAgentForPolicyWithToken(ctx, t, opts, fixture, info.KibanaClient, enrollKeyResp)
+	require.NoError(t, err, "failed to install Elastic Agent with the first policy")
+
+	t.Log("Get the first policy's uninstall token")
+	uninstallToken, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	require.NoError(t, err, "failed to get uninstall token for the first policy")
+
+	// Only cleanup using first policy's uninstall token if the test fails
+	// before Agent is reassigned to the second policy.
+	isReassigned := false
+	defer func() {
+		if !isReassigned {
+			addEndpointCleanup(t, uninstallToken)
+		}
+	}()
+
+	t.Log("Ensuring Elastic Agent and Endpoint are healthy before policy reassignment")
+	agentClient := fixture.Client()
+	err = agentClient.Connect(ctx)
+	require.NoError(t, err, "could not connect to the initial agent")
+
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy prior to policy reassignment",
+	)
+
+	// Get Endpoint's policy ID
+	firstEndpointPolicyID := getEndpointPolicyID(t, ctx)
+
+	t.Log("Creating the second policy")
+	secondPolicy := createBasicPolicy()
+	policyResp, _ = createPolicyAndEnrollmentToken(ctx, t, info.KibanaClient, secondPolicy)
+
+	t.Log("Install Elastic Defend")
+	pkgPolicyResp, err = installElasticDefendPackage(t, info, policyResp.ID)
+	require.NoErrorf(t, err, "Policy Response was: %v", pkgPolicyResp)
+
+	t.Log("Updating the second policy to add tamper protection")
+	updateReq = kibana.AgentPolicyUpdateRequest{
+		Name:        secondPolicy.Name,
+		Namespace:   secondPolicy.Namespace,
+		IsProtected: &isProtected,
+	}
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, updateReq)
+	require.NoError(t, err)
+
+	t.Log("Get the second policy's uninstall token")
+	uninstallToken, err = tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	require.NoError(t, err, "failed to get uninstall token for the second policy")
+
+	// Reassign the agent to the second policy
+	t.Log("Reassigning the agent to the second policy")
+	policyReassignReq := kibana.AgentPolicyReassignRequest{
+		PolicyID: policyResp.ID,
+	}
+
+	err = info.KibanaClient.ReassignAgentToPolicy(ctx, agentID, policyReassignReq)
+	require.NoError(t, err, "failed to reassign the agent to the second policy")
+
+	isReassigned = true // Prevents cleaning up Endpoint using first policy's uninstall token
+	addEndpointCleanup(t, uninstallToken)
+
+	t.Log("Ensuring Elastic Agent and Endpoint are healthy after policy reassignment")
+	require.Eventually(t,
+		func() bool { return agentAndEndpointAreHealthy(t, ctx, agentClient) },
+		endpointHealthPollingTimeout,
+		time.Second,
+		"Endpoint component or units are not healthy after policy reassignment",
+	)
+
+	// Assert that Endpoint is running a different policy.  We use a require.Eventually here because
+	// the policy reassignment can take a few seconds to propagate to Endpoint.
+	t.Log("Ensuring that Endpoint is running a different policy")
+	require.Eventually(t,
+		func() bool {
+			secondEndpointPolicyID := getEndpointPolicyID(t, ctx)
+			return firstEndpointPolicyID != secondEndpointPolicyID
+		},
+		1*time.Minute,
+		time.Second,
+		"Endpoint is not running a different policy after policy reassignment",
+	)
+
+	// Re-fetch the uninstall token after endpoint confirms the new policy is active.
+	// getEndpointPolicyID can return the new policy ID before endpoint has persisted the
+	// new tamper-protection hash, so the token fetched before reassignment may be stale.
+	// A second cleanup registered here (LIFO: runs first) uses the fresh token; the earlier
+	// cleanup is a no-op if this one succeeds (endpoint binary already gone).
+	latestPolicy2Token, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	if err != nil {
+		t.Logf("Warning: failed to re-fetch policy 2 uninstall token after policy propagation: %v", err)
+	} else {
+		addEndpointCleanup(t, latestPolicy2Token)
+	}
+}
+
+func getEndpointPolicyID(t *testing.T, ctx context.Context) string {
+	// /opt/Elastic/Endpoint/elastic-endpoint status --output json
+	cmd := exec.CommandContext(ctx, "/opt/Elastic/Endpoint/elastic-endpoint", "status", "--output", "json")
+	output, err := cmd.CombinedOutput()
+	require.NoError(t, err)
+
+	var status struct {
+		ElasticEndpoint struct {
+			Policy struct {
+				ID string `json:"id"`
+			}
+		} `json:"elastic-endpoint"`
+	}
+	err = json.Unmarshal(output, &status)
+	require.NoError(t, err)
+
+	return status.ElasticEndpoint.Policy.ID
+}
+>>>>>>> 91498ad39 (Fix flaky TestPolicyReassignWithTamperProtectedEndpoint cleanup (#16329))
