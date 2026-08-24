@@ -72,7 +72,7 @@ require (
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.55.0
-	golang.org/x/exp v0.0.0-20260820122028-d6e0b57b1a69
+	golang.org/x/exp v0.0.0-20260820142414-ca536658362e
 	golang.org/x/mod v0.40.0
 	golang.org/x/net v0.58.0
 	golang.org/x/sync v0.22.0
@@ -275,7 +275,7 @@ require (
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.21.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
-	github.com/rednafi/link-patrol v0.0.0-20260720155300-91230b91b1a0 // indirect
+	github.com/rednafi/link-patrol v0.0.0-20260817181640-c9dbc41d081a // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/rubenv/sql-migrate v1.8.1 // indirect
@@ -290,7 +290,7 @@ require (
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
-	github.com/vektra/mockery/v3 v3.7.2 // indirect
+	github.com/vektra/mockery/v3 v3.7.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
@@ -301,7 +301,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	github.com/yuin/goldmark v1.8.4 // indirect
+	github.com/yuin/goldmark v1.8.5 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
