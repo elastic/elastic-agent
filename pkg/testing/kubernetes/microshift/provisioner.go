@@ -13,10 +13,13 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/cenkalti/backoff/v5"
+
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
@@ -136,71 +139,78 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 	}
 
 	containerName := "microshift-" + instanceName
-	apiServerPort, err := getFreePort()
-	if err != nil {
-		return "", "", fmt.Errorf("finding MicroShift API port: %w", err)
-	}
 	microShiftImage, err := microShiftImageForKubernetesVersion(k8sVersion)
 	if err != nil {
 		return "", "", err
 	}
 
-	p.logf("MicroShift image: %s", microShiftImage)
-	p.logf("MicroShift container: %s", containerName)
-	p.logf("MicroShift API port: %d", apiServerPort)
-
-	if err := p.run(ctx, "docker", "pull", microShiftImage); err != nil {
-		return "", "", fmt.Errorf("pulling MicroShift image: %w", err)
-	}
-	if err := p.run(
-		ctx,
-		"docker",
-		"run",
-		"--privileged",
-		"--cgroupns=private",
-		"--rm",
-		"--detach",
-		"--tty",
-		"--name", containerName,
-		"--hostname", "127.0.0.1.nip.io",
-		"--publish", fmt.Sprintf("127.0.0.1:%d:6443", apiServerPort),
-		microShiftImage,
-	); err != nil {
-		return "", "", fmt.Errorf("starting MicroShift container: %w", err)
+	apiServerPort, adopted, err := p.existingContainerPort(ctx, containerName)
+	if err != nil {
+		return "", "", err
 	}
 
 	setupComplete := false
 	defer func() {
-		if !setupComplete {
+		// Only tear down a container we created; an adopted one is left as-is.
+		if !setupComplete && !adopted {
 			_ = p.stopContainer(context.Background(), containerName)
 		}
 	}()
 
-	deadline := time.Now().Add(microShiftWaitTimeout)
-	for {
+	if adopted {
+		p.logf("Reusing running MicroShift container %s on API port %d", containerName, apiServerPort)
+	} else {
+		apiServerPort, err = getFreePort()
+		if err != nil {
+			return "", "", fmt.Errorf("finding MicroShift API port: %w", err)
+		}
+
+		p.logf("MicroShift image: %s", microShiftImage)
+		p.logf("MicroShift container: %s", containerName)
+		p.logf("MicroShift API port: %d", apiServerPort)
+
+		if err := p.run(ctx, "docker", "pull", microShiftImage); err != nil {
+			return "", "", fmt.Errorf("pulling MicroShift image: %w", err)
+		}
 		if err := p.run(
 			ctx,
 			"docker",
-			"exec",
-			containerName,
-			"/bin/test",
-			"-f",
-			microShiftKubeconfigPath,
-		); err == nil {
-			break
+			"run",
+			"--privileged",
+			"--cgroupns=private",
+			"--rm",
+			"--detach",
+			"--tty",
+			"--name", containerName,
+			"--hostname", "127.0.0.1.nip.io",
+			"--publish", fmt.Sprintf("127.0.0.1:%d:6443", apiServerPort),
+			microShiftImage,
+		); err != nil {
+			return "", "", fmt.Errorf("starting MicroShift container: %w", err)
 		}
-		if ctx.Err() != nil {
-			return "", "", ctx.Err()
-		}
-		if time.Now().After(deadline) {
-			return "", "", errors.Join(
-				fmt.Errorf("timed out waiting for MicroShift kubeconfig after %s", microShiftWaitTimeout),
-				p.diagnostics(context.Background(), containerName),
+	}
+
+	_, err = backoff.Retry(
+		ctx,
+		func() (struct{}, error) {
+			return struct{}{}, p.run(
+				ctx,
+				"docker",
+				"exec",
+				containerName,
+				"/bin/test",
+				"-f",
+				microShiftKubeconfigPath,
 			)
-		}
-		if err := wait(ctx, time.Second); err != nil {
-			return "", "", err
-		}
+		},
+		backoff.WithBackOff(backoff.NewConstantBackOff(1*time.Second)),
+		backoff.WithMaxElapsedTime(microShiftWaitTimeout),
+	)
+	if err != nil {
+		return "", "", errors.Join(
+			fmt.Errorf("waiting for MicroShift kubeconfig: %w", err),
+			p.diagnostics(context.Background(), containerName),
+		)
 	}
 
 	kubeConfigContents, err := p.output(
@@ -240,37 +250,70 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 	}
 	p.logf("Kubeconfig: %s", kubeConfig)
 
-	deadline = time.Now().Add(microShiftWaitTimeout)
-	for {
-		err = p.run(
-			ctx,
-			"kubectl",
-			"--kubeconfig", kubeConfig,
-			"wait",
-			"--for=condition=Ready",
-			"nodes",
-			"--all",
-			"--timeout=10s",
-		)
-		if err == nil {
-			break
-		}
-		if ctx.Err() != nil {
-			return "", "", ctx.Err()
-		}
-		if time.Now().After(deadline) {
-			return "", "", errors.Join(
-				fmt.Errorf("timed out waiting for MicroShift node readiness after %s: %w", microShiftWaitTimeout, err),
-				p.diagnostics(context.Background(), containerName),
+	nodeReadyOutput, err := backoff.Retry(
+		ctx,
+		func() (string, error) {
+			return p.output(
+				ctx,
+				"kubectl",
+				"--kubeconfig", kubeConfig,
+				"wait",
+				"--for=condition=Ready",
+				"nodes",
+				"--all",
+				"--timeout=10s",
 			)
-		}
-		if err := wait(ctx, time.Second); err != nil {
-			return "", "", err
-		}
+		},
+		backoff.WithBackOff(backoff.NewConstantBackOff(1*time.Second)),
+		backoff.WithMaxElapsedTime(microShiftWaitTimeout),
+	)
+	if err != nil {
+		return "", "", errors.Join(
+			fmt.Errorf("waiting for MicroShift node readiness: %w", err),
+			p.diagnostics(context.Background(), containerName),
+		)
 	}
+	p.logf("%s", strings.TrimSpace(nodeReadyOutput))
 
 	setupComplete = true
 	return kubeConfig, containerName, nil
+}
+
+func (p *provisioner) existingContainerPort(ctx context.Context, containerName string) (uint16, bool, error) {
+	running, err := p.output(ctx, "docker", "inspect", "-f", "{{.State.Running}}", containerName)
+	if err != nil {
+		return 0, false, nil //nolint:nilerr // inspect fails when no such container exists
+	}
+
+	if strings.TrimSpace(running) != "true" {
+		return 0, false, fmt.Errorf("MicroShift container %s exists but is not running", containerName)
+	}
+
+	portOut, err := p.output(ctx, "docker", "port", containerName, "6443")
+	if err != nil {
+		return 0, false, fmt.Errorf("reading published port of MicroShift container %s: %w", containerName, err)
+	}
+	port, err := parsePublishedPort(portOut)
+	if err != nil {
+		return 0, false, fmt.Errorf("MicroShift container %s: %w", containerName, err)
+	}
+	return port, true, nil
+}
+
+func parsePublishedPort(portOut string) (uint16, error) {
+	fields := strings.Fields(portOut)
+	if len(fields) == 0 {
+		return 0, fmt.Errorf("no published port in %q", portOut)
+	}
+	_, portStr, err := net.SplitHostPort(fields[0])
+	if err != nil {
+		return 0, fmt.Errorf("parsing published port %q: %w", fields[0], err)
+	}
+	port, err := strconv.ParseUint(portStr, 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf("parsing published port %q: %w", portStr, err)
+	}
+	return uint16(port), nil
 }
 
 func (p *provisioner) stopContainer(ctx context.Context, containerName string) error {
@@ -323,7 +366,7 @@ func getFreePort() (uint16, error) {
 		return 0, err
 	}
 	defer listener.Close()
-	return uint16(listener.Addr().(*net.TCPAddr).Port), nil
+	return uint16(listener.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // G115 a TCP port is always within uint16 range
 }
 
 func microShiftSkipDelete() bool {
@@ -342,17 +385,6 @@ func microShiftImageForKubernetesVersion(kubernetesVersion string) (string, erro
 		return "", fmt.Errorf("no MicroShift image configured for Kubernetes version %q", kubernetesVersion)
 	}
 	return image, nil
-}
-
-func wait(ctx context.Context, duration time.Duration) error {
-	timer := time.NewTimer(duration)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 func (p *provisioner) loadImage(ctx context.Context, containerName, image string) error {

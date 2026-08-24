@@ -107,3 +107,35 @@ func TestMicroShiftSkipDelete(t *testing.T) {
 		t.Fatal("expected MicroShift deletion not to be skipped")
 	}
 }
+
+func TestParsePublishedPort(t *testing.T) {
+	tests := []struct {
+		name    string
+		portOut string
+		want    uint16
+		wantErr bool
+	}{
+		{name: "ipv4", portOut: "127.0.0.1:32768\n", want: 32768},
+		{name: "multiple lines uses first", portOut: "127.0.0.1:32768\n[::]:32768\n", want: 32768},
+		{name: "empty", portOut: "", wantErr: true},
+		{name: "no port", portOut: "127.0.0.1\n", wantErr: true},
+		{name: "out of range", portOut: "127.0.0.1:70000\n", wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parsePublishedPort(tt.portOut)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got port %d", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("expected port %d, got %d", tt.want, got)
+			}
+		})
+	}
+}
