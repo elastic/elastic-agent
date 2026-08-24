@@ -106,7 +106,7 @@ func TestProxyURL(t *testing.T) {
 				require.NoError(t, err, "could not generate action with policy")
 
 				// Create checkin action with respective ack token
-				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy" //nolint:gosec
+				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -140,7 +140,7 @@ func TestProxyURL(t *testing.T) {
 
 				// now that we have fleet and the proxy running, we can add actions which
 				// depend on them.
-				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy" //nolint:gosec
+				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 					"actionID-TestNoProxyInThePolicyActionID", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
@@ -185,7 +185,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -233,7 +233,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -282,7 +282,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestRemoveProxyFromThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestRemoveProxyFromThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestRemoveProxyFromThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -324,7 +324,7 @@ func TestProxyURL(t *testing.T) {
 					actionIDRemoveProxyFromPolicy, *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestRemovedProxyFromThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestRemovedProxyFromThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -392,7 +392,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -495,7 +495,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -636,7 +636,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec // G101: test token, not a real credential
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,

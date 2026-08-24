@@ -103,15 +103,15 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			return false
 		}
 
-		if client.State(status.State) != client.Healthy { //nolint:gosec
-			fmt.Fprintf(&stateBuff, "agent isn't healthy: %s-%s", //nolint:gosec
-				client.State(status.State), status.Message)
+		if client.State(status.State) != client.Healthy { //nolint:gosec // G115: protobuf int32 cast is safe
+			fmt.Fprintf(&stateBuff, "agent isn't healthy: %s-%s",
+				client.State(status.State), status.Message) //nolint:gosec // G115: protobuf int32 cast is safe
 			return false
 		}
 
 		if len(status.Components) == 0 {
-			fmt.Fprintf(&stateBuff, "healthy but without components: agent status: %s-%s", //nolint:gosec
-				client.State(status.State), status.Message)
+			fmt.Fprintf(&stateBuff, "healthy but without components: agent status: %s-%s",
+				client.State(status.State), status.Message) //nolint:gosec // G115: protobuf int32 cast is safe
 			return false
 		}
 
@@ -127,7 +127,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 				return false
 			}
 
-			state := client.State(c.State) //nolint:gosec
+			state := client.State(c.State) //nolint:gosec // G115: protobuf int32 cast is safe
 			if state != client.Healthy {
 				fmt.Fprintf(&stateBuff, "%s not health, agent status output: %s",
 					c.Name, bs)
@@ -172,7 +172,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"glob pattern \"%s\": found %d paths to elastic-otel-collector, can only have 1",
 		glob, len(compPaths))
 
-	cmdVer := exec.Command(compPaths[0], "filebeat", "version") //nolint:gosec
+	cmdVer := exec.Command(compPaths[0], "filebeat", "version") //nolint:gosec,noctx // path from Glob, no context needed
 	output, err = cmdVer.CombinedOutput()
 	require.NoError(t, err, "failed to get filebeat version")
 	outStr := string(output)
