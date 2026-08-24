@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/go-ucfg"
 )

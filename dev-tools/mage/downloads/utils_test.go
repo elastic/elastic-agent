@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	backoff "github.com/cenkalti/backoff/v4"
+	backoff "github.com/cenkalti/backoff/v7"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
