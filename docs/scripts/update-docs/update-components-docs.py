@@ -17,6 +17,7 @@ import yaml
 import re
 from pathlib import Path
 import subprocess
+import json
 import os
 import tempfile
 
@@ -404,7 +405,6 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
     # Get since data from local components.yml (disk, not git tag)
     component_since = get_component_since()
     print(f"Found {len(component_since)} component since entries")
-    pre_existing_since_keys = set(component_since.keys())
     newly_stamped = []
 
     lines = elastic_agent_go_mod.splitlines()
@@ -732,9 +732,9 @@ def generate_markdown():
     # so the workflow can include a review prompt in the PR description.
     new_components_file = os.environ.get('NEW_COMPONENTS_FILE')
     if new_components_file and components_result['newly_stamped']:
-        import json
         Path(new_components_file).write_text(
-            json.dumps({'newly_stamped': sorted(components_result['newly_stamped'])})
+            json.dumps({'newly_stamped': sorted(components_result['newly_stamped'])}),
+            encoding='utf-8',
         )
         print(f"\nNew components written to {new_components_file}: {components_result['newly_stamped']}")
 
