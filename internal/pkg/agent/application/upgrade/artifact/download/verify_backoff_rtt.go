@@ -64,7 +64,7 @@ func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		}
 
 		attempt++
-		resp, err := btr.next.RoundTrip(req) //nolint:bodyclose // the response body is closed when status code >= 400 or it is closed by the caller
+		resp, err := btr.next.RoundTrip(req)
 		if err != nil {
 			btr.logger.Errorf("attempt %d: error round-trip: %v", attempt, err)
 			return nil, err
