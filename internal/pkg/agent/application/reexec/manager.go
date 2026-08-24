@@ -5,9 +5,21 @@
 package reexec
 
 import (
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// CanReExec reports whether the agent is running in an environment where a
+// re-execution of the process will be recovered: installed via the install
+// sub-command and running under the control of the system supervisor
+// (systemd/launchd/Windows service). Actions that re-exec the process (UPGRADE,
+// RESTART) require this to hold. It lives here, rather than in the upgrade
+// manager, so it can be shared by both the upgrade and restart paths.
+func CanReExec() bool {
+	return paths.RunningInstalled() && info.RunningUnderSupervisor()
+}
 
 // ExecManager is the interface that the global reexec manager implements.
 type ExecManager interface {

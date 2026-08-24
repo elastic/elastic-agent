@@ -79,6 +79,13 @@ var ErrNotUpgradable = errors.New(
 	"cannot be upgraded; must be installed with install sub-command and " +
 		"running under control of the systems supervisor")
 
+// ErrNotRestartable error is returned when a restart cannot be performed
+// because the agent is not running in an environment where a re-execution
+// would be recovered.
+var ErrNotRestartable = errors.New(
+	"cannot be restarted; must be installed with install sub-command and " +
+		"running under control of the systems supervisor")
+
 // ErrUpgradeInProgress error is returned if two or more upgrades are
 // attempted at the same time.
 var ErrUpgradeInProgress = errors.New("upgrade already in progress")
@@ -337,6 +344,12 @@ type Coordinator struct {
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
+	// canReExec reports whether a re-execution of the process will be recovered
+	// (installed and running under a system supervisor). It is a field so tests
+	// can override it; it defaults to reexec.CanReExec. Both the upgrade path
+	// (via UpgradeManager.Upgradeable) and the restart path rely on this check.
+	canReExec func() bool
+
 	monitoringServerReloader configReloader
 
 	runtimeMgr RuntimeManager
@@ -589,6 +602,7 @@ func New(
 
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
+		canReExec:        reexec.CanReExec,
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -697,6 +711,23 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	// override the overall state to stopping until the re-execution is complete
 	c.SetOverrideState(agentclient.Stopping, "Re-executing")
 	c.reexecMgr.ReExec(callback, argOverrides...)
+}
+
+// Restart re-executes the agent to fulfil a RESTART action. It reuses the same
+// re-exec machinery as an upgrade, but performs no upgrade steps (no download,
+// marker, or version change). Unlike an upgrade it does not consider the
+// release-level upgrade flag; it only requires that a re-execution will be
+// recovered (canReExec). The action is not acknowledged here; it is
+// acknowledged on the next startup by the managed config manager.
+// Called from external goroutines.
+func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) error {
+	if !c.canReExec() {
+		return ErrNotRestartable
+	}
+
+	// ReExec sets the override state to Stopping and performs the re-execution.
+	c.ReExec(nil)
+	return nil
 }
 
 // Migrate migrates agent to a new cluster and ACKs success to the old one.

@@ -137,7 +137,7 @@ type Upgrader struct {
 func IsUpgradeable() bool {
 	// only upgradeable if running from Agent installer and running under the
 	// control of the system supervisor (or built specifically with upgrading enabled)
-	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
+	return release.Upgradeable() || reexec.CanReExec()
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
