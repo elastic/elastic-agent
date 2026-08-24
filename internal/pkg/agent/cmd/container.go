@@ -1424,18 +1424,25 @@ func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) er
 	ackRequest := &fleetapi.AckRequest{Events: nil}
 	ackCMD := fleetapi.NewAckCmd(&agentInfo{agentID}, client)
 	retries := 0
-	return backoff.Retry(func() error {
+	_, err := backoff.Retry(ctx, func() (struct{}, error) {
 		retries++
-		_, err := ackCMD.Execute(ctx, ackRequest)
+		_, execErr := ackCMD.Execute(ctx, ackRequest)
 		switch {
-		case err == nil:
-			return nil
-		case errors.Is(err, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
-			return backoff.Permanent(err)
+		case execErr == nil:
+			return struct{}{}, nil
+		case errors.Is(execErr, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
+			return struct{}{}, backoff.Permanent(execErr)
 		default:
-			return err
+			return struct{}{}, execErr
 		}
-	}, &backoff.ConstantBackOff{Interval: retryInterval})
+	}, backoff.WithBackOff(&backoff.ConstantBackOff{Interval: retryInterval}))
+	if err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return re.LastErr
+		}
+		return err
+	}
+	return nil
 }
 
 // kibanaFetchFleetServerPolicy is used to gather the fleet-server policy specified by ID from Kibana

@@ -194,7 +194,6 @@ func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version
 
 	expBo := backoff.NewExponentialBackOff()
 	expBo.InitialInterval = config.RetrySleepInitDuration
-	boCtx := backoff.WithContext(expBo, cancelCtx)
 
 	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
@@ -210,36 +209,36 @@ func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version
 	versionStr := version.CoreVersion()
 	latestSnapshotURI := fmt.Sprintf("https://snapshots.elastic.co/latest/%s-SNAPSHOT.json", versionStr)
 
-	opFn := func() error {
+	opFn := func() (struct{}, error) {
 		req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, latestSnapshotURI, nil)
 		if err != nil {
-			return backoff.Permanent(fmt.Errorf("failed to create request to the snapshot API: %w", err))
+			return struct{}{}, backoff.Permanent(fmt.Errorf("failed to create request to the snapshot API: %w", err))
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return err
+			return struct{}{}, err
 		}
 		defer resp.Body.Close()
 
 		switch resp.StatusCode {
 		case http.StatusNotFound:
-			return backoff.Permanent(fmt.Errorf("snapshot for version %q not found", versionStr))
+			return struct{}{}, backoff.Permanent(fmt.Errorf("snapshot for version %q not found", versionStr))
 		case http.StatusOK:
 			var info struct {
 				BuildID string `json:"build_id"`
 			}
 			if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-				return backoff.Permanent(err)
+				return struct{}{}, backoff.Permanent(err)
 			}
 			parts := strings.Split(info.BuildID, "-")
 			if len(parts) != 2 {
-				return backoff.Permanent(fmt.Errorf("wrong format for a build ID: %s", info.BuildID))
+				return struct{}{}, backoff.Permanent(fmt.Errorf("wrong format for a build ID: %s", info.BuildID))
 			}
 			snapshotBuildID = parts[1]
-			return nil
+			return struct{}{}, nil
 		default:
-			return fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
+			return struct{}{}, fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
 		}
 	}
 
@@ -247,7 +246,10 @@ func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version
 		upgradeDetails.SetRetryableError(err)
 	}
 
-	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
+	if _, err := backoff.Retry(cancelCtx, opFn, backoff.WithBackOff(expBo), backoff.WithNotify(opFailureNotificationFn)); err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return "", re.LastErr
+		}
 		return "", err
 	}
 

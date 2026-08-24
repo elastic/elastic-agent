@@ -36,12 +36,37 @@ func TestDownloadFile(t *testing.T) {
 	assert.FileExistsf(t, dRequest.TargetPath, "file should exist")
 }
 
+// withMaxRetries wraps b to stop after max retries. This replaces the removed
+// backoff.WithMaxRetries helper from backoff/v4.
+func withMaxRetries(b backoff.BackOff, max uint64) backoff.BackOff {
+	return &maxRetriesBackOff{BackOff: b, max: max}
+}
+
+type maxRetriesBackOff struct {
+	backoff.BackOff
+	max     uint64
+	retries uint64
+}
+
+func (m *maxRetriesBackOff) NextBackOff() time.Duration {
+	if m.retries >= m.max {
+		return backoff.Stop
+	}
+	m.retries++
+	return m.BackOff.NextBackOff()
+}
+
+func (m *maxRetriesBackOff) Reset() {
+	m.retries = 0
+	m.BackOff.Reset()
+}
+
 // useFastDownloadFileBackoff replaces the download retry policy with one that
 // does not wait between attempts and gives up after maxRetries retries.
 func useFastDownloadFileBackoff(t *testing.T, maxRetries uint64) {
 	orig := downloadFileBackoff
 	downloadFileBackoff = func() backoff.BackOff {
-		return backoff.WithMaxRetries(backoff.NewConstantBackOff(time.Millisecond), maxRetries)
+		return withMaxRetries(backoff.NewConstantBackOff(time.Millisecond), maxRetries)
 	}
 	t.Cleanup(func() { downloadFileBackoff = orig })
 }
