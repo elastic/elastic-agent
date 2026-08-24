@@ -7,6 +7,7 @@ package manager
 import (
 	"context"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,7 +22,6 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/yaml.v3"
 
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 
@@ -122,7 +122,7 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	// prepare and serialize config first so we can exit early if there's a problem
-	cfgYamlBytes, err := prepareAndSerializeConfig(cfg)
+	cfgBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (r *subprocessExecution) startCollector(
 		stdOutLast, stdErrLast,
 	)
 	ctl.startBackgroundWorkers()
-	ctl.updateConfigYamlBytes(cfgYamlBytes)
+	ctl.updateConfigBytes(cfgBytes)
 	return ctl, nil
 }
 
@@ -546,24 +546,24 @@ func (s *procHandle) Stopped() bool {
 
 // UpdateConfig submits a new configuration to the collector process.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
-	yamlBytes, err := prepareAndSerializeConfig(cfg)
+	cfgBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
 		return err
 	}
 
-	s.updateConfigYamlBytes(yamlBytes)
+	s.updateConfigBytes(cfgBytes)
 
 	return nil
 }
 
-// updateConfigYamlBytes submits a new serialized configuration to the collector process.
-func (s *procHandle) updateConfigYamlBytes(cfgYamlBytes []byte) {
+// updateConfigBytes submits a new serialized configuration to the collector process.
+func (s *procHandle) updateConfigBytes(cfgBytes []byte) {
 	// Drain any pending config (latest-wins semantics).
 	select {
 	case <-s.configCh:
 	default:
 	}
-	s.configCh <- cfgYamlBytes
+	s.configCh <- cfgBytes
 }
 
 // LogLevel return the otel collector's log level.
@@ -571,19 +571,25 @@ func (s *procHandle) LogLevel() logp.Level {
 	return s.collectorLogLevel
 }
 
-// prepareAndSerializeConfig serializes the configuration to yaml.
+// prepareAndSerializeConfig serializes the configuration to JSON.
+// JSON is used rather than YAML because yaml.Marshal can corrupt or fail to
+// round-trip multi-line strings whose content lines have inconsistent leading
+// whitespace (e.g. audit_rules block scalars). JSON strings always use explicit
+// \n escaping, which avoids the YAML block-scalar indentation ambiguity.
+// confmap.NewRetrievedFromYAML on the receiver side accepts JSON because JSON
+// is a strict subset of YAML.
 func prepareAndSerializeConfig(cfg *confmap.Conf) ([]byte, error) {
 	if cfg == nil {
 		return nil, errors.New("no configuration provided")
 	}
 
 	confMap := cfg.ToStringMap()
-	yamlBytes, err := yaml.Marshal(confMap)
+	jsonBytes, err := json.Marshal(confMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return nil, fmt.Errorf("failed to marshal config to json: %w", err)
 	}
 
-	return yamlBytes, nil
+	return jsonBytes, nil
 }
 
 type zapWriter interface {
