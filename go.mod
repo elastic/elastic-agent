@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.26.6
+go 1.26.7
 
 replace github.com/elastic/beats/v7 => ./beats
 
@@ -15,11 +15,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260817194941-3785719268ff
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260822015605-7cc001032344
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.46.3
-	github.com/elastic/elastic-agent-system-metrics v0.14.4
+	github.com/elastic/elastic-agent-system-metrics v0.14.5
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
@@ -54,7 +54,7 @@ require (
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/testcontainers/testcontainers-go v0.44.0
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.157.0
 	go.opentelemetry.io/otel/sdk/metric v1.44.0
 	go.uber.org/zap v1.28.0
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.55.0
 	golang.org/x/exp v0.0.0-20260813180055-c1d0aacb2297
 	golang.org/x/mod v0.40.0
@@ -117,7 +117,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/auth v0.23.0 // indirect
+	cloud.google.com/go/auth v0.23.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
@@ -233,7 +233,7 @@ require (
 	github.com/lann/builder v0.0.0-20180802200727-47ae307949d0 // indirect
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/lestrrat-go/strftime v1.2.0 // indirect
-	github.com/lib/pq v1.10.9 // indirect
+	github.com/lib/pq v1.12.3 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
