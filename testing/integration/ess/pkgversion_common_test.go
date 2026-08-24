@@ -96,7 +96,7 @@ func getAgentVersionOutput(t *testing.T, f *integrationtest.Fixture, ctx context
 		require.NoError(t, readingErr, "error reading agent version command stderr")
 	}()
 
-	stdout, err = versionCmd.Output()
+	stdout, _ = versionCmd.Output()
 	state = versionCmd.ProcessState
 	wg.Wait()
 	return

@@ -309,9 +309,13 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 	rctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, http.MethodGet, "https://"+host, nil)
-	_, err = http.DefaultClient.Do(req)
-	if !(errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, os.ErrDeadlineExceeded)) {
+	require.NoError(t, err, "failed to create request")
+	resp, err := http.DefaultClient.Do(req)
+	if resp != nil && resp.Body != nil {
+		resp.Body.Close()
+	}
+	if !errors.Is(err, context.DeadlineExceeded) &&
+		!errors.Is(err, os.ErrDeadlineExceeded) {
 		t.Fatalf(
 			"request to %q should have failed, iptables rules should have blocked it",
 			host)
@@ -415,7 +419,6 @@ func PerformManagedUpgrade(
 		return fmt.Errorf("failed creating policy: %w", err)
 	}
 
-	policy = policyResp.AgentPolicy
 	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policyResp.ID,
@@ -459,6 +462,7 @@ func PerformManagedUpgrade(
 	if upgradeOpts.CustomWatcherCfg != "" {
 		t.Log("Setting custom watcher config")
 		err = startFixture.Configure(ctx, []byte("fleet.enabled: true\n"+upgradeOpts.CustomWatcherCfg))
+		require.NoError(t, err, "failed to configure watcher")
 	}
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
@@ -543,7 +547,7 @@ func PerformManagedUpgrade(
 	}
 
 	// wait for version
-	_, err = backoff.Retry(ctx, func() (string, error) {
+	_, _ = backoff.Retry(ctx, func() (string, error) {
 		t.Log("Getting Agent version...")
 		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
 		if err != nil {
@@ -597,7 +601,7 @@ func defaultPolicy() kibana.AgentPolicy {
 // simulateAirGapedEnvironment uses iptables to block outgoing packages to the
 // IPs (v4 and v6) associated with host.
 func simulateAirGapedEnvironment(t *testing.T, host string) {
-	ips, err := net.LookupIP(host)
+	ips, err := net.LookupIP(host) //nolint:noctx
 	require.NoErrorf(t, err, "could not get IPs for host %q", host)
 
 	// iptables -A OUTPUT -j DROP -d IP
@@ -613,12 +617,12 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 		}
 		args := []string{"-A", "OUTPUT", "-j", "DROP", "-d", ip.String()}
 
-		out, err := exec.Command(
+		out, err := exec.Command( //nolint:noctx
 			cmd, args...).
 			CombinedOutput()
 		if err != nil {
-			fmt.Println("FAILED:", cmd, args)
-			fmt.Println(string(out))
+			t.Logf("FAILED: %v %v", cmd, args)
+			t.Logf("%s", string(out))
 		}
 		t.Logf("added iptables rule %v", args[1:])
 		toCleanUp = append(toCleanUp, append([]string{cmd, "-D"}, args[1:]...))
@@ -631,12 +635,12 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 			cmd := c[0]
 			args := c[1:]
 
-			out, err := exec.Command(
+			out, err := exec.Command( //nolint:noctx
 				cmd, args...).
 				CombinedOutput()
 			if err != nil {
-				fmt.Println("clean up FAILED:", cmd, args)
-				fmt.Println(string(out))
+				t.Logf("clean up FAILED: %v %v", cmd, args)
+				t.Logf("%s", string(out))
 			}
 		}
 	})
@@ -662,22 +666,13 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string, packa
 	for _, d := range dl {
 		files = append(files, d.Name())
 	}
-	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-		fileServerDir, files)
+	t.Logf("ArtifactsServer root dir %q, served files %q", fileServerDir, files)
 
 	fs := http.FileServer(http.Dir(fileServerDir))
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	}))
-}
-
-func agentUpgradeDetailsString(a kibana.GetAgentResponse) string {
-	if a.UpgradeDetails == nil {
-		return "upgrade details is NIL"
-	}
-
-	return fmt.Sprintf("%#v", *a.UpgradeDetails)
 }
 
 // startHTTPSFileServer prepares and returns a started HTTPS file server serving
@@ -690,8 +685,7 @@ func startHTTPSFileServer(t *testing.T, rootDir string, cert tls.Certificate) *h
 	for _, d := range dl {
 		files = append(files, d.Name())
 	}
-	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-		rootDir, files)
+	t.Logf("ArtifactsServer root dir %q, served files %q", rootDir, files)
 
 	fs := http.FileServer(http.Dir(rootDir))
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -699,7 +693,7 @@ func startHTTPSFileServer(t *testing.T, rootDir string, cert tls.Certificate) *h
 		fs.ServeHTTP(w, r)
 	}))
 
-	server.Listener, err = net.Listen("tcp", "127.0.0.1:443")
+	server.Listener, err = net.Listen("tcp", "127.0.0.1:443") //nolint:noctx
 	require.NoError(t, err, "could not create net listener for port 443")
 
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}

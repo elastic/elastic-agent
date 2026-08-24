@@ -31,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent-libs/testing/proxytest"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
-	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
@@ -77,7 +76,7 @@ func TestProxyURL(t *testing.T) {
 	type setupFunc func(t *testing.T, mockFleet *mockFleetComponents) (proxies map[string]*proxytest.Proxy, enrollArgs installArgs)
 
 	// assertFunc is the hook the main test loop calls for performing assertions after the agent has been installed and is healthy
-	type assertFunc func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents)
+	type assertFunc func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents)
 
 	type testcase struct {
 		name       string
@@ -107,7 +106,7 @@ func TestProxyURL(t *testing.T) {
 				require.NoError(t, err, "could not generate action with policy")
 
 				// Create checkin action with respective ack token
-				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy"
+				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -117,7 +116,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"proxy": proxy}, installArgs{insecure: true, proxyURL: proxy.LocalhostURL, enrollmentURL: unreachableFleetHttpURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, _ map[string]*proxytest.Proxy, _ *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, _ map[string]*proxytest.Proxy, _ *mockFleetComponents) {
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 			},
 		},
@@ -141,7 +140,7 @@ func TestProxyURL(t *testing.T) {
 
 				// now that we have fleet and the proxy running, we can add actions which
 				// depend on them.
-				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy"
+				ackToken := "ackToken-AckTokenTestNoProxyInThePolicy" //nolint:gosec
 				action, err := fleetservertest.NewActionWithEmptyPolicyChange(
 					"actionID-TestNoProxyInThePolicyActionID", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
@@ -154,7 +153,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"proxy": proxy}, installArgs{insecure: true, proxyURL: proxy.LocalhostURL, enrollmentURL: unreachableFleetHttpURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 			},
 		},
@@ -167,13 +166,13 @@ func TestProxyURL(t *testing.T) {
 					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port),
 					proxytest.WithRequestLog("proxy-enroll", t.Logf),
 					proxytest.WithVerboseLog())
-				proxyEnroll.Start()
+				require.NoError(t, proxyEnroll.Start(), "error starting enroll proxy")
 				t.Cleanup(proxyEnroll.Close)
 				proxyFleetPolicy := proxytest.New(t,
 					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port),
 					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
 					proxytest.WithVerboseLog())
-				proxyFleetPolicy.Start()
+				require.NoError(t, proxyFleetPolicy.Start(), "error starting fleet policy proxy")
 				t.Cleanup(proxyFleetPolicy.Close)
 
 				// set the proxy URL in policy to proxyFleetPolicy
@@ -186,7 +185,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy"
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -196,7 +195,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"enroll": proxyEnroll, "policy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: unreachableFleetHttpURL, proxyURL: proxyEnroll.LocalhostURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
 				// ensure the agent is communicating through the proxy set in the policy
@@ -223,7 +222,7 @@ func TestProxyURL(t *testing.T) {
 					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port), // this is needed as we pass an unreachable host in policy
 					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
 					proxytest.WithVerboseLog())
-				proxyFleetPolicy.Start()
+				require.NoError(t, proxyFleetPolicy.Start(), "error starting fleet policy proxy")
 				t.Cleanup(proxyFleetPolicy.Close)
 
 				s := proxyFleetPolicy.LocalhostURL
@@ -234,7 +233,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy"
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -243,7 +242,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
 				// ensure the agent is communicating through the new proxy
@@ -271,7 +270,7 @@ func TestProxyURL(t *testing.T) {
 					proxytest.WithRewrite(unreachableFleetHost, "localhost:"+mockFleet.fleetServer.Port),
 					proxytest.WithRequestLog("proxy-fleet-policy", t.Logf),
 					proxytest.WithVerboseLog())
-				proxyFleetPolicy.Start()
+				require.NoError(t, proxyFleetPolicy.Start(), "error starting fleet policy proxy")
 				t.Cleanup(proxyFleetPolicy.Close)
 
 				mockFleet.policyData.FleetProxyURL = new(string)
@@ -283,7 +282,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestRemoveProxyFromThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestRemoveProxyFromThePolicy"
+				ackToken := "AckToken-TestRemoveProxyFromThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -293,7 +292,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"fleetProxy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				// assert the agent is actually connected to fleet.
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
@@ -325,7 +324,7 @@ func TestProxyURL(t *testing.T) {
 					actionIDRemoveProxyFromPolicy, *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestRemovedProxyFromThePolicy"
+				ackToken := "AckToken-TestRemovedProxyFromThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -361,6 +360,7 @@ func TestProxyURL(t *testing.T) {
 				caCertPool.AddCert(caCert)
 
 				proxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, caKey, caCert)
+				require.NoError(t, err, "failed to generate proxy cert")
 
 				// Create a fake proxy with TLS config to be used in fleet policy
 				proxyFleetPolicy := proxytest.New(t,
@@ -392,7 +392,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy"
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -401,7 +401,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				// assert the agent is actually connected to fleet.
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
@@ -454,6 +454,7 @@ func TestProxyURL(t *testing.T) {
 				clientCACertPool.AddCert(clientCACert)
 
 				proxyCert, _, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, serverCAKey, serverCACert)
+				require.NoError(t, err, "failed to generate proxy cert")
 
 				// Create a fake proxy with mTLS config to be used in fleet policy
 				proxyFleetPolicy := proxytest.New(t,
@@ -479,6 +480,7 @@ func TestProxyURL(t *testing.T) {
 
 				// generate a certificate for elastic-agent from the client CA
 				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, clientCAKey, clientCACert)
+				require.NoError(t, err, "failed to generate agent cert")
 
 				mockFleet.policyData.FleetProxyURL = &proxyFleetPolicy.LocalhostURL
 				mockFleet.policyData.SSL = &fleetservertest.SSL{
@@ -493,7 +495,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy"
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -502,7 +504,7 @@ func TestProxyURL(t *testing.T) {
 				return map[string]*proxytest.Proxy{"proxyFleetPolicy": proxyFleetPolicy}, installArgs{insecure: true, enrollmentURL: mockFleet.fleetServer.LocalhostURL}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				// assert the agent is actually connected to fleet.
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
@@ -619,6 +621,7 @@ func TestProxyURL(t *testing.T) {
 
 				// generate a certificate for elastic-agent from the client CA
 				_, agentPair, err := certutil.GenerateChildCert("localhost", []net.IP{net.IPv6loopback, net.IPv6zero, net.ParseIP("127.0.0.1")}, clientCAKey, clientCACert)
+				require.NoError(t, err, "failed to generate agent cert")
 
 				mockFleet.policyData.FleetProxyURL = &proxyFleetPolicy.LocalhostURL
 				mockFleet.policyData.SSL = &fleetservertest.SSL{
@@ -633,7 +636,7 @@ func TestProxyURL(t *testing.T) {
 					"actionID-TestValidProxyInThePolicy", *mockFleet.policyData)
 				require.NoError(t, err, "could not generate action with policy")
 
-				ackToken := "AckToken-TestValidProxyInThePolicy"
+				ackToken := "AckToken-TestValidProxyInThePolicy" //nolint:gosec
 				mockFleet.checkinWithAcker.AddCheckin(
 					ackToken,
 					0,
@@ -647,7 +650,7 @@ func TestProxyURL(t *testing.T) {
 					}
 			},
 			wantErr: assert.NoError,
-			assertFunc: func(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
+			assertFunc: func(ctx context.Context, t *testing.T, fixture *atesting.Fixture, proxies map[string]*proxytest.Proxy, mockFleet *mockFleetComponents) {
 				// assert the agent is actually connected to fleet.
 				check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
@@ -713,8 +716,8 @@ func TestProxyURL(t *testing.T) {
 
 			fixture, err := define.NewFixtureFromLocalBuild(t,
 				define.Version(),
-				integrationtest.WithAllowErrors(),
-				integrationtest.WithLogOutput())
+				atesting.WithAllowErrors(),
+				atesting.WithLogOutput())
 			require.NoError(t, err, "SetupTest: NewFixtureFromLocalBuild failed")
 
 			err = fixture.EnsurePrepared(ctx)
@@ -729,13 +732,13 @@ func TestProxyURL(t *testing.T) {
 
 			out, err := fixture.Install(
 				ctx,
-				&integrationtest.InstallOpts{
+				&atesting.InstallOpts{
 					Force:          true,
 					NonInteractive: true,
 					Insecure:       args.insecure,
 					ProxyURL:       args.proxyURL,
 					Privileged:     privileged,
-					EnrollOpts: integrationtest.EnrollOpts{
+					EnrollOpts: atesting.EnrollOpts{
 						URL:                    args.enrollmentURL,
 						EnrollmentToken:        "anythingWillDO",
 						CertificateAuthorities: args.certificateAuthorities,
