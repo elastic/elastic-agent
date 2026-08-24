@@ -45,6 +45,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [dockerstatsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/dockerstatsreceiver/v0.157.0/receiver/dockerstatsreceiver/README.md) | v0.157.0 |
 | [elasticapmintakereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/elasticapmintakereceiver/v0.65.0/receiver/elasticapmintakereceiver/README.md) | v0.65.0 |
 | [filelogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/filelogreceiver/v0.157.0/receiver/filelogreceiver/README.md) | v0.157.0 |
+| [googlecloudmonitoringreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/googlecloudmonitoringreceiver/v0.157.0/receiver/googlecloudmonitoringreceiver/README.md) | v0.157.0 |
 | [haproxyreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/haproxyreceiver/v0.157.0/receiver/haproxyreceiver/README.md) | v0.157.0 |
 | [hostmetricsreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/hostmetricsreceiver/v0.157.0/receiver/hostmetricsreceiver/README.md) | v0.157.0 |
 | [httpcheckreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/httpcheckreceiver/v0.157.0/receiver/httpcheckreceiver/README.md) | v0.157.0 |

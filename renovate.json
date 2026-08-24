@@ -19,6 +19,7 @@
   ],
   "labels": [
     "automation",
+    "dependencies",
     "skip-changelog",
     "backport-skip",
     "Team:Elastic-Agent-Control-Plane"
