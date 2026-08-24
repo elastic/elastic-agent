@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/Jeffail/gabs/v2"
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"go.elastic.co/apm/v2"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
