@@ -1,6 +1,8 @@
 path: .oblt-cli-version
 pull_request:
   labels:
-    - backport-active-all
+    - automation
     - dependencies
+    - backport-active-all
     - skip-changelog
+    - Team:Elastic-Agent-Control-Plane

@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Align OTel Elasticsearch exporter request and document retry behavior with Beats Elasticsearch output
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/14531
