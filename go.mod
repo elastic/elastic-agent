@@ -32,8 +32,8 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.21.7
-	github.com/google/pprof v0.0.0-20260604005048-7023385849c0
+	github.com/google/go-containerregistry v0.21.9
+	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.24.0
 	github.com/jedib0t/go-pretty/v6 v6.8.2
@@ -41,7 +41,7 @@ require (
 	github.com/kardianos/service v1.3.0
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/magefile/mage v1.17.2
-	github.com/moby/moby/client v0.5.0
+	github.com/moby/moby/client v0.5.1
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension v0.157.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.157.0
@@ -51,7 +51,7 @@ require (
 	github.com/sajari/regression v1.0.1
 	github.com/schollz/progressbar/v3 v3.19.1
 	github.com/spf13/cobra v1.10.2
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
 	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
@@ -68,7 +68,7 @@ require (
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.157.0
 	go.opentelemetry.io/collector/service v0.157.0
 	go.uber.org/zap v1.28.0
-	go.yaml.in/yaml/v3 v3.0.4
+	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.55.0
 	golang.org/x/exp v0.0.0-20260820122028-d6e0b57b1a69
 	golang.org/x/mod v0.40.0
@@ -446,7 +446,7 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kamstrup/intmap v0.5.2 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
-	github.com/klauspost/compress v1.19.0 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
