@@ -108,8 +108,8 @@ github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.3.1 h1:Wgf5rZb
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys v1.3.1/go.mod h1:xxCBG/f/4Vbmh2XQJBsOmNdxWUY5j/s27jujKPbQf14=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.1.1 h1:bFWuoEKg+gImo7pvkiQEFAc8ocibADgXeiLAxWhWmkI=
 github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/internal v1.1.1/go.mod h1:Vih/3yc6yac2JzU4hzpaDupBJP0Flaia9rXXrU8xyww=
-github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3 h1:ZJJNFaQ86GVKQ9ehwqyAFE6pIfyicpuJ8IkVaPBc6/4=
-github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3/go.mod h1:URuDvhmATVKqHBH9/0nOiNKk0+YcwfQ3WkK5PqHKxc8=
+github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0 h1:irsmOWwkp0KCTTNS5e2hdFeIvSQClQo2No3IaNmL3Vw=
+github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.0/go.mod h1:GWcBkQj3MqN7ozHKLaCCAuNLiXoIGv2RtanfAwSjY/Y=
 github.com/Azure/azure-storage-blob-go v0.15.0 h1:rXtgp8tN1p29GvpGgfJetavIG0V7OgcSXPpwp3tx6qk=
 github.com/Azure/azure-storage-blob-go v0.15.0/go.mod h1:vbjsVbX0dlxnRc4FFMPsS9BsJWPcne7GB7onqlPvz58=
 github.com/Azure/go-amqp v1.5.0 h1:GRiQK1VhrNFbyx5VlmI6BsA1FCp27W5rb9kxOZScnTo=
@@ -301,8 +301,8 @@ github.com/aws/aws-sdk-go-v2/service/kafka v1.52.0 h1:jalIJqKvZMvJRvs6ABLX+FhHz8
 github.com/aws/aws-sdk-go-v2/service/kafka v1.52.0/go.mod h1:pW4pYNuVeScl13yqwsjLY0F/7g2YD8E0AvR6SOQsJZE=
 github.com/aws/aws-sdk-go-v2/service/lightsail v1.54.0 h1:07DKnL5eKSel3XEM2UxlD/z9zUZZ6XMHLGDXkAdY4u8=
 github.com/aws/aws-sdk-go-v2/service/lightsail v1.54.0/go.mod h1:Etcg8xorq1b0g0V2KMNgFjubYITZseJv08qtX/3szko=
-github.com/aws/aws-sdk-go-v2/service/organizations v1.53.8 h1:PFuSKsW0z1aEGlVyIvu4FsJbDkMbDo7tiSykCpUb1Sc=
-github.com/aws/aws-sdk-go-v2/service/organizations v1.53.8/go.mod h1:n3yWrjDL92I+vC1c6SiQfM/5mEKvDYNdWMEm3zNNiI0=
+github.com/aws/aws-sdk-go-v2/service/organizations v1.54.0 h1:Aw0sxpKnfyYeeWiijqf4Qe8QfASXFnE6AWkmKPoPISI=
+github.com/aws/aws-sdk-go-v2/service/organizations v1.54.0/go.mod h1:n3yWrjDL92I+vC1c6SiQfM/5mEKvDYNdWMEm3zNNiI0=
 github.com/aws/aws-sdk-go-v2/service/rds v1.124.3 h1:l3550sPUyUzixLRwx1elN+RUzhNU1kjhQlfRjfihWFg=
 github.com/aws/aws-sdk-go-v2/service/rds v1.124.3/go.mod h1:/fSxL3rOnTn3/xxn43kI7v/mdri0L2Zf/BPsnWEpkw4=
 github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.36.1 h1:tTPnhzgem608QbAEBftE0MDmTYStR6fXuT9UdF9+FGE=
