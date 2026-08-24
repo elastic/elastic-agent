@@ -25,8 +25,10 @@ actions:
     spec:
       automerge: false
       labels:
+        - automation
         - dependencies
         - backport-active-all
+        - Team:Elastic-Agent-Control-Plane
       title: '[Automation] Bump Golang version to {{ source "latestGoVersion" }}'
 
 sources:
