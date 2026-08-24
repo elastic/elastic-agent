@@ -29,28 +29,33 @@ func saveConfigToStore(store storage.Store, reader io.ReadSeeker, log *logger.Lo
 	ctx, cancel := context.WithTimeout(context.Background(), saveRetryDuration)
 	defer cancel()
 
-	bo := backoff.WithContext(backoff.NewConstantBackOff(saveRetryInterval), ctx)
-
-	return backoff.Retry(func() error {
-		err := store.Save(reader)
-		if err == nil {
+	_, err := backoff.Retry(ctx, func() (struct{}, error) {
+		saveErr := store.Save(reader)
+		if saveErr == nil {
 			// Save succeeded
-			return nil
+			return struct{}{}, nil
 		}
 
-		if !errors.Is(err, syscall.ERROR_ACCESS_DENIED) {
+		if !errors.Is(saveErr, syscall.ERROR_ACCESS_DENIED) {
 			// Save failed due to an error that is not ACCESS_DENIED. Immediately
 			// indicate failure without retrying further.
-			log.Debugf("Saving configuration to store failed: %v. Not retrying.", err)
-			return backoff.Permanent(err)
+			log.Debugf("Saving configuration to store failed: %v. Not retrying.", saveErr)
+			return struct{}{}, backoff.Permanent(saveErr)
 		}
 
 		if _, seekErr := reader.Seek(0, io.SeekStart); seekErr != nil {
-			log.Debugf("Saving configuration to store failed: %v. Failed to reset reader: %v. Not retrying.", err, seekErr)
-			return backoff.Permanent(errors.Join(err, seekErr))
+			log.Debugf("Saving configuration to store failed: %v. Failed to reset reader: %v. Not retrying.", saveErr, seekErr)
+			return struct{}{}, backoff.Permanent(errors.Join(saveErr, seekErr))
 		}
 
-		log.Debugf("Saving configuration to store failed: %v. Retrying...", err)
+		log.Debugf("Saving configuration to store failed: %v. Retrying...", saveErr)
+		return struct{}{}, saveErr
+	}, backoff.WithBackOff(backoff.NewConstantBackOff(saveRetryInterval)))
+	if err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return re.LastErr
+		}
 		return err
-	}, bo)
+	}
+	return nil
 }

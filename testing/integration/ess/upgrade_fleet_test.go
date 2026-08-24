@@ -601,7 +601,7 @@ func defaultPolicy() kibana.AgentPolicy {
 // simulateAirGapedEnvironment uses iptables to block outgoing packages to the
 // IPs (v4 and v6) associated with host.
 func simulateAirGapedEnvironment(t *testing.T, host string) {
-	ips, err := net.LookupIP(host) //nolint:noctx
+	ips, err := net.LookupIP(host) //nolint:noctx // test helper without context parameter
 	require.NoErrorf(t, err, "could not get IPs for host %q", host)
 
 	// iptables -A OUTPUT -j DROP -d IP
@@ -617,7 +617,7 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 		}
 		args := []string{"-A", "OUTPUT", "-j", "DROP", "-d", ip.String()}
 
-		out, err := exec.Command( //nolint:noctx
+		out, err := exec.Command( //nolint:noctx // test helper without context parameter
 			cmd, args...).
 			CombinedOutput()
 		if err != nil {
@@ -635,7 +635,7 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 			cmd := c[0]
 			args := c[1:]
 
-			out, err := exec.Command( //nolint:noctx
+			out, err := exec.Command( //nolint:noctx // test helper without context parameter
 				cmd, args...).
 				CombinedOutput()
 			if err != nil {
@@ -693,7 +693,7 @@ func startHTTPSFileServer(t *testing.T, rootDir string, cert tls.Certificate) *h
 		fs.ServeHTTP(w, r)
 	}))
 
-	server.Listener, err = net.Listen("tcp", "127.0.0.1:443") //nolint:noctx
+	server.Listener, err = net.Listen("tcp", "127.0.0.1:443") //nolint:noctx // test helper without context parameter
 	require.NoError(t, err, "could not create net listener for port 443")
 
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
