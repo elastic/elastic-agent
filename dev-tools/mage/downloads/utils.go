@@ -40,7 +40,7 @@ var downloadFileBackoff = func() backoff.BackOff {
 func downloadFile(downloadRequest *downloadRequest) error {
 	stat, _ := os.Stat(downloadRequest.TargetPath)
 
-	exp := downloadFileBackoff()
+	bo := downloadFileBackoff()
 
 	download := func() error {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
@@ -92,8 +92,7 @@ func downloadFile(downloadRequest *downloadRequest) error {
 		return nil
 	}
 
-	err := backoff.Retry(download, exp)
-	if err != nil {
+	if err := retryOperation(download, bo, time.Minute); err != nil {
 		return err
 	}
 

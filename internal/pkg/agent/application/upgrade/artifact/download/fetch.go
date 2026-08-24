@@ -43,7 +43,59 @@ func defaultFileOps() FileOps {
 	}
 }
 
-func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops FileOps) (err error) {
+type downloadFunc func(ctx context.Context, source, dst string) error
+
+func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source string, dst string, downloadFn downloadFunc) error {
+	cancelDeadline := time.Now().Add(config.Timeout)
+	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
+	defer cancel()
+
+	upgradeDetails.SetRetryUntil(&cancelDeadline)
+
+	expBo := backoff.NewExponentialBackOff()
+	expBo.InitialInterval = config.RetrySleepInitDuration
+
+	var attempt uint
+	opFn := func() (struct{}, error) {
+		attempt++
+		log.Infof("download attempt %d", attempt)
+		if err := downloadFn(cancelCtx, source, dst); err != nil {
+			if upgradeErrors.IsPermanentHTTPError(err) {
+				return struct{}{}, backoff.Permanent(err)
+			}
+			if upgradeErrors.IsDiskSpaceError(err) {
+				log.Infof("insufficient disk space error detected, stopping retries")
+				return struct{}{}, backoff.Permanent(err)
+			}
+			var agentErr errors.Error
+			if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem {
+				log.Infof("filesystem error detected, stopping retries")
+				return struct{}{}, backoff.Permanent(err)
+			}
+			return struct{}{}, err
+		}
+		return struct{}{}, nil
+	}
+
+	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
+		log.Warnf("download attempt %d failed: %s; retrying in %s.",
+			attempt, err.Error(), retryAfter)
+		upgradeDetails.SetRetryableError(err)
+	}
+
+	if _, err := backoff.Retry(cancelCtx, opFn, backoff.WithBackOff(expBo), backoff.WithNotify(opFailureNotificationFn)); err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return re.LastErr
+		}
+		return err
+	}
+
+	upgradeDetails.SetRetryableError(nil)
+	upgradeDetails.SetRetryUntil(nil)
+	return nil
+}
+
+func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops fileOps) (err error) {
 	defer func() {
 		if err != nil {
 			if removeErr := os.Remove(targetPath); removeErr != nil && !os.IsNotExist(removeErr) {

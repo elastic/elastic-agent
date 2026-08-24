@@ -1647,20 +1647,23 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 		var sub client.ClientStateWatch
 		expBackoff := backoff.NewExponentialBackOff()
 		expBackoff.InitialInterval = 100 * time.Millisecond
-		expBackoff.MaxElapsedTime = timeout
 		expBackoff.MaxInterval = 2 * time.Second
-		err = backoff.RetryNotify(
-			func() error {
-				var err error
-				sub, err = c.StateWatch(ctx)
-				return err
+		_, err = backoff.Retry(ctx,
+			func() (struct{}, error) {
+				var watchErr error
+				sub, watchErr = c.StateWatch(ctx)
+				return struct{}{}, watchErr
 			},
-			backoff.WithContext(expBackoff, ctx),
-			func(err error, retryAfter time.Duration) {
+			backoff.WithBackOff(expBackoff),
+			backoff.WithMaxElapsedTime(timeout),
+			backoff.WithNotify(func(err error, retryAfter time.Duration) {
 				t.Logf("%s: StateWatch failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
-			},
+			}),
 		)
 		if err != nil {
+			if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+				err = re.LastErr
+			}
 			errCh <- fmt.Errorf("StateWatch() failed: %w", err)
 			return
 		}

@@ -300,7 +300,16 @@ func Resolve(target artifact.Artifact, sourceURI, sourceSubdir, fileName string)
 	return uri, nil
 }
 
-func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version *agtversion.ParsedSemVer) (string, error) {
+func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version *agtversion.ParsedSemVer, upgradeDetails *details.Details) (string, error) {
+	cancelDeadline := time.Now().Add(config.Timeout)
+	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
+	defer cancel()
+
+	upgradeDetails.SetRetryUntil(&cancelDeadline)
+
+	expBo := backoff.NewExponentialBackOff()
+	expBo.InitialInterval = config.RetrySleepInitDuration
+
 	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
@@ -314,33 +323,52 @@ func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version
 	versionStr := version.CoreVersion()
 	latestSnapshotURI := fmt.Sprintf("https://snapshots.elastic.co/latest/%s-SNAPSHOT.json", versionStr)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestSnapshotURI, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request to the snapshot API: %w", err)
+	var snapshotBuildID string
+	opFn := func() (struct{}, error) {
+		req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, latestSnapshotURI, nil)
+		if err != nil {
+			return struct{}{}, backoff.Permanent(fmt.Errorf("failed to create request to the snapshot API: %w", err))
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return struct{}{}, err
+		}
+		defer resp.Body.Close()
+
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			return struct{}{}, backoff.Permanent(fmt.Errorf("snapshot for version %q not found", versionStr))
+		case http.StatusOK:
+			var info struct {
+				BuildID string `json:"build_id"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+				return struct{}{}, backoff.Permanent(err)
+			}
+			parts := strings.Split(info.BuildID, "-")
+			if len(parts) != 2 {
+				return struct{}{}, backoff.Permanent(fmt.Errorf("wrong format for a build ID: %s", info.BuildID))
+			}
+			snapshotBuildID = parts[1]
+			return struct{}{}, nil
+		default:
+			return struct{}{}, fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
+		}
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
+	opFailureNotificationFn := func(err error, _ time.Duration) {
+		upgradeDetails.SetRetryableError(err)
+	}
+
+	if _, err := backoff.Retry(cancelCtx, opFn, backoff.WithBackOff(expBo), backoff.WithNotify(opFailureNotificationFn)); err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return "", re.LastErr
+		}
 		return "", err
 	}
-	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusNotFound:
-		return "", fmt.Errorf("snapshot for version %q not found", versionStr)
-	case http.StatusOK:
-		var info struct {
-			BuildID string `json:"build_id"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-			return "", err
-		}
-		parts := strings.Split(info.BuildID, "-")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("wrong format for a build ID: %s", info.BuildID)
-		}
-		return parts[1], nil
-	default:
-		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
-	}
+	upgradeDetails.SetRetryableError(nil)
+	upgradeDetails.SetRetryUntil(nil)
+	return snapshotBuildID, nil
 }

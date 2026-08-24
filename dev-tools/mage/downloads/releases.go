@@ -60,6 +60,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 	version := r.Version
 
 	exp := getExponentialBackoff(time.Minute)
+	startTime := time.Now()
 
 	retryCount := 1
 
@@ -92,7 +93,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 				slog.String("error", err.Error()),
 				slog.Int("retry", retryCount),
 				slog.String("statusEndpoint", url),
-				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.Duration("elapsedTime", time.Since(startTime)),
 				slog.String("resp", bodyStr),
 			)
 			var statusError httpStatusError
@@ -108,7 +109,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 		return nil
 	}
 
-	err = backoff.Retry(apiStatus, exp)
+	err = retryOperation(apiStatus, exp, time.Minute)
 	if err != nil {
 		logger.Error("Failed to get artifact",
 			slog.String("resolver", r.Kind()),
@@ -135,7 +136,7 @@ func (r *ArtifactURLResolver) Resolve() (string, string, error) {
 		slog.Int("retries", retryCount),
 		slog.String("artifact", artifact),
 		slog.String("artifactName", artifactName),
-		slog.Duration("elapsedTime", exp.GetElapsedTime()),
+		slog.Duration("elapsedTime", time.Since(startTime)),
 		slog.String("version", tmpVersion),
 	)
 
@@ -205,6 +206,7 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 	}
 
 	exp := getExponentialBackoff(time.Minute)
+	startTime := time.Now()
 
 	retryCount := 1
 
@@ -222,7 +224,7 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 				slog.String("error", err.Error()),
 				slog.Int("retry", retryCount),
 				slog.String("statusEndpoint", url),
-				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.Duration("elapsedTime", time.Since(startTime)),
 				slog.String("resp", bodyStr),
 			)
 			var statusError httpStatusError
@@ -237,7 +239,7 @@ func (as *ArtifactsSnapshotVersion) GetSnapshotArtifactVersion(project string, v
 		return nil
 	}
 
-	err := backoff.Retry(apiStatus, exp)
+	err := retryOperation(apiStatus, exp, time.Minute)
 	if err != nil {
 		return "", err
 	}
@@ -334,6 +336,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 	}
 
 	exp := getExponentialBackoff(time.Minute)
+	startTime := time.Now()
 
 	retryCount := 1
 
@@ -353,7 +356,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 				slog.String("error", err.Error()),
 				slog.Int("retry", retryCount),
 				slog.String("statusEndpoint", url),
-				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.Duration("elapsedTime", time.Since(startTime)),
 				slog.String("resp", bodyStr),
 			)
 			var statusError httpStatusError
@@ -369,7 +372,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 		return nil
 	}
 
-	err = backoff.Retry(apiStatus, exp)
+	err = retryOperation(apiStatus, exp, time.Minute)
 	if err != nil {
 		return "", "", err
 	}
@@ -397,7 +400,7 @@ func (asur *ArtifactsSnapshotURLResolver) Resolve() (string, string, error) {
 		slog.Int("retries", retryCount),
 		slog.String("artifact", artifact),
 		slog.String("artifactName", artifactName),
-		slog.Duration("elapsedTime", exp.GetElapsedTime()),
+		slog.Duration("elapsedTime", time.Since(startTime)),
 		slog.String("project", asur.Project),
 		slog.String("version", version),
 	)
@@ -456,6 +459,7 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 	shaURL := fmt.Sprintf("%s.sha512", url)
 
 	exp := getExponentialBackoff(time.Minute)
+	startTime := time.Now()
 	retryCount := 1
 	found := false
 
@@ -468,7 +472,7 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 				slog.String("error", err.Error()),
 				slog.Int("retry", retryCount),
 				slog.String("statusEndpoint", url),
-				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.Duration("elapsedTime", time.Since(startTime)),
 				slog.String("resp", bodyStr),
 			)
 			var statusError httpStatusError
@@ -486,13 +490,13 @@ func (r *ReleaseURLResolver) Resolve() (string, string, error) {
 			slog.String("kind", r.Kind()),
 			slog.Int("retries", retryCount),
 			slog.String("statusEndpoint", url),
-			slog.Duration("elapsedTime", exp.GetElapsedTime()),
+			slog.Duration("elapsedTime", time.Since(startTime)),
 		)
 
 		return nil
 	}
 
-	err := backoff.Retry(apiStatus, exp)
+	err := retryOperation(apiStatus, exp, time.Minute)
 	if err != nil {
 		return "", "", err
 	}
