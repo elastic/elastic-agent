@@ -8362,11 +8362,11 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.82.1/LIC
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/protobuf
-Version: v1.36.11
+Version: v1.36.12-0.20260120151049-f2248ac996af
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/protobuf@v1.36.11/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/protobuf@v1.36.12-0.20260120151049-f2248ac996af/LICENSE:
 
 Copyright (c) 2018 The Go Authors. All rights reserved.
 
@@ -8939,11 +8939,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/api
-Version: v0.35.3
+Version: v0.36.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.35.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.36.4/LICENSE:
 
 
                                  Apache License
@@ -9151,11 +9151,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.35.3/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/apimachinery
-Version: v0.35.3
+Version: v0.36.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.35.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.36.4/LICENSE:
 
 
                                  Apache License
@@ -9363,11 +9363,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.35.3/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/client-go
-Version: v0.35.3
+Version: v0.36.4
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.35.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.36.4/LICENSE:
 
 
                                  Apache License
@@ -33747,11 +33747,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/fxamacker/cbor/v2
-Version: v2.9.0
+Version: v2.9.1
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.9.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/fxamacker/cbor/v2@v2.9.1/LICENSE:
 
 MIT License
 
@@ -34653,11 +34653,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/jsonreferenc
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -34865,11 +34865,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag@v0.25.5
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/cmdutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/cmdutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/cmdutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -35077,11 +35077,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/cmdutil
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/conv
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/conv@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/conv@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -35289,11 +35289,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/conv@v0
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/fileutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/fileutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/fileutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -35713,11 +35713,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/jsonnam
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/jsonutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/jsonutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/jsonutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -35925,11 +35925,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/jsonuti
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/loading
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/loading@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/loading@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -36137,11 +36137,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/loading
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/mangling
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/mangling@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/mangling@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -36349,11 +36349,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/manglin
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/netutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/netutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/netutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -36561,11 +36561,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/netutil
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/stringutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/stringutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/stringutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -36773,11 +36773,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/stringu
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/typeutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/typeutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/typeutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -36985,11 +36985,11 @@ Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/typeuti
 
 --------------------------------------------------------------------------------
 Dependency : github.com/go-openapi/swag/yamlutils
-Version: v0.25.5
+Version: v0.26.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/yamlutils@v0.25.5/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/go-openapi/swag/yamlutils@v0.26.0/LICENSE:
 
 
                                  Apache License
@@ -37295,11 +37295,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/gnostic-models
-Version: v0.7.0
+Version: v0.7.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/gnostic-models@v0.7.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/gnostic-models@v0.7.1/LICENSE:
 
 
                                  Apache License
@@ -43559,11 +43559,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : go.elastic.co/apm/module/apmelasticsearch/v2
-Version: v2.7.6
+Version: v2.7.12
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.6/LICENSE:
+Contents of probable licence file $GOMODCACHE/go.elastic.co/apm/module/apmelasticsearch/v2@v2.7.12/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -55515,11 +55515,11 @@ third-party archives.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/kube-openapi
-Version: v0.0.0-20250910181357-589584f1c912
+Version: v0.0.0-20260427204847-8949caaa1199
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/kube-openapi@v0.0.0-20250910181357-589584f1c912/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/kube-openapi@v0.0.0-20260427204847-8949caaa1199/LICENSE:
 
 
                                  Apache License
@@ -55727,11 +55727,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/kube-openapi@v0.0.0-2025091
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/utils
-Version: v0.0.0-20251002143259-bc988d571ff4
+Version: v0.0.0-20260319190234-28399d86e0b5
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/utils@v0.0.0-20251002143259-bc988d571ff4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/utils@v0.0.0-20260319190234-28399d86e0b5/LICENSE:
 
 
                                  Apache License
@@ -56807,11 +56807,11 @@ Contents of probable licence file $GOMODCACHE/sigs.k8s.io/randfill@v1.0.0/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : sigs.k8s.io/structured-merge-diff/v6
-Version: v6.3.2-0.20260122202528-d9cc6641c482
+Version: v6.4.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/sigs.k8s.io/structured-merge-diff/v6@v6.3.2-0.20260122202528-d9cc6641c482/LICENSE:
+Contents of probable licence file $GOMODCACHE/sigs.k8s.io/structured-merge-diff/v6@v6.4.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
@@ -112413,11 +112413,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/kubelet@v0.35.4/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : sigs.k8s.io/controller-runtime
-Version: v0.23.3
+Version: v0.24.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/sigs.k8s.io/controller-runtime@v0.23.3/LICENSE:
+Contents of probable licence file $GOMODCACHE/sigs.k8s.io/controller-runtime@v0.24.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
