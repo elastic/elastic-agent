@@ -46,7 +46,7 @@ The `api_key` setting on the {{es}} exporter controls outbound authentication fr
 
 Using the same API key for both inbound and outbound authentication is not recommended from a security perspective. Use separate keys with the minimum required privileges for each purpose.
 
-Refer to [Authentication methods for {{agent}}](/reference/edot-collector/config/authentication-methods.md) for details.
+Refer to [Authentication methods for {{agent}}](/reference/otel-collector/config/authentication-methods.md) for details.
 :::
 
 #### Creating an API key for the {{es}} exporter
