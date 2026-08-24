@@ -1934,6 +1934,18 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		time.Second,
 		"Endpoint is not running a different policy after policy reassignment",
 	)
+
+	// Re-fetch the uninstall token after endpoint confirms the new policy is active.
+	// getEndpointPolicyID can return the new policy ID before endpoint has persisted the
+	// new tamper-protection hash, so the token fetched before reassignment may be stale.
+	// A second cleanup registered here (LIFO: runs first) uses the fresh token; the earlier
+	// cleanup is a no-op if this one succeeds (endpoint binary already gone).
+	latestPolicy2Token, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	if err != nil {
+		t.Logf("Warning: failed to re-fetch policy 2 uninstall token after policy propagation: %v", err)
+	} else {
+		addEndpointCleanup(t, latestPolicy2Token)
+	}
 }
 
 func getEndpointPolicyID(t *testing.T, ctx context.Context) string {
