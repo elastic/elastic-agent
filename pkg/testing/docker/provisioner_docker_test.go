@@ -8,11 +8,11 @@ package docker
 
 import (
 	"context"
-	"net"
 	"testing"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	dockerclient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,15 +101,31 @@ func TestCheckDocker(t *testing.T) {
 	assert.NotNil(t, p.client)
 }
 
-func TestContainerIP(t *testing.T) {
+func TestContainerSSHPort(t *testing.T) {
 	p := newTestProvisioner(t)
 	name := containerName(t.Name())
-	startAlpine(t, p, name)
-
-	ip, err := p.containerIP(context.Background(), name)
+	pullImage(t, p, "alpine")
+	ctx := context.Background()
+	resp, err := p.client.ContainerCreate(ctx, dockerclient.ContainerCreateOptions{
+		Config: &container.Config{Image: "alpine", Cmd: []string{"sleep", "60"}},
+		HostConfig: &container.HostConfig{
+			PortBindings: network.PortMap{
+				network.MustParsePort("22/tcp"): []network.PortBinding{{HostPort: ""}},
+			},
+		},
+		Name: name,
+	})
 	require.NoError(t, err)
-	assert.NotEmpty(t, ip)
-	assert.NotNil(t, net.ParseIP(ip), "expected a valid IP address, got %q", ip)
+	_, err = p.client.ContainerStart(ctx, resp.ID, dockerclient.ContainerStartOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = p.client.ContainerRemove(context.Background(), name,
+			dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	})
+
+	port, err := p.containerSSHPort(context.Background(), name)
+	require.NoError(t, err)
+	assert.Greater(t, port, 0)
 }
 
 func TestClean(t *testing.T) {

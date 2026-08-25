@@ -26,11 +26,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	dockerclient "github.com/moby/moby/client"
 	"golang.org/x/mod/modfile"
 
@@ -314,6 +316,13 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 			"/run/lock": "",
 		},
 		Binds: []string{"/sys/fs/cgroup:/sys/fs/cgroup:rw"},
+		// Publish SSH to loopback so the runner can connect regardless of whether
+		// Docker is local or remote (e.g. inside a Lima VM or Docker Desktop VM).
+		// On native Linux the loopback binding is directly reachable; on Lima/Docker
+		// Desktop the host automatically port-forwards loopback bindings from the VM.
+		PortBindings: network.PortMap{
+			network.MustParsePort("22/tcp"): []network.PortBinding{{HostPort: ""}},
+		},
 	}
 	if modCache != "" {
 		// Share the host module cache read-only; configureGoProxy points Go at it.
@@ -353,7 +362,7 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 		return common.Instance{}, err
 	}
 
-	ip, err := p.containerIP(ctx, name)
+	sshPort, err := p.containerSSHPort(ctx, name)
 	if err != nil {
 		return common.Instance{}, err
 	}
@@ -362,9 +371,13 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 		ID:          batch.ID,
 		Provisioner: Name,
 		Name:        name,
-		IP:          ip,
-		Username:    sshUser,
-		RemotePath:  fmt.Sprintf("/home/%s/agent", sshUser),
+		// The container's 172.x.x.x IP is only reachable inside the Docker host
+		// (which may be a remote VM on Lima or Docker Desktop). Use the published
+		// loopback port instead — reachable on the local machine in all cases.
+		IP:         "127.0.0.1",
+		SSHPort:    sshPort,
+		Username:   sshUser,
+		RemotePath: fmt.Sprintf("/home/%s/agent", sshUser),
 		// the image bakes in build-essential, unzip and the matching Go
 		// toolchain, so the runner can skip its Prepare step entirely.
 		Prepared: true,
@@ -513,17 +526,21 @@ func (p *provisioner) waitForDockerd(ctx context.Context, name string) error {
 	}
 }
 
-func (p *provisioner) containerIP(ctx context.Context, name string) (string, error) {
+func (p *provisioner) containerSSHPort(ctx context.Context, name string) (int, error) {
 	result, err := p.client.ContainerInspect(ctx, name, dockerclient.ContainerInspectOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to inspect container %s: %w", name, err)
+		return 0, fmt.Errorf("failed to inspect container %s: %w", name, err)
 	}
-	for _, ep := range result.Container.NetworkSettings.Networks {
-		if ep.IPAddress.IsValid() {
-			return ep.IPAddress.String(), nil
+	bindings := result.Container.NetworkSettings.Ports[network.MustParsePort("22/tcp")]
+	for _, b := range bindings {
+		if b.HostIP.String() == "127.0.0.1" || !b.HostIP.IsValid() {
+			port, err := strconv.Atoi(b.HostPort)
+			if err == nil && port > 0 {
+				return port, nil
+			}
 		}
 	}
-	return "", fmt.Errorf("container %s has no IP address", name)
+	return 0, fmt.Errorf("container %s has no published SSH port on 127.0.0.1", name)
 }
 
 func (p *provisioner) checkDocker(ctx context.Context) error {
