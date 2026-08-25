@@ -2343,15 +2343,6 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
 	}
 
-	// render elastic-agent-standalone OpenShift kustomize
-	openShiftKustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "openshift", "elastic-agent-standalone"))
-	if err != nil {
-		return fmt.Errorf("failed to render OpenShift kustomize: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentOpenShiftKustomizePath), openShiftKustomizeYaml, 0o644); err != nil {
-		return fmt.Errorf("failed to write OpenShift kustomize.yaml: %w", err)
-	}
-
 	return nil
 }
 

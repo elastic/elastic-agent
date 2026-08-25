@@ -1053,10 +1053,7 @@ type k8sKustomizeOverrides struct {
 // to further adjust the k8s objects
 func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		kustomizePath, err := k8sKustomizePath(kCtx.clientSet)
-		require.NoError(t, err, "failed to select kustomize manifest")
-
-		kustomizeYaml, err := os.ReadFile(kustomizePath)
+		kustomizeYaml, err := os.ReadFile(AgentKustomizePath)
 		require.NoError(t, err, "failed to read kustomize manifest")
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
@@ -1154,21 +1151,6 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 	}
 }
 
-func k8sKustomizePath(clientSet kubernetes.Interface) (string, error) {
-	groups, err := clientSet.Discovery().ServerGroups()
-	if err != nil {
-		return "", fmt.Errorf("discovering Kubernetes API groups: %w", err)
-	}
-
-	for _, group := range groups.Groups {
-		if group.Name == "security.openshift.io" {
-			return AgentOpenShiftKustomizePath, nil
-		}
-	}
-
-	return AgentKustomizePath, nil
-}
-
 // k8sStepCheckAgentStatus checks the status of the agent inside the pods returned by the selector
 func k8sStepCheckAgentStatus(agentPodLabelSelector string, expectedPodNumber int, containerName string, componentPresence map[string]bool) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
@@ -1260,6 +1242,8 @@ func k8sStepHelmUninstall(releaseName string) k8sTestStep {
 
 		uninstallAction := action.NewUninstall(actionConfig)
 		uninstallAction.Wait = true
+		uninstallAction.Timeout = 2 * time.Minute
+		uninstallAction.DeletionPropagation = "foreground"
 		_, err = uninstallAction.Run(releaseName)
 		require.NoError(t, err, "failed to uninstall helm chart")
 	}
