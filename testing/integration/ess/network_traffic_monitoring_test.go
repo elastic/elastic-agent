@@ -107,10 +107,10 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 }
 
-// validateNetworkTrafficEvents generates TLS traffic to serverName and returns
+// validateNetworkTrafficEvents generates TLS traffic to serverName:port and returns
 // the captured event for it. Traffic is generated on every poll so a missed
 // capture is retried rather than failing the test.
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID, serverName string, since time.Time) mapstr.M {
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID, serverName, port string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -129,7 +129,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 
 	t.Logf("starting to query ES for network traffic events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		dialTLS(t, serverName)
+		dialTLS(t, serverName, port)
 
 		query = genESQuery(agentID,
 			[][]string{
@@ -150,7 +150,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 	return doc
 }
 
-// esServerName returns the Elasticsearch hostname, used as the TLS SNI.
+// esServerName returns the Elasticsearch hostname used as the TLS SNI.
 func esServerName(t *testing.T) string {
 	raw := os.Getenv("ELASTICSEARCH_HOST")
 	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
@@ -160,17 +160,31 @@ func esServerName(t *testing.T) string {
 	return u.Hostname()
 }
 
-// dialTLS triggers a TLS handshake to host:443 for the packet component to
+// esPort returns the TCP port for the Elasticsearch host. It reads the port
+// from ELASTICSEARCH_HOST (e.g. "9200" for a local stack) and falls back to
+// "443" when no explicit port is present (ESS cloud).
+func esPort(t *testing.T) string {
+	raw := os.Getenv("ELASTICSEARCH_HOST")
+	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
+	u, err := url.Parse(raw)
+	require.NoError(t, err, "parsing ELASTICSEARCH_HOST")
+	if p := u.Port(); p != "" {
+		return p
+	}
+	return "443"
+}
+
+// dialTLS triggers a TLS handshake to host:port for the packet component to
 // capture. A dial error is fine: the SNI is sent before cert verification.
-func dialTLS(t *testing.T, host string) {
+func dialTLS(t *testing.T, host, port string) {
 	conn, err := tls.DialWithDialer(
 		&net.Dialer{Timeout: 10 * time.Second},
 		"tcp",
-		net.JoinHostPort(host, "443"),
+		net.JoinHostPort(host, port),
 		&tls.Config{ServerName: host},
 	)
 	if err != nil {
-		t.Logf("TLS dial to %s returned %v (handshake still captured)", host, err)
+		t.Logf("TLS dial to %s:%s returned %v (handshake still captured)", host, port, err)
 		return
 	}
 	_ = conn.Close()
@@ -186,12 +200,14 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	require.NoError(t, err, "could not get agent status")
 
 	// Use one fixed destination for both runtimes so the captured handshakes are
-	// directly comparable.
+	// directly comparable. Use the actual port from ELASTICSEARCH_HOST so that
+	// the TLS dial succeeds on local stacks (port 9200) as well as ESS (port 443).
 	serverName := esServerName(t)
+	port := esPort(t)
 
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, time.Now())
+		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, port, time.Now())
 	})
 
 	var otelDoc mapstr.M
@@ -219,7 +235,7 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected a packet (network_traffic) component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, otelSince)
+		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, port, otelSince)
 	})
 
 	t.Run("compare", func(t *testing.T) {
