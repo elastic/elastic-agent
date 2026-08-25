@@ -84,6 +84,9 @@ func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifa
 	}
 
 	if _, err := backoff.Retry(cancelCtx, opFn, backoff.WithBackOff(expBo), backoff.WithNotify(opFailureNotificationFn)); err != nil {
+		if cancelCtx.Err() != nil {
+			return cancelCtx.Err()
+		}
 		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
 			return re.LastErr
 		}
