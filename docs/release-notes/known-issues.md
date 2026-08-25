@@ -103,7 +103,7 @@ grep -c 'agent container initialisation - chown paths' <agent-container-logs>
 Update the agent policy to set `agent.logging.to_stderr` to `true` and `agent.logging.to_files` to `false`, so the policy matches the container's logging configuration. Use the {{fleet}} API to apply these settings:
 
 ```bash
-curl -k -u <user>:<password> \
+curl -u <user>:<password> \
   -X PUT https://<kibana-host>/api/fleet/agent_policies/<policy-id> \
   -H 'Content-Type: application/json' \
   -H 'kbn-xsrf: true' \
@@ -123,9 +123,11 @@ curl -k -u <user>:<password> \
 
 The `name` and `namespace` values are required by the API and must match the existing policy. Retrieve them first with a GET request to `/api/fleet/agent_policies/<policy-id>`.
 
-After updating the policy, clear the agent state to break the loop. An agent already looping replays the cached policy action faster than a {{fleet}} check-in interval, so the corrected policy never reaches it. Clear the state by removing `/usr/share/elastic-agent/state/fleet.yml` — either from inside the running container, from the mounted volume on the host, or by recreating the container. Alternatively, set the `FLEET_FORCE=1` environment variable and restart to force re-enrollment regardless of existing state.
+After updating the policy, clear the agent state to break the loop. An agent already looping replays the cached policy action faster than a {{fleet}} check-in interval, so the corrected policy never reaches it. Clear the state by removing `/usr/share/elastic-agent/state/fleet.yml` — from inside the running container, from the mounted volume on the host, or by recreating the container. Alternatively, set the `FLEET_FORCE=1` environment variable and restart to force re-enrollment regardless of existing state.
 
-To prevent the loop from occurring, set the `LOGS_PATH` environment variable on the container. This prevents the entrypoint from injecting the forced logging configuration that causes the mismatch. Agent logs will be written to files instead of stderr when this variable is set.
+**Alternative workaround**
+
+Instead of updating the agent policy with the API call, you can prevent the loop from occurring by setting the `LOGS_PATH` environment variable on the container before it starts. This stops the container entrypoint from injecting a logging configuration, so no mismatch between the container and the policy can occur. Note that when `LOGS_PATH` is set, agent logs are written to files rather than stderr.
 
 For more information, check [Issue #15432](https://github.com/elastic/elastic-agent/issues/15432).
 :::
