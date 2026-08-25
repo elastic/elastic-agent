@@ -27,9 +27,86 @@ import (
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
-	Index         string `config:"index"`
-	Preset        string `config:"preset"`
-	RetryOnStatus []int  `config:"retry_on_status"`
+	Index                 string `config:"index"`
+	Preset                string `config:"preset"`
+	RetryOnStatus         []int  `config:"retry_on_status"`
+	RetryOnDocumentStatus []int  `config:"retry_on_document_status"`
+}
+
+// defaultRetryOnDocumentStatus matches Beats' retry behavior for individual
+// bulk response items.
+var defaultRetryOnDocumentStatus = []int{
+	// 429
+	http.StatusTooManyRequests,
+	// 5xx
+	http.StatusInternalServerError,
+	http.StatusNotImplemented,
+	http.StatusBadGateway,
+	http.StatusServiceUnavailable,
+	http.StatusGatewayTimeout,
+	http.StatusHTTPVersionNotSupported,
+	http.StatusVariantAlsoNegotiates,
+	http.StatusInsufficientStorage,
+	http.StatusLoopDetected,
+	http.StatusNotExtended,
+	http.StatusNetworkAuthenticationRequired,
+}
+
+func defaultRetryOnStatus() []int {
+	// Beats retries every failed bulk request except 413, which it handles by
+	// splitting the batch or dropping it when it cannot be split.
+	return []int{
+		// 3xx
+		http.StatusMultipleChoices,   // 300
+		http.StatusMovedPermanently,  // 301
+		http.StatusFound,             // 302
+		http.StatusSeeOther,          // 303
+		http.StatusNotModified,       // 304
+		http.StatusUseProxy,          // 305
+		http.StatusTemporaryRedirect, // 307
+		http.StatusPermanentRedirect, // 308
+		// 4xx, excluding 413 (Request Entity Too Large)
+		http.StatusBadRequest,                   // 400
+		http.StatusUnauthorized,                 // 401
+		http.StatusPaymentRequired,              // 402
+		http.StatusForbidden,                    // 403
+		http.StatusNotFound,                     // 404
+		http.StatusMethodNotAllowed,             // 405
+		http.StatusNotAcceptable,                // 406
+		http.StatusProxyAuthRequired,            // 407
+		http.StatusRequestTimeout,               // 408
+		http.StatusConflict,                     // 409
+		http.StatusGone,                         // 410
+		http.StatusLengthRequired,               // 411
+		http.StatusPreconditionFailed,           // 412
+		http.StatusRequestURITooLong,            // 414
+		http.StatusUnsupportedMediaType,         // 415
+		http.StatusRequestedRangeNotSatisfiable, // 416
+		http.StatusExpectationFailed,            // 417
+		http.StatusTeapot,                       // 418
+		http.StatusMisdirectedRequest,           // 421
+		http.StatusUnprocessableEntity,          // 422
+		http.StatusLocked,                       // 423
+		http.StatusFailedDependency,             // 424
+		http.StatusTooEarly,                     // 425
+		http.StatusUpgradeRequired,              // 426
+		http.StatusPreconditionRequired,         // 428
+		http.StatusTooManyRequests,              // 429
+		http.StatusRequestHeaderFieldsTooLarge,  // 431
+		http.StatusUnavailableForLegalReasons,   // 451
+		// 5xx
+		http.StatusInternalServerError,           // 500
+		http.StatusNotImplemented,                // 501
+		http.StatusBadGateway,                    // 502
+		http.StatusServiceUnavailable,            // 503
+		http.StatusGatewayTimeout,                // 504
+		http.StatusHTTPVersionNotSupported,       // 505
+		http.StatusVariantAlsoNegotiates,         // 506
+		http.StatusInsufficientStorage,           // 507
+		http.StatusLoopDetected,                  // 508
+		http.StatusNotExtended,                   // 510
+		http.StatusNetworkAuthenticationRequired, // 511
+	}
 }
 
 // maxQueueEvents is a memory limiter, not a performance tuning value.
@@ -49,24 +126,10 @@ const maxQueueEvents = 64000
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
-	Index:  "",       // Dynamic routing is disabled if index is set
-	Preset: "custom", // default is custom if not set
-	RetryOnStatus: []int{
-		// 429
-		http.StatusTooManyRequests,
-		// 5xx
-		http.StatusInternalServerError,
-		http.StatusNotImplemented,
-		http.StatusBadGateway,
-		http.StatusServiceUnavailable,
-		http.StatusGatewayTimeout,
-		http.StatusHTTPVersionNotSupported,
-		http.StatusVariantAlsoNegotiates,
-		http.StatusInsufficientStorage,
-		http.StatusLoopDetected,
-		http.StatusNotExtended,
-		http.StatusNetworkAuthenticationRequired,
-	},
+	Index:                 "",       // Dynamic routing is disabled if index is set
+	Preset:                "custom", // default is custom if not set
+	RetryOnDocumentStatus: append([]int(nil), defaultRetryOnDocumentStatus...),
+	RetryOnStatus:         defaultRetryOnStatus(),
 }
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
@@ -311,11 +374,12 @@ func getTotalNumConnections(cfg *config.C) int {
 func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	// Retries
 	retryCfg := map[string]any{
-		"enabled":          true,
-		"max_retries":      escfg.MaxRetries,
-		"initial_interval": escfg.Backoff.Init, // backoff.init
-		"max_interval":     escfg.Backoff.Max,  // backoff.max
-		"retry_on_status":  escfg.RetryOnStatus,
+		"enabled":                  true,
+		"max_retries":              escfg.MaxRetries,
+		"initial_interval":         escfg.Backoff.Init, // backoff.init
+		"max_interval":             escfg.Backoff.Max,  // backoff.max
+		"retry_on_status":          escfg.RetryOnStatus,
+		"retry_on_document_status": escfg.RetryOnDocumentStatus,
 	}
 
 	if escfg.MaxRetries == 0 {

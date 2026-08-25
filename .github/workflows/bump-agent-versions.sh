@@ -34,6 +34,7 @@ else
        --base "$current_ref" \
        --fill-first \
        --head "$pr_branch" \
+       --label 'automation' \
        --label 'Team:Elastic-Agent' \
        --label 'Team:Elastic-Agent-Control-Plane' \
        --label 'update-versions' \

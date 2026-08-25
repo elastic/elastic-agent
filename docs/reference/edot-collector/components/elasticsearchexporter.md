@@ -40,9 +40,107 @@ The exporter supports standard OpenTelemetry [authentication configuration](http
 - `user` and `password`: For HTTP Basic Authentication
 - `api_key`: For [{{es}} API key authentication](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-security-create-api-key)
 
+:::{note} Authentication to and from {{agent}}
+
+The `api_key` setting on the {{es}} exporter controls outbound authentication from {{agent}} to {{es}} for bulk indexing. This is separate from the `apikeyauth` extension, which authenticates incoming OTLP traffic from SDKs to {{agent}}. 
+
+Using the same API key for both inbound and outbound authentication is not recommended from a security perspective. Use separate keys with the minimum required privileges for each purpose.
+
+Refer to [Authentication methods for {{agent}}](/reference/edot-collector/config/authentication-methods.md) for details.
+:::
+
+#### Creating an API key for the {{es}} exporter
+
+The API key used in the `api_key` setting authenticates bulk indexing requests to {{es}}. The key must have index-level privileges on the data streams that the exporter writes to.
+
+For logs, metrics, and traces (the default signals) {{agent}} writes to OTel-native data streams matching `logs-*-*`, `metrics-*-*`, and `traces-*-*`. Bulk indexing requires the following index privileges:
+
+- `auto_configure`: Allows automatic creation and configuration of data stream templates.
+- `create_doc`: Allows writing documents using the Bulk API.
+
+If you turn on [{{es}} node discovery](#es-node-discovery), the key also needs the `monitor` cluster privilege. Without it, discovery fails with a 403 that is only visible in the {{agent}} logs.
+
+:::{note}
+Profiling data requires [universal profiling](docs-content://solutions/observability/infra-and-hosts/get-started-with-universal-profiling.md#profiling-configure-data-ingestion) to be configured in {{es}} separately, which manages its own index setup and permissions. The following API key example covers logs, metrics, and traces only.
+:::
+
+Create the API key using the {{es}} Security API:
+
+::::{dropdown} Example: Create an API key for the {{es}} exporter
+```console
+POST /_security/api_key
+{
+  "name": "edot-collector-exporter",
+  "role_descriptors": {
+    "edot_writer": {
+      "cluster": [],
+      "indices": [
+        {
+          "names": ["logs-*-*", "metrics-*-*", "traces-*-*"],
+          "privileges": ["auto_configure", "create_doc"]
+        }
+      ]
+    }
+  }
+}
+```
+
+The response includes an `encoded` field. Use that value as the `api_key` in your exporter configuration.
+
+:::{note}
+If you write to custom data streams or indices outside the default patterns, add those patterns to the `names` list with the same privileges.
+:::
+
+::::
+
 ### TLS and security settings
 
 The exporter supports standard OpenTelemetry TLS configuration for secure connections. You can configure TLS certificates, client authentication, and other security settings through the standard [TLS configuration options](https://github.com/open-telemetry/opentelemetry-collector/blob/main/config/configtls/README.md#tls-configuration-settings).
+
+#### {{ecloud}} and serverless
+
+For {{ecloud}} and {{serverless-full}}, TLS is enforced automatically and certificates are signed by a public CA trusted by default on most systems. You can omit the `tls` block entirely, or set it explicitly as shown:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: "https://my-deployment.es.us-east-1.aws.elastic-cloud.com:443"
+    api_key: "${ELASTIC_API_KEY}"
+    tls:
+      insecure: false
+```
+
+#### Self-managed with a custom or self-signed CA
+
+For self-managed {{es}} deployments using a private CA or self-signed certificate, provide the CA certificate file so the exporter can verify the server:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: "https://elasticsearch:9200"
+    api_key: "${ELASTIC_API_KEY}"
+    tls:
+      insecure: false
+      ca_file: "/path/to/ca.crt"
+```
+
+The `ca_file` path must be readable by the {{agent}} process. Setting `ca_file` replaces the system trust store rather than adding to it, so if the same exporter also needs to trust publicly-signed certificates, set `include_system_ca_certs_pool: true` as well. To skip verification entirely during testing, you can set `insecure_skip_verify: true`, but this is not recommended for production.
+
+#### Mutual TLS (mTLS)
+
+For self-managed deployments that require client certificate authentication:
+
+```yaml subs=true
+exporters:
+  elasticsearch:
+    endpoint: "https://elasticsearch:9200"
+    api_key: "${ELASTIC_API_KEY}"
+    tls:
+      insecure: false
+      ca_file: "/path/to/ca.crt"
+      cert_file: "/path/to/client.crt"
+      key_file: "/path/to/client.key"
+```
 
 ## Mapping modes
 
@@ -187,7 +285,10 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `retry::max_retries` | `2` | Number of HTTP request retries. To turn off retries, set `retry::enabled` to `false` instead of setting `max_retries` to `0`. |
 | `retry::initial_interval` | `100ms` | Initial waiting time if an HTTP request failed. |
 | `retry::max_interval` | `1m` | Max waiting time if an HTTP request failed. |
-| `retry::retry_on_status` | `[429]` | Status codes that trigger request or document level retries. Request level retry and document level retry status codes are shared and cannot be configured separately. To avoid duplicates, it defaults to `[429]`. |
+| `retry::retry_on_status` | `[429]` | Status codes that trigger request-level retries. To avoid duplicates, it defaults to `[429]`. |
+| `retry::retry_on_document_status` | `retry::retry_on_status` | Status codes that trigger retries for failed documents in a successful bulk HTTP response. If unset, uses `retry::retry_on_status`. |
+
+When Elastic Agent translates an Elasticsearch output for the OTel runtime, request-level retries include every `3xx` through `5xx` status except `413`, matching Beats Elasticsearch output behavior. Document-level retries include `429` and `5xx` statuses, so document-level authorization failures do not block unrelated documents.
 
 :::{note}
 The `flush::interval` config is ignored when using `sending_queue` ({applies_to}`stack: ga 9.3`) or when the `batcher::enabled` config ({applies_to}`stack: removed 9.3`) is explicitly set.
