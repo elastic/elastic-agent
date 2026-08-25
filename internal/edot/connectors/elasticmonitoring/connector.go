@@ -29,6 +29,12 @@ type monitoringConnector struct {
 	consumer consumer.Logs
 }
 
+const (
+	monitoringFieldComponentID = "component.id"
+	monitoringFieldInputID     = "filebeat_input.id"
+	monitoringFieldInputType   = "filebeat_input.input"
+)
+
 func createConnector(
 	_ context.Context,
 	set connector.Settings,
@@ -56,8 +62,8 @@ func (c *monitoringConnector) Capabilities() consumer.Capabilities {
 //
 // Each ResourceMetrics in md represents one monitoring event. The event type
 // (exporter, input, or receiver) is read from the elastic.monitoring.event.type
-// resource attribute; the appropriate event template is cloned and all metrics
-// in the ResourceMetrics are written as fields on the event.
+// scope attribute on the first ScopeMetrics entry; the appropriate event template
+// is cloned and all metrics in the ResourceMetrics are written as fields on the event.
 func (c *monitoringConnector) ConsumeMetrics(ctx context.Context, md pmetric.Metrics) error {
 	pLogs := plog.NewLogs()
 	resourceLogs := pLogs.ResourceLogs().AppendEmpty()
@@ -89,6 +95,7 @@ func (c *monitoringConnector) appendMonitoringEvent(scopeLogs plog.ScopeLogs, rm
 
 	eventTypeVal, ok := scopeAttrs.Get(internaltelemetry.EventTypeAttr)
 	if !ok {
+		c.logger.Warn("monitoring event missing event type scope attribute, dropping ResourceMetrics")
 		return
 	}
 
@@ -103,15 +110,16 @@ func (c *monitoringConnector) appendMonitoringEvent(scopeLogs plog.ScopeLogs, rm
 	}
 
 	if compID, ok := scopeAttrs.Get(internaltelemetry.ComponentIDAttr); ok {
-		template["component.id"] = compID.Str()
+		template[monitoringFieldComponentID] = compID.Str()
 	}
 
-	if eventTypeVal.Str() == internaltelemetry.EventTypeInput {
+	eventType := eventTypeVal.Str()
+	if eventType == internaltelemetry.EventTypeInput {
 		if inputID, ok := scopeAttrs.Get(internaltelemetry.InputIDAttr); ok {
-			template["filebeat_input.id"] = inputID.Str()
+			template[monitoringFieldInputID] = inputID.Str()
 		}
 		if inputType, ok := scopeAttrs.Get(internaltelemetry.InputTypeAttr); ok {
-			template["filebeat_input.input"] = inputType.Str()
+			template[monitoringFieldInputType] = inputType.Str()
 		}
 	}
 

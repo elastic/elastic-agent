@@ -22,9 +22,9 @@ func (p *monitoringProcessor) ConsumeMetrics(ctx context.Context, md pmetric.Met
 
 // buildProcessedMetrics transforms raw collector internal-telemetry metrics into
 // a canonical form where each ResourceMetrics represents one monitoring event.
-// Scope attributes encode the event type and component identity; resource attributes
-// from the input (set by the receiver from the SDK meter provider's resource) are
-// propagated to each output ResourceMetrics.
+// Scope attributes encode the event type and component identity; the resource from
+// the first input ResourceMetrics is propagated to every output ResourceMetrics
+// (in practice the input always has exactly one ResourceMetrics from a single meter provider).
 // Metrics carry Beats-compatible field names and aggregated values.
 func buildProcessedMetrics(logger *zap.Logger, cfg *Config, md pmetric.Metrics) pmetric.Metrics {
 	out := pmetric.NewMetrics()

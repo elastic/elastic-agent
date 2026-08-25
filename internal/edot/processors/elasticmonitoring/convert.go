@@ -105,6 +105,8 @@ const (
 	// RegistryBridge in beats, which bridges Beats monitoring registries into
 	// OTel async instruments. Metrics from this scope carry a "receiver"
 	// data point attribute containing the OTel component ID.
+	// This must match the unexported `scopeName` constant in
+	// beats/x-pack/otel/telemetry/bridge.go; update both if the beats package path changes.
 	registryBridgeScopeName = "github.com/elastic/beats/v7/x-pack/otel/telemetry"
 	// registryBridgeReceiverKey is the data point attribute key set by the
 	// RegistryBridge to identify which Beat receiver emitted the metric.
@@ -354,7 +356,11 @@ func buildExporterMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource,
 // they are identical across all streams and must not be multiplied per input.
 func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
 	type inputKey struct{ compID, inputID string }
-	events := map[inputKey]pmetric.ResourceMetrics{}
+	type inputEvent struct {
+		sm     pmetric.ScopeMetrics
+		fields map[string]pmetric.NumberDataPoint
+	}
+	events := map[inputKey]*inputEvent{}
 
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
@@ -362,9 +368,13 @@ func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Met
 			sm := rm.ScopeMetrics().At(j)
 
 			// Prefer receiver kind, but fall back to any component ID present
-			// (e.g. beat bridge metrics that may not carry a component kind).
+			// for scopes that carry no component kind (e.g. beat bridge metrics).
+			// Scopes with an explicit non-receiver kind are skipped.
 			otelID := componentIDForScope(sm, "receiver")
 			if otelID == "" {
+				if kindVal, hasKind := sm.Scope().Attributes().Get(otelComponentKindKey); hasKind && kindVal.Str() != "receiver" {
+					continue
+				}
 				idVal, ok := sm.Scope().Attributes().Get(otelComponentIDKey)
 				if !ok {
 					continue
@@ -391,19 +401,19 @@ func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Met
 					key := inputKey{compID: compID, inputID: inputIDVal.Str()}
 					event, exists := events[key]
 					if !exists {
-						event = out.ResourceMetrics().AppendEmpty()
-						res.CopyTo(event.Resource())
-						sm := event.ScopeMetrics().AppendEmpty()
-						sm.Scope().SetName(internaltelemetry.ScopeName)
-						sm.Scope().Attributes().PutStr(internaltelemetry.EventTypeAttr, internaltelemetry.EventTypeInput)
-						sm.Scope().Attributes().PutStr(internaltelemetry.ComponentIDAttr, key.compID)
+						sm := newEventScope(out, res, internaltelemetry.EventTypeInput, key.compID)
 						sm.Scope().Attributes().PutStr(internaltelemetry.InputIDAttr, key.inputID)
+						event = &inputEvent{sm: sm, fields: map[string]pmetric.NumberDataPoint{}}
 						events[key] = event
 					}
 					if inputType, ok := dp.Attributes().Get(otelInputTypeKey); ok {
-						event.ScopeMetrics().At(0).Scope().Attributes().PutStr(internaltelemetry.InputTypeAttr, inputType.Str())
+						event.sm.Scope().Attributes().PutStr(internaltelemetry.InputTypeAttr, inputType.Str())
 					}
-					copyNumberMetric(event.ScopeMetrics().At(0), m, outName, dp)
+					if existing, ok := event.fields[outName]; ok {
+						addDataPointValue(existing, dp)
+					} else {
+						event.fields[outName] = copyNumberMetric(event.sm, m, outName, dp)
+					}
 				}
 			}
 		}
@@ -422,6 +432,7 @@ func buildReceiverPipelineMetrics(res pcommon.Resource, md pmetric.Metrics, out 
 		fields map[string]pmetric.NumberDataPoint
 	}
 	events := map[string]*receiverEvent{}
+	beatTypes := map[string]string{} // cache beatTypeFromOtelID results by otelID
 
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
@@ -452,7 +463,12 @@ func buildReceiverPipelineMetrics(res pcommon.Resource, md pmetric.Metrics, out 
 						}
 						events[compID] = event
 					}
-					field := receiverMetricField(beatTypeFromOtelID(otelID), m.Name())
+					bt, ok := beatTypes[otelID]
+					if !ok {
+						bt = beatTypeFromOtelID(otelID)
+						beatTypes[otelID] = bt
+					}
+					field := receiverMetricField(bt, m.Name())
 					if existing, exists := event.fields[field]; exists {
 						addDataPointValue(existing, dp)
 					} else {
