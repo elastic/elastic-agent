@@ -995,17 +995,15 @@ specs:
       arch: amd64
       types: [docker]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_spec, *docker_builder_spec, *agent_docker_cloud_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_cloud_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_cloud_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: [*docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_cloud_spec, *elastic_license_for_binaries]
     #### End Cloud specific docker images ####
 
     #### Service specific docker images ####
@@ -1013,17 +1011,15 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_spec, *docker_builder_spec, *agent_docker_cloud_spec, *agent_docker_service_spec, *elastic_license_for_binaries]
         # The service image is always based on Wolfi
-        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_cloud_spec, *agent_docker_service_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_cloud_spec, *agent_docker_service_spec, *elastic_license_for_binaries]
         # The service image is always based on Wolfi
-        <<: [*docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_cloud_spec, *agent_docker_service_spec, *elastic_license_for_binaries]
     #### End Service specific docker images ####
 
     - os: linux
@@ -1079,9 +1075,8 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: [*docker_fips_spec, *agent_docker_fips_spec]
+        <<: [*docker_fips_spec, *agent_docker_fips_spec, *docker_builder_spec, *agent_docker_cloud_fips_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: [*docker_builder_spec, *agent_docker_cloud_fips_spec, *elastic_license_for_binaries]
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
 
@@ -1089,9 +1084,8 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: [*docker_fips_spec, *agent_docker_fips_spec]
+        <<: [*docker_fips_spec, *agent_docker_fips_spec, *docker_builder_arm_spec, *agent_docker_cloud_fips_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: [*docker_builder_arm_spec, *agent_docker_cloud_fips_spec, *elastic_license_for_binaries]
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
 
