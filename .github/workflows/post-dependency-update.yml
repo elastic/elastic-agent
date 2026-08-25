@@ -76,7 +76,7 @@ jobs:
           git commit -m "Update archive-proxy go.mod"
 
       - name: update NOTICE.txt and NOTICE-fips.txt
-        run: make notice
+        run: mage notice
 
       - name: check for modified NOTICE.txt or NOTICE-fips.txt
         id: notice-check
