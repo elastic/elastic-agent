@@ -581,8 +581,8 @@ github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5/go.mod h1:WZjPDy7VNzn77AAfnAfVjZNvfJTYfPetfZk5yoSTLaQ=
 github.com/redis/go-redis/v9 v9.7.3 h1:YpPyAayJV+XErNsatSElgRZZVCwXX9QzkKYNvO7x0wM=
 github.com/redis/go-redis/v9 v9.7.3/go.mod h1:bGUrSggJ9X9GUmZpZNEOQKaANxSGgOEBRltRTZHSvrA=
-github.com/rednafi/link-patrol v0.0.0-20260817181640-c9dbc41d081a h1:EVAfnFuzrXqc0xT50WVFrM6HzunNDj4QscHk12WfrNU=
-github.com/rednafi/link-patrol v0.0.0-20260817181640-c9dbc41d081a/go.mod h1:sxHToi+irLKr7d+B1SSEf22NjALTRHhOObVTN0+t918=
+github.com/rednafi/link-patrol v0.0.0-20260824155319-d15a9ccb03c5 h1:d0fTxBCuRTCmbvriMCed63U3AhWmC/wJFvhFHx4Qxxg=
+github.com/rednafi/link-patrol v0.0.0-20260824155319-d15a9ccb03c5/go.mod h1:MhokTnU3Bb/bDpgpdooHj/AdoG+28EqPrsqpV+DTKaw=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
