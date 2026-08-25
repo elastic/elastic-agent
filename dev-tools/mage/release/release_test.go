@@ -10,9 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"gopkg.in/yaml.v3"
 )
 
@@ -643,104 +640,5 @@ func TestPatchPRBodies(t *testing.T) {
 	}
 	if !strings.Contains(body, "Does **not** bump version/version.go") {
 		t.Errorf("patchBeforeBuildPRBody() = %q, want version.go not bumped note", body)
-	}
-}
-
-func TestCreateReleaseBranch(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	gitRepo, err := git.PlainInit(tmpDir, false)
-	if err != nil {
-		t.Fatalf("failed to init repo: %v", err)
-	}
-
-	w, err := gitRepo.Worktree()
-	if err != nil {
-		t.Fatalf("failed to get worktree: %v", err)
-	}
-
-	versionDir := filepath.Join(tmpDir, "version")
-	k8sDir := filepath.Join(tmpDir, "deploy", "kubernetes")
-	if err := os.MkdirAll(versionDir, 0755); err != nil {
-		t.Fatalf("failed to create version dir: %v", err)
-	}
-	if err := os.MkdirAll(k8sDir, 0755); err != nil {
-		t.Fatalf("failed to create k8s dir: %v", err)
-	}
-
-	files := map[string]string{
-		"README.md": "# Test",
-		filepath.Join("version", "version.go"): `package version
-
-const defaultBeatVersion = "9.4.0"
-`,
-		filepath.Join("deploy", "kubernetes", "elastic-agent-managed-kubernetes.yaml"):    "image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0",
-		filepath.Join("deploy", "kubernetes", "elastic-agent-standalone-kubernetes.yaml"): "image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0",
-		".mergify.yml": "pull_request_rules: []",
-	}
-	for relPath, content := range files {
-		fullPath := filepath.Join(tmpDir, relPath)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			t.Fatalf("failed to create dir for %s: %v", relPath, err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			t.Fatalf("failed to write %s: %v", relPath, err)
-		}
-		if _, err := w.Add(relPath); err != nil {
-			t.Fatalf("failed to add %s: %v", relPath, err)
-		}
-	}
-
-	_, err = w.Commit("Initial commit", &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  "Test",
-			Email: "test@example.com",
-		},
-	})
-	if err != nil {
-		t.Fatalf("failed to commit: %v", err)
-	}
-
-	headRef, err := gitRepo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD: %v", err)
-	}
-	mainRef := plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), headRef.Hash())
-	if err := gitRepo.Storer.SetReference(mainRef); err != nil {
-		t.Fatalf("failed to create main branch: %v", err)
-	}
-	if err := w.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("main")}); err != nil {
-		t.Fatalf("failed to checkout main: %v", err)
-	}
-	_ = gitRepo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
-
-	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.0",
-		BaseBranch:     "main",
-		ReleaseBranch:  "9.5",
-		ProjectOwner:   "elastic",
-		ProjectRepo:    "elastic-agent",
-		GitAuthorName:  "Test User",
-		GitAuthorEmail: "test@example.com",
-	}
-
-	err = CreateReleaseBranch(cfg, tmpDir)
-	if err != nil {
-		t.Errorf("CreateReleaseBranch() error = %v", err)
-		return
-	}
-
-	repo, err := OpenRepo(tmpDir)
-	if err != nil {
-		t.Fatalf("failed to open repo: %v", err)
-	}
-
-	currentBranch, err := repo.GetCurrentBranch()
-	if err != nil {
-		t.Errorf("GetCurrentBranch() error = %v", err)
-		return
-	}
-	if currentBranch != cfg.ReleaseBranch {
-		t.Errorf("CreateReleaseBranch() branch = %s, want %s", currentBranch, cfg.ReleaseBranch)
 	}
 }

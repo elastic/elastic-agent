@@ -475,17 +475,9 @@ func TestGetCurrentBranch(t *testing.T) {
 func TestPushRequiresToken(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
-	oldToken := os.Getenv("GITHUB_TOKEN")
-	os.Unsetenv("GITHUB_TOKEN")
-	t.Cleanup(func() {
-		if oldToken != "" {
-			os.Setenv("GITHUB_TOKEN", oldToken)
-		}
-	})
-
-	err := gitRepo.Push("origin")
+	err := gitRepo.Push("origin", "")
 	if err == nil {
-		t.Error("Push() should fail without GITHUB_TOKEN, got nil error")
+		t.Error("Push() should fail without a token, got nil error")
 	}
 }
 

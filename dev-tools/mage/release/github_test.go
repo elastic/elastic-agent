@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/v68/github"
@@ -144,5 +145,57 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	}
 	if createCalls != 1 {
 		t.Errorf("CreatePR() called create API %d times, want 1", createCalls)
+	}
+}
+
+func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
+	existingPR := &github.PullRequest{
+		Number:  github.Ptr(42),
+		HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/42"),
+		Head: &github.PullRequestBranch{
+			Ref: github.Ptr("ff-prep-main-9.5.0"),
+		},
+		Base: &github.PullRequestBranch{
+			Ref: github.Ptr("main"),
+		},
+		State: github.Ptr("open"),
+	}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/pulls":
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}); err != nil {
+				t.Errorf("failed to encode PR list response: %v", err)
+			}
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/labels/"+mergeLabelFFDay:
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(&github.Label{Name: github.Ptr(mergeLabelFFDay)}); err != nil {
+				t.Errorf("failed to encode label response: %v", err)
+			}
+		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/elastic-agent/issues/42/labels":
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = fmt.Fprint(w, `{"message":"Resource not accessible by integration"}`)
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			http.NotFound(w, r)
+		}
+	})
+
+	ghClient := newTestGitHubClient(t, handler)
+	_, err := ghClient.CreatePR(PROptions{
+		Owner:  "elastic",
+		Repo:   "elastic-agent",
+		Title:  "[Release 9.5.0] Prepare main",
+		Head:   "ff-prep-main-9.5.0",
+		Base:   "main",
+		Body:   "body",
+		Labels: []string{mergeLabelFFDay},
+	})
+	if err == nil {
+		t.Fatal("CreatePR() should fail when labels cannot be added")
+	}
+	if !strings.Contains(err.Error(), "failed to add labels") {
+		t.Errorf("CreatePR() error = %v, want failed to add labels", err)
 	}
 }

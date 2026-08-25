@@ -6,7 +6,6 @@ package release
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/google/go-github/v68/github"
@@ -163,12 +162,12 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err := repo.CheckoutBranch(releaseBranch); err != nil {
 		return err
 	}
-	if err := repo.Push("origin"); err != nil {
+	if err := repo.Push("origin", cfg.GitHubToken); err != nil {
 		return err
 	}
 
 	gh := NewGitHubClient(cfg.GitHubToken)
-	results, err := finalizeWorkflowPRs(repo, gh, branchesToFinalize)
+	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
 	}
@@ -415,7 +414,7 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	gh := NewGitHubClient(cfg.GitHubToken)
-	results, err := finalizeWorkflowPRs(repo, gh, branchesToFinalize)
+	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
 	}
@@ -493,10 +492,10 @@ Updates docs versions to %s (former prepare-patch-release docs PR).
 `, currentRelease, currentRelease, currentRelease)
 }
 
-func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, items []workflowPR) ([]workflowPRResult, error) {
+func finalizeWorkflowPRs(repo *GitRepo, gh *GitHubClient, token string, items []workflowPR) ([]workflowPRResult, error) {
 	results := make([]workflowPRResult, 0, len(items))
 	for i, item := range items {
-		pr, err := finalizePR(repo, gh, item.branch, item.base, item.opts)
+		pr, err := finalizePR(repo, gh, token, item.branch, item.base, item.opts)
 		if err != nil {
 			return results, fmt.Errorf("failed to finalize PR %d/%d: %w", i+1, len(items), err)
 		}
@@ -534,7 +533,7 @@ func formatWorkflowPRLine(index int, result workflowPRResult) string {
 // finalizePR pushes a branch when it has new commits and creates or reuses an open PR.
 // When the branch has nothing new to push, it still resolves a related open or merged PR
 // so workflow summaries always list every expected slot.
-func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, opts PROptions) (*github.PullRequest, error) {
+func finalizePR(repo *GitRepo, gh *GitHubClient, token, branchName, baseBranch string, opts PROptions) (*github.PullRequest, error) {
 	if err := repo.CheckoutBranch(branchName); err != nil {
 		return nil, err
 	}
@@ -544,7 +543,9 @@ func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, 
 		return nil, err
 	}
 	if found {
-		gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels)
+		if err := gh.ensurePRLabels(opts.Owner, opts.Repo, existingPR.GetNumber(), opts.Labels); err != nil {
+			return nil, err
+		}
 		return existingPR, nil
 	}
 
@@ -565,95 +566,9 @@ func finalizePR(repo *GitRepo, gh *GitHubClient, branchName, baseBranch string, 
 		return nil, nil
 	}
 
-	if err := repo.Push("origin"); err != nil {
+	if err := repo.Push("origin", token); err != nil {
 		return nil, err
 	}
 
 	return gh.CreatePR(opts)
-}
-
-// CreateReleaseBranch creates the release branch from main and commits prepared changes.
-func CreateReleaseBranch(cfg *ReleaseConfig, repoPath string) error {
-	fmt.Printf("=== Creating Release Branch %s ===\n", cfg.ReleaseBranch)
-
-	originalWd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
-	}
-	if err := os.Chdir(repoPath); err != nil {
-		return fmt.Errorf("failed to change to repository path %s: %w", repoPath, err)
-	}
-	defer func() {
-		_ = os.Chdir(originalWd)
-	}()
-
-	gitRepo, err := OpenRepo(".")
-	if err != nil {
-		return err
-	}
-
-	if err := gitRepo.EnsureBranchFrom(cfg.BaseBranch, cfg.ReleaseBranch); err != nil {
-		return err
-	}
-
-	if err := PrepareMajorMinorRelease(cfg); err != nil {
-		return err
-	}
-
-	commitMsg := fmt.Sprintf("[Release %s] Prepare release %s", cfg.CurrentRelease, cfg.CurrentRelease)
-	if _, err := gitRepo.CommitAll(commitMsg, cfg.GitAuthorName, cfg.GitAuthorEmail); err != nil {
-		return err
-	}
-
-	fmt.Printf("Created release branch %s with changes\n", cfg.ReleaseBranch)
-	return nil
-}
-
-// CreateReleasePR creates a pull request for the release branch (legacy single-PR helper).
-func CreateReleasePR(cfg *ReleaseConfig, ghClient *GitHubClient) error {
-	fmt.Println("=== Creating Release PR ===")
-
-	prOpts := PROptions{
-		Owner:     cfg.ProjectOwner,
-		Repo:      cfg.ProjectRepo,
-		Title:     fmt.Sprintf("[Release %s] Prepare release branch", cfg.CurrentRelease),
-		Head:      cfg.ReleaseBranch,
-		Base:      cfg.BaseBranch,
-		Body:      majorMinorPRBody(cfg.CurrentRelease),
-		Reviewers: cfg.ProjectReviewers,
-		Labels:    []string{"backport-skip", "skip-changelog"},
-	}
-
-	repo, err := OpenRepo(".")
-	if err != nil {
-		return err
-	}
-
-	pr, err := finalizePR(repo, ghClient, cfg.ReleaseBranch, cfg.BaseBranch, prOpts)
-	if err != nil {
-		return err
-	}
-	if pr == nil {
-		fmt.Println("No PR created (release already up to date)")
-		return nil
-	}
-
-	fmt.Printf("Created PR: %s\n", pr.GetHTMLURL())
-	return nil
-}
-
-func majorMinorPRBody(version string) string {
-	return fmt.Sprintf(`## Release %s
-
-### Changes
-- Updated version to %s
-- Updated K8s manifests, Helm charts, kustomize overlays, and integration testdata
-- Added backport rule to .mergify.yml
-
-### Checklist
-- [ ] Verify version is correct in version/version.go
-- [ ] Check K8s manifests and Helm examples have correct image tags
-- [ ] Confirm mergify config is updated
-- [ ] Run integration tests
-`, version, version)
 }
