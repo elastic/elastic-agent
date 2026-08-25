@@ -18,5 +18,5 @@ func TestDefaultAgentFleetConfig(t *testing.T) {
 	err := yaml.Unmarshal(DefaultAgentFleetConfig, &cfg)
 	assert.NoError(t, err)
 
-	assert.Equal(t, map[string]interface{}{"fleet": map[interface{}]interface{}{"enabled": true}}, cfg)
+	assert.Equal(t, map[string]interface{}{"fleet": map[string]interface{}{"enabled": true}}, cfg)
 }

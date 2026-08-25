@@ -514,7 +514,8 @@ func (c Component) MarshalYAML() (interface{}, error) {
 	if c.Err != nil {
 		c.ErrMsg = c.Err.Error()
 	}
-	return c, nil
+	type componentAlias Component // alias breaks the MarshalYAML recursion in yaml.v3
+	return componentAlias(c), nil
 }
 
 func (c *Component) MarshalJSON() ([]byte, error) {

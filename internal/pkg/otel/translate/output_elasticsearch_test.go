@@ -68,8 +68,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -138,8 +136,6 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -205,8 +201,6 @@ parameters:
 endpoints:
   - http://localhost:9200?somekey=somevalue
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -274,8 +268,6 @@ ssl.curve_types: "P-256"
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -342,8 +334,6 @@ preset: %s
 `
 
 		commonOTelCfg := `
-logs_dynamic_pipeline:
-  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -425,8 +415,6 @@ timeout: 1m30s
 			{
 				presetName: "scale",
 				output: `
-logs_dynamic_pipeline:
-  enabled: true
 endpoints:
   - http://localhost:9200
 retry:
@@ -552,8 +540,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -634,8 +620,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -688,8 +672,6 @@ index: "some-index"
 compression_level: %d`
 
 	otelConfig := `
-logs_dynamic_pipeline:
-  enabled: true
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
