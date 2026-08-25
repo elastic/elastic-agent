@@ -111,7 +111,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 		if len(status.Components) == 0 {
 			fmt.Fprintf(&stateBuff, "healthy but without components: agent status: %s-%s",
-				client.State(status.State), status.Message) //nolint:gosec // G115: protobuf int32 cast is safe
+				client.State(status.State), status.Message)
 			return false
 		}
 
