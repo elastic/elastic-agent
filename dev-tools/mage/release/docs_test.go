@@ -167,11 +167,18 @@ func TestIsReleaseWritablePath(t *testing.T) {
 		want bool
 	}{
 		{path: "version/version.go", want: true},
+		{path: filepath.FromSlash("version/version.go"), want: true},
+		{path: `version\version.go`, want: true},
 		{path: "deploy/helm/elastic-agent/Chart.yaml", want: true},
+		{path: filepath.FromSlash("deploy/kubernetes/elastic-agent-managed-kubernetes.yaml"), want: true},
+		{path: `deploy\kubernetes\elastic-agent-managed-kubernetes.yaml`, want: true},
 		{path: "testing/integration/k8s/testdata/elastic-agent-kustomize.yaml", want: true},
+		{path: filepath.FromSlash("testing/integration/k8s/testdata/elastic-agent-kustomize.yaml"), want: true},
 		{path: ".mergify.yml", want: true},
 		{path: "README.md", want: true},
 		{path: "../outside", want: false},
+		{path: filepath.FromSlash("../outside"), want: false},
+		{path: `..\outside`, want: false},
 	}
 
 	for _, tt := range tests {

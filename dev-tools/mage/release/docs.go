@@ -22,6 +22,8 @@ var releaseWritablePrefixes = []string{
 }
 
 func isReleaseWritablePath(path string) bool {
+	// Normalize separators so Windows filepath.Clean results (\) match slash allowlists.
+	path = filepath.ToSlash(strings.ReplaceAll(path, `\`, "/"))
 	if path == ".mergify.yml" || path == "README.md" {
 		return true
 	}
@@ -68,7 +70,7 @@ func collectDocFiles() ([]string, error) {
 		if d.IsDir() {
 			return nil
 		}
-		if strings.HasSuffix(path, "rendered/manifest.yaml") {
+		if strings.HasSuffix(filepath.ToSlash(path), "rendered/manifest.yaml") {
 			files = append(files, path)
 		}
 		return nil
@@ -88,6 +90,7 @@ func snapshotVersion(version string) string {
 
 func applyVersionReplacements(path, content, newVersion string) string {
 	snapshot := snapshotVersion(newVersion)
+	path = filepath.ToSlash(strings.ReplaceAll(path, `\`, "/"))
 
 	switch {
 	case strings.HasSuffix(path, "Chart.yaml"):
