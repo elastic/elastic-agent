@@ -31,9 +31,9 @@ const oauth2ClientExtensionType = "oauth2client"
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
 func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
-	kConfig, err := readKafkaConfig(config)
+	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("error reading kafka config: %w", err)
 	}
 
 	if err := checkUnsupportedKafkaConfig(config, logger); err != nil {
@@ -405,43 +405,6 @@ func getTransformProcessorID(outputName string) otelcomponent.ID {
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
-}
-
-// readKafkaConfig unpacks the kafka output config. Beats process runtime does
-// not support OAUTHBEARER, so ReadConfig rejects it; OTel translation still
-// needs the rest of the kafka settings, so we unpack with a supported mechanism
-// and restore OAUTHBEARER afterwards.
-func readKafkaConfig(cfg *config.C) (*kafka.KafkaConfig, error) {
-	kConfig, err := kafka.ReadConfig(cfg)
-	if err == nil {
-		return kConfig, nil
-	}
-	if !strings.Contains(err.Error(), "not valid SASL mechanism 'OAUTHBEARER'") {
-		return nil, fmt.Errorf("error reading kafka config: %w", err)
-	}
-
-	var raw map[string]any
-	if unpackErr := cfg.Unpack(&raw); unpackErr != nil {
-		return nil, fmt.Errorf("error reading kafka config: %w", err)
-	}
-	sasl, _ := raw["sasl"].(map[string]any)
-	if sasl == nil {
-		sasl = map[string]any{}
-		raw["sasl"] = sasl
-	}
-	sasl["mechanism"] = "PLAIN"
-	delete(raw, "sasl.mechanism")
-
-	tmp, tmpErr := config.NewConfigFrom(raw)
-	if tmpErr != nil {
-		return nil, fmt.Errorf("error reading kafka config: %w", tmpErr)
-	}
-	kConfig, err = kafka.ReadConfig(tmp)
-	if err != nil {
-		return nil, fmt.Errorf("error reading kafka config: %w", err)
-	}
-	kConfig.Sasl.SaslMechanism = "OAUTHBEARER"
-	return kConfig, nil
 }
 
 // log warning for unsupported config
