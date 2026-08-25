@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"gopkg.in/yaml.v3"
 )
@@ -56,18 +55,20 @@ func LoadSpecs(files ...string) (map[string][]OSPackageArgs, error) {
 		data = append(data, d)
 	}
 
-	// Parse into yaml.Node first to allow custom extra_vars deep-merge.
+	// Parse into yaml.Node first to allow custom deep-merge.
 	var root yaml.Node
 	if err := yaml.Unmarshal(bytes.Join(data, []byte{'\n'}), &root); err != nil {
 		return nil, fmt.Errorf("failed to parse spec YAML: %w", err)
 	}
 
 	// yaml.v3 performs a shallow merge for <<: keys: when multiple anchors each
-	// define extra_vars, only the first anchor's extra_vars map survives. packages.yml
-	// relies on yaml.v2's deep-merge behavior, where individual sub-keys from multiple
-	// anchors are combined. We replicate that here by walking the node tree and
-	// prepending a fully-merged extra_vars node before decoding.
-	fixExtraVarsMerge(&root, make(map[*yaml.Node]bool))
+	// define the same map-typed key (e.g. extra_vars or files), only the first
+	// anchor's value survives. packages.yml relies on yaml.v2's deep-merge
+	// behavior, where sub-keys from multiple anchors are combined. We replicate
+	// that here by walking the node tree and, for every mapping-valued key that
+	// appears across multiple merge sources, prepending (or replacing) a fully-
+	// merged version so yaml.v3's decode sees the complete merged map.
+	fixDeepMerge(&root, make(map[*yaml.Node]bool))
 
 	type PackageYAML struct {
 		Specs map[string][]OSPackageArgs `yaml:"specs"`
@@ -92,11 +93,12 @@ func LoadSpecs(files ...string) (map[string][]OSPackageArgs, error) {
 	return packages.Specs, nil
 }
 
-// fixExtraVarsMerge walks the YAML node tree and, for each mapping node that has
-// merge keys (<<:), collects extra_vars sub-keys from all merge sources and
-// prepends a unified extra_vars node. The prepended node takes priority during
-// Decode, emulating yaml.v2's deep-merge behavior for the extra_vars map.
-func fixExtraVarsMerge(node *yaml.Node, visited map[*yaml.Node]bool) {
+// fixDeepMerge walks the YAML node tree and, for each mapping node that has
+// merge keys (<<:), deep-merges any mapping-valued keys (e.g. extra_vars,
+// files) across all merge sources. This replicates yaml.v2's behavior where
+// map sub-keys from multiple anchors are combined, rather than yaml.v3's
+// shallow "first anchor wins" merge.
+func fixDeepMerge(node *yaml.Node, visited map[*yaml.Node]bool) {
 	if node == nil || visited[node] {
 		return
 	}
@@ -105,15 +107,15 @@ func fixExtraVarsMerge(node *yaml.Node, visited map[*yaml.Node]bool) {
 	switch node.Kind {
 	case yaml.DocumentNode, yaml.SequenceNode:
 		for _, child := range node.Content {
-			fixExtraVarsMerge(child, visited)
+			fixDeepMerge(child, visited)
 		}
 	case yaml.AliasNode:
-		fixExtraVarsMerge(node.Alias, visited)
+		fixDeepMerge(node.Alias, visited)
 	case yaml.MappingNode:
 		// Recurse into children first so nested merge keys are resolved before
-		// we collect extra_vars from anchor references.
+		// we collect values from anchor references.
 		for _, child := range node.Content {
-			fixExtraVarsMerge(child, visited)
+			fixDeepMerge(child, visited)
 		}
 
 		// Only act on mappings that have at least one merge key.
@@ -128,113 +130,131 @@ func fixExtraVarsMerge(node *yaml.Node, visited map[*yaml.Node]bool) {
 			return
 		}
 
-		merged := collectAllExtraVars(node)
-		if len(merged) == 0 {
+		// Collect, for each key that has a mapping-valued result across all
+		// merge sources, the combined sub-keys (first-occurrence wins).
+		mergedMaps := collectMergedMappingKeys(node)
+		for key, mergedVal := range mergedMaps {
+			// Find the existing explicit value for this key in the node (if any).
+			existingIdx := -1
+			for i := 0; i < len(node.Content)-1; i += 2 {
+				if node.Content[i].Value == key && node.Content[i].Tag != "!!merge" {
+					existingIdx = i
+					break
+				}
+			}
+			if existingIdx >= 0 {
+				// Replace existing value with the deep-merged one.
+				node.Content[existingIdx+1] = mergedVal
+			} else {
+				// Prepend a new key-value pair so it takes priority over
+				// merge-key values during yaml.v3 Decode.
+				keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
+				node.Content = append([]*yaml.Node{keyNode, mergedVal}, node.Content...)
+			}
+		}
+	}
+}
+
+// collectMergedMappingKeys returns, for each key that has a mapping-typed value
+// in the given node or in any of its merge sources, a yaml.MappingNode whose
+// content is the union of all sub-keys from all sources (first occurrence wins
+// per sub-key). Only keys whose values are mapping nodes are returned; scalar
+// and sequence values are handled correctly by yaml.v3's native first-wins rule.
+//
+// The returned map only contains keys where the merged result has more sub-keys
+// than the node's own explicit value (i.e. where extra sub-keys come from merge
+// sources). Keys where the node already has a complete value are excluded.
+func collectMergedMappingKeys(node *yaml.Node) map[string]*yaml.Node {
+	// result maps a key name to its merged MappingNode.
+	result := make(map[string]*yaml.Node)
+	// seenSubKeys tracks which sub-keys have been added for each outer key.
+	seenSubKeys := make(map[string]map[string]bool)
+
+	// visit processes a source mapping node. The offset controls priority:
+	// 0 = the node itself (highest), higher = from deeper merge chains.
+	var visit func(src *yaml.Node, offset int)
+	visit = func(src *yaml.Node, offset int) {
+		if src == nil {
 			return
 		}
-
-		// Build a sorted yaml.Node for the merged extra_vars map.
-		keys := make([]string, 0, len(merged))
-		for k := range merged {
-			keys = append(keys, k)
+		if src.Kind == yaml.AliasNode {
+			visit(src.Alias, offset)
+			return
 		}
-		sort.Strings(keys)
-		valNode := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
-		for _, k := range keys {
-			valNode.Content = append(valNode.Content,
-				&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: k},
-				&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: merged[k]},
-			)
+		if src.Kind != yaml.MappingNode {
+			return
 		}
+		for i := 0; i < len(src.Content)-1; i += 2 {
+			keyNode := src.Content[i]
+			valNode := src.Content[i+1]
 
-		// If the node already has an explicit extra_vars key, replace its value with
-		// the merged result to avoid duplicate key errors in yaml.v3.
-		// Otherwise prepend a new key so it takes priority over merge-key values.
-		existingIdx := -1
+			if keyNode.Tag == "!!merge" {
+				// Recurse into merge key sources.
+				switch valNode.Kind {
+				case yaml.AliasNode:
+					visit(valNode.Alias, offset+1)
+				case yaml.SequenceNode:
+					for idx, item := range valNode.Content {
+						if item.Kind == yaml.AliasNode {
+							visit(item.Alias, offset+idx+1)
+						}
+					}
+				}
+				continue
+			}
+
+			if valNode.Kind != yaml.MappingNode {
+				continue // scalar and sequence keys: native yaml.v3 behavior is correct
+			}
+
+			// Resolve alias values.
+			resolvedVal := valNode
+			if resolvedVal.Kind == yaml.AliasNode {
+				resolvedVal = resolvedVal.Alias
+			}
+			if resolvedVal.Kind != yaml.MappingNode {
+				continue
+			}
+
+			k := keyNode.Value
+			if _, exists := result[k]; !exists {
+				result[k] = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				seenSubKeys[k] = make(map[string]bool)
+			}
+			// Merge sub-keys from this source; first occurrence wins.
+			for j := 0; j < len(resolvedVal.Content)-1; j += 2 {
+				sk := resolvedVal.Content[j].Value
+				if !seenSubKeys[k][sk] {
+					seenSubKeys[k][sk] = true
+					result[k].Content = append(result[k].Content,
+						resolvedVal.Content[j],
+						resolvedVal.Content[j+1],
+					)
+				}
+			}
+		}
+	}
+
+	visit(node, 0)
+
+	// Drop entries where the merge produced no more sub-keys than what the
+	// node already has explicitly — no fix needed in those cases.
+	for k, mergedVal := range result {
+		if len(mergedVal.Content) == 0 {
+			delete(result, k)
+			continue
+		}
+		ownLen := 0
 		for i := 0; i < len(node.Content)-1; i += 2 {
-			if node.Content[i].Value == "extra_vars" && node.Content[i].Tag != "!!merge" {
-				existingIdx = i
+			if node.Content[i].Value == k && node.Content[i].Tag != "!!merge" {
+				ownLen = len(node.Content[i+1].Content)
 				break
 			}
 		}
-		if existingIdx >= 0 {
-			node.Content[existingIdx+1] = valNode
-		} else {
-			keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "extra_vars"}
-			node.Content = append([]*yaml.Node{keyNode, valNode}, node.Content...)
-		}
-	}
-}
-
-// collectAllExtraVars collects extra_vars sub-keys from a mapping node and all
-// its merge sources. Among merge sources, "first anchor wins" semantics apply.
-// The node's own inline extra_vars (if any) take the highest priority.
-func collectAllExtraVars(node *yaml.Node) map[string]string {
-	if node == nil {
-		return nil
-	}
-	if node.Kind == yaml.AliasNode {
-		return collectAllExtraVars(node.Alias)
-	}
-	if node.Kind != yaml.MappingNode {
-		return nil
-	}
-
-	merged := make(map[string]string)
-	var own map[string]string
-
-	for i := 0; i < len(node.Content)-1; i += 2 {
-		keyNode := node.Content[i]
-		valNode := node.Content[i+1]
-
-		switch {
-		case keyNode.Value == "extra_vars" && keyNode.Tag != "!!merge":
-			own = extraVarsFromNode(valNode)
-		case keyNode.Tag == "!!merge":
-			var sources []*yaml.Node
-			switch valNode.Kind {
-			case yaml.AliasNode:
-				sources = []*yaml.Node{valNode.Alias}
-			case yaml.SequenceNode:
-				for _, item := range valNode.Content {
-					if item.Kind == yaml.AliasNode {
-						sources = append(sources, item.Alias)
-					}
-				}
-			}
-			for _, src := range sources {
-				for k, v := range collectAllExtraVars(src) {
-					if _, exists := merged[k]; !exists {
-						merged[k] = v
-					}
-				}
-			}
+		if len(mergedVal.Content) <= ownLen {
+			delete(result, k)
 		}
 	}
 
-	for k, v := range own {
-		merged[k] = v
-	}
-	if len(merged) == 0 {
-		return nil
-	}
-	return merged
-}
-
-// extraVarsFromNode decodes a yaml.MappingNode into a map[string]string.
-func extraVarsFromNode(node *yaml.Node) map[string]string {
-	if node == nil {
-		return nil
-	}
-	if node.Kind == yaml.AliasNode {
-		return extraVarsFromNode(node.Alias)
-	}
-	if node.Kind != yaml.MappingNode {
-		return nil
-	}
-	result := make(map[string]string)
-	for i := 0; i < len(node.Content)-1; i += 2 {
-		result[node.Content[i].Value] = node.Content[i+1].Value
-	}
 	return result
 }
