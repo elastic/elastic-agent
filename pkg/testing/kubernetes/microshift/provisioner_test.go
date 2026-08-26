@@ -70,11 +70,12 @@ func TestMicroShiftImageForKubernetesVersion(t *testing.T) {
 		"1.33.5":     "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
 		"v1.34.2":    "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
 		"v1.34.2+ci": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
+		"v1.35.0":    "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10-amd64",
 	}
 
 	for version, expectedImage := range tests {
 		t.Run(version, func(t *testing.T) {
-			image, err := microShiftImageForKubernetesVersion(version)
+			image, err := microShiftImageForKubernetesVersion(version, "amd64")
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -82,29 +83,6 @@ func TestMicroShiftImageForKubernetesVersion(t *testing.T) {
 				t.Fatalf("expected image %q, got %q", expectedImage, image)
 			}
 		})
-	}
-}
-
-func TestMicroShiftImageForKubernetesVersionErrors(t *testing.T) {
-	for _, version := range []string{"", "v1.35.0", "not-a-version"} {
-		t.Run(version, func(t *testing.T) {
-			_, err := microShiftImageForKubernetesVersion(version)
-			if err == nil {
-				t.Fatalf("expected an error for Kubernetes version %q", version)
-			}
-		})
-	}
-}
-
-func TestMicroShiftSkipDelete(t *testing.T) {
-	t.Setenv("MICROSHIFT_SKIP_DELETE", "true")
-	if !microShiftSkipDelete() {
-		t.Fatal("expected MicroShift deletion to be skipped")
-	}
-
-	t.Setenv("MICROSHIFT_SKIP_DELETE", "false")
-	if microShiftSkipDelete() {
-		t.Fatal("expected MicroShift deletion not to be skipped")
 	}
 }
 

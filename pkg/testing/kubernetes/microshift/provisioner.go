@@ -38,6 +38,9 @@ const (
 var microShiftImagesByKubernetesMinor = map[string]string{
 	"1.33": "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
 	"1.34": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
+	// TODO(samuelvl): microshift has not released a 4.22 image yet, use minc which is fully compatible.
+	// Tracked in https://github.com/microshift-io/microshift/issues/235
+	"1.35": "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10",
 }
 
 // NewProvisioner creates a Kubernetes instance provisioner backed by MicroShift.
@@ -78,13 +81,6 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			return nil, err
 		}
 
-		provisioned := false
-		defer func() {
-			if !provisioned && !microShiftSkipDelete() {
-				_ = p.stopContainer(context.Background(), containerName)
-			}
-		}()
-
 		agentImageName, err := kubernetes.VariantToImage(batch.OS.DockerVariant)
 		if err != nil {
 			return nil, err
@@ -109,16 +105,11 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 				"container":   containerName,
 			},
 		})
-		provisioned = true
 	}
 	return instances, nil
 }
 
 func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
-	if microShiftSkipDelete() {
-		return nil
-	}
-
 	var errs []error
 	for _, instance := range instances {
 		containerName, _ := instance.Internal["container"].(string)
@@ -139,7 +130,7 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 	}
 
 	containerName := "microshift-" + instanceName
-	microShiftImage, err := microShiftImageForKubernetesVersion(k8sVersion)
+	microShiftImage, err := microShiftImageForKubernetesVersion(k8sVersion, runtime.GOARCH)
 	if err != nil {
 		return "", "", err
 	}
@@ -148,14 +139,6 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 	if err != nil {
 		return "", "", err
 	}
-
-	setupComplete := false
-	defer func() {
-		// Only tear down a container we created; an adopted one is left as-is.
-		if !setupComplete && !adopted {
-			_ = p.stopContainer(context.Background(), containerName)
-		}
-	}()
 
 	if adopted {
 		p.logf("Reusing running MicroShift container %s on API port %d", containerName, apiServerPort)
@@ -172,9 +155,7 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 		if err := p.run(ctx, "docker", "pull", microShiftImage); err != nil {
 			return "", "", fmt.Errorf("pulling MicroShift image: %w", err)
 		}
-		if err := p.run(
-			ctx,
-			"docker",
+		runArgs := []string{
 			"run",
 			"--privileged",
 			"--cgroupns=private",
@@ -184,8 +165,13 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 			"--name", containerName,
 			"--hostname", "127.0.0.1.nip.io",
 			"--publish", fmt.Sprintf("127.0.0.1:%d:6443", apiServerPort),
-			microShiftImage,
-		); err != nil {
+		}
+		if microShiftIsMincImage(microShiftImage) {
+			// minc needs a writable /host-container volume to start but it's never used
+			runArgs = append(runArgs, "-v", "/host-container")
+		}
+		runArgs = append(runArgs, microShiftImage)
+		if err := p.run(ctx, "docker", runArgs...); err != nil {
 			return "", "", fmt.Errorf("starting MicroShift container: %w", err)
 		}
 	}
@@ -275,7 +261,6 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 	}
 	p.logf("%s", strings.TrimSpace(nodeReadyOutput))
 
-	setupComplete = true
 	return kubeConfig, containerName, nil
 }
 
@@ -354,37 +339,6 @@ func (p *provisioner) diagnostics(ctx context.Context, containerName string) err
 		journalErr = fmt.Errorf("getting MicroShift service journal: %w", journalErr)
 	}
 	return errors.Join(statusErr, journalErr)
-}
-
-func getFreePort() (uint16, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
-	if err != nil {
-		return 0, err
-	}
-	listener, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return 0, err
-	}
-	defer listener.Close()
-	return uint16(listener.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // G115 a TCP port is always within uint16 range
-}
-
-func microShiftSkipDelete() bool {
-	return os.Getenv("MICROSHIFT_SKIP_DELETE") == "true"
-}
-
-func microShiftImageForKubernetesVersion(kubernetesVersion string) (string, error) {
-	version, err := semver.NewVersion(kubernetesVersion)
-	if err != nil {
-		return "", fmt.Errorf("invalid Kubernetes version %q: %w", kubernetesVersion, err)
-	}
-
-	minor := fmt.Sprintf("%d.%d", version.Major(), version.Minor())
-	image, found := microShiftImagesByKubernetesMinor[minor]
-	if !found {
-		return "", fmt.Errorf("no MicroShift image configured for Kubernetes version %q", kubernetesVersion)
-	}
-	return image, nil
 }
 
 func (p *provisioner) loadImage(ctx context.Context, containerName, image string) error {
@@ -477,4 +431,38 @@ func (p *provisioner) logf(format string, args ...interface{}) {
 	if p.logger != nil {
 		p.logger.Logf(format, args...)
 	}
+}
+
+func getFreePort() (uint16, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
+	return uint16(listener.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // G115 a TCP port is always within uint16 range
+}
+
+func microShiftImageForKubernetesVersion(kubernetesVersion, arch string) (string, error) {
+	version, err := semver.NewVersion(kubernetesVersion)
+	if err != nil {
+		return "", fmt.Errorf("invalid Kubernetes version %q: %w", kubernetesVersion, err)
+	}
+
+	minor := fmt.Sprintf("%d.%d", version.Major(), version.Minor())
+	image, found := microShiftImagesByKubernetesMinor[minor]
+	if !found {
+		return "", fmt.Errorf("no MicroShift image configured for Kubernetes version %q", kubernetesVersion)
+	}
+	if microShiftIsMincImage(image) {
+		image = image + "-" + arch
+	}
+	return image, nil
+}
+
+func microShiftIsMincImage(image string) bool {
+	return strings.HasPrefix(image, "quay.io/minc-org/minc:")
 }
