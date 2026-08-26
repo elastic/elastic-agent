@@ -18,6 +18,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -49,6 +50,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/go-elasticsearch/v8"
+	mockes "github.com/elastic/mock-es/pkg/api"
 	"github.com/elastic/sarama"
 )
 
@@ -1017,6 +1019,317 @@ agent.internal.runtime.filebeat.filestream: otel
 		"Expected %d metrics events, got %v", numEvents, actualHits)
 
 	cancel()
+}
+
+func TestOTelElasticsearchRetryStatusLevels(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+	})
+
+	const (
+		initialBackoff = time.Second
+		maxBackoff     = 4 * time.Second
+	)
+
+	var (
+		mu                       sync.Mutex
+		bulkRequestTimes         []time.Time
+		rejectedDocumentAttempts int
+		successfulDocuments      []string
+	)
+
+	mockESHandler := mockes.NewDeterministicAPIHandler(
+		uuid.Must(uuid.NewV4()),
+		"",
+		nil,
+		time.Now().Add(time.Hour),
+		0,
+		0,
+		func(action mockes.Action, event []byte) int {
+			if action.Action != "create" {
+				return http.StatusOK
+			}
+
+			message := string(event)
+			mu.Lock()
+			defer mu.Unlock()
+
+			if strings.Contains(message, "Line 0") {
+				rejectedDocumentAttempts++
+				return http.StatusUnauthorized
+			}
+
+			successfulDocuments = append(successfulDocuments, message)
+			return http.StatusOK
+		},
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/_bulk" {
+			mu.Lock()
+			bulkRequestTimes = append(bulkRequestTimes, time.Now())
+			attempts := len(bulkRequestTimes)
+			mu.Unlock()
+
+			if attempts <= 2 {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		mockESHandler.ServeHTTP(w, r)
+	})
+
+	mockESServer := httptest.NewServer(mux)
+	t.Cleanup(mockESServer.Close)
+
+	inputPath := filepath.Join(t.TempDir(), "input.log")
+	require.NoError(t, os.WriteFile(inputPath, []byte("Line 0\nLine 1\nLine 2\n"), 0o600))
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	configTemplate := `
+inputs:
+  - type: filestream
+    id: retry-status-levels
+    use_output: default
+    streams:
+      - id: retry-status-levels
+        data_stream:
+          dataset: retry_status_levels
+        paths:
+          - {{.InputPath}}
+    queue.mem.flush.timeout: 0s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    username: elastic
+    password: changeme
+    bulk_max_size: 3
+    backoff:
+      init: {{.InitialBackoff}}
+      max: {{.MaxBackoff}}
+agent:
+  monitoring:
+    metrics: false
+    logs: false
+  grpc.port: 4321
+  internal:
+    runtime.filebeat.filestream: otel
+`
+
+	var configBuffer bytes.Buffer
+	require.NoError(t, template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+		"InputPath":      inputPath,
+		"ESEndpoint":     mockESServer.URL,
+		"InitialBackoff": initialBackoff,
+		"MaxBackoff":     maxBackoff,
+	}))
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(2*time.Minute))
+	defer cancel()
+
+	require.NoError(t, fixture.Prepare(ctx))
+	require.NoError(t, fixture.Configure(ctx, configBuffer.Bytes()))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+	require.NoError(t, cmd.Start())
+
+	t.Cleanup(func() {
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Logf("Elastic-Agent output:\n%s", output.String())
+		}
+	})
+
+	var requestTimes []time.Time
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if len(bulkRequestTimes) != 3 || rejectedDocumentAttempts != 1 || len(successfulDocuments) != 2 {
+			return false
+		}
+		requestTimes = append([]time.Time(nil), bulkRequestTimes...)
+		return true
+	}, 30*time.Second, 50*time.Millisecond, "expected two request retries and one terminal document-level 401")
+
+	firstRetryDelay := requestTimes[1].Sub(requestTimes[0])
+	secondRetryDelay := requestTimes[2].Sub(requestTimes[1])
+	const schedulingTolerance = 250 * time.Millisecond
+
+	assert.GreaterOrEqual(t, firstRetryDelay, initialBackoff/2-schedulingTolerance)
+	assert.LessOrEqual(t, firstRetryDelay, initialBackoff+schedulingTolerance)
+	assert.GreaterOrEqual(t, secondRetryDelay, initialBackoff-schedulingTolerance)
+	assert.LessOrEqual(t, secondRetryDelay, 2*initialBackoff+schedulingTolerance)
+	assert.GreaterOrEqual(t, secondRetryDelay, firstRetryDelay)
+
+	assert.Never(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+
+		return len(bulkRequestTimes) != 3 || rejectedDocumentAttempts != 1 || len(successfulDocuments) != 2
+	}, 2*initialBackoff, 50*time.Millisecond, "document-level 401 should not be retried")
+}
+
+// TestOTelElasticsearchInvalidAPIKeyBackoff verifies that a standalone Agent
+// retries request-level authentication failures with exponential backoff.
+func TestOTelElasticsearchInvalidAPIKeyBackoff(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+	})
+
+	const (
+		initialBackoff = time.Second
+		maxBackoff     = 4 * time.Second
+		invalidAPIKey  = "invalid-api-key"
+	)
+	expectedEncodedAPIKey := base64.StdEncoding.EncodeToString([]byte(invalidAPIKey))
+
+	var (
+		mu                sync.Mutex
+		bulkRequestTimes  []time.Time
+		invalidKeyWasSent bool
+	)
+
+	mockESHandler := mockes.NewDeterministicAPIHandler(
+		uuid.Must(uuid.NewV4()),
+		"",
+		nil,
+		time.Now().Add(time.Hour),
+		0,
+		0,
+		func(mockes.Action, []byte) int {
+			return http.StatusOK
+		},
+	)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/_bulk" {
+			mu.Lock()
+			bulkRequestTimes = append(bulkRequestTimes, time.Now())
+			authScheme, apiKey, found := strings.Cut(r.Header.Get("Authorization"), " ")
+			// Verify the case-insensitive auth scheme and the exact base64-encoded API key.
+			invalidKeyWasSent = invalidKeyWasSent || (found && strings.EqualFold(authScheme, "APIKey") && apiKey == expectedEncodedAPIKey)
+			mu.Unlock()
+
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		mockESHandler.ServeHTTP(w, r)
+	})
+
+	mockESServer := httptest.NewServer(mux)
+	t.Cleanup(mockESServer.Close)
+
+	inputPath := filepath.Join(t.TempDir(), "input.log")
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	configTemplate := `
+inputs:
+  - type: filestream
+    id: invalid-api-key-backoff
+    use_output: default
+    streams:
+      - id: invalid-api-key-backoff
+        data_stream:
+          dataset: invalid_api_key_backoff
+        paths:
+          - {{.InputPath}}
+    queue.mem.flush.timeout: 0s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["{{.ESEndpoint}}"]
+    api_key: "{{.APIKey}}"
+    bulk_max_size: 1
+    backoff:
+      init: {{.InitialBackoff}}
+      max: {{.MaxBackoff}}
+agent:
+  monitoring:
+    metrics: false
+    logs: false
+  grpc.port: 0
+  internal:
+    runtime.filebeat.filestream: otel
+`
+	var configBuffer bytes.Buffer
+	require.NoError(t, template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer, map[string]any{
+		"InputPath":      inputPath,
+		"ESEndpoint":     mockESServer.URL,
+		"APIKey":         invalidAPIKey,
+		"InitialBackoff": initialBackoff,
+		"MaxBackoff":     maxBackoff,
+	}))
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(2*time.Minute))
+	defer cancel()
+
+	require.NoError(t, fixture.Prepare(ctx))
+	require.NoError(t, fixture.Configure(ctx, configBuffer.Bytes()))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err)
+
+	output := strings.Builder{}
+	cmd.Stderr = &output
+	cmd.Stdout = &output
+	require.NoError(t, cmd.Start())
+
+	t.Cleanup(func() {
+		_ = cmd.Wait()
+	})
+
+	integration.GenerateLogFile(t, inputPath, 100*time.Millisecond, 1)
+
+	var requestTimes []time.Time
+	require.Eventually(t, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+
+		if len(bulkRequestTimes) < 4 {
+			return false
+		}
+		requestTimes = append([]time.Time(nil), bulkRequestTimes[:4]...)
+		return true
+	}, 30*time.Second, 50*time.Millisecond, "expected a retried request with an invalid API key")
+
+	mu.Lock()
+	keyWasSent := invalidKeyWasSent
+	mu.Unlock()
+	require.True(t, keyWasSent, "expected the configured invalid API key to be sent to Elasticsearch")
+
+	firstRetryDelay := requestTimes[1].Sub(requestTimes[0])
+	secondRetryDelay := requestTimes[2].Sub(requestTimes[1])
+	thirdRetryDelay := requestTimes[3].Sub(requestTimes[2])
+	const schedulingTolerance = 250 * time.Millisecond
+
+	// First retry: 0.5 * initialBackoff
+	assert.GreaterOrEqual(t, firstRetryDelay, initialBackoff/2-schedulingTolerance)
+	assert.LessOrEqual(t, firstRetryDelay, initialBackoff+schedulingTolerance)
+
+	// Second retry: initialBackoff
+	assert.GreaterOrEqual(t, secondRetryDelay, initialBackoff-schedulingTolerance)
+	assert.LessOrEqual(t, secondRetryDelay, 2*initialBackoff+schedulingTolerance)
+
+	// Third retry: 2*initialBackoff
+	assert.GreaterOrEqual(t, thirdRetryDelay, 2*initialBackoff-schedulingTolerance)
+	assert.LessOrEqual(t, thirdRetryDelay, maxBackoff+schedulingTolerance)
 }
 
 func TestOTelHTTPMetricsInput(t *testing.T) {
@@ -3430,16 +3743,21 @@ agent.monitoring:
 
 		outFileURL := filepath.Join(logstash_testdata, fmt.Sprintf("%s.json", testCaseName))
 
-		// wait for logs to be published over HTTP
+		// wait for logs to be published and for the file to contain a valid JSON record
+		var outData mapstr.M
 		require.EventuallyWithTf(t,
 			func(ct *assert.CollectT) {
-				_, err := os.Stat(outFileURL)
-				require.NoError(ct, err)
+				data, err := os.ReadFile(outFileURL)
+				if err != nil {
+					// file not present yet
+					return
+				}
+				outData = parseFirstJSONLine(data)
+				assert.NotNil(ct, outData, "file exists but contains no JSON record yet")
 			},
 			2*time.Minute, 10*time.Second, "expected documents to be published to logstash output for %s mode", tt.name)
 
-		// download files from Logstash into testdata directory
-		logstash[tt.name] = downloadData(t, outFileURL)
+		logstash[tt.name] = outData
 
 		cancel()
 		_ = cmd.Wait()
@@ -3471,10 +3789,9 @@ agent.monitoring:
 
 }
 
-func downloadData(t *testing.T, file string) mapstr.M {
-	data, err := os.ReadFile(file)
-	require.NoError(t, err, "failed to copy data from %s", file)
-
+// parseFirstJSONLine returns the first non-empty JSON object from data, or nil
+// if no valid JSON line is found.
+func parseFirstJSONLine(data []byte) mapstr.M {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		line := bytes.TrimSpace(scanner.Bytes())
@@ -3482,7 +3799,9 @@ func downloadData(t *testing.T, file string) mapstr.M {
 			continue
 		}
 		var m mapstr.M
-		require.NoError(t, json.Unmarshal(line, &m), "failed to unmarshal line from %s", file)
+		if err := json.Unmarshal(line, &m); err != nil {
+			return nil
+		}
 		return m
 	}
 	return nil
