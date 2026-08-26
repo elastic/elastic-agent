@@ -97,9 +97,13 @@ func hideInheritedFlags(c *cobra.Command) {
 }
 
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string, supervisedMonitoringURL string, componentsFn func() (otelcol.Factories, error)) error {
-	// Must run before OTel constructs any component: Beat processors read the hostname
-	// override on construction, so it must be set first.
-	initBeatHostnameFromEnv()
+	if supervised {
+		// Agent-generated configs pass the override to each Beat receiver through its native
+		// hostname setting. Set the process-wide value before OTel constructs processors so
+		// they observe the same hostname. Standalone collectors own their receiver config and
+		// should use the native hostname setting directly.
+		initBeatHostnameFromEnv()
+	}
 
 	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel, componentsFn)
 	if err != nil {
