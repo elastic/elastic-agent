@@ -435,7 +435,6 @@ func (c *commandRuntime) start(comm Communicator) error {
 	// differentiate data paths
 	args = append(args, "-E", "path.data="+workDir)
 
-	// pass the agent hostname override to beats so host.name is consistent
 	if c.current.BeatName() != "" {
 		if hostname := util.HostnameOverride(); hostname != "" {
 			args = append(args, "--hostname", hostname)

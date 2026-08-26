@@ -312,7 +312,6 @@ func getCollectorConfigForComponent(
 	// than sharing one across all pipelines, since different beats can have different
 	// default processors.
 	beatDefaultProcessors := GetDefaultProcessors(comp.BeatName())
-
 	beatProcessorID := GetProcessorID(comp.ID).String()
 	var pipelineProcessors []string
 	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {

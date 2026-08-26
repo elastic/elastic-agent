@@ -4062,9 +4062,6 @@ func TestInjectOsqueryConfig(t *testing.T) {
 	}
 }
 
-// TestGetReceiversConfigHostnameOverride verifies that ELASTIC_AGENT_HOSTNAME is injected
-// into every Beat receiver via the native Beats hostname config key, mirroring the
-// --hostname flag used in the process runtime path.
 func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	comp := &component.Component{
 		ID:        "filestream-hostname-test",
