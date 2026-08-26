@@ -112,7 +112,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
-	err = os.MkdirAll(testLogsBasePath, 0o755)
+	err = os.MkdirAll(testLogsBasePath, 0o755) //nolint:gosec // path comes from a trusted test env var (K8S_TESTS_POD_LOGS_BASE)
 	require.NoError(t, err, "failed to create test logs directory")
 
 	esHost, err := integration.GetESHost()
@@ -226,10 +226,10 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	}
 }
 
-// k8sGetAgentID returns the agent ID for the given agent pod
-func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
+// k8sGetAgentStatus returns the status for the agent in the given pod.
+func k8sGetAgentStatus(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
 	namespace string, agentPodName string, containerName string,
-) (string, error) {
+) (atesting.AgentStatusOutput, error) {
 	command := []string{"elastic-agent", "status", "--output=json"}
 
 	status := atesting.AgentStatusOutput{} // clear status output
@@ -239,13 +239,24 @@ func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buff
 	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
 	cancel()
 	if err != nil {
-		return "", err
+		return atesting.AgentStatusOutput{}, err
 	}
 
 	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-		return "", err
+		return atesting.AgentStatusOutput{}, err
 	}
 
+	return status, nil
+}
+
+// k8sGetAgentID returns the agent ID for the given agent pod.
+func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
+	namespace string, agentPodName string, containerName string,
+) (string, error) {
+	status, err := k8sGetAgentStatus(ctx, client, stdout, stderr, namespace, agentPodName, containerName)
+	if err != nil {
+		return "", err
+	}
 	return status.Info.ID, nil
 }
 
@@ -513,7 +524,7 @@ type GetAgentResponse struct {
 // kibanaGetAgent essentially re-implements kibana.GetAgent to extract also GetAgentResponse.EnrolledAt
 func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgentResponse, error) {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s", id)
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
+	r, err := kc.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error calling get agent API: %w", err)
 	}
