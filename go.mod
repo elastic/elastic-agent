@@ -45,7 +45,7 @@ require (
 	github.com/moby/moby/client v0.5.1
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.159.1-0.20260825134713-7531790b5bc9
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.157.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.159.0
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1

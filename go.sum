@@ -533,8 +533,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.159.0
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest v0.159.0/go.mod h1:Hc+PQQduHGJKUXXumlIydv2jr07sFN5yIllZDldoMKc=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.159.0 h1:myQAaDpKnfPy/KU9BsBEWPsinvEPI4UFO5Yi2v7RiTU=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatautil v0.159.0/go.mod h1:Qzcts6LLXE+jpdEy1LCHL2Ddgit8hw08Ifj3zuYTitw=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.157.0 h1:Hvb9H2RXwCjJMT6btIzDpUbSPN/jqYDByxTRhzo8u7A=
-github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.157.0/go.mod h1:ib1+KCvPhgXKImjziaSmV5rO633StGIVMLyS1TqH+fM=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.159.0 h1:9IRKl90UJABffnvJlZ3vUYaMv/ODFIyEOkZS+ZDMoSI=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.159.0/go.mod h1:RMX7GR7TyPtrjlQYJngCMGXnofRJuZFeJ97L8pDtsC4=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJwooC2xJA040=
