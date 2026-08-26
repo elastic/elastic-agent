@@ -469,12 +469,8 @@ func getReceiversConfigForComponent(
 		sharedConfig["features"] = receiverFeatures
 	}
 
-	// OTel Beat receivers never see CLI flags. Inject ELASTIC_AGENT_HOSTNAME via the
-	// native Beat hostname config key so the receiver initialises its own identity
-	// (Info.Hostname, FQDN resolution, monitoring) with the override value.
-	// Note: externalized Beat processors such as add_host_metadata already see the
-	// override because RunCollector calls beat.SetHostnameOverride before any component
-	// is constructed. The native receiver setting below is for the receiver's own identity.
+	// OTel Beat receivers never see CLI flags, so pass ELASTIC_AGENT_HOSTNAME via the
+	// native Beat hostname config key for the receiver's own identity initialisation.
 	if hostname := util.HostnameOverride(); hostname != "" {
 		sharedConfig["hostname"] = hostname
 	}

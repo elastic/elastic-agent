@@ -964,17 +964,12 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 	require.NoError(t, err, "error at getting schedulable node count")
 	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
-	// Create a dedicated policy so this test does not permanently mutate the shared
-	// Fleet enrollment policy. The policy (and all its package policies) is deleted
-	// in cleanup; agents must be gone before deletion, which is best-effort here.
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 	policyResp, err := info.KibanaClient.CreatePolicy(ctx, kibana.AgentPolicy{
 		ID:          "test-hostname-override-" + policyUUID,
 		Name:        "test-hostname-override-" + policyUUID,
 		Namespace:   "default",
 		Description: "Temporary policy for TestKubernetesAgentBeatsHostnameOverride",
-		// Force System metrics onto the process runtime so this test exercises
-		// hostname override handling in Metricbeat, not the OTel receiver.
 		Overrides: map[string]interface{}{
 			"agent": map[string]interface{}{
 				"internal": map[string]interface{}{
@@ -1021,10 +1016,8 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 			},
 			"presets": map[string]any{
 				"perNode": map[string]any{
-					// Disable host networking so the pod hostname is not the node name,
-					// simulating restricted environments such as AKS with Cilium.
+					// hostNetwork: false so the pod hostname is a generated name, not the node name.
 					"hostNetwork": false,
-					// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
 					"extraEnvs": []any{
 						map[string]any{
 							"name":  "ELASTIC_NETINFO",
@@ -1066,8 +1059,6 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 		require.NoError(t, err, "failed to get agent status for pod %s", pod.Name)
 		id := status.Info.ID
 		require.NotEmpty(t, id)
-		// Unenroll before the policy cleanup runs (LIFO: this cleanup was registered
-		// after the DeletePolicy cleanup, so it executes first).
 		t.Cleanup(func() {
 			cleanCtx, cancel := context.WithTimeout(context.Background(), time.Minute) //nolint:forbidigo // t.Context() is cancelled at cleanup time
 			defer cancel()

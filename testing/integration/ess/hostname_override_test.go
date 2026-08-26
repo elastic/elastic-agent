@@ -52,11 +52,7 @@ func TestHostnameEnvOverride(t *testing.T) {
 		name    string
 		runtime component.RuntimeManager
 	}{
-		// process: ELASTIC_AGENT_HOSTNAME is forwarded as --hostname to the beat binary.
 		{name: "process_runtime", runtime: component.ProcessRuntimeManager},
-		// otel_receiver: RunCollector sets the Beat-wide hostname override before any OTel
-		// component is constructed, so externalized Beat processors see the value on init.
-		// Each Beat receiver also receives the override via its native hostname config key.
 		{name: "otel_receiver", runtime: component.OtelRuntimeManager},
 	}
 
@@ -106,8 +102,6 @@ func TestHostnameEnvOverride(t *testing.T) {
 					kibana.MonitoringEnabledLogs,
 					kibana.MonitoringEnabledMetrics,
 				},
-				// Force system/metrics onto the target runtime so the test exercises
-				// the specific code path under test.
 				Overrides: map[string]interface{}{
 					"agent": map[string]interface{}{
 						"internal": map[string]interface{}{
@@ -146,10 +140,6 @@ func TestHostnameEnvOverride(t *testing.T) {
 			t.Log("Verify that the System integration is running on the expected runtime")
 			assertComponentRuntime(ctx, t, agentFixture, "system/metrics-default", tc.runtime)
 
-			// Keep the system-metrics assertion first so a regression in the specific
-			// path under test (--hostname or hostname: config) fails before broader checks.
-			// Fresh install: the component needs to start, run its first collection cycle,
-			// send data to ES, and have it indexed. Use a longer timeout than the default 2m.
 			t.Log("Verify that host.name in beats-collected system metrics matches ELASTIC_AGENT_HOSTNAME")
 			verifyHostNameInIndices(t, "metrics-system.*-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
 
