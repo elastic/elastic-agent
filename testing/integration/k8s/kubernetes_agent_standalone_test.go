@@ -964,12 +964,15 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 	require.NoError(t, err, "error at getting schedulable node count")
 	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
 
-	policyID := kCtx.enrollParams.PolicyID
-	policy, err := info.KibanaClient.GetPolicy(ctx, policyID)
-	require.NoError(t, err, "failed to get agent policy")
-	_, err = info.KibanaClient.UpdatePolicy(ctx, policyID, kibana.AgentPolicyUpdateRequest{
-		Name:      policy.Name,
-		Namespace: policy.Namespace,
+	// Create a dedicated policy so this test does not permanently mutate the shared
+	// Fleet enrollment policy. The policy (and all its package policies) is deleted
+	// in cleanup; agents must be gone before deletion, which is best-effort here.
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	policyResp, err := info.KibanaClient.CreatePolicy(ctx, kibana.AgentPolicy{
+		ID:          "test-hostname-override-" + policyUUID,
+		Name:        "test-hostname-override-" + policyUUID,
+		Namespace:   "default",
+		Description: "Temporary policy for TestKubernetesAgentBeatsHostnameOverride",
 		// Force System metrics onto the process runtime so this test exercises
 		// hostname override handling in Metricbeat, not the OTel receiver.
 		Overrides: map[string]interface{}{
@@ -984,13 +987,21 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 			},
 		},
 	})
-	require.NoError(t, err, "failed to force system metrics onto the process runtime")
+	require.NoError(t, err, "failed to create dedicated agent policy")
+	t.Cleanup(func() {
+		if err := info.KibanaClient.DeletePolicy(ctx, policyResp.ID); err != nil {
+			t.Logf("failed to delete agent policy %q: %v", policyResp.ID, err)
+		}
+	})
 
 	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system",
 		integration.PreinstalledPackages["system"],
 		filepath.Join("..", "ess", "testdata", "system_integration_setup.json"),
-		uuid.Must(uuid.NewV4()).String(), policyID)
+		uuid.Must(uuid.NewV4()).String(), policyResp.ID)
 	require.NoError(t, err, "failed to install System integration")
+
+	enrollToken, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policyResp.ID)
+	require.NoError(t, err, "failed to create enrollment token for dedicated policy")
 
 	namespace := kCtx.getNamespace(t)
 	k8sStepCreateNamespace()(t, ctx, kCtx, namespace)
@@ -1005,7 +1016,7 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 			"fleet": map[string]any{
 				"enabled": true,
 				"url":     kCtx.enrollParams.FleetURL,
-				"token":   kCtx.enrollParams.EnrollmentToken,
+				"token":   enrollToken.APIKey,
 				"preset":  "perNode",
 			},
 			"presets": map[string]any{
