@@ -36,7 +36,6 @@ const (
 )
 
 // initBeatHostnameFromEnv sets the process-wide Beat hostname override from ELASTIC_AGENT_HOSTNAME.
-// Passing "" clears any stale value from a prior in-process run.
 func initBeatHostnameFromEnv() {
 	beat.SetHostnameOverride(util.HostnameOverride())
 }
