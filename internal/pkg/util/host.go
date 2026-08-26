@@ -19,8 +19,6 @@ const EnvHostName = "ELASTIC_AGENT_HOSTNAME"
 
 // HostnameOverride returns the trimmed value of ELASTIC_AGENT_HOSTNAME,
 // or "" if the variable is unset or contains only whitespace.
-// All code paths that read the override must go through this function so
-// normalisation is consistent across the process and OTel runtimes.
 func HostnameOverride() string {
 	return strings.TrimSpace(os.Getenv(EnvHostName))
 }

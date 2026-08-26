@@ -384,11 +384,7 @@ func setHostname(ctx context.Context, hostname string, log func(args ...any)) er
 }
 
 func getExternalIP() (string, error) {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://api.ipify.org", nil) //nolint:forbidigo // no test context available here
-	if err != nil {
-		return "", err
-	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := http.Get("https://api.ipify.org")
 	if err != nil {
 		return "", err
 	}
