@@ -58,7 +58,7 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-      - label: ":package: amd64: FIPS tar.gz,zip (linux,windows)"
+      - label: ":package: amd64: FIPS tar.gz,zip (linux,windows,macos)"
         key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz,zip"
@@ -96,7 +96,7 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-      - label: ":package: arm64: FIPS tar.gz,zip (linux,windows)"
+      - label: ":package: arm64: FIPS tar.gz,zip (linux,windows,macos)"
         key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz,zip"
