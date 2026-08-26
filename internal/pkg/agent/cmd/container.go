@@ -150,6 +150,18 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_FLEET_PASSWORD - Kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
+  ELASTIC_AGENT_HOSTNAME - override the hostname reported by Elastic Agent and all supervised Beat
+    workloads. Leading/trailing whitespace is trimmed; unset or whitespace-only values fall back to
+    the OS hostname (or FQDN when agent.features.fqdn is enabled). Useful in Kubernetes deployments
+    with hostNetwork: false where the pod OS hostname is a generated name instead of the node name:
+
+      env:
+        - name: ELASTIC_AGENT_HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+
+    An explicit add_host_metadata.name in a Beat input configuration retains its normal precedence.
 
 * Beats Receivers
   The following experimental environment variables can be set to enable using Beats Receivers.

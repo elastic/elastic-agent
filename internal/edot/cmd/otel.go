@@ -19,11 +19,14 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
+
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -31,6 +34,14 @@ const (
 	agentBaseDirectory    = "/usr/share/elastic-agent"    // directory that holds all elastic-agent related files
 	defaultStateDirectory = agentBaseDirectory + "/state" // directory that will hold the state data
 )
+
+// initBeatHostnameFromEnv reads ELASTIC_AGENT_HOSTNAME and installs its trimmed value as
+// the Beat-wide hostname override. Passing "" (unset or whitespace-only var) clears any
+// stale override left by a prior in-process run. Must be called before OTel constructs
+// component factories so externalized Beat processors see the correct value on init.
+func initBeatHostnameFromEnv() {
+	beat.SetHostnameOverride(util.HostnameOverride())
+}
 
 func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams, componentsFn func() (otelcol.Factories, error)) *cobra.Command {
 	cmd := &cobra.Command{
@@ -88,6 +99,14 @@ func hideInheritedFlags(c *cobra.Command) {
 }
 
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string, supervisedMonitoringURL string, componentsFn func() (otelcol.Factories, error)) error {
+	// In supervised mode the Beat-wide hostname override must be set before OTel constructs
+	// any component. Externalized Beat processors (e.g. add_host_metadata) read the override
+	// on construction; setting it here ensures they observe ELASTIC_AGENT_HOSTNAME rather than
+	// the OS hostname. Passing "" clears any stale override from a prior in-process run.
+	if supervised {
+		initBeatHostnameFromEnv()
+	}
+
 	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel, componentsFn)
 	if err != nil {
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
