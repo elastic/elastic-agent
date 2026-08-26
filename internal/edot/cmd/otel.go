@@ -99,9 +99,7 @@ func hideInheritedFlags(c *cobra.Command) {
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string, supervisedMonitoringURL string, componentsFn func() (otelcol.Factories, error)) error {
 	// Must run before OTel constructs any component: Beat processors read the hostname
 	// override on construction, so it must be set first.
-	if supervised {
-		initBeatHostnameFromEnv()
-	}
+	initBeatHostnameFromEnv()
 
 	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel, componentsFn)
 	if err != nil {
