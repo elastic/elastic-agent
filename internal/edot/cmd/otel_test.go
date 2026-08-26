@@ -74,9 +74,8 @@ func TestPrepareCollectorSettings(t *testing.T) {
 	})
 }
 
-// TestInitBeatHostnameFromEnv verifies the production helper that RunCollector calls in
-// supervised mode before any OTel component factory runs. Tests must not run in parallel
-// because they share the process-wide Beat hostname override.
+// TestInitBeatHostnameFromEnv tests must not run in parallel: they share the
+// process-wide Beat hostname override.
 func TestInitBeatHostnameFromEnv(t *testing.T) {
 	reset := func() { beat.SetHostnameOverride("") }
 

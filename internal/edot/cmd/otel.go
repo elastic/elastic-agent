@@ -35,10 +35,8 @@ const (
 	defaultStateDirectory = agentBaseDirectory + "/state" // directory that will hold the state data
 )
 
-// initBeatHostnameFromEnv reads ELASTIC_AGENT_HOSTNAME and installs its trimmed value as
-// the Beat-wide hostname override. Passing "" (unset or whitespace-only var) clears any
-// stale override left by a prior in-process run. Must be called before OTel constructs
-// component factories so externalized Beat processors see the correct value on init.
+// initBeatHostnameFromEnv sets the process-wide Beat hostname override from ELASTIC_AGENT_HOSTNAME.
+// Passing "" clears any stale value from a prior in-process run.
 func initBeatHostnameFromEnv() {
 	beat.SetHostnameOverride(util.HostnameOverride())
 }
@@ -99,10 +97,8 @@ func hideInheritedFlags(c *cobra.Command) {
 }
 
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string, supervisedMonitoringURL string, componentsFn func() (otelcol.Factories, error)) error {
-	// In supervised mode the Beat-wide hostname override must be set before OTel constructs
-	// any component. Externalized Beat processors (e.g. add_host_metadata) read the override
-	// on construction; setting it here ensures they observe ELASTIC_AGENT_HOSTNAME rather than
-	// the OS hostname. Passing "" clears any stale override from a prior in-process run.
+	// Must run before OTel constructs any component: Beat processors read the hostname
+	// override on construction, so it must be set first.
 	if supervised {
 		initBeatHostnameFromEnv()
 	}
