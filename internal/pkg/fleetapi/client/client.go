@@ -138,13 +138,16 @@ func CheckRemote(ctx context.Context, c Sender) error {
 		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
 	}
 
+	// discard body for proper cancellation and connection reuse.
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
 	}
 
-	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
 
 	return nil
 }
