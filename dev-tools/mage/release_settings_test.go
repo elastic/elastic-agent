@@ -40,11 +40,18 @@ func TestInferLatestRelease(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := InferLatestRelease(tt.version)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("InferLatestRelease() error = %v, wantErr %v", err, tt.wantErr)
+			parsed, err := ParseReleaseVersion(tt.version)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ParseReleaseVersion() error = nil, wantErr %v", tt.wantErr)
+				}
 				return
 			}
+			if err != nil {
+				t.Errorf("ParseReleaseVersion() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			got := InferLatestRelease(parsed)
 			if got != tt.want {
 				t.Errorf("InferLatestRelease() = %s, want %s", got, tt.want)
 			}
@@ -75,11 +82,18 @@ func TestInferNextRelease(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := InferNextRelease(tt.version)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("InferNextRelease() error = %v, wantErr %v", err, tt.wantErr)
+			parsed, err := ParseReleaseVersion(tt.version)
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ParseReleaseVersion() error = nil, wantErr %v", tt.wantErr)
+				}
 				return
 			}
+			if err != nil {
+				t.Errorf("ParseReleaseVersion() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			got := InferNextRelease(parsed)
 			if got != tt.want {
 				t.Errorf("InferNextRelease() = %s, want %s", got, tt.want)
 			}

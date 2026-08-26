@@ -386,7 +386,11 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 	}
 
 	if cfg.ReleaseBranch == "" {
-		cfg.ReleaseBranch = devtools.InferReleaseBranch(cfg.CurrentRelease)
+		parsed, err := devtools.ParseReleaseVersion(cfg.CurrentRelease)
+		if err != nil {
+			return err
+		}
+		cfg.ReleaseBranch = devtools.InferReleaseBranch(parsed)
 	}
 
 	if err := ensurePatchCurrentReleaseMatchesBranch(repo, cfg); err != nil {

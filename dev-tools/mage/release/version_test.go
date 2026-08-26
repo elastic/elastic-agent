@@ -22,10 +22,11 @@ func TestSelectLatestReleaseBefore(t *testing.T) {
 }
 
 func TestInferNextProjectMinorVersion(t *testing.T) {
-	got, err := devtools.InferNextProjectMinorVersion("9.5.0")
+	parsed, err := devtools.ParseReleaseVersion("9.5.0")
 	if err != nil {
-		t.Fatalf("InferNextProjectMinorVersion() error = %v", err)
+		t.Fatalf("ParseReleaseVersion() error = %v", err)
 	}
+	got := devtools.InferNextProjectMinorVersion(parsed)
 	if got != "9.6.0" {
 		t.Errorf("InferNextProjectMinorVersion() = %s, want 9.6.0", got)
 	}

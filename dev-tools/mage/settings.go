@@ -294,7 +294,8 @@ var (
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
 )
 
-func parseAgentCoreVersion(data []byte) (string, error) {
+// ParseAgentCoreVersion extracts defaultBeatVersion from version/version.go contents.
+func ParseAgentCoreVersion(data []byte) (string, error) {
 	matches := agentCoreVersionRegex.FindSubmatch(data)
 	if len(matches) == 2 {
 		return string(matches[1]), nil
@@ -1901,7 +1902,7 @@ func (s *Settings) initBuildVariables() error {
 	if err != nil {
 		return fmt.Errorf("failed to read agent-core version file=%v: %w", agentCoreVersionFile, err)
 	}
-	s.agentCoreVersion, err = parseAgentCoreVersion(data)
+	s.agentCoreVersion, err = ParseAgentCoreVersion(data)
 	if err != nil {
 		return fmt.Errorf("failed to parse agent-core version: %w", err)
 	}

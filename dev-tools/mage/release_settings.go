@@ -7,8 +7,9 @@ package mage
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
+
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // ReleaseSettings holds configuration for release automation (feature freeze / patch).
@@ -91,96 +92,58 @@ func (s *Settings) loadReleaseSettingsFromEnv() error {
 }
 
 func (s *Settings) populateReleaseFromCurrent(currentRelease string) error {
-	latestRelease, err := InferLatestRelease(currentRelease)
+	parsed, err := ParseReleaseVersion(currentRelease)
 	if err != nil {
-		return fmt.Errorf("failed to infer LatestRelease: %w", err)
+		return err
 	}
 
-	nextRelease, err := InferNextRelease(currentRelease)
-	if err != nil {
-		return fmt.Errorf("failed to infer NextRelease: %w", err)
-	}
-
-	nextProjectMinorVersion, err := InferNextProjectMinorVersion(currentRelease)
-	if err != nil {
-		return fmt.Errorf("failed to infer NextProjectMinorVersion: %w", err)
-	}
-
-	s.Release.CurrentRelease = currentRelease
-	s.Release.LatestRelease = latestRelease
-	s.Release.NextRelease = nextRelease
-	s.Release.ReleaseBranch = InferReleaseBranch(currentRelease)
-	s.Release.NextProjectMinorVersion = nextProjectMinorVersion
-	s.Release.NextProjectMinorBranch = InferNextProjectMinorBranch(currentRelease)
+	s.Release.CurrentRelease = parsed.CoreVersion()
+	s.Release.LatestRelease = InferLatestRelease(parsed)
+	s.Release.NextRelease = InferNextRelease(parsed)
+	s.Release.ReleaseBranch = InferReleaseBranch(parsed)
+	s.Release.NextProjectMinorVersion = InferNextProjectMinorVersion(parsed)
+	s.Release.NextProjectMinorBranch = InferNextProjectMinorBranch(parsed)
 	return nil
+}
+
+// ParseReleaseVersion parses a release version string as major.minor.patch with no
+// prerelease or build metadata (e.g. CURRENT_RELEASE=9.5.0).
+func ParseReleaseVersion(currentRelease string) (*version.ParsedSemVer, error) {
+	parsed, err := version.ParseVersion(strings.TrimSpace(currentRelease))
+	if err != nil {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch): %w", currentRelease, err)
+	}
+	if parsed.Prerelease() != "" || parsed.BuildMetadata() != "" {
+		return nil, fmt.Errorf("invalid version format: %s (expected major.minor.patch without prerelease/build metadata)", currentRelease)
+	}
+	return parsed, nil
 }
 
 // InferLatestRelease calculates the previous release version (patch - 1).
 // For minor releases (patch == 0), returns empty string; callers may resolve via GitHub.
-func InferLatestRelease(currentRelease string) (string, error) {
-	parts := strings.Split(currentRelease, ".")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
-	}
-
-	patch, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return "", fmt.Errorf("invalid patch version: %s", parts[2])
-	}
-
-	if patch == 0 {
-		return "", nil
-	}
-
-	return fmt.Sprintf("%s.%s.%d", parts[0], parts[1], patch-1), nil
-}
-
-func InferNextRelease(currentRelease string) (string, error) {
-	parts := strings.Split(currentRelease, ".")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
-	}
-
-	patch, err := strconv.Atoi(parts[2])
-	if err != nil {
-		return "", fmt.Errorf("invalid patch version: %s", parts[2])
-	}
-
-	return fmt.Sprintf("%s.%s.%d", parts[0], parts[1], patch+1), nil
-}
-
-func InferReleaseBranch(currentRelease string) string {
-	parts := strings.Split(currentRelease, ".")
-	if len(parts) >= 2 {
-		return parts[0] + "." + parts[1]
-	}
-	return ""
-}
-
-func InferNextProjectMinorVersion(currentRelease string) (string, error) {
-	parts := strings.Split(currentRelease, ".")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("invalid version format: %s (expected major.minor.patch)", currentRelease)
-	}
-
-	minor, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return "", fmt.Errorf("invalid minor version: %s", parts[1])
-	}
-
-	return fmt.Sprintf("%s.%d.0", parts[0], minor+1), nil
-}
-
-func InferNextProjectMinorBranch(currentRelease string) string {
-	parts := strings.Split(currentRelease, ".")
-	if len(parts) < 2 {
+func InferLatestRelease(v *version.ParsedSemVer) string {
+	if v.Patch() == 0 {
 		return ""
 	}
+	return version.NewParsedSemVer(v.Major(), v.Minor(), v.Patch()-1, "", "").CoreVersion()
+}
 
-	minor, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return ""
-	}
+// InferNextRelease returns the next patch version (patch + 1).
+func InferNextRelease(v *version.ParsedSemVer) string {
+	return version.NewParsedSemVer(v.Major(), v.Minor(), v.Patch()+1, "", "").CoreVersion()
+}
 
-	return fmt.Sprintf("%s.%d", parts[0], minor+1)
+// InferReleaseBranch returns the major.minor release branch name.
+func InferReleaseBranch(v *version.ParsedSemVer) string {
+	return fmt.Sprintf("%d.%d", v.Major(), v.Minor())
+}
+
+// InferNextProjectMinorVersion returns the next minor version as major.(minor+1).0.
+func InferNextProjectMinorVersion(v *version.ParsedSemVer) string {
+	return version.NewParsedSemVer(v.Major(), v.Minor()+1, 0, "", "").CoreVersion()
+}
+
+// InferNextProjectMinorBranch returns the next minor branch as major.(minor+1).
+func InferNextProjectMinorBranch(v *version.ParsedSemVer) string {
+	return fmt.Sprintf("%d.%d", v.Major(), v.Minor()+1)
 }

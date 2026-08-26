@@ -17,20 +17,17 @@ import (
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
-var defaultBeatVersionPattern = regexp.MustCompile(`const defaultBeatVersion = "([^"]+)"`)
-
-// ReadAgentVersion returns defaultBeatVersion from version/version.go.
+// ReadAgentVersion returns defaultBeatVersion from the on-disk version/version.go.
+// It must read the file rather than using the compile-time version.Agent constant:
+// release workflows call CheckoutBranch and then compare CURRENT_RELEASE to the
+// version on that branch.
 func ReadAgentVersion() (string, error) {
 	versionFile := "version/version.go"
 	content, err := os.ReadFile(versionFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to read %s: %w", versionFile, err)
 	}
-	match := defaultBeatVersionPattern.FindSubmatch(content)
-	if match == nil {
-		return "", fmt.Errorf("version pattern not found in %s", versionFile)
-	}
-	return string(match[1]), nil
+	return devtools.ParseAgentCoreVersion(content)
 }
 
 func validateRepoRelativePath(path string) (string, error) {
@@ -141,7 +138,11 @@ func UpdatePatchDocs(newVersion string) error {
 
 // UpdateDocs updates version references using release-branch defaults.
 func UpdateDocs(newVersion string) error {
-	releaseBranch := devtools.InferReleaseBranch(newVersion)
+	parsed, err := devtools.ParseReleaseVersion(newVersion)
+	if err != nil {
+		return err
+	}
+	releaseBranch := devtools.InferReleaseBranch(parsed)
 	return UpdateDocsWithOptions(DocsUpdateOptions{
 		BaseBranch:     releaseBranch,
 		CurrentVersion: newVersion,
@@ -156,7 +157,11 @@ func UpdateDocsWithOptions(opts DocsUpdateOptions) error {
 		return fmt.Errorf("CurrentVersion is required")
 	}
 	if opts.ReleaseBranch == "" {
-		opts.ReleaseBranch = devtools.InferReleaseBranch(opts.CurrentVersion)
+		parsed, err := devtools.ParseReleaseVersion(opts.CurrentVersion)
+		if err != nil {
+			return err
+		}
+		opts.ReleaseBranch = devtools.InferReleaseBranch(parsed)
 	}
 	if opts.BaseBranch == "" {
 		opts.BaseBranch = opts.ReleaseBranch
