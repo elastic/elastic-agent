@@ -18,6 +18,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -42,6 +43,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
@@ -71,6 +73,8 @@ type k8sContext struct {
 	esEncodedAPIKey string
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
+	// openshift is true when the cluster is OpenShift
+	openshift bool
 	// createdAt is the time when the k8sContext was created
 	createdAt time.Time
 }
@@ -112,7 +116,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
-	err = os.MkdirAll(testLogsBasePath, 0o755)
+	err = os.MkdirAll(filepath.Clean(testLogsBasePath), 0o755)
 	require.NoError(t, err, "failed to create test logs directory")
 
 	esHost, err := integration.GetESHost()
@@ -128,6 +132,8 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
 	require.NoError(t, err, "failed to create fleet enroll params")
 
+	openshift := os.Getenv("INSTANCE_PROVISIONER") == microshift.Name
+
 	return k8sContext{
 		client:          client,
 		clientSet:       clientSet,
@@ -139,6 +145,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		esAPIKey:        string(beatsStyleAPIKey),
 		esEncodedAPIKey: esAPIKey.Encoded,
 		enrollParams:    enrollParams,
+		openshift:       openshift,
 		createdAt:       time.Now(),
 	}
 }
@@ -513,7 +520,7 @@ type GetAgentResponse struct {
 // kibanaGetAgent essentially re-implements kibana.GetAgent to extract also GetAgentResponse.EnrolledAt
 func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgentResponse, error) {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s", id)
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
+	r, err := kc.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error calling get agent API: %w", err)
 	}

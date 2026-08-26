@@ -14,7 +14,6 @@ metadata:
       Collects container/node logs and Kubernetes metrics as a non-root user.
       No privileged containers, no host PID/IPC.
       Uses the spc_t SELinux type for cross-MCS container log access.
-priority: 10
 allowHostPID: false
 allowHostIPC: false
 # Needed when a preset requires it (e.g. the per-node collector).

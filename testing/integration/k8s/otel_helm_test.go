@@ -57,7 +57,8 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/values.yaml"},
+						ValueFiles: helmWithOpenshiftOverlays(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/values.yaml"),
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
@@ -100,8 +101,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						ValueFiles: helmWithOpenshiftOverlays(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"),
+						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -129,8 +131,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs-values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						ValueFiles: helmWithOpenshiftOverlays(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs-values.yaml"),
+						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -159,8 +162,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmTemplateApplyWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						ValueFiles: helmWithOpenshiftOverlays(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"),
+						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
@@ -292,4 +296,14 @@ func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamN
 			require.Greater(collectT, docs.Hits.Total.Value, 0)
 		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", dsName))
 	}
+}
+
+// helmWithOpenshiftOverlays appends OpenShift-specific helm value files to base when on OpenShift.
+func helmWithOpenshiftOverlays(kCtx k8sContext, base ...string) []string {
+	if !kCtx.openshift {
+		return base
+	}
+	return append(base,
+		"../../../deploy/helm/edot-collector/kube-stack/openshift/values.yaml",
+	)
 }
