@@ -1066,6 +1066,15 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 		require.NoError(t, err, "failed to get agent status for pod %s", pod.Name)
 		id := status.Info.ID
 		require.NotEmpty(t, id)
+		// Unenroll before the policy cleanup runs (LIFO: this cleanup was registered
+		// after the DeletePolicy cleanup, so it executes first).
+		t.Cleanup(func() {
+			cleanCtx, cancel := context.WithTimeout(context.Background(), time.Minute) //nolint:forbidigo // t.Context() is cancelled at cleanup time
+			defer cancel()
+			if err := fleettools.UnEnrollAgent(cleanCtx, info.KibanaClient, id); err != nil {
+				t.Logf("failed to unenroll agent %q: %v", id, err)
+			}
+		})
 
 		var foundSystemMetrics bool
 		for _, comp := range status.Components {
