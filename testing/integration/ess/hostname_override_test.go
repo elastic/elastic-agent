@@ -86,12 +86,12 @@ func TestHostnameEnvOverride(t *testing.T) {
 			t.Cleanup(func() {
 				if readErr == nil {
 					// Restore the original content.
-					os.WriteFile(dropInFile, existingDropIn, 0o644) //nolint:errcheck // best-effort cleanup
+					os.WriteFile(dropInFile, existingDropIn, 0o644) //nolint:gosec // G703: path is a fixed system drop-in location
 				} else {
-					os.Remove(dropInFile) //nolint:errcheck // best-effort cleanup
+					os.Remove(dropInFile)
 				}
 				if dirCreated {
-					os.Remove(dropInDir) //nolint:errcheck // removes only if empty
+					os.Remove(dropInDir)
 				}
 			})
 
