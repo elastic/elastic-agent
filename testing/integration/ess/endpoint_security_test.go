@@ -132,8 +132,8 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 	})
 }
 
-func getEndpointVersion(t *testing.T) string {
-	cmd := exec.CommandContext(t.Context(), "sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
+func getEndpointVersion(t *testing.T, ctx context.Context) string {
+	cmd := exec.CommandContext(ctx, "sudo", "/opt/Elastic/Endpoint/elastic-endpoint", "version")
 	output, err := cmd.CombinedOutput()
 	require.NoError(t, err)
 	// version: 8.18.0-SNAPSHOT, compiled: Wed Feb 19 01:00:00 2025, branch: HEAD, commit: c450b50f91507c3166b072df8557f5efd871103a
@@ -176,7 +176,8 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 			return
 		}
 
-		out, err := exec.CommandContext(t.Context(), "sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
+		cleanupCtx := context.WithoutCancel(t.Context())
+		out, err := exec.CommandContext(cleanupCtx, "sudo", "systemctl", "stop", "ElasticEndpoint").CombinedOutput()
 		if err != nil {
 			t.Log(string(out))
 			t.Logf("error while stopping Elastic Endpoint: %s", err.Error())
@@ -187,7 +188,7 @@ func addEndpointCleanup(t *testing.T, uninstallToken string) {
 			return
 		}
 
-		uninstallContext, uninstallCancel := context.WithTimeout(t.Context(), 5*time.Minute)
+		uninstallContext, uninstallCancel := context.WithTimeout(cleanupCtx, 5*time.Minute)
 		defer uninstallCancel()
 
 		t.Logf("Uninstalling endpoint with the following uninstall token: %s", uninstallToken)
@@ -275,7 +276,7 @@ func testUnprotectedInstallUpgrade(
 
 	installFirstAgent(ctx, t, info, false, packageFormat, upgradeFromVersion.String())
 
-	initEndpointVersion := getEndpointVersion(t)
+	initEndpointVersion := getEndpointVersion(t, ctx)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
 	t.Log("Setup agent fixture with the test build")
@@ -311,7 +312,7 @@ func testUnprotectedInstallUpgrade(
 	)
 
 	t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
-	upgradedEndpointVersion := getEndpointVersion(t)
+	upgradedEndpointVersion := getEndpointVersion(t, ctx)
 	t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
 	startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
@@ -346,7 +347,7 @@ func testTamperProtectedInstallUpgrade(
 
 	fixture, uninstallToken := installFirstAgent(ctx, t, info, true, packageFormat, initialVersion)
 
-	initEndpointVersion := getEndpointVersion(t)
+	initEndpointVersion := getEndpointVersion(t, ctx)
 	t.Logf("The initial endpoint version is %s", initEndpointVersion)
 
 	// Optionally stop the endpoint service before upgrade
@@ -399,7 +400,7 @@ func testTamperProtectedInstallUpgrade(
 
 	if checkVersionUpgrade {
 		t.Log("Validate that the initial endpoint version is smaller than the upgraded version")
-		upgradedEndpointVersion := getEndpointVersion(t)
+		upgradedEndpointVersion := getEndpointVersion(t, ctx)
 		t.Logf("The upgraded endpoint version is %s", upgradedEndpointVersion)
 
 		startEndpointVersion, err := version.ParseVersion(initEndpointVersion)
@@ -573,7 +574,7 @@ func testInstallAndCLIUninstallWithEndpointSecurity(t *testing.T, info *define.I
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(t.Context(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
@@ -1018,7 +1019,7 @@ func TestEndpointLogsAreCollectedInDiagnostics(t *testing.T) {
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(t.Context(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
@@ -1214,7 +1215,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 	t.Cleanup(func() {
 		t.Log("Un-enrolling Elastic Agent...")
 		// Use a separate context as the one in the test body will have been cancelled at this point.
-		cleanupCtx, cleanupCancel := context.WithTimeout(t.Context(), time.Minute)
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
 	})
@@ -1691,7 +1692,7 @@ func generateMTLSCerts(t *testing.T, name string) certificatePaths {
 	// all the configs, including the certificates, which would be gone if the
 	// directory is deleted.
 	tmpDir, err := os.MkdirTemp(os.TempDir(), t.Name()+"-"+name)
-	require.NoError(t, err, "error creating temp dir for certificates")
+	require.NoError(t, err, "failed to create temp dir for certificates")
 	t.Logf("[%s] certificates saved on: %s", name, tmpDir)
 
 	proxyCAKey, proxyCACert, proxyCAPair, err := certutil.NewRSARootCA(
@@ -1926,6 +1927,18 @@ func TestPolicyReassignWithTamperProtectedEndpoint(t *testing.T) {
 		time.Second,
 		"Endpoint is not running a different policy after policy reassignment",
 	)
+
+	// Re-fetch the uninstall token after endpoint confirms the new policy is active.
+	// getEndpointPolicyID can return the new policy ID before endpoint has persisted the
+	// new tamper-protection hash, so the token fetched before reassignment may be stale.
+	// A second cleanup registered here (LIFO: runs first) uses the fresh token; the earlier
+	// cleanup is a no-op if this one succeeds (endpoint binary already gone).
+	latestPolicy2Token, err := tools.GetUninstallToken(ctx, info.KibanaClient, policyResp.ID)
+	if err != nil {
+		t.Logf("Warning: failed to re-fetch policy 2 uninstall token after policy propagation: %v", err)
+	} else {
+		addEndpointCleanup(t, latestPolicy2Token)
+	}
 }
 
 func getEndpointPolicyID(t *testing.T, ctx context.Context) string {
