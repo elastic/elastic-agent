@@ -198,7 +198,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 							"queue.mem.flush.min_events": 1600,
 							"queue.mem.flush.timeout":    "10s",
 							"sasl.mechanism":             "OAUTHBEARER",
-							"oauth": map[string]any{
+							"auth": map[string]any{
 								"oauth2client": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 									"client_id":     "my-client",
 									"client_secret": "my-secret",

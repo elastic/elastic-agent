@@ -23,7 +23,7 @@ topic: static-topic
 username: elastic
 password: changeme
 sasl.mechanism: OAUTHBEARER
-oauth:
+auth:
   oauth2client:
     client_id: my-client
     client_secret: my-secret
@@ -89,7 +89,7 @@ func TestKafkaOAuthRequiresOauthConfig(t *testing.T) {
 		wantErr string
 	}{
 		{
-			name: "missing oauth",
+			name: "missing auth",
 			input: `
 hosts: ["kafka1:9092"]
 topic: static-topic
@@ -98,22 +98,22 @@ sasl.mechanism: OAUTHBEARER
 			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
 		},
 		{
-			name: "empty oauth",
+			name: "empty auth",
 			input: `
 hosts: ["kafka1:9092"]
 topic: static-topic
 sasl.mechanism: OAUTHBEARER
-oauth: {}
+auth: {}
 `,
 			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
 		},
 		{
-			name: "unsupported oauth type",
+			name: "unsupported auth type",
 			input: `
 hosts: ["kafka1:9092"]
 topic: static-topic
 sasl.mechanism: OAUTHBEARER
-oauth:
+auth:
   unknown:
     client_id: my-client
 `,

@@ -3204,7 +3204,7 @@ outputs:
     protocol: https
 {{- if eq .SaslMechanism "OAUTHBEARER"}}
     sasl.mechanism: OAUTHBEARER
-    oauth:
+    auth:
       oauth2client:
         client_id: {{.ClientID}}
         client_secret: {{.ClientSecret}}

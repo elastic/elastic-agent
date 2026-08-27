@@ -104,7 +104,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			},
 		}
 
-		oauthCfg, err := config.Child("oauth", -1)
+		oauthCfg, err := config.Child("auth", -1)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
@@ -114,8 +114,8 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 
 		switch oauthCfg.GetFields()[0] {
-		case "oauth2client":
-			oauth2ClientCfg, err := oauthCfg.Child("oauth2client", -1)
+		case oauth2ClientExtensionType:
+			oauth2ClientCfg, err := oauthCfg.Child(oauth2ClientExtensionType, -1)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
 			}
