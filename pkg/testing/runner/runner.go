@@ -262,8 +262,6 @@ func (r *Runner) Clean() error {
 	return r.writeState()
 }
 
-<<<<<<< HEAD
-=======
 func (r *Runner) stackEnv(batch common.OSBatch, logger common.Logger) (map[string]string, error) {
 	env := map[string]string{}
 	for k, v := range r.cfg.ExtraEnv {
@@ -304,8 +302,6 @@ func internalString(internal map[string]interface{}, key, fallback string) strin
 	}
 	return fallback
 }
-
->>>>>>> 960845b (Add local stack provisioner (#16188))
 func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
 	results := make(map[string]common.OSRunnerResult)
 	var resultsMx sync.Mutex
