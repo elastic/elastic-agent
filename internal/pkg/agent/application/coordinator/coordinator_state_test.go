@@ -5,6 +5,7 @@
 package coordinator
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	pkgcomponent "github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -234,4 +236,37 @@ func TestApplyComponentState_StartingFromNewRuntimeReplacesExisting(t *testing.T
 	assert.Equal(t, pkgcomponent.ProcessRuntimeManager, coord.state.Components[0].Component.RuntimeManager,
 		"component should now be under process runtime")
 	assert.Equal(t, client.UnitStateStarting, coord.state.Components[0].State.State)
+}
+
+func TestRecoverableActionsError(t *testing.T) {
+	pingErr := errors.New("fleet server ping returned a bad status code: 429")
+
+	tt := []struct {
+		id       string
+		err      error
+		expected agentclient.State
+	}{
+		{"no error", nil, agentclient.Healthy},
+		{"plain error", pingErr, agentclient.Failed},
+		{"recoverable error", errors.NewRecoverable(pingErr), agentclient.Degraded},
+		{"wrapped recoverable error", fmt.Errorf("validating fleet client config: %w", errors.NewRecoverable(pingErr)), agentclient.Degraded},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.id, func(t *testing.T) {
+			coord := &Coordinator{
+				state: State{
+					CoordinatorState:   agentclient.Healthy,
+					CoordinatorMessage: "Running",
+				},
+				actionsErr: tc.err,
+			}
+
+			state := coord.generateReportableState()
+			assert.Equal(t, tc.expected, state.State)
+			if tc.err != nil {
+				assert.Equal(t, "Actions: "+tc.err.Error(), state.Message)
+			}
+		})
+	}
 }
