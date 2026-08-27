@@ -35,12 +35,12 @@ const (
 	microShiftWaitTimeout      = 5 * time.Minute
 )
 
-var microShiftImagesByKubernetesMinor = map[string]string{
-	"1.33": "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
-	"1.34": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
+var microShiftImagesByOpenShiftMinor = map[string]string{
+	"4.20": "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
+	"4.21": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
 	// TODO(samuelvl): microshift has not released a 4.22 image yet, use minc which is fully compatible.
 	// Tracked in https://github.com/microshift-io/microshift/issues/235
-	"1.35": "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10",
+	"4.22": "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10",
 }
 
 // NewProvisioner creates a Kubernetes instance provisioner backed by MicroShift.
@@ -60,6 +60,10 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
+}
+
 func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
@@ -68,8 +72,8 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	if batch.Type != define.Kubernetes || batch.Arch != runtime.GOARCH {
 		return false
 	}
-	if batch.Distro != "" && batch.Distro != Name {
-		// not kind, don't run
+	if batch.Distro != "" && batch.Distro != kubernetes.OpenShiftDistro {
+		// not openshift, don't run
 		return false
 	}
 	return true
@@ -78,9 +82,9 @@ func (p *provisioner) Supported(batch define.OS) bool {
 func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
 	var instances []common.Instance
 	for _, batch := range batches {
-		k8sVersion := fmt.Sprintf("v%s", batch.OS.Version)
-		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.Batch.Group)
-		kubeConfig, containerName, err := p.setup(ctx, instanceName, k8sVersion)
+		openshiftVersion := batch.OS.Version
+		instanceName := fmt.Sprintf("%s-%s", openshiftVersion, batch.Batch.Group)
+		kubeConfig, containerName, err := p.setup(ctx, instanceName, openshiftVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +108,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			Provisioner: Name,
 			Internal: map[string]interface{}{
 				"config":      kubeConfig,
-				"version":     k8sVersion,
+				"version":     openshiftVersion,
 				"agent_image": agentImage,
 				"container":   containerName,
 			},
@@ -128,13 +132,13 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 	return errors.Join(errs...)
 }
 
-func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string) (string, string, error) {
+func (p *provisioner) setup(ctx context.Context, instanceName, openshiftVersion string) (string, string, error) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return "", "", fmt.Errorf("docker command missing: %w", err)
 	}
 
 	containerName := "microshift-" + instanceName
-	microShiftImage, err := microShiftImageForKubernetesVersion(k8sVersion, runtime.GOARCH)
+	microShiftImage, err := microShiftImageForOpenShiftVersion(openshiftVersion, runtime.GOARCH)
 	if err != nil {
 		return "", "", err
 	}
@@ -450,16 +454,16 @@ func getFreePort() (uint16, error) {
 	return uint16(listener.Addr().(*net.TCPAddr).Port), nil //nolint:gosec // G115 a TCP port is always within uint16 range
 }
 
-func microShiftImageForKubernetesVersion(kubernetesVersion, arch string) (string, error) {
-	version, err := semver.NewVersion(kubernetesVersion)
+func microShiftImageForOpenShiftVersion(openshiftVersion, arch string) (string, error) {
+	version, err := semver.NewVersion(openshiftVersion)
 	if err != nil {
-		return "", fmt.Errorf("invalid Kubernetes version %q: %w", kubernetesVersion, err)
+		return "", fmt.Errorf("invalid OpenShift version %q: %w", openshiftVersion, err)
 	}
 
 	minor := fmt.Sprintf("%d.%d", version.Major(), version.Minor())
-	image, found := microShiftImagesByKubernetesMinor[minor]
+	image, found := microShiftImagesByOpenShiftMinor[minor]
 	if !found {
-		return "", fmt.Errorf("no MicroShift image configured for Kubernetes version %q", kubernetesVersion)
+		return "", fmt.Errorf("no MicroShift image configured for OpenShift version %q", openshiftVersion)
 	}
 	if microShiftIsMincImage(image) {
 		image = image + "-" + arch

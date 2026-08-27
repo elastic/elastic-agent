@@ -64,18 +64,17 @@ func TestProvisionerSupported(t *testing.T) {
 	}
 }
 
-func TestMicroShiftImageForKubernetesVersion(t *testing.T) {
+func TestMicroShiftImageForOpenShiftVersion(t *testing.T) {
 	tests := map[string]string{
-		"1.33":       "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
-		"1.33.5":     "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
-		"v1.34.2":    "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
-		"v1.34.2+ci": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
-		"v1.35.0":    "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10-amd64",
+		"4.20":    "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
+		"4.20.0":  "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
+		"v4.21.2": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
+		"v4.22.0": "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10-amd64",
 	}
 
 	for version, expectedImage := range tests {
 		t.Run(version, func(t *testing.T) {
-			image, err := microShiftImageForKubernetesVersion(version, "amd64")
+			image, err := microShiftImageForOpenShiftVersion(version, "amd64")
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}

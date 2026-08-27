@@ -3230,7 +3230,8 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	// The local stack provisioner runs elastic-package locally and needs no ESS
 	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
 	var provisionCfg ess.ProvisionerConfig
-	if cfg.IntegrationTest.StackProvisioner != ess.ProvisionerLocal {
+	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
+	if stackProvisionerMode != ess.ProvisionerLocal && stackProvisionerMode != ess.ProvisionerExternal {
 		provisionCfg, err = essProvisionerConfig(cfg, identifier)
 		if err != nil {
 			return nil, err
@@ -3353,11 +3354,15 @@ func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerCon
 	case ess.ProvisionerLocal:
 		sp, err := ess.NewLocalProvisioner()
 		return sp, mode, err
+	case ess.ProvisionerExternal:
+		sp, err := ess.NewExternalProvisioner()
+		return sp, mode, err
 	default:
-		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q, %q or %q, not %s",
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
 			ess.ProvisionerLocal,
+			ess.ProvisionerExternal,
 			mode)
 	}
 }

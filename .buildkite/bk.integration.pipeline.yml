@@ -166,6 +166,45 @@ common:
       - build/diagnostics/**
       - build/*.pod_logs_dump/*
 
+  # key to hold the list of OpenShift versions to test against
+  - openshift_test:
+    versions: &openshift_test_versions
+      - &openshift_min_test_version v4.20.0 # Kubernetes 1.33
+      - v4.21.0                             # Kubernetes 1.34
+      - &openshift_max_test_version v4.22.0 # Kubernetes 1.35
+    versions_without_min_max: &openshift_test_versions_without_min_max
+      - v4.21
+    variants: &openshift_test_variants
+      - basic
+      - complete
+      - complete-wolfi
+      - elastic-otel-collector
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+      - wolfi
+    default_variants: &openshift_test_default_variants
+      - complete
+      - complete-wolfi
+      - elastic-otel-collector
+    env: &openshift_test_env
+      OPENSHIFT_VERSION: "{{matrix.version}}"
+      DOCKER_VARIANTS: "{{matrix.variants}}"
+      TARGET_ARCH: "amd64"
+    agent: &openshift_test_agent
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      diskSizeGb: 80
+    command: &openshift_test_command |
+      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
+    artifact_paths: &openshift_test_artifact_paths
+      - build/*
+      - build/diagnostics/**
+      - build/*.pod_logs_dump/*
+
 steps:
   - label: "Custom ECH Testing"
     key: integration-tests-ech
@@ -952,6 +991,30 @@ steps:
             version:
               *k8s_test_versions
 
+      - label: ":openshift:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          *openshift_test_env
+        command: *openshift_test_command
+        artifact_paths:
+          *openshift_test_artifact_paths
+        # TODO(samuelvl): remove soft_fail once OpenShift tests are stable
+        soft_fail: true
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *openshift_test_agent
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variants:
+              *openshift_test_default_variants
+            version:
+              *openshift_test_versions
+
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
     if_changed:
@@ -992,6 +1055,31 @@ steps:
               - *k8s_min_test_version
               - *k8s_max_test_version
 
+      - label: ":openshift:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          *openshift_test_env
+        command: *openshift_test_command
+        artifact_paths:
+          *openshift_test_artifact_paths
+        # TODO(samuelvl): remove soft_fail once OpenShift tests are stable
+        soft_fail: true
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *openshift_test_agent
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variants:
+              *openshift_test_variants
+            version:
+              - *openshift_min_test_version
+              - *openshift_max_test_version
+
   - group: ":kubernetes: Kubernetes (tier 3)"
     key: integration-tests-kubernetes-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
@@ -1025,6 +1113,30 @@ steps:
               *k8s_test_variants
             version:
               *k8s_test_versions_without_min_max
+
+      - label: ":openshift:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          *openshift_test_env
+        command: *openshift_test_command
+        artifact_paths:
+          *openshift_test_artifact_paths
+        # TODO(samuelvl): remove soft_fail once OpenShift tests are stable
+        soft_fail: true
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *openshift_test_agent
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variants:
+              *openshift_test_variants
+            version:
+              *openshift_test_versions_without_min_max
 
   - group: "Serverless integration test"
     key: integration-tests-serverless
