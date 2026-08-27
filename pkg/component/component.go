@@ -205,7 +205,15 @@ func (d *DynamicInputsConfig) validate() error {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:                 string(DefaultRuntimeManager),
-		DynamicInputs:           DefaultDynamicInputsConfig(),
+		DynamicInputs: DynamicInputsConfig{
+			Default:     string(ProcessRuntimeManager),
+			Auditbeat:   BeatRuntimeConfig{InputType: make(map[string]string)},
+			Filebeat:    BeatRuntimeConfig{InputType: make(map[string]string)},
+			Heartbeat:   BeatRuntimeConfig{InputType: make(map[string]string)},
+			Metricbeat:  BeatRuntimeConfig{InputType: make(map[string]string)},
+			Osquerybeat: BeatRuntimeConfig{InputType: make(map[string]string)},
+			Packetbeat:  BeatRuntimeConfig{InputType: make(map[string]string)},
+		},
 		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),
