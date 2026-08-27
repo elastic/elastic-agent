@@ -160,3 +160,25 @@ var _ Error = agentError{}
 
 // Check it implements error
 var _ error = agentError{}
+
+// RecoverableError marks an error as potentially transient.
+type RecoverableError struct {
+	Err error
+}
+
+func NewRecoverable(err error) *RecoverableError {
+	return &RecoverableError{Err: err}
+}
+
+func (e *RecoverableError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *RecoverableError) Unwrap() error {
+	return e.Err
+}
+
+func IsRecoverable(err error) bool {
+	var recoverableErr *RecoverableError
+	return goerrors.As(err, &recoverableErr)
+}
