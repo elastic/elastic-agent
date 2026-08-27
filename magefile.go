@@ -3350,34 +3350,9 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 			return nil, err
 		}
 	}
-<<<<<<< HEAD
-
-	var stackProvisioner tcommon.StackProvisioner
-	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	switch stackProvisionerMode {
-	case "", ess.ProvisionerStateful:
-		stackProvisionerMode = ess.ProvisionerStateful
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	case ess.ProvisionerServerless:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
-			ess.ProvisionerStateful,
-			ess.ProvisionerServerless,
-			stackProvisionerMode)
-=======
 	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
 	if err != nil {
 		return nil, err
->>>>>>> 960845b (Add local stack provisioner (#16188))
 	}
 
 	timestamp := cfg.IntegrationTest.TimestampEnabled

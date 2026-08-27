@@ -157,8 +157,6 @@ share similar leavers as the packaging process.
        container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
        runner drives the container over SSH exactly like a VM. Requires Docker.
 
-<<<<<<< HEAD
-=======
  - `STACK_PROVISIONER`: Sets the provisioner used to create the Elastic Stack
    (Elasticsearch, Kibana, Fleet Server) the tests talk to. Possible values are:
      - `stateful`: Provisions a cloud ESS deployment (the default). Requires an
@@ -222,8 +220,6 @@ share similar leavers as the packaging process.
    ```
 
 When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
-
->>>>>>> 960845b (Add local stack provisioner (#16188))
 An example for running a single test, including packaging the artifacts for it is:
 ```
 DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)

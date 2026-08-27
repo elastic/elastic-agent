@@ -210,6 +210,11 @@ func (r *Runner) Run(ctx context.Context) (Result, error) {
 		if err != nil {
 			return Result{}, err
 		}
+	case common.ProvisionerTypeLocal:
+		results, err = r.runLocalInstances(ctx, instances)
+		if err != nil {
+			return Result{}, err
+		}
 
 	default:
 		return Result{}, fmt.Errorf("invalid provisioner type %d", r.ip.Type())
@@ -262,8 +267,6 @@ func (r *Runner) Clean() error {
 	return r.writeState()
 }
 
-<<<<<<< HEAD
-=======
 func (r *Runner) stackEnv(batch common.OSBatch, logger common.Logger) (map[string]string, error) {
 	env := map[string]string{}
 	for k, v := range r.cfg.ExtraEnv {
@@ -304,8 +307,6 @@ func internalString(internal map[string]interface{}, key, fallback string) strin
 	}
 	return fallback
 }
-
->>>>>>> 960845b (Add local stack provisioner (#16188))
 func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
 	results := make(map[string]common.OSRunnerResult)
 	var resultsMx sync.Mutex
@@ -318,29 +319,10 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 		}
 
 		logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
-		// start with the ExtraEnv first preventing the other environment flags below
-		// from being overwritten
-		env := map[string]string{}
-		for k, v := range r.cfg.ExtraEnv {
-			env[k] = v
-		}
-		// ensure that we have all the requirements for the stack if required
-		if batch.Batch.Stack != nil {
-			// wait for the stack to be ready before continuing
-			logger.Logf("Waiting for stack to be ready...")
-			stack, stackErr := r.getStackForBatchID(batch.ID)
-			if stackErr != nil {
-				err = stackErr
-				continue
-			}
-			env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
-			env["ELASTICSEARCH_USERNAME"] = stack.Username
-			env["ELASTICSEARCH_PASSWORD"] = stack.Password
-			env["KIBANA_HOST"] = stack.Kibana
-			env["KIBANA_USERNAME"] = stack.Username
-			env["KIBANA_PASSWORD"] = stack.Password
-			env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
-			logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+		env, stackErr := r.stackEnv(batch, logger)
+		if stackErr != nil {
+			err = stackErr
+			continue
 		}
 
 		// set the go test flags
@@ -355,8 +337,8 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 		// run the actual tests on the host
 		result, runErr := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, prefix, batch.Batch, env)
 		if runErr != nil {
-			logger.Logf("Failed to execute tests on instance: %s", err)
-			err = fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, err)
+			logger.Logf("Failed to execute tests on instance: %s", runErr)
+			err = fmt.Errorf("failed to execute tests on instance %s: %w", instance.Name, runErr)
 		}
 		resultsMx.Lock()
 		results[batch.ID] = result
@@ -364,6 +346,32 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 	}
 	if err != nil {
 		return nil, err
+	}
+	return results, nil
+}
+
+func (r *Runner) runLocalInstances(ctx context.Context, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
+	results := make(map[string]common.OSRunnerResult)
+	for _, instance := range instances {
+		batch, ok := findBatchByID(instance.ID, r.batches)
+		if !ok {
+			return nil, fmt.Errorf("unable to find batch with ID: %s", instance.ID)
+		}
+
+		logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
+		env, err := r.stackEnv(batch, logger)
+		if err != nil {
+			return nil, err
+		}
+		env["GOTEST_FLAGS"] = r.cfg.TestFlags
+		env["TEST_BINARY_NAME"] = r.cfg.BinaryName
+
+		result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
+		if err != nil {
+			logger.Logf("Failed to execute tests: %s", err)
+			return nil, fmt.Errorf("failed to execute tests for batch %s: %w", batch.ID, err)
+		}
+		results[batch.ID] = result
 	}
 	return results, nil
 }
@@ -442,29 +450,9 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		logger.Logf("Failed to copy files instance: %s", err)
 		return common.OSRunnerResult{}, fmt.Errorf("failed to copy files to instance %s: %w", instance.Name, err)
 	}
-	// start with the ExtraEnv first preventing the other environment flags below
-	// from being overwritten
-	env := map[string]string{}
-	for k, v := range r.cfg.ExtraEnv {
-		env[k] = v
-	}
-
-	// ensure that we have all the requirements for the stack if required
-	if batch.Batch.Stack != nil {
-		// wait for the stack to be ready before continuing
-		logger.Logf("Waiting for stack to be ready...")
-		stack, err := r.getStackForBatchID(batch.ID)
-		if err != nil {
-			return common.OSRunnerResult{}, err
-		}
-		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
-		env["ELASTICSEARCH_USERNAME"] = stack.Username
-		env["ELASTICSEARCH_PASSWORD"] = stack.Password
-		env["KIBANA_HOST"] = stack.Kibana
-		env["KIBANA_USERNAME"] = stack.Username
-		env["KIBANA_PASSWORD"] = stack.Password
-		env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
-		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+	env, err := r.stackEnv(batch, logger)
+	if err != nil {
+		return common.OSRunnerResult{}, err
 	}
 
 	if batch.Batch.Stack != nil {
