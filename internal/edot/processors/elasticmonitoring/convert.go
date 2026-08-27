@@ -15,60 +15,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 )
 
-// exporterMetrics accumulates raw values for a single exporter, keyed by
-// canonical source metric name, along with the latest data-point timestamp
-// seen. The timestamp is propagated to every output data point so downstream
-// consumers see a meaningful observation time rather than the zero value.
-type exporterMetrics struct {
-	timestamp pcommon.Timestamp
-	values    map[string]int64
-}
-
-// exporterMetricNames maps the source metric names tracked for exporters to
-// the canonical key their values accumulate under. Most names map to
-// themselves; retried docs are reported under two source names that feed the
-// same counter.
-var exporterMetricNames = map[string]string{
-	otelQueueSizeKey:           otelQueueSizeKey,
-	otelQueueCapacityKey:       otelQueueCapacityKey,
-	otelSentLogsKey:            otelSentLogsKey,
-	otelSentSpansKey:           otelSentSpansKey,
-	otelSentMetricsKey:         otelSentMetricsKey,
-	otelFailedLogsKey:          otelFailedLogsKey,
-	otelFailedSpansKey:         otelFailedSpansKey,
-	otelFailedMetricsKey:       otelFailedMetricsKey,
-	otelDocsProcessedKey:       otelDocsProcessedKey,
-	otelDocsRetriedKey:         otelDocsRetriedKey,
-	otelDocsRetriedHTTPRequest: otelDocsRetriedKey,
-	otelBulkRequestsKey:        otelBulkRequestsKey,
-	otelFlushedBytesKey:        otelFlushedBytesKey,
-}
-
-// addMetric accumulates a metric's integer data points into em; all currently
-// tracked exporter metrics are integer sums or gauges. Queue capacity is a
-// point-in-time value and is overwritten rather than summed.
-func (em *exporterMetrics) addMetric(m pmetric.Metric) {
-	name, tracked := exporterMetricNames[m.Name()]
-	if !tracked {
-		return
-	}
-	dps := numberDataPoints(m)
-	for i := 0; i < dps.Len(); i++ {
-		dp := dps.At(i)
-		if dp.ValueType() != pmetric.NumberDataPointValueTypeInt {
-			continue
-		}
-		if name == otelQueueCapacityKey {
-			em.values[name] = dp.IntValue()
-		} else {
-			em.values[name] += dp.IntValue()
-		}
-		if dp.Timestamp() > em.timestamp {
-			em.timestamp = dp.Timestamp()
-		}
-	}
-}
-
 const (
 	beatsQueueFilledEventsKey   = "beat.stats.libbeat.pipeline.queue.filled.events"
 	beatsQueueMaxEventsKey      = "beat.stats.libbeat.pipeline.queue.max_events"
@@ -112,6 +58,60 @@ const (
 	// RegistryBridge to identify which Beat receiver emitted the metric.
 	registryBridgeReceiverKey = "receiver"
 )
+
+// exporterMetricNames maps the source metric names tracked for exporters to
+// the canonical key their values accumulate under. Most names map to
+// themselves; retried docs are reported under two source names that feed the
+// same counter.
+var exporterMetricNames = map[string]string{
+	otelQueueSizeKey:           otelQueueSizeKey,
+	otelQueueCapacityKey:       otelQueueCapacityKey,
+	otelSentLogsKey:            otelSentLogsKey,
+	otelSentSpansKey:           otelSentSpansKey,
+	otelSentMetricsKey:         otelSentMetricsKey,
+	otelFailedLogsKey:          otelFailedLogsKey,
+	otelFailedSpansKey:         otelFailedSpansKey,
+	otelFailedMetricsKey:       otelFailedMetricsKey,
+	otelDocsProcessedKey:       otelDocsProcessedKey,
+	otelDocsRetriedKey:         otelDocsRetriedKey,
+	otelDocsRetriedHTTPRequest: otelDocsRetriedKey,
+	otelBulkRequestsKey:        otelBulkRequestsKey,
+	otelFlushedBytesKey:        otelFlushedBytesKey,
+}
+
+// exporterMetrics accumulates raw values for a single exporter, keyed by
+// canonical source metric name, along with the latest data-point timestamp
+// seen. The timestamp is propagated to every output data point so downstream
+// consumers see a meaningful observation time rather than the zero value.
+type exporterMetrics struct {
+	timestamp pcommon.Timestamp
+	values    map[string]int64
+}
+
+// addMetric accumulates a metric's integer data points into em; all currently
+// tracked exporter metrics are integer sums or gauges. Queue capacity is a
+// point-in-time value and is overwritten rather than summed.
+func (em *exporterMetrics) addMetric(m pmetric.Metric) {
+	name, tracked := exporterMetricNames[m.Name()]
+	if !tracked {
+		return
+	}
+	dps := numberDataPoints(m)
+	for i := 0; i < dps.Len(); i++ {
+		dp := dps.At(i)
+		if dp.ValueType() != pmetric.NumberDataPointValueTypeInt {
+			continue
+		}
+		if name == otelQueueCapacityKey {
+			em.values[name] = dp.IntValue()
+		} else {
+			em.values[name] += dp.IntValue()
+		}
+		if dp.Timestamp() > em.timestamp {
+			em.timestamp = dp.Timestamp()
+		}
+	}
+}
 
 // agentComponentID extracts the agent component ID from an OTel component ID.
 // OTel component IDs follow the pattern "{type}/_agent-component/{compID}".
