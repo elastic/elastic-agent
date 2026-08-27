@@ -1250,6 +1250,72 @@ inputs:
 		assert.False(t, filestreamInOtel, "Dynamic filestream input should NOT be in otel manager")
 	})
 
+	t.Run("dynamic input using only static variables stays on the otel runtime", func(t *testing.T) {
+		// Reset state from previous test runs
+		updated = false
+		otelUpdated = false
+		components = nil
+		otelConfig = nil
+
+		// Track components sent to otel manager
+		var otelComponents []pkgcomponent.Component
+		otelManager.updateComponentCallback = func(comp []pkgcomponent.Component) error {
+			otelComponents = comp
+			return nil
+		}
+
+		// The input only references a variable declared as static, so even though it is rendered
+		// from a dynamic provider it can't cause configuration reloads and must stay on otel.
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.dynamic_inputs:
+  default: process
+  static_variables:
+    - local_dynamic.group
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: static-filestream-input
+    type: filestream
+    path: "/var/log/${local_dynamic.group}.log"
+    use_output: default
+`)
+
+		vars, err := transpiler.NewVarsWithProcessors("local_dynamic-1", map[string]interface{}{
+			"local_dynamic": map[string]interface{}{
+				"group": "shared",
+				"path":  "/var/log/test.log",
+			},
+		}, "local_dynamic", nil, nil, "", "local_dynamic")
+		require.NoError(t, err)
+		coord.vars = []*transpiler.Vars{vars}
+		coord.varsMgr = &fakeVarsManager{}
+
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+
+		var filestreamInOtel bool
+		for _, comp := range otelComponents {
+			if strings.Contains(comp.ID, "filestream") {
+				filestreamInOtel = true
+				assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager,
+					"input using only static variables should stay on the otel runtime")
+				assert.False(t, comp.Dynamic, "component should not be marked as dynamic")
+			}
+		}
+		for _, comp := range components {
+			assert.NotContains(t, comp.ID, "filestream",
+				"input using only static variables should not be moved to the process runtime")
+		}
+		assert.True(t, filestreamInOtel, "filestream input should be handled by the otel manager")
+	})
+
 }
 
 func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
@@ -2707,7 +2773,7 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 	}
 
 	t.Run("no change when DynamicInputs is empty", func(t *testing.T) {
-		runtimeCfg := &pkgcomponent.RuntimeConfig{DynamicInputs: ""}
+		runtimeCfg := &pkgcomponent.RuntimeConfig{}
 		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
 		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
@@ -2715,7 +2781,9 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 
 	t.Run("no change when component is not dynamic", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
+			DynamicInputs: pkgcomponent.DynamicInputsConfig{
+				Default: string(pkgcomponent.ProcessRuntimeManager),
+			},
 		}
 		comp := otelSupportedComponent(false)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
@@ -2724,11 +2792,38 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 
 	t.Run("dynamic component switches to the configured runtime", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
+			DynamicInputs: pkgcomponent.DynamicInputsConfig{
+				Default: string(pkgcomponent.ProcessRuntimeManager),
+			},
 		}
 		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.RuntimeManager(runtimeCfg.DynamicInputs), comp.RuntimeManager)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
+	})
+
+	t.Run("per beat and per input type overrides are honored", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: pkgcomponent.DynamicInputsConfig{
+				Default: string(pkgcomponent.ProcessRuntimeManager),
+				Filebeat: pkgcomponent.BeatRuntimeConfig{
+					// the input type override keeps this component on the otel runtime
+					InputType: map[string]string{"filestream": string(pkgcomponent.OtelRuntimeManager)},
+				},
+			},
+		}
+
+		filestream := otelSupportedComponent(true)
+		filestream.InputSpec = &pkgcomponent.InputRuntimeSpec{BinaryName: "filebeat"}
+		filestream.InputType = "filestream"
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &filestream)
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, filestream.RuntimeManager)
+
+		// another filebeat input type falls back to the global default
+		logInput := otelSupportedComponent(true)
+		logInput.InputSpec = &pkgcomponent.InputRuntimeSpec{BinaryName: "filebeat"}
+		logInput.InputType = "log"
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &logInput)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, logInput.RuntimeManager)
 	})
 
 	t.Run("default configuration leaves dynamic otel components on otel runtime", func(t *testing.T) {
@@ -2740,26 +2835,29 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 }
 
 func TestGetDynamicInputs(t *testing.T) {
+	log, _ := loggertest.New("get-dynamic-inputs")
 
-	t.Run("returns empty map when inputToDynamicProvider is nil", func(t *testing.T) {
-		result := getDynamicInputs(nil)
+	t.Run("returns empty map when renderedInputs is nil", func(t *testing.T) {
+		result := getDynamicInputs(log, nil, nil)
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
 
-	t.Run("returns empty map when inputToDynamicProvider is empty", func(t *testing.T) {
-		result := getDynamicInputs(map[string]string{})
+	t.Run("returns empty map when renderedInputs is empty", func(t *testing.T) {
+		result := getDynamicInputs(log, map[string]transpiler.RenderedInputInfo{}, nil)
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
 
 	t.Run("identifies inputs with dynamic provider variables", func(t *testing.T) {
 		// The `local_dynamic` provider is registered via import side effect above
-		inputToDynamicProvider := map[string]string{
-			"static-input":  "",              // no dynamic provider
-			"dynamic-input": "local_dynamic", // uses local_dynamic provider
+		renderedInputs := map[string]transpiler.RenderedInputInfo{
+			// no dynamic provider
+			"static-input": {DynamicProvider: ""},
+			// uses local_dynamic provider
+			"dynamic-input": {DynamicProvider: "local_dynamic", ProviderVars: []string{"local_dynamic.id"}},
 		}
-		result := getDynamicInputs(inputToDynamicProvider)
+		result := getDynamicInputs(log, renderedInputs, nil)
 		assert.NotNil(t, result)
 		// The static-input should NOT be marked as dynamic (empty provider)
 		assert.False(t, result["static-input"], "static-input should not be marked as dynamic")
@@ -2769,13 +2867,61 @@ func TestGetDynamicInputs(t *testing.T) {
 
 	t.Run("inputs with non-dynamic provider variables are not marked dynamic", func(t *testing.T) {
 		// The env provider is a context provider, not a dynamic provider
-		inputToDynamicProvider := map[string]string{
-			"env-input": "env",
+		renderedInputs := map[string]transpiler.RenderedInputInfo{
+			"env-input": {DynamicProvider: "env", ProviderVars: []string{"env.SOME_VAR"}},
 		}
-		result := getDynamicInputs(inputToDynamicProvider)
+		result := getDynamicInputs(log, renderedInputs, nil)
 		assert.NotNil(t, result)
 		// The env provider is a context provider, not a dynamic provider
 		// So this input should NOT be marked as dynamic
 		assert.False(t, result["env-input"], "env-input should not be marked as dynamic")
+	})
+
+	t.Run("static_variables", func(t *testing.T) {
+		tests := map[string]struct {
+			providerVars    []string
+			staticVariables []string
+			wantDynamic     bool
+		}{
+			"exact match excludes the input": {
+				providerVars:    []string{"local_dynamic.group"},
+				staticVariables: []string{"local_dynamic.group"},
+				wantDynamic:     false,
+			},
+			"path prefix match excludes the input": {
+				providerVars:    []string{"local_dynamic.node.name", "local_dynamic.node.labels.app"},
+				staticVariables: []string{"local_dynamic.node"},
+				wantDynamic:     false,
+			},
+			"prefix must end on a path separator": {
+				providerVars:    []string{"local_dynamic.nodename"},
+				staticVariables: []string{"local_dynamic.node"},
+				wantDynamic:     true,
+			},
+			"a single uncovered variable keeps the input dynamic": {
+				providerVars:    []string{"local_dynamic.group", "local_dynamic.id"},
+				staticVariables: []string{"local_dynamic.group"},
+				wantDynamic:     true,
+			},
+			"no recorded variables keeps the input dynamic": {
+				providerVars:    nil,
+				staticVariables: []string{"local_dynamic.group"},
+				wantDynamic:     true,
+			},
+			"empty static_variables keeps the current behavior": {
+				providerVars:    []string{"local_dynamic.group"},
+				staticVariables: nil,
+				wantDynamic:     true,
+			},
+		}
+
+		for name, tt := range tests {
+			t.Run(name, func(t *testing.T) {
+				result := getDynamicInputs(log, map[string]transpiler.RenderedInputInfo{
+					"input-1": {DynamicProvider: "local_dynamic", ProviderVars: tt.providerVars},
+				}, tt.staticVariables)
+				assert.Equal(t, tt.wantDynamic, result["input-1"])
+			})
+		}
 	})
 }
