@@ -12,7 +12,7 @@ Review important information about the  8.19.21 release.
 
 
 
-* Fix local privilege escalation via binary tampering on Windows unprivileged installs. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/pull/16346[#16346] https://github.com/elastic/elastic-agent/pull/16354[#16354] https://github.com/elastic/elastic-agent/pull/16355[#16355] https://github.com/elastic/elastic-agent/pull/16188[#16188] https://github.com/elastic/elastic-agent/issues/14531[#14531]
+* Fix local privilege escalation via binary tampering on Windows unprivileged installs. https://github.com/elastic/elastic-agent/pull/16058[#16058] 
 
 
 
@@ -30,7 +30,7 @@ Review important information about the  8.19.21 release.
 
 
 
-* Bump github.com/kardianos/service to v1.3.0 and update Linux systemd template for new mini template engine. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/pull/16346[#16346] https://github.com/elastic/elastic-agent/pull/16354[#16354] https://github.com/elastic/elastic-agent/pull/16355[#16355] https://github.com/elastic/elastic-agent/pull/16188[#16188] https://github.com/elastic/elastic-agent/issues/14531[#14531]
+* Bump github.com/kardianos/service to v1.3.0 and update Linux systemd template for new mini template engine. https://github.com/elastic/elastic-agent/pull/15976[#15976] 
 * Update Go to 1.26.6. https://github.com/elastic/elastic-agent/pull/16203[#16203] 
 
 
@@ -43,9 +43,9 @@ Review important information about the  8.19.21 release.
 
 
 
-* Fix Windows FIPS upgrade failure caused by mismatched directory name. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/pull/16346[#16346] https://github.com/elastic/elastic-agent/pull/16354[#16354] https://github.com/elastic/elastic-agent/pull/16355[#16355] https://github.com/elastic/elastic-agent/pull/16188[#16188] https://github.com/elastic/elastic-agent/issues/14531[#14531]
-* Align OTel Elasticsearch exporter request and document retry behavior with Beats Elasticsearch output. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/pull/16346[#16346] https://github.com/elastic/elastic-agent/pull/16354[#16354] https://github.com/elastic/elastic-agent/pull/16355[#16355] https://github.com/elastic/elastic-agent/pull/16188[#16188] https://github.com/elastic/elastic-agent/issues/14531[#14531]
-* Allow the current Windows Agent user to write component executables. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/pull/16346[#16346] https://github.com/elastic/elastic-agent/pull/16354[#16354] https://github.com/elastic/elastic-agent/pull/16355[#16355] https://github.com/elastic/elastic-agent/pull/16188[#16188] https://github.com/elastic/elastic-agent/issues/14531[#14531]
-* Diagnostics now collects component trace logs in container deployments. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/pull/16346[#16346] https://github.com/elastic/elastic-agent/pull/16354[#16354] https://github.com/elastic/elastic-agent/pull/16355[#16355] https://github.com/elastic/elastic-agent/pull/16188[#16188] https://github.com/elastic/elastic-agent/issues/14531[#14531]
+* Fix Windows FIPS upgrade failure caused by mismatched directory name. https://github.com/elastic/elastic-agent/pull/16065[#16065] 
+* Align OTel Elasticsearch exporter request and document retry behavior with Beats Elasticsearch output. https://github.com/elastic/elastic-agent/pull/16089[#16089] https://github.com/elastic/elastic-agent/issues/14531[#14531]
+* Allow the current Windows Agent user to write component executables. https://github.com/elastic/elastic-agent/pull/16173[#16173] 
+* Diagnostics now collects component trace logs in container deployments. https://github.com/elastic/elastic-agent/pull/16177[#16177] 
 
 // end 8.19.21 relnotes
