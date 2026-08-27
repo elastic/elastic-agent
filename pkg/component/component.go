@@ -205,11 +205,7 @@ func (d *DynamicInputsConfig) validate() error {
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:                 string(DefaultRuntimeManager),
-<<<<<<< HEAD
-		DynamicInputs:           string(ProcessRuntimeManager),
-=======
 		DynamicInputs:           DefaultDynamicInputsConfig(),
->>>>>>> 13b94d0 (Make the dynamic inputs runtime override configurable (#15926))
 		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),

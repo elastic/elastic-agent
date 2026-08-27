@@ -4278,13 +4278,9 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	config := DefaultRuntimeConfig()
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
-<<<<<<< HEAD
-	assert.Equal(t, string(ProcessRuntimeManager), config.DynamicInputs)
-=======
 	assert.Equal(t, DefaultDynamicInputsConfig(), config.DynamicInputs)
 	assert.Equal(t, "", config.DynamicInputs.Default)
 	assert.Empty(t, config.DynamicInputs.StaticVariables)
->>>>>>> 13b94d0 (Make the dynamic inputs runtime override configurable (#15926))
 	assert.Equal(t, "otel", config.Auditbeat.Default)
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
