@@ -1,0 +1,141 @@
+version: 8.19.21
+entries:
+    - kind: enhancement
+      summary: Bump github.com/kardianos/service to v1.3.0 and update Linux systemd template for new mini template engine
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1785938601
+      file:
+        name: 1785938601-bump-github.com-kardianos-service-to-v1.3.0.yaml
+        checksum: 09456961c2184d39cf6afc2376147ad5b5cacb32
+    - kind: security
+      summary: Fix local privilege escalation via binary tampering on Windows unprivileged installs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786027979
+      file:
+        name: 1786027979-fix-local-privilege-escalation-via-binary-tampering-on-windows-unprivileged-installs.yaml
+        checksum: 80ae62807a1f4847ab2a35b31a2bbd1cc5088ba2
+    - kind: bug-fix
+      summary: Fix Windows FIPS upgrade failure caused by mismatched directory name
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786061388
+      file:
+        name: 1786061388-strip-fips-from-zip-filename-prefix.yaml
+        checksum: 2b38a814f1550f33801e053d727df044171af602
+    - kind: other
+      summary: Bump Node.js to 22.23.2 and npm to 12.0.2 in Elastic Agent complete Docker images.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786098015
+      file:
+        name: 1786098015-bump-heartbeat-nodejs-22.23.2-npm-12.0.2.yaml
+        checksum: e07e98ee08db9123aeecb7474dce702bacce435e
+    - kind: bug-fix
+      summary: Align OTel Elasticsearch exporter request and document retry behavior with Beats Elasticsearch output
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786144369
+      file:
+        name: 1786144369-retry-otel-elasticsearch-request-authentication-failures-without-retrying-rejected-documents.yaml
+        checksum: f7b549af7e1cf9032b1688638cef4129e0380c5b
+    - kind: bug-fix
+      summary: Allow the current Windows Agent user to write component executables
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786546956
+      file:
+        name: 1786546956-allow-current-windows-agent-user-to-write-components.yaml
+        checksum: 41ed34a45401af3ed3c43d0d0fae2e4db5c643a1
+    - kind: bug-fix
+      summary: diagnostics now collects component trace logs in container deployments
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16089
+        - https://github.com/elastic/elastic-agent/pull/16346
+        - https://github.com/elastic/elastic-agent/pull/16354
+        - https://github.com/elastic/elastic-agent/pull/16355
+        - https://github.com/elastic/elastic-agent/pull/16188
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786552448
+      file:
+        name: 1786552448-fix-diagnostics-collect-component-trace-logs-in-container-deployments.yaml
+        checksum: 9d9b61b0990a91b60c9dc772954552e2b6eee639
+    - kind: enhancement
+      summary: Update Go to 1.26.6
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16203
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786744535
+      file:
+        name: 1786744535-updatecli_main_bump-golang-version.yaml
+        checksum: 9e2ddf07095b7c79c869ebc8e6d5254bec6eec55
