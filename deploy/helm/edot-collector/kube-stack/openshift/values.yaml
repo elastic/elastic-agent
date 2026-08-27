@@ -19,9 +19,10 @@ cleanupJob:
 extraObjects:
   # Allow the OTel Operator to run as non-root (UID 65532) on OpenShift.
   - apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
+    kind: RoleBinding
     metadata:
       name: "{{ .Release.Name }}-otel-operator-nonroot-v2"
+      namespace: "{{ .Release.Namespace }}"
     roleRef:
       apiGroup: rbac.authorization.k8s.io
       kind: ClusterRole
@@ -77,9 +78,10 @@ extraObjects:
 
   # Bind the daemon collector service account to the SCC ClusterRole above.
   - apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
+    kind: RoleBinding
     metadata:
       name: "{{ .Release.Name }}-edot-daemon-collector-scc"
+      namespace: "{{ .Release.Namespace }}"
     roleRef:
       apiGroup: rbac.authorization.k8s.io
       kind: ClusterRole

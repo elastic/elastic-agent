@@ -303,7 +303,14 @@ func helmWithOpenshiftOverlays(kCtx k8sContext, base ...string) []string {
 	if !kCtx.openshift {
 		return base
 	}
-	return append(base,
+	overlays := append(base,
 		"../../../deploy/helm/edot-collector/kube-stack/openshift/values.yaml",
 	)
+	// TODO(samuelvl): Remove after local testing is finished
+	if os.Getenv("CI") == "" {
+		overlays = append(overlays,
+			"../../../deploy/helm/edot-collector/kube-stack/openshift/test-values.yaml",
+		)
+	}
+	return overlays
 }

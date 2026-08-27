@@ -60,15 +60,19 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
 }
 
-func (p *provisioner) SetLogger(logger common.Logger) {
-	p.logger = logger
+func (p *provisioner) SetLogger(l common.Logger) {
+	p.logger = l
 }
 
 func (p *provisioner) Supported(batch define.OS) bool {
 	if batch.Type != define.Kubernetes || batch.Arch != runtime.GOARCH {
 		return false
 	}
-	return batch.Distro == "" || batch.Distro == Name
+	if batch.Distro != "" && batch.Distro != Name {
+		// not kind, don't run
+		return false
+	}
+	return true
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
@@ -135,12 +139,12 @@ func (p *provisioner) setup(ctx context.Context, instanceName, k8sVersion string
 		return "", "", err
 	}
 
-	apiServerPort, adopted, err := p.existingContainerPort(ctx, containerName)
+	apiServerPort, exists, err := p.existingContainerPort(ctx, containerName)
 	if err != nil {
 		return "", "", err
 	}
 
-	if adopted {
+	if exists {
 		p.logf("Reusing running MicroShift container %s on API port %d", containerName, apiServerPort)
 	} else {
 		apiServerPort, err = getFreePort()
