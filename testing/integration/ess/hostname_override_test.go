@@ -120,10 +120,11 @@ func TestHostnameEnvOverride(t *testing.T) {
 			policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, info.KibanaClient, createPolicyReq)
 			require.NoError(t, err)
 
-			_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system",
+			systemPackage, err := tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system",
 				integration.PreinstalledPackages["system"], "testdata/system_integration_setup.json",
 				uuid.Must(uuid.NewV4()).String(), policy.ID)
 			require.NoError(t, err)
+			require.NotEmpty(t, systemPackage.Item.Namespace)
 
 			t.Cleanup(func() {
 				// context.Background is intentional: t.Context() is already cancelled when Cleanup runs.
@@ -141,7 +142,7 @@ func TestHostnameEnvOverride(t *testing.T) {
 			assertComponentRuntime(ctx, t, agentFixture, "system/metrics-default", tc.runtime)
 
 			t.Log("Verify that host.name in beats-collected system metrics matches ELASTIC_AGENT_HOSTNAME")
-			verifyHostNameInIndices(t, "metrics-system.*-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
+			verifyHostNameInIndices(t, "metrics-system.*-*", customHostname, since, systemPackage.Item.Namespace, info.ESClient, 5*time.Minute)
 
 			t.Log("Verify that host.name in logs-* and metrics-* matches ELASTIC_AGENT_HOSTNAME")
 			verifyHostNameInIndices(t, "logs-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
