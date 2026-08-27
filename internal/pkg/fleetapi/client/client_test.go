@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -300,10 +301,15 @@ func Test_CheckRemote(t *testing.T) {
 		name          string
 		serverStatus  int
 		expectedError bool
+		isRecoverable bool
 	}{
-		{"ok", http.StatusOK, false},
-		{"4xx", http.StatusNotFound, true},
-		{"5xx", http.StatusInternalServerError, true},
+		{"ok", http.StatusOK, false, false},
+		{"4xx", http.StatusNotFound, true, false},
+		{"5xx", http.StatusInternalServerError, true, false},
+		{"too many requests", http.StatusTooManyRequests, true, true},
+		{"service unavailable", http.StatusServiceUnavailable, true, true},
+		{"bad gateway", http.StatusBadGateway, true, false},
+		{"gateway timeout", http.StatusGatewayTimeout, true, false},
 	}
 
 	testLogger, _ := loggertest.New("test_CheckRemote")
@@ -316,7 +322,13 @@ func Test_CheckRemote(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			require.Equal(t, tc.expectedError, CheckRemote(t.Context(), c) != nil)
+
+			checkErr := CheckRemote(t.Context(), c)
+			require.Equal(t, tc.expectedError, checkErr != nil)
+			assert.Equal(t, tc.isRecoverable, errors.IsRecoverable(checkErr))
+			if tc.expectedError {
+				assert.ErrorContains(t, checkErr, fmt.Sprintf("fleet server ping returned a bad status code: %d", tc.serverStatus))
+			}
 		})
 	}
 }
