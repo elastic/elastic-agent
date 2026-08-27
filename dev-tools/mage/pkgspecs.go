@@ -170,8 +170,48 @@ func collectMergedMappingKeys(node *yaml.Node) map[string]*yaml.Node {
 	// seenSubKeys tracks which sub-keys have been added for each outer key.
 	seenSubKeys := make(map[string]map[string]bool)
 
-	// visit processes a source mapping node. The offset controls priority:
-	// 0 = the node itself (highest), higher = from deeper merge chains.
+	// collectExplicit collects mapping-valued keys from src's own explicit
+	// (non-merge) entries only. visitMerges handles merge key recursion.
+	collectExplicit := func(src *yaml.Node) {
+		if src == nil || src.Kind != yaml.MappingNode {
+			return
+		}
+		for i := 0; i < len(src.Content)-1; i += 2 {
+			keyNode := src.Content[i]
+			valNode := src.Content[i+1]
+			if keyNode.Tag == "!!merge" {
+				continue
+			}
+			if valNode.Kind != yaml.MappingNode {
+				continue
+			}
+			resolvedVal := valNode
+			if resolvedVal.Kind == yaml.AliasNode {
+				resolvedVal = resolvedVal.Alias
+			}
+			if resolvedVal.Kind != yaml.MappingNode {
+				continue
+			}
+			k := keyNode.Value
+			if _, exists := result[k]; !exists {
+				result[k] = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+				seenSubKeys[k] = make(map[string]bool)
+			}
+			for j := 0; j < len(resolvedVal.Content)-1; j += 2 {
+				sk := resolvedVal.Content[j].Value
+				if !seenSubKeys[k][sk] {
+					seenSubKeys[k][sk] = true
+					result[k].Content = append(result[k].Content,
+						resolvedVal.Content[j],
+						resolvedVal.Content[j+1],
+					)
+				}
+			}
+		}
+	}
+
+	// visit processes a merge-source mapping node and all of its nested merge
+	// sources, collecting mapping-valued keys (first occurrence wins).
 	var visit func(src *yaml.Node, offset int)
 	visit = func(src *yaml.Node, offset int) {
 		if src == nil {
@@ -235,7 +275,27 @@ func collectMergedMappingKeys(node *yaml.Node) map[string]*yaml.Node {
 		}
 	}
 
-	visit(node, 0)
+	// Process node's own explicit keys first so they take priority over merge
+	// sources — mirrors yaml.v2's behavior where explicit keys always win.
+	collectExplicit(node)
+	// Then visit merge sources to collect additional sub-keys.
+	for i := 0; i < len(node.Content)-1; i += 2 {
+		keyNode := node.Content[i]
+		valNode := node.Content[i+1]
+		if keyNode.Tag != "!!merge" {
+			continue
+		}
+		switch valNode.Kind {
+		case yaml.AliasNode:
+			visit(valNode.Alias, 1)
+		case yaml.SequenceNode:
+			for idx, item := range valNode.Content {
+				if item.Kind == yaml.AliasNode {
+					visit(item.Alias, idx+1)
+				}
+			}
+		}
+	}
 
 	// Drop entries where the merge produced no more sub-keys than what the
 	// node already has explicitly — no fix needed in those cases.
