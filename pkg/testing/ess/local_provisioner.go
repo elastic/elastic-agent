@@ -46,7 +46,6 @@ const (
 	localElasticsearchURL = "https://elasticsearch:9200"
 	localKibanaURL        = "https://kibana:5601"
 	localFleetServerURL   = "https://fleet-server:8220"
-	localHostFleetURL     = "https://127.0.0.1:8220"
 )
 
 // elastic-package shellinit environment variable names (see internal/stack/shellinit.go).
@@ -170,18 +169,11 @@ func (p *LocalProvisioner) Create(ctx context.Context, request common.StackReque
 			// and CA file instead of the service-name endpoints above.
 			"host_elasticsearch":       env[epElasticsearchHostEnv],
 			"host_kibana":              env[epKibanaHostEnv],
-			"host_integrations_server": valueOrDefault(env[epFleetServerHostEnv], localHostFleetURL),
+			"host_integrations_server": env[epFleetServerHostEnv],
 			"ca_cert_path":             env[epCACertEnv],
 		},
 		Ready: true,
 	}, nil
-}
-
-func valueOrDefault(value, fallback string) string {
-	if value != "" {
-		return value
-	}
-	return fallback
 }
 
 // WaitForReady verifies the stack is healthy. `stack up` already blocks until the

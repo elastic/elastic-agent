@@ -73,15 +73,6 @@ func TestNetworkName(t *testing.T) {
 	}
 }
 
-func TestValueOrDefault(t *testing.T) {
-	if got := valueOrDefault("configured", "fallback"); got != "configured" {
-		t.Errorf("valueOrDefault() = %q, want configured", got)
-	}
-	if got := valueOrDefault("", "fallback"); got != "fallback" {
-		t.Errorf("valueOrDefault() = %q, want fallback", got)
-	}
-}
-
 func TestNewLocalProvisioner(t *testing.T) {
 	t.Run("bin and profile from env", func(t *testing.T) {
 		t.Setenv("ELASTIC_PACKAGE_BIN", "/usr/bin/true")

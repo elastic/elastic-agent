@@ -229,8 +229,7 @@ share similar leavers as the packaging process.
    containers being attachable to the elastic-package compose network and
    reachable over that network — a model that assumes Docker is running on the
    host itself, not inside a VM. Use the cloud (`stateful` / `serverless`)
-   provisioners on macOS instead, or use a Linux machine where Docker runs
-   natively.
+   provisioners on macOS instead.
 
    Example (no cloud account required):
    ```
