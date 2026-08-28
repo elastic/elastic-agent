@@ -170,14 +170,20 @@ func TestConvertAllMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedSent, eventsAcked)
 
-	expectedFailed := failedLogs + failedSpans + failedMetrics + enqueueFailedLogs + enqueueFailedSpans + enqueueFailedMetrics
+	expectedSendFailed := failedLogs + failedSpans + failedMetrics
+	expectedEnqueueFailed := enqueueFailedLogs + enqueueFailedSpans + enqueueFailedMetrics
+	expectedFailed := expectedSendFailed + expectedEnqueueFailed
 	eventsDropped, err := beatEvent.GetValue(beatsOutputEventsDroppedKey)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedFailed, eventsDropped)
 
+	// Enqueue failures never reach the bulk indexer, so docs.processed does
+	// not count them; total adds them back so it covers every doc handed to
+	// the output.
+	expectedTotal := docsProcessed + expectedEnqueueFailed
 	eventsTotal, err := beatEvent.GetValue(beatsOutputEventsTotalKey)
 	assert.NoError(t, err)
-	assert.Equal(t, docsProcessed, eventsTotal)
+	assert.Equal(t, expectedTotal, eventsTotal)
 
 	eventsFailed, err := beatEvent.GetValue(beatsOutputEventsFailedKey)
 	assert.NoError(t, err)
@@ -187,14 +193,70 @@ func TestConvertAllMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, flushedBytes, writeBytes)
 
-	expectedActive := docsProcessed - expectedSent - expectedFailed
+	// Only send failures are subtracted: they passed through the bulk indexer
+	// and so are included in docs.processed.
+	expectedActive := docsProcessed - expectedSent - expectedSendFailed
 	active, err := beatEvent.GetValue(beatsOutputEventsActiveKey)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedActive, active)
 
+	assert.Equal(t, expectedTotal, expectedSent+expectedFailed+expectedActive,
+		"total should equal acked + dropped + active")
+
 	batches, err := beatEvent.GetValue(beatsOutputEventsBatchesKey)
 	assert.NoError(t, err)
 	assert.Equal(t, bulkRequests, batches)
+}
+
+// TestConvertMetricsEnqueueFailedKeepsActiveNonNegative covers the queue-full
+// case that block_on_overflow: false produces: Elasticsearch accepts every doc
+// the bulk indexer sends, so there are no send failures, but the sending queue
+// rejects a large number of records before they ever reach the indexer.
+//
+// docs.processed is recorded by the bulk indexer, which sits downstream of the
+// queue, so it excludes the rejected records. Subtracting them from it drove
+// output.events.active far negative and reported a nonsensical "docs in
+// flight" count.
+func TestConvertMetricsEnqueueFailedKeepsActiveNonNegative(t *testing.T) {
+	const exporterID = "elasticsearch/_agent-component/default"
+	const (
+		docsProcessed     = int64(1000)
+		sentLogs          = int64(1000)
+		enqueueFailedLogs = int64(5000)
+	)
+
+	md, sm := newMetricsWithExporterScope(exporterID)
+	appendSumInt(sm, otelDocsProcessedKey, docsProcessed)
+	appendSumInt(sm, otelSentLogsKey, sentLogs)
+	appendSumInt(sm, otelEnqueueFailedLogsKey, enqueueFailedLogs)
+
+	result := convertScopeMetrics(md)
+	metrics, ok := result[exporterID]
+	require.Truef(t, ok, "exporter metrics should contain metrics for id %q", exporterID)
+
+	beatEvent := mapstr.M{}
+	addMetricsToEventFields(zap.NewNop(), metrics, &beatEvent)
+
+	active, err := beatEvent.GetValue(beatsOutputEventsActiveKey)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), active,
+		"every processed doc was sent, so nothing is in flight")
+
+	acked, err := beatEvent.GetValue(beatsOutputEventsAckedKey)
+	require.NoError(t, err)
+	assert.Equal(t, sentLogs, acked)
+
+	dropped, err := beatEvent.GetValue(beatsOutputEventsDroppedKey)
+	require.NoError(t, err)
+	assert.Equal(t, enqueueFailedLogs, dropped, "queue rejections are drops")
+
+	total, err := beatEvent.GetValue(beatsOutputEventsTotalKey)
+	require.NoError(t, err)
+	assert.Equal(t, docsProcessed+enqueueFailedLogs, total,
+		"total covers rejected records too, not just what the indexer saw")
+
+	assert.Equal(t, total, acked.(int64)+dropped.(int64)+active.(int64),
+		"total should equal acked + dropped + active")
 }
 
 func TestCollectComponentInputMetrics_Basic(t *testing.T) {
