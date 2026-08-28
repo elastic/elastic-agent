@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 )
 
 func TestProvisionerSupported(t *testing.T) {
@@ -28,11 +29,11 @@ func TestProvisionerSupported(t *testing.T) {
 			supported: true,
 		},
 		{
-			name: "MicroShift distro",
+			name: "OpenShift distro",
 			os: define.OS{
 				Type:   define.Kubernetes,
 				Arch:   runtime.GOARCH,
-				Distro: Name,
+				Distro: kubernetes.OpenShiftDistro,
 			},
 			supported: true,
 		},
