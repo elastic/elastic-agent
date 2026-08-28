@@ -7,6 +7,7 @@ package transpiler
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -19,9 +20,20 @@ const (
 	idKey      = "id"
 )
 
-// RenderInputs renders dynamic inputs section. It also returns a map of input id to the dynamic provider used when
-// rendering that input.
-func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, error) {
+// RenderedInputInfo describes how a rendered input was produced from a set of variables.
+type RenderedInputInfo struct {
+	// DynamicProvider is the name of the dynamic provider whose mapping produced the variable
+	// set the input was rendered from.
+	DynamicProvider string
+	// ProviderVars are the variables owned by DynamicProvider (that is, namespaced under its
+	// name) which were actually resolved while rendering the input. It is sorted and
+	// deduplicated.
+	ProviderVars []string
+}
+
+// RenderInputs renders dynamic inputs section. It also returns a map of input id to information about the dynamic
+// provider used when rendering that input, including which of the provider's variables the input resolved.
+func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]RenderedInputInfo, error) {
 	l, ok := inputs.Value().(*List)
 	if !ok {
 		return nil, nil, fmt.Errorf("inputs must be an array")
@@ -29,7 +41,7 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, erro
 	var nodes []varIDMap
 	// the below allocation doesn't account for nodes filtered out by conditions, but it's still preferable to
 	// overallocate once compared to dynamically growing the map
-	inputIdToDynamicProvider := make(map[string]string, len(varsArray)-1)
+	inputIdToRenderInfo := make(map[string]RenderedInputInfo, len(varsArray)-1)
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
 	for _, vars := range varsArray {
@@ -42,8 +54,18 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, erro
 			if streams := getStreams(dict); streams != nil {
 				hadStreams = true
 			}
+			// Only variable sets coming from a dynamic provider need introspection, the
+			// variables of context providers can't make an input dynamic.
+			applyVars := vars
+			var observed map[string]struct{}
+			if vars.dynamicProvider != "" {
+				observed = make(map[string]struct{})
+				applyVars = vars.WithVarObserver(func(name string) {
+					observed[name] = struct{}{}
+				})
+			}
 			// Apply creates a new Node with a deep copy of all the values
-			n, err := dict.Apply(vars)
+			n, err := dict.Apply(applyVars)
 			if errors.Is(err, ErrNoMatch) {
 				// has a variable that didn't exist, so we ignore it
 				continue
@@ -70,7 +92,12 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, erro
 			_, exists := nodesMap[hash]
 			if !exists {
 				nodesMap[hash] = dict
-				nodes = append(nodes, varIDMap{vars.ID(), vars.dynamicProvider, dict})
+				nodes = append(nodes, varIDMap{
+					id:              vars.ID(),
+					dynamicProvider: vars.dynamicProvider,
+					providerVars:    providerOwnedVars(vars.dynamicProvider, observed),
+					d:               dict,
+				})
 			}
 		}
 	}
@@ -101,24 +128,49 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]string, erro
 					return nil, nil, fmt.Errorf("id field type invalid, expected string, int, uint, or float got: %T", idKey.value)
 				}
 				if node.dynamicProvider != "" {
-					inputIdToDynamicProvider[idKey.value.String()] = node.dynamicProvider
+					inputIdToRenderInfo[idKey.value.String()] = node.renderedInputInfo()
 				}
 			} else {
 				node.d.Insert(NewKey("id", NewStrVal(node.id)))
 				if node.dynamicProvider != "" {
-					inputIdToDynamicProvider[node.id] = node.dynamicProvider
+					inputIdToRenderInfo[node.id] = node.renderedInputInfo()
 				}
 			}
 		}
 		nInputs = append(nInputs, promoteProcessors(node.d))
 	}
-	return NewList(nInputs), inputIdToDynamicProvider, nil
+	return NewList(nInputs), inputIdToRenderInfo, nil
 }
 
 type varIDMap struct {
 	id              string
 	dynamicProvider string
+	providerVars    []string
 	d               *Dict
+}
+
+func (v varIDMap) renderedInputInfo() RenderedInputInfo {
+	return RenderedInputInfo{
+		DynamicProvider: v.dynamicProvider,
+		ProviderVars:    v.providerVars,
+	}
+}
+
+// providerOwnedVars returns the sorted subset of observed variable names that are namespaced
+// under the given provider, that is, whose first '.'-separated segment is the provider name.
+func providerOwnedVars(provider string, observed map[string]struct{}) []string {
+	if provider == "" || len(observed) == 0 {
+		return nil
+	}
+	var vars []string
+	for name := range observed {
+		if varPrefixMatched(name, provider) {
+			vars = append(vars, name)
+		}
+	}
+	// sort to keep the result stable, it ends up in logs and diagnostics
+	slices.Sort(vars)
+	return vars
 }
 
 func getStreams(dict *Dict) *List {

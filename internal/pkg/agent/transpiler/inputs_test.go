@@ -805,9 +805,9 @@ func TestRenderInputs(t *testing.T) {
 
 func TestRenderInputs_DynamicProviderMap(t *testing.T) {
 	testcases := map[string]struct {
-		input                      Node
-		varsArray                  []*Vars
-		expectedDynamicProviderMap map[string]string
+		input                Node
+		varsArray            []*Vars
+		expectedRenderedInfo map[string]RenderedInputInfo
 	}{
 		"no dynamic provider returns empty map": {
 			input: NewKey("inputs", NewList([]Node{
@@ -820,7 +820,7 @@ func TestRenderInputs_DynamicProviderMap(t *testing.T) {
 				mustMakeVars(map[string]interface{}{}),
 			},
 			// Static inputs (no dynamic provider) are not added to the map
-			expectedDynamicProviderMap: map[string]string{},
+			expectedRenderedInfo: map[string]RenderedInputInfo{},
 		},
 		"with dynamic provider": {
 			input: NewKey("inputs", NewList([]Node{
@@ -837,8 +837,11 @@ func TestRenderInputs_DynamicProviderMap(t *testing.T) {
 					},
 				}, "kubernetes", nil),
 			},
-			expectedDynamicProviderMap: map[string]string{
-				"input-1-kubernetes-123": "kubernetes",
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"input-1-kubernetes-123": {
+					DynamicProvider: "kubernetes",
+					ProviderVars:    []string{"kubernetes.path"},
+				},
 			},
 		},
 		"mixed static and dynamic inputs": {
@@ -862,17 +865,161 @@ func TestRenderInputs_DynamicProviderMap(t *testing.T) {
 				}, "local_dynamic", nil),
 			},
 			// Only dynamic inputs are added to the map
-			expectedDynamicProviderMap: map[string]string{
-				"dynamic-input-local_dynamic-abc": "local_dynamic",
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"dynamic-input-local_dynamic-abc": {
+					DynamicProvider: "local_dynamic",
+					ProviderVars:    []string{"local_dynamic.path"},
+				},
+			},
+		},
+		"multiple provider variables are recorded sorted and deduplicated": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("path", NewStrVal("${kubernetes.path}")),
+					NewKey("other_path", NewStrVal("${kubernetes.path}")),
+					NewKey("group", NewStrVal("${kubernetes.node.name}-${kubernetes.namespace}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("kubernetes-123", map[string]interface{}{
+					"kubernetes": map[string]interface{}{
+						"path":      "/var/log/containers",
+						"namespace": "default",
+						"node": map[string]interface{}{
+							"name": "node-1",
+						},
+					},
+				}, "kubernetes", nil),
+			},
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"input-1-kubernetes-123": {
+					DynamicProvider: "kubernetes",
+					ProviderVars: []string{
+						"kubernetes.namespace",
+						"kubernetes.node.name",
+						"kubernetes.path",
+					},
+				},
+			},
+		},
+		"variables of other providers are not recorded": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("path", NewStrVal("${kubernetes.path}")),
+					NewKey("host", NewStrVal("${host.name}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("kubernetes-123", map[string]interface{}{
+					"kubernetes": map[string]interface{}{
+						"path": "/var/log/containers",
+					},
+					"host": map[string]interface{}{
+						"name": "localhost",
+					},
+				}, "kubernetes", nil),
+			},
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"input-1-kubernetes-123": {
+					DynamicProvider: "kubernetes",
+					ProviderVars:    []string{"kubernetes.path"},
+				},
+			},
+		},
+		"alternation records only the matching branch": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+					// the first alternative is missing, so the provider variable matches
+					NewKey("path", NewStrVal("${kubernetes.missing|kubernetes.path}")),
+					// the first alternative matches, so the second one is never resolved
+					NewKey("host", NewStrVal("${host.name|kubernetes.namespace}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("kubernetes-123", map[string]interface{}{
+					"kubernetes": map[string]interface{}{
+						"path":      "/var/log/containers",
+						"namespace": "default",
+					},
+					"host": map[string]interface{}{
+						"name": "localhost",
+					},
+				}, "kubernetes", nil),
+			},
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"input-1-kubernetes-123": {
+					DynamicProvider: "kubernetes",
+					ProviderVars:    []string{"kubernetes.path"},
+				},
+			},
+		},
+		"deduplicated renders keep the info of the surviving instance": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+					// identical for both vars sets, so the second render is deduplicated
+					NewKey("group", NewStrVal("${local_dynamic.group}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("local_dynamic-1", map[string]interface{}{
+					"local_dynamic": map[string]interface{}{
+						"id":    "1",
+						"group": "shared",
+					},
+				}, "local_dynamic", nil),
+				mustMakeVarsP("local_dynamic-2", map[string]interface{}{
+					"local_dynamic": map[string]interface{}{
+						"id":    "2",
+						"group": "shared",
+					},
+				}, "local_dynamic", nil),
+			},
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"input-1-local_dynamic-1": {
+					DynamicProvider: "local_dynamic",
+					ProviderVars:    []string{"local_dynamic.group"},
+				},
+			},
+		},
+		"conditions on provider variables are recorded": {
+			input: NewKey("inputs", NewList([]Node{
+				NewDict([]Node{
+					NewKey("id", NewStrVal("input-1")),
+					NewKey("type", NewStrVal("filestream")),
+					NewKey("condition", NewStrVal("${kubernetes.namespace} == 'default'")),
+					NewKey("path", NewStrVal("${kubernetes.path}")),
+				}),
+			})),
+			varsArray: []*Vars{
+				mustMakeVarsP("kubernetes-123", map[string]interface{}{
+					"kubernetes": map[string]interface{}{
+						"path":      "/var/log/containers",
+						"namespace": "default",
+					},
+				}, "kubernetes", nil),
+			},
+			expectedRenderedInfo: map[string]RenderedInputInfo{
+				"input-1-kubernetes-123": {
+					DynamicProvider: "kubernetes",
+					ProviderVars:    []string{"kubernetes.namespace", "kubernetes.path"},
+				},
 			},
 		},
 	}
 
 	for name, test := range testcases {
 		t.Run(name, func(t *testing.T) {
-			_, dynamicProviderMap, err := RenderInputs(test.input, test.varsArray)
+			_, renderedInfo, err := RenderInputs(test.input, test.varsArray)
 			require.NoError(t, err)
-			assert.Equal(t, test.expectedDynamicProviderMap, dynamicProviderMap)
+			assert.Equal(t, test.expectedRenderedInfo, renderedInfo)
 		})
 	}
 }
