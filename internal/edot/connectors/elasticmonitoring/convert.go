@@ -27,6 +27,10 @@ type exporterMetrics struct {
 	failedSpans   *int64
 	failedMetrics *int64
 
+	enqueueFailedLogs    *int64
+	enqueueFailedSpans   *int64
+	enqueueFailedMetrics *int64
+
 	docsProcessed *int64
 	docsRetried   *int64
 	bulkRequests  *int64
@@ -53,6 +57,9 @@ const (
 	otelFailedLogsKey          = "otelcol_exporter_send_failed_log_records"
 	otelFailedSpansKey         = "otelcol_exporter_send_failed_spans"
 	otelFailedMetricsKey       = "otelcol_exporter_send_failed_metric_points"
+	otelEnqueueFailedLogsKey    = "otelcol_exporter_enqueue_failed_log_records"
+	otelEnqueueFailedSpansKey   = "otelcol_exporter_enqueue_failed_spans"
+	otelEnqueueFailedMetricsKey = "otelcol_exporter_enqueue_failed_metric_points"
 	otelDocsProcessedKey       = "otelcol.elasticsearch.docs.processed"
 	otelDocsRetriedKey         = "otelcol.elasticsearch.docs.retried"
 	otelDocsRetriedHTTPRequest = "otelcol.elasticsearch.docs.retried_http_request"
@@ -122,6 +129,12 @@ func addValue(em *exporterMetrics, name string, value int64) {
 		add(&em.failedSpans, &value)
 	case otelFailedMetricsKey:
 		add(&em.failedMetrics, &value)
+	case otelEnqueueFailedLogsKey:
+		add(&em.enqueueFailedLogs, &value)
+	case otelEnqueueFailedSpansKey:
+		add(&em.enqueueFailedSpans, &value)
+	case otelEnqueueFailedMetricsKey:
+		add(&em.enqueueFailedMetrics, &value)
 	case otelDocsProcessedKey:
 		add(&em.docsProcessed, &value)
 	case otelDocsRetriedKey, otelDocsRetriedHTTPRequest:
@@ -200,6 +213,15 @@ func addMetricsToEventFields(logger *zap.Logger, em exporterMetrics, event *maps
 	}
 	if em.failedMetrics != nil {
 		failedTotal += *em.failedMetrics
+	}
+	if em.enqueueFailedLogs != nil {
+		failedTotal += *em.enqueueFailedLogs
+	}
+	if em.enqueueFailedSpans != nil {
+		failedTotal += *em.enqueueFailedSpans
+	}
+	if em.enqueueFailedMetrics != nil {
+		failedTotal += *em.enqueueFailedMetrics
 	}
 	mapstrSetWithErrorLog(logger, event, beatsOutputEventsDroppedKey, failedTotal)
 

@@ -110,18 +110,21 @@ func appendGaugeFloat64WithAttrs(sm pmetric.ScopeMetrics, name string, value flo
 func TestConvertAllMetrics(t *testing.T) {
 	const exporterID = "elasticsearch/_agent-component/monitoring"
 	const (
-		queueCapacity = int64(1000)
-		queueSize     = int64(500)
-		sentLogs      = int64(1)
-		sentSpans     = int64(2)
-		sentMetrics   = int64(3)
-		failedLogs    = int64(4)
-		failedSpans   = int64(5)
-		failedMetrics = int64(6)
-		docsProcessed = int64(100)
-		docsRetried   = int64(8)
-		bulkRequests  = int64(9)
-		flushedBytes  = int64(10)
+		queueCapacity        = int64(1000)
+		queueSize            = int64(500)
+		sentLogs             = int64(1)
+		sentSpans            = int64(2)
+		sentMetrics          = int64(3)
+		failedLogs           = int64(4)
+		failedSpans          = int64(5)
+		failedMetrics        = int64(6)
+		enqueueFailedLogs    = int64(7)
+		enqueueFailedSpans   = int64(8)
+		enqueueFailedMetrics = int64(9)
+		docsProcessed        = int64(200)
+		docsRetried          = int64(11)
+		bulkRequests         = int64(12)
+		flushedBytes         = int64(13)
 	)
 
 	md, sm := newMetricsWithExporterScope(exporterID)
@@ -133,6 +136,9 @@ func TestConvertAllMetrics(t *testing.T) {
 	appendSumInt(sm, otelFailedLogsKey, failedLogs)
 	appendSumInt(sm, otelFailedSpansKey, failedSpans)
 	appendSumInt(sm, otelFailedMetricsKey, failedMetrics)
+	appendSumInt(sm, otelEnqueueFailedLogsKey, enqueueFailedLogs)
+	appendSumInt(sm, otelEnqueueFailedSpansKey, enqueueFailedSpans)
+	appendSumInt(sm, otelEnqueueFailedMetricsKey, enqueueFailedMetrics)
 	appendSumInt(sm, otelDocsProcessedKey, docsProcessed)
 	appendSumInt(sm, otelDocsRetriedKey, docsRetried)
 	appendSumInt(sm, otelFlushedBytesKey, flushedBytes)
@@ -164,7 +170,7 @@ func TestConvertAllMetrics(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expectedSent, eventsAcked)
 
-	expectedFailed := failedLogs + failedSpans + failedMetrics
+	expectedFailed := failedLogs + failedSpans + failedMetrics + enqueueFailedLogs + enqueueFailedSpans + enqueueFailedMetrics
 	eventsDropped, err := beatEvent.GetValue(beatsOutputEventsDroppedKey)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedFailed, eventsDropped)
