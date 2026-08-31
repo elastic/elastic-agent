@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,6 +64,10 @@ func (p *provisioner) Name() string {
 
 func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
+}
+
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
 }
 
 func (p *provisioner) SetLogger(l common.Logger) {
@@ -276,7 +281,9 @@ type cmdResult struct {
 func (p *provisioner) kindCmd(stdIn io.Reader, args ...string) (cmdResult, error) {
 
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("kind", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "kind", args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if stdIn != nil {
