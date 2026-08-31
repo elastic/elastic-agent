@@ -870,19 +870,14 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							"perNode": map[string]any{
 								// hostNetwork: false so the pod hostname is a generated name, not the node name.
 								"hostNetwork": false,
-								// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
 								"extraEnvs": []any{
 									map[string]any{
 										"name":  "ELASTIC_NETINFO",
 										"value": "false",
 									},
 									map[string]any{
-										"name": "ELASTIC_AGENT_HOSTNAME",
-										"valueFrom": map[string]any{
-											"fieldRef": map[string]any{
-												"fieldPath": "spec.nodeName",
-											},
-										},
+										"name":  "ELASTIC_AGENT_HOSTNAME",
+										"value": "test-hostname-e2e-override",
 									},
 								},
 							},
@@ -891,8 +886,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				}),
 				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
 				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					// For each agent pod, verify that the Fleet-reported hostname matches
-					// the Kubernetes node the pod is running on.
 					podList := &corev1.PodList{}
 					err := kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
 						opt.LabelSelector = "name=agent-pernode-helm-agent"
@@ -903,9 +896,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 
 					var stdout, stderr bytes.Buffer
 					for _, pod := range podList.Items {
-						nodeName := pod.Spec.NodeName
-						require.NotEmpty(t, nodeName, "pod %s has no node assigned", pod.Name)
-
 						id, err := k8sGetAgentID(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent")
 						require.NoError(t, err, "failed to get agent ID for pod %s", pod.Name)
 						require.NotEmpty(t, id)
@@ -914,10 +904,10 @@ func TestKubernetesAgentHelm(t *testing.T) {
 							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
 							assert.NoError(collect, err)
 							if resp != nil {
-								assert.Equal(collect, nodeName, resp.LocalMetadata.Host.Hostname,
-									"agent %s on node %s reported wrong hostname", id, nodeName)
+								assert.Equal(collect, "test-hostname-e2e-override", resp.LocalMetadata.Host.Hostname,
+									"agent %s in pod %s reported wrong hostname", id, pod.Name)
 							}
-						}, 2*time.Minute, 5*time.Second, "agent %s hostname did not match node %s", id, nodeName)
+						}, 2*time.Minute, 5*time.Second, "agent %s hostname override did not propagate", id)
 					}
 				},
 			},
@@ -1020,12 +1010,8 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 							"value": "false",
 						},
 						map[string]any{
-							"name": "ELASTIC_AGENT_HOSTNAME",
-							"valueFrom": map[string]any{
-								"fieldRef": map[string]any{
-									"fieldPath": "spec.nodeName",
-								},
-							},
+							"name":  "ELASTIC_AGENT_HOSTNAME",
+							"value": "test-hostname-e2e-override",
 						},
 					},
 				},
@@ -1036,8 +1022,8 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 		"system/metrics": true,
 	})(t, ctx, kCtx, namespace)
 
-	// For each agent pod, verify that both Fleet metadata and Beats-produced
-	// System metrics use the Kubernetes node name.
+	const wantHostname = "test-hostname-e2e-override"
+
 	podList := &corev1.PodList{}
 	err = kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
 		opt.LabelSelector = "name=agent-pernode-helm-agent"
@@ -1048,9 +1034,6 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	for _, pod := range podList.Items {
-		nodeName := pod.Spec.NodeName
-		require.NotEmpty(t, nodeName, "pod %s has no node assigned", pod.Name)
-
 		status, err := k8sGetAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent")
 		require.NoError(t, err, "failed to get agent status for pod %s", pod.Name)
 		id := status.Info.ID
@@ -1078,10 +1061,10 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 			resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
 			assert.NoError(collect, err)
 			if resp != nil {
-				assert.Equal(collect, nodeName, resp.LocalMetadata.Host.Hostname,
-					"agent %s on node %s reported wrong hostname", id, nodeName)
+				assert.Equal(collect, wantHostname, resp.LocalMetadata.Host.Hostname,
+					"agent %s in pod %s reported wrong hostname", id, pod.Name)
 			}
-		}, 2*time.Minute, 5*time.Second, "agent %s hostname did not match node %s", id, nodeName)
+		}, 2*time.Minute, 5*time.Second, "agent %s hostname override did not propagate", id)
 
 		docs := integration.FindESDocs(t, func() (estools.Documents, error) {
 			return estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", id)
@@ -1091,7 +1074,7 @@ func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
 			require.True(t, ok, "system.cpu document for agent %s has no host object", id)
 			hostname, ok := host["name"].(string)
 			require.True(t, ok, "system.cpu document for agent %s has no host.name", id)
-			require.Equal(t, nodeName, hostname,
+			require.Equal(t, wantHostname, hostname,
 				"system.cpu document for agent %s reported the wrong host.name", id)
 		}
 	}
