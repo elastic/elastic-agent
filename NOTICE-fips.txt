@@ -31010,11 +31010,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/api
-Version: v0.295.0
+Version: v0.296.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/api@v0.295.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/api@v0.296.0/LICENSE:
 
 Copyright (c) 2011 Google Inc. All rights reserved.
 
