@@ -74,28 +74,30 @@ func TestHostnameEnvOverride(t *testing.T) {
 			// Inject ELASTIC_AGENT_HOSTNAME via a systemd drop-in before the service starts.
 			// The drop-in must exist before install because the service starts immediately on install.
 			dropInDir := serviceDropInDir(installOpts.Namespace)
-			dropInFile := filepath.Join(dropInDir, "elastic-agent-hostname.conf")
-			dirCreated := false
-			if _, err := os.Stat(dropInDir); os.IsNotExist(err) {
+
+			_, statErr := os.Stat(dropInDir)
+			require.True(t, statErr == nil || os.IsNotExist(statErr),
+				"stat drop-in dir: %v", statErr)
+			if os.IsNotExist(statErr) {
 				require.NoError(t, os.MkdirAll(dropInDir, 0o755))
-				dirCreated = true
+				// Register directory cleanup immediately after creation.
+				t.Cleanup(func() {
+					if err := os.Remove(dropInDir); err != nil && !os.IsNotExist(err) {
+						t.Errorf("failed to remove drop-in dir: %v", err)
+					}
+				})
 			}
-			// Preserve an existing drop-in file so cleanup can restore it.
-			existingDropIn, readErr := os.ReadFile(dropInFile)
-			require.True(t, readErr == nil || os.IsNotExist(readErr),
-				"failed to read existing drop-in: %v", readErr)
-			require.NoError(t, os.WriteFile(dropInFile, []byte(fmt.Sprintf("[Service]\nEnvironment=ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644)) //nolint:gosec // G306 file permissions intentional
+
+			// Use a unique test-owned filename to avoid overwriting any existing drop-in.
+			dropInFile := filepath.Join(dropInDir, fmt.Sprintf("elastic-agent-hostname-%s.conf", customHostname))
+			// Register file cleanup before the write so the host is restored even if
+			// os.WriteFile truncates the file and then fails.
 			t.Cleanup(func() {
-				if readErr == nil {
-					assert.NoError(t, os.WriteFile(dropInFile, existingDropIn, 0o644), //nolint:gosec // G306 file permissions intentional
-						"failed to restore drop-in file")
-				} else {
-					assert.NoError(t, os.Remove(dropInFile), "failed to remove drop-in file")
-				}
-				if dirCreated {
-					assert.NoError(t, os.Remove(dropInDir), "failed to remove drop-in dir")
+				if err := os.Remove(dropInFile); err != nil && !os.IsNotExist(err) {
+					t.Errorf("failed to remove drop-in file: %v", err)
 				}
 			})
+			require.NoError(t, os.WriteFile(dropInFile, []byte(fmt.Sprintf("[Service]\nEnvironment=ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644))
 
 			createPolicyReq := kibana.AgentPolicy{
 				Name:      fmt.Sprintf("test-policy-hostname-%s-%s", tc.name, customHostname),
