@@ -38,11 +38,6 @@ const (
 	// Hostname group of tests. Used for testing Elastic Agent hostname behaviour (FQDN, env override).
 	Hostname = "hostname"
 
-	// FQDN is an alias kept for compatibility; prefer Hostname for new tests.
-	//
-	// Deprecated: use Hostname.
-	FQDN = Hostname
-
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 

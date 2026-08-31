@@ -435,7 +435,9 @@ func (c *commandRuntime) start(comm Communicator) error {
 	// differentiate data paths
 	args = append(args, "-E", "path.data="+workDir)
 
-	if c.current.BeatName() != "" {
+	if beatName := c.current.BeatName(); beatName != "" && beatName != "cloudbeat" {
+		// Cloudbeat pins a Beats revision that predates the --hostname flag; skip it
+		// until its Beats dependency is updated.
 		if hostname := util.HostnameOverride(); hostname != "" {
 			args = append(args, "--hostname", hostname)
 		}

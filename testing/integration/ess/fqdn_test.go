@@ -354,6 +354,11 @@ func verifyNoOtherHostnameInIndices(t *testing.T, indices, agentID, expectedHost
 							},
 						},
 					},
+					{
+						"exists": map[string]interface{}{
+							"field": "host.name",
+						},
+					},
 				},
 				"must_not": []map[string]interface{}{
 					{

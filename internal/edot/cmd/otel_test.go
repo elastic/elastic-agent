@@ -103,6 +103,7 @@ func TestInitBeatHostnameFromEnv(t *testing.T) {
 
 	t.Run("unset_env_clears_stale_override", func(t *testing.T) {
 		t.Cleanup(reset)
+		t.Setenv(util.EnvHostName, "")
 		beat.SetHostnameOverride("stale-node")
 		initBeatHostnameFromEnv()
 		assert.Equal(t, "", beat.GetHostnameOverride())

@@ -4122,6 +4122,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 
 	t.Run("env_unset", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "")
 		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)

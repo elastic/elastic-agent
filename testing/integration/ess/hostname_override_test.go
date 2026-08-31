@@ -82,16 +82,18 @@ func TestHostnameEnvOverride(t *testing.T) {
 			}
 			// Preserve an existing drop-in file so cleanup can restore it.
 			existingDropIn, readErr := os.ReadFile(dropInFile)
-			require.NoError(t, os.WriteFile(dropInFile, []byte(fmt.Sprintf("[Service]\nEnvironment=ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644))
+			require.True(t, readErr == nil || os.IsNotExist(readErr),
+				"failed to read existing drop-in: %v", readErr)
+			require.NoError(t, os.WriteFile(dropInFile, []byte(fmt.Sprintf("[Service]\nEnvironment=ELASTIC_AGENT_HOSTNAME=%s\n", customHostname)), 0o644)) //nolint:gosec // G306 file permissions intentional
 			t.Cleanup(func() {
 				if readErr == nil {
-					// Restore the original content.
-					os.WriteFile(dropInFile, existingDropIn, 0o644) //nolint:gosec,errcheck // G703 path traversal; best-effort restore
+					assert.NoError(t, os.WriteFile(dropInFile, existingDropIn, 0o644), //nolint:gosec // G306 file permissions intentional
+						"failed to restore drop-in file")
 				} else {
-					os.Remove(dropInFile)
+					assert.NoError(t, os.Remove(dropInFile), "failed to remove drop-in file")
 				}
 				if dirCreated {
-					os.Remove(dropInDir)
+					assert.NoError(t, os.Remove(dropInDir), "failed to remove drop-in dir")
 				}
 			})
 

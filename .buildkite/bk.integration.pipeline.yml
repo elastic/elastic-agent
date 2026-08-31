@@ -102,7 +102,7 @@ common:
     # - fleet-privileged
     # - fleet-upgrade-to-pr-build
     # - install-uninstall
-    # - fqdn
+    # - hostname
     # - deb
     # - container
 

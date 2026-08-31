@@ -55,6 +55,7 @@ func TestGetHostNameEnvOverride(t *testing.T) {
 }
 
 func TestGetHostName(t *testing.T) {
+	t.Setenv(EnvHostName, "")
 	cases := map[string]struct {
 		fqdnFeatureEnabled bool
 		hostInfo           types.HostInfo
