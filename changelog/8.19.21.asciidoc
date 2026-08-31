@@ -30,7 +30,7 @@ Review important information about the  8.19.21 release.
 
 
 
-* Bump github.com/kardianos/service to v1.3.0 and update Linux systemd template for new mini template engine. https://github.com/elastic/elastic-agent/pull/15976[#15976] 
+* Bump `github.com/kardianos/service` to v1.3.0 and update Linux `systemd` template for new mini template engine. https://github.com/elastic/elastic-agent/pull/15976[#15976] 
 * Update Go to 1.26.6. https://github.com/elastic/elastic-agent/pull/16203[#16203] 
 
 
