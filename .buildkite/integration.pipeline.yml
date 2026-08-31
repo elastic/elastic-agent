@@ -125,6 +125,9 @@ steps:
           .buildkite/scripts/steps/integration-cloud-image-push.sh
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -143,6 +146,9 @@ steps:
           .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "aws"
           instanceType: "c6g.4xlarge"
@@ -162,6 +168,9 @@ steps:
           .buildkite/scripts/steps/integration-cloud-image-push.sh
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
@@ -181,6 +190,9 @@ steps:
           .buildkite/scripts/steps/integration-package.sh
         artifact_paths:
           - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
         agents:
           provider: "aws"
           instanceType: "c6g.2xlarge"
