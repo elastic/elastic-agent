@@ -33,8 +33,8 @@ require (
 	github.com/gofrs/flock v0.13.0
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.21.9
-	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3
+	github.com/google/go-containerregistry v0.22.0
+	github.com/google/pprof v0.0.0-20260830191439-4932ad3515ea
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.25.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
@@ -218,7 +218,7 @@ require (
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
-	github.com/klauspost/compress v1.19.1 // indirect
+	github.com/klauspost/compress v1.19.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.0 // indirect
