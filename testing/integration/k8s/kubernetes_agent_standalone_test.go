@@ -849,9 +849,6 @@ func TestKubernetesAgentHelm(t *testing.T) {
 			},
 		},
 		{
-			// Verifies that ELASTIC_AGENT_HOSTNAME env var (injected via the Kubernetes downward API)
-			// takes precedence over the OS hostname. This is the recommended approach for AKS clusters
-			// with Cilium where hostNetwork: true is forbidden and the OS hostname is not the node name.
 			name: "helm managed agent hostname override via ELASTIC_AGENT_HOSTNAME env var",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
@@ -871,8 +868,7 @@ func TestKubernetesAgentHelm(t *testing.T) {
 						},
 						"presets": map[string]any{
 							"perNode": map[string]any{
-								// Disable host networking so the pod hostname is not the node name,
-								// simulating restricted environments (e.g. AKS + Cilium).
+								// hostNetwork: false so the pod hostname is a generated name, not the node name.
 								"hostNetwork": false,
 								// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
 								"extraEnvs": []any{
