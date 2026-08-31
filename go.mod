@@ -86,7 +86,7 @@ require (
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	helm.sh/helm/v3 v3.21.0
+	helm.sh/helm/v4 v4.2.4
 	howett.net/plist v1.0.2-0.20250314012144-ee69052608d9
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
