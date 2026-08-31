@@ -43,8 +43,10 @@ func (p *ExternalProvisioner) SetLogger(l common.Logger) {
 
 // Create returns a Stack populated from environment variables. No remote
 // provisioning is performed, the stack is considered immediately ready.
-func (p *ExternalProvisioner) Create(_ context.Context, _ common.StackRequest) (common.Stack, error) {
+func (p *ExternalProvisioner) Create(_ context.Context, req common.StackRequest) (common.Stack, error) {
 	return common.Stack{
+		ID:            req.ID,
+		Version:       req.Version,
 		Provisioner:   ProvisionerExternal,
 		Elasticsearch: os.Getenv("ELASTICSEARCH_HOST"),
 		Kibana:        os.Getenv("KIBANA_HOST"),
