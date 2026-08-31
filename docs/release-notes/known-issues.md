@@ -42,6 +42,35 @@ Alternatively, set `_runtime_experimental: process` on the affected inputs.
 
 For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
 ::::
+
+:::{dropdown} GCP integration data collected through Pub/Sub is silently dropped on the OTel runtime
+
+**Applies to: {{agent}} 9.5.0 to 9.5.1**
+
+On August 5, 2026, a known issue was discovered where the Filebeat OTel runtime converts values with the Go type `map[string]string` to the string `unknown type: map[string]string` instead of an object. When the destination data stream maps the field as an object, {{es}} rejects the document with a `document_parsing_exception`.
+
+The GCP Pub/Sub input uses a `map[string]string` value for the top-level `labels` field. As a result, this issue affects all GCP integration data streams collected through Pub/Sub, including `gcp.audit`, `gcp.vpcflow`, and `gcp.firewall`.
+
+**Symptoms**
+
+{{fleet}} reports the {{agent}} status as **Healthy**, and agent logs do not contain related errors. The Pub/Sub subscription consumes and acknowledges messages, so no backlog appears. If the destination data stream has the Failure Store enabled, the rejected documents are redirected there and the bulk response reports success. The only visible symptom is that no new documents are searchable.
+
+**Workaround**
+
+Force Filebeat to use the process runtime instead of the OTel runtime:
+
+```yaml
+agent:
+  internal.runtime.filebeat.default: process
+```
+
+**Resolution**
+
+Upgrade to {{agent}} 9.5.2 or later.
+
+For more information, check [Issue #52460](https://github.com/elastic/beats/issues/52460).
+:::
+
 :::{dropdown} Osquery live and scheduled query results are missing in Kibana on {{agent}} 9.5.0
 
 **Applies to: {{agent}} 9.5.0**
