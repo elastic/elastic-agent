@@ -104,13 +104,13 @@ agent:
 			dynamicInputs.RuntimeManagerForDynamicInput("packetbeat", "packet"))
 	})
 
-	t.Run("unset leaves the feature disabled", func(t *testing.T) {
+	t.Run("unset uses the default (process)", func(t *testing.T) {
 		c, err := NewFromConfig(config.MustNewConfigFrom(`agent.internal.runtime.default: otel`))
 		require.NoError(t, err)
 
 		dynamicInputs := c.Settings.Internal.Runtime.DynamicInputs
-		assert.Equal(t, "", dynamicInputs.Default)
-		assert.Equal(t, component.RuntimeManager(""),
+		assert.Equal(t, string(component.ProcessRuntimeManager), dynamicInputs.Default)
+		assert.Equal(t, component.ProcessRuntimeManager,
 			dynamicInputs.RuntimeManagerForDynamicInput("filebeat", "filestream"))
 	})
 
