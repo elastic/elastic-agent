@@ -147,6 +147,10 @@ func TestHostnameEnvOverride(t *testing.T) {
 			t.Log("Verify that host.name in logs-* and metrics-* matches ELASTIC_AGENT_HOSTNAME")
 			verifyHostNameInIndices(t, "logs-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
 			verifyHostNameInIndices(t, "metrics-*", customHostname, since, info.Namespace, info.ESClient, 5*time.Minute)
+
+			t.Log("Verify that no document from this agent carries a different host.name")
+			verifyNoOtherHostnameInIndices(t, "logs-*", agentID, customHostname, since, info.Namespace, info.ESClient)
+			verifyNoOtherHostnameInIndices(t, "metrics-*", agentID, customHostname, since, info.Namespace, info.ESClient)
 		})
 	}
 }

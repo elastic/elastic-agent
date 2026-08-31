@@ -330,6 +330,80 @@ func verifyHostNameInIndices(t *testing.T, indices, hostname, since, namespace s
 	)
 }
 
+// verifyNoOtherHostnameInIndices asserts that no document written by the given
+// agent to indices since the provided timestamp carries a host.name other than
+// expectedHostname. Call after verifyHostNameInIndices so documents have had
+// time to arrive before this negative check runs.
+func verifyNoOtherHostnameInIndices(t *testing.T, indices, agentID, expectedHostname, since, namespace string, esClient *elasticsearch.Client) {
+	t.Helper()
+	queryRaw := map[string]interface{}{
+		"query": map[string]interface{}{
+			"bool": map[string]interface{}{
+				"must": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"agent.id": map[string]interface{}{
+								"value": agentID,
+							},
+						},
+					},
+					{
+						"term": map[string]interface{}{
+							"data_stream.namespace": map[string]interface{}{
+								"value": namespace,
+							},
+						},
+					},
+				},
+				"must_not": []map[string]interface{}{
+					{
+						"term": map[string]interface{}{
+							"host.name": map[string]interface{}{
+								"value": expectedHostname,
+							},
+						},
+					},
+				},
+				"filter": []map[string]interface{}{
+					{
+						"range": map[string]interface{}{
+							"@timestamp": map[string]interface{}{
+								"gte": since,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	queryBytes, err := json.Marshal(queryRaw)
+	require.NoError(t, err)
+
+	search := esClient.Search
+	resp, err := search(
+		search.WithIndex(indices),
+		search.WithFilterPath("hits.total"),
+		search.WithTrackTotalHits(true),
+		search.WithBody(bytes.NewReader(queryBytes)),
+	)
+	require.NoError(t, err)
+	require.False(t, resp.IsError())
+	defer resp.Body.Close()
+
+	var body struct {
+		Hits struct {
+			Total struct {
+				Value int `json:"value"`
+			} `json:"total"`
+		} `json:"hits"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	assert.Zero(t, body.Hits.Total.Value,
+		"found %d document(s) in %s for agent %s with host.name != %q",
+		body.Hits.Total.Value, indices, agentID, expectedHostname)
+}
+
 func getHostname(ctx context.Context) (string, error) {
 	cmd := exec.CommandContext(ctx, "hostname")
 	out, err := cmd.Output()
