@@ -48,6 +48,8 @@ const (
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCoreProjectName is the project name for elastic-agent-core in the build manifest.
 	AgentCoreProjectName = "elastic-agent-core"
+	// AgentSecurityCoreProjectName is the project name for the security distribution variant core artifact.
+	AgentSecurityCoreProjectName = "elastic-agent-security-core"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
 
 	// Mapped functions

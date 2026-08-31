@@ -27,6 +27,7 @@ type AgentECSMeta struct {
 	Complete      bool   `json:"complete"`
 	Unprivileged  bool   `json:"unprivileged"`
 	FIPS          bool   `json:"fips"`
+	Variant       string `json:"variant,omitempty"`
 }
 
 // SystemECSMeta is a collection of operating system metadata in ECS compliant object form.

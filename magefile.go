@@ -328,6 +328,7 @@ func GolangCrossBuild(ctx context.Context) error {
 	params := devtools.DefaultGolangCrossBuildArgs(cfg)
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=grpcnotrace")
 	injectBuildVars(cfg, params.Vars)
 
 	// The elastic-agent binary only requires cgo on darwin (Keychain access
@@ -347,6 +348,31 @@ func GolangCrossBuild(ctx context.Context) error {
 	return nil
 }
 
+// GolangCrossBuildSecurity builds the security-only distribution variant of the elastic-agent binary
+// inside the golang-builder. Do not use directly; use Build.CrossBuildSecurity instead.
+// The binary is stamped with release.variant=security and written as elastic-agent-security-<goos>-<arch>
+// so it can coexist with the standard elastic-agent-<goos>-<arch> in build/golang-crossbuild/.
+func GolangCrossBuildSecurity(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGolangCrossBuildArgs(cfg)
+	params.OutputDir = "build/golang-crossbuild"
+	params.Name = "elastic-agent-security-" + cfg.Build.GOOS + "-" + cfg.Platform().Arch
+	params.Package = "github.com/elastic/elastic-agent"
+	injectBuildVars(cfg, params.Vars)
+	params.Vars["github.com/elastic/elastic-agent/internal/pkg/release.variant"] = "security"
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=securityonly,grpcnotrace")
+
+	if cfg.Platform().GOOS != "darwin" {
+		params.CGO = false
+	}
+
+	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Binary build the fleet artifact.
 func (Build) Binary(ctx context.Context) error {
 	mg.Deps(Prepare.Env)
@@ -354,6 +380,7 @@ func (Build) Binary(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	buildArgs := devtools.DefaultBuildArgs(cfg)
 	buildArgs.OutputDir = buildDir
+	buildArgs.ExtraFlags = append(buildArgs.ExtraFlags, "-tags=grpcnotrace")
 	injectBuildVars(cfg, buildArgs.Vars)
 
 	return devtools.Build(ctx, cfg, buildArgs)
@@ -695,7 +722,33 @@ func Package(ctx context.Context) error {
 		}
 	}
 
-	return packageAgent(ctx, cfg, pkgSpec)
+	// When the security-only variant is also being packaged, prevent packageAgent
+	// from cleaning up the drop path so that packageAgentSecurity can reuse
+	// the already-downloaded component archives.
+	if os.Getenv("VARIANTS") == "security" {
+		cfg.Packaging.KeepArchive = true
+	}
+
+	if err := packageAgent(ctx, cfg, pkgSpec); err != nil {
+		return err
+	}
+
+	// Run the security distribution packaging pass when VARIANTS=security is set.
+	// This builds elastic-agent-security-* artifacts alongside the standard ones.
+	if os.Getenv("VARIANTS") == "security" {
+		endpointSpec, err := devtools.LoadElasticAgentSecurityPackageSpec(cfg.ElasticBeatsDir)
+		if err != nil {
+			return fmt.Errorf("error loading endpoint package spec: %w", err)
+		}
+		if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+			mg.CtxDeps(ctx, PackageAgentSecurityCore)
+		}
+		if err := packageAgentSecurity(ctx, cfg, endpointSpec); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
@@ -920,6 +973,16 @@ func CrossBuild(ctx context.Context) error {
 	return devtools.CrossBuild(ctx, cfg)
 }
 
+// CrossBuildSecurity cross-builds the security-only distribution variant of the elastic-agent binary.
+// The resulting binary is named elastic-agent-security-<goos>-<arch> and is stamped with
+// the security-only variant ldflag so it can coexist with the standard build output.
+func (Build) CrossBuildSecurity(ctx context.Context) error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+	cfg := devtools.SettingsFromContext(ctx)
+	opts := []devtools.CrossBuildOption{devtools.WithTarget("golangCrossBuildSecurity")}
+	return devtools.CrossBuild(ctx, cfg, opts...)
+}
+
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
 //
@@ -945,6 +1008,28 @@ func PackageAgentCore(ctx context.Context) error {
 
 	fmt.Println("--- Package elastic-agent-core")
 	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return err
+	}
+	// ran directly as we don't want mage to cache that it already called devtools.Package
+	return devtools.Package(ctx, cfg, coreSpec)
+}
+
+// PackageAgentSecurityCore cross-builds and packages the elastic-agent-security-core intermediate
+// artifact. This is the security-only distribution variant's equivalent of PackageAgentCore: it
+// produces elastic-agent-security-core-<version>-<platform>.tar.gz archives used as the
+// input for the final elastic-agent-security packaging step.
+func PackageAgentSecurityCore(ctx context.Context) error {
+	start := time.Now()
+	defer func() { fmt.Println("packageAgentSecurityCore ran for", time.Since(start)) }()
+
+	cfg := devtools.SettingsFromContext(ctx)
+
+	fmt.Println("--- Build elastic-agent-security-core")
+	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuildSecurity, Build.CrossBuildSecurity, Build.WindowsArchiveRootBinary)
+
+	fmt.Println("--- Package elastic-agent-security-core")
+	coreSpec, err := devtools.LoadElasticAgentSecurityCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
 	}
@@ -1294,6 +1379,71 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	}
 
 	// build package and test
+	if err := devtools.Package(ctx, cfg, pkgSpecs); err != nil {
+		return err
+	}
+	return nil
+}
+
+// packageAgentSecurity packages the security-only distribution variant of the elastic-agent.
+// It mirrors packageAgent but extracts from elastic-agent-security-core (build/core-endpoint/)
+// and uses the security-only packaging spec.
+func packageAgentSecurity(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) error {
+	fmt.Println("--- Package elastic-agent-security")
+
+	dependenciesVersion := cfg.Build.DependenciesVersion
+	if dependenciesVersion == "" {
+		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
+		if agentCoreVersion == "" {
+			dependenciesVersion = bversion.GetDefaultVersion()
+		} else {
+			dependenciesVersion = agentCoreVersion
+		}
+		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
+	}
+	log.Printf("Endpoint packaging with dependenciesVersion: %s", dependenciesVersion)
+
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, pkgSpecs)
+	if err != nil {
+		return fmt.Errorf("failed extracting endpoint dependencies: %w", err)
+	}
+
+	platforms := cfg.GetPlatforms().Names()
+
+	// Reuse the drop path kept alive by Package (KeepArchive=true when VARIANTS=security).
+	// The standard packaging run already downloaded and moved component archives into
+	// dropPath/archives/; calling collectPackageDependencies again would call
+	// movePackagesToArchive which globs dropPath/*.tar.gz — but those files were
+	// already moved to the archives/ subdir in the first pass and are no longer at the
+	// root. So we locate the drop path directly and reuse archives/ as-is.
+	dropPath := cfg.Packaging.AgentDropPath
+	if dropPath == "" {
+		dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
+		var absErr error
+		dropPath, absErr = filepath.Abs(dropPath)
+		if absErr != nil {
+			return fmt.Errorf("obtaining absolute endpoint drop path: %w", absErr)
+		}
+	}
+	archivePath := filepath.Join(dropPath, "archives")
+
+	cfg = cfg.WithAgentDropPath(dropPath)
+
+	defer os.RemoveAll(dropPath)
+
+	flatPath := filepath.Join(dropPath, ".elastic-agent-security_flat")
+	if err := os.MkdirAll(flatPath, 0o755); err != nil {
+		return fmt.Errorf("creating flat dir %q: %w", flatPath, err)
+	}
+	defer os.RemoveAll(flatPath)
+
+	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
+
+	err = extractAgentSecurityCoreForPackage(ctx, cfg, dependenciesVersion)
+	if err != nil {
+		return err
+	}
+
 	if err := devtools.Package(ctx, cfg, pkgSpecs); err != nil {
 		return err
 	}
@@ -1700,15 +1850,27 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 }
 
 func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
+	return extractAgentCoreForPackageWith(ctx, cfg, version, devtools.AgentCoreProjectName, "core")
+}
+
+func extractAgentSecurityCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
+	return extractAgentCoreForPackageWith(ctx, cfg, version, devtools.AgentSecurityCoreProjectName, "core-endpoint")
+}
+
+// extractAgentCoreForPackageWith extracts a core archive identified by projectName into
+// build/<baseDirName>/extracted/<goos>-<arch>/ so that packages.yml file entries can source
+// from those paths.
+func extractAgentCoreForPackageWith(ctx context.Context, cfg *devtools.Settings, version string, projectName string, baseDirName string) error {
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(devtools.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(projectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
-			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			devtools.AgentCoreProjectName,
+			"found an unexpected number of %s components (should be 1) [projectName: %q, fips: %v]: %v",
+			projectName,
+			projectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -1717,7 +1879,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 	platforms := cfg.GetPlatforms().Names()
 
 	repositoryRoot := cfg.ElasticBeatsDir
-	downloadDir := filepath.Join(repositoryRoot, "build", "core")
+	downloadDir := filepath.Join(repositoryRoot, "build", baseDirName)
 
 	var coreDownloadDir string
 	switch cfg.Packaging.CoreSource {
@@ -1726,12 +1888,12 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 		coreDownloadDir = filepath.Join(downloadDir, cfg.Packaging.Manifest.BuildID)
 		_, err = downloadDRAArtifacts(ctx, cfg.Packaging.Manifest, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
 		if err != nil {
-			return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
+			return fmt.Errorf("downloading %s artifacts: %w", projectName, err)
 		}
 	default:
 		// CoreSourceLocal (and the empty zero value, which callers outside
 		// Package may leave unset): use the packages written by
-		// PackageAgentCore into build/distributions.
+		// PackageAgentCore/PackageAgentSecurityCore into build/distributions.
 		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
 	}
 
@@ -1740,7 +1902,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 	extractDir := filepath.Join(downloadDir, extractionSubdir)
 	_ = os.RemoveAll(extractDir) // ignore error
 
-	// place the artifacts where the package.yml expects them (in 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}')
+	// place the artifacts where the package.yml expects them (in 'build/<baseDirName>/extracted/{{.GOOS}}-{{.Platform.Arch}}')
 	for _, platform := range platforms {
 		if !elasticAgentCoreComponent.SupportsPlatform(platform) {
 			continue
@@ -1756,7 +1918,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 		}
 
 		// rename this directory to match the format expected by the core_source packaging target
-		// this is 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}' in the repository
+		// this is 'build/<baseDirName>/extracted/{{.GOOS}}-{{.Platform.Arch}}' in the repository
 		targetArtifactName := elasticAgentCoreComponent.GetRootDir(version, platform)
 		srcDir := filepath.Join(extractDir, targetArtifactName)
 		dstDir := filepath.Join(extractDir, strings.Replace(platform, "/", "-", 1))
@@ -3697,7 +3859,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	params.OutputDir = "build/golang-crossbuild"
 	params.WorkDir = "internal/edot"
 	params.Package = "."
-	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat,grpcnotrace")
 	injectBuildVars(cfg, params.Vars)
 
 	// Workaround for https://github.com/golang/go/issues/75077: the Go PE linker assigns
@@ -3786,6 +3948,50 @@ func (Otel) CrossBuild(ctx context.Context) error {
 		// use the npcap build image for windows
 		opts = append(opts, devtools.ImageSelector(npcapImageSelector(cfg.Docker.WindowsNpcap)))
 	}
+
+	return devtools.CrossBuild(ctx, cfg, opts...)
+}
+
+// GolangCrossBuildSecurity builds the security-only variant elastic-otel-collector binary inside the
+// golang-crossbuild container. Do not use directly; use Otel.CrossBuildSecurity instead.
+// Built with the securityonly build tag, which removes beat subcommands and excludes
+// auditbeat, heartbeat, and packetbeat receivers.
+func (Otel) GolangCrossBuildSecurity(ctx context.Context) error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGolangCrossBuildArgs(cfg)
+	params.Name = "elastic-otel-collector-security-" + cfg.Build.GOOS + "-" + cfg.Platform().Arch
+	params.OutputDir = "build/golang-crossbuild"
+	params.WorkDir = "internal/edot"
+	params.Package = "."
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat,securityonly,grpcnotrace")
+	injectBuildVars(cfg, params.Vars)
+
+	if cfg.Build.DevBuild && cfg.Build.GOOS == "windows" {
+		if params.Env == nil {
+			params.Env = map[string]string{}
+		}
+		params.Env["GOEXPERIMENT"] = "nodwarf5"
+	}
+
+	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CrossBuildSecurity builds the security-only variant elastic-otel-collector binary for all target platforms.
+// The resulting binary is named elastic-otel-collector-security-<goos>-<arch> and compiled with the
+// securityonly build tag, which removes beat subcommands and excludes auditbeat, heartbeat,
+// and packetbeat receivers.
+func (Otel) CrossBuildSecurity(ctx context.Context) error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+
+	cfg := devtools.SettingsFromContext(ctx)
+
+	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector-security"), devtools.WithTarget("otel:golangCrossBuildSecurity")}
 
 	return devtools.CrossBuild(ctx, cfg, opts...)
 }

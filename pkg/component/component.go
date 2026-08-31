@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
@@ -825,6 +826,12 @@ func (r *RuntimeSpecs) componentsForInputType(
 				if input.runtimeManager == "" {
 					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
+				// In the security-only variant all beat inputs must use the otel
+				// runtime — process mode is not possible (the beat subcommands
+				// are not compiled in).
+				if release.IsSecurityOnlyVariant() && inputSpec.BeatName() != "" {
+					input.runtimeManager = OtelRuntimeManager
+				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
 					unitForInput(input, unitID),
@@ -879,6 +886,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 			if input.runtimeManager == "" {
 				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
+			}
+			// In the security-only variant all beat inputs must use the otel runtime.
+			if release.IsSecurityOnlyVariant() && inputSpec.BeatName() != "" {
+				input.runtimeManager = OtelRuntimeManager
 			}
 
 			var units []Unit
@@ -1136,6 +1147,11 @@ func toIntermediate(
 			case OtelRuntimeManager, ProcessRuntimeManager:
 			default:
 				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
+			}
+			// The security-only variant cannot run beats in process mode: the beat
+			// subcommands are not compiled into the security-only variant collector binary.
+			if release.IsSecurityOnlyVariant() && runtimeManagerVal == ProcessRuntimeManager {
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', process runtime is not supported in the security-only distribution variant", idx)
 			}
 			runtimeManager = runtimeManagerVal
 			delete(input, runtimeManagerKey)

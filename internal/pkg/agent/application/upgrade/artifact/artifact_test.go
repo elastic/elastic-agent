@@ -14,6 +14,7 @@ import (
 
 func TestArtifactFileName(t *testing.T) {
 	tests := map[string]struct {
+		variant      string
 		fips         bool
 		arch         string
 		os           string
@@ -104,11 +105,27 @@ func TestArtifactFileName(t *testing.T) {
 			version:      agtversion.NewParsedSemVer(9, 1, 0, "SNAPSHOT", ""),
 			expectedName: "elastic-agent-fips-9.1.0-SNAPSHOT-linux-x86_64.tar.gz",
 		},
+		"linux_endpoint_x86_64": {
+			variant:      "security",
+			fips:         false,
+			arch:         "amd64",
+			os:           "linux",
+			version:      agtversion.NewParsedSemVer(9, 1, 0, "", ""),
+			expectedName: "elastic-agent-security-9.1.0-linux-x86_64.tar.gz",
+		},
+		"linux_endpoint_snapshot_x86_64": {
+			variant:      "security",
+			fips:         false,
+			arch:         "amd64",
+			os:           "linux",
+			version:      agtversion.NewParsedSemVer(9, 1, 0, "SNAPSHOT", ""),
+			expectedName: "elastic-agent-security-9.1.0-SNAPSHOT-linux-x86_64.tar.gz",
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			a, err := New("elastic-agent", test.fips, test.version, test.os, test.arch)
+			a, err := New("elastic-agent", test.variant, test.fips, test.version, test.os, test.arch)
 			require.NoError(t, err)
 			require.Equal(t, test.expectedName, a.FileName())
 		})
