@@ -136,12 +136,12 @@
         "gomod"
       ],
       "matchPackageNames": [
-        "/^github\\.com/elastic/beats//",
+        "/^github\\.com/elastic/beats/",
         "/^github\\.com/elastic/sarama$/",
         "/^go\\.opentelemetry\\.io//",
         "/^github\\.com/open-telemetry//",
         "/^github\\.com/elastic/opentelemetry-collector-components//",
-        "/^github\\.com/elastic/elastic-agent//"
+        "/^github\\.com/elastic/elastic-agent/"
       ],
       "enabled": false
     },
