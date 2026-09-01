@@ -272,12 +272,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 				"expiry_buffer":               "5m0s",
 				"grant_type":                  "",
 				"tls": map[string]any{
-					"tpm": map[string]any{
-						"auth":       "",
-						"enabled":    false,
-						"owner_auth": "",
-						"path":       "",
-					},
+					"tpm": map[string]any{},
 				},
 				"token_url": "https://example.com/oauth2/token",
 			},
