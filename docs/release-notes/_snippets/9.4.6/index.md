@@ -1,6 +1,8 @@
 ## 9.4.6 [elastic-agent-release-notes-9.4.6]
 
-
+::::{important} 
+The 9.4.6 release contains fixes for potential security vulnerabilities. For details, go to [security announcements](https://discuss.elastic.co/c/announcements/security-announcements/31).
+::::
 
 ### Features and enhancements [elastic-agent-9.4.6-features-enhancements]
 
