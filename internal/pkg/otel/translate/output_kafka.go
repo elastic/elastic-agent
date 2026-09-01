@@ -81,8 +81,6 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 	}
 
-<<<<<<< HEAD
-=======
 	// Compression
 	if kConfig.Compression == "gzip" {
 		// compression_level is only available for gzip compression
@@ -92,7 +90,6 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	}
 
 	// Enables SASL authentication
->>>>>>> 898ebba ([beatreceiver] Set `compression_level` only for gzip compression type (#16359))
 	if kConfig.Username != "" {
 		if kConfig.Sasl.SaslMechanism == "" {
 			kConfig.Sasl.SaslMechanism = "PLAIN"
