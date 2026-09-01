@@ -346,7 +346,6 @@ func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName st
 	return DefaultRuntimeManager
 }
 
-
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
 	defaultUnitLogLevel                  = client.UnitLogLevelInfo
