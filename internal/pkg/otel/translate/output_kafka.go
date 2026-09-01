@@ -31,6 +31,7 @@ const oauth2ClientExtensionType = "oauth2client"
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
 func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
+	extensionCfg = make(map[string]any)
 	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error reading kafka config: %w", err)
@@ -72,10 +73,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			"queue_size": getQueueSize(logger, config),
 		},
 		"producer": map[string]any{
-			"compression": kConfig.Compression,
-			"compression_params": map[string]any{
-				"level": kConfig.CompressionLevel,
-			},
+			"compression":       kConfig.Compression,
 			"max_message_bytes": maxMessageBytes,
 			"required_acks":     requiredAcks,
 		},
@@ -93,7 +91,13 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 	}
 
-	extensionCfg = make(map[string]any)
+	// Compression
+	if kConfig.Compression == "gzip" {
+		// compression_level is only available for gzip compression
+		kafkaExporter["producer"].(map[string]any)["compression_params"] = map[string]any{
+			"level": kConfig.CompressionLevel,
+		}
+	}
 
 	// Set SASL authentication
 	if strings.ToUpper(kConfig.Sasl.SaslMechanism) == "OAUTHBEARER" {
@@ -134,15 +138,18 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 
 	} else if kConfig.Username != "" {
-		if kConfig.Sasl.SaslMechanism == "" {
-			kConfig.Sasl.SaslMechanism = "PLAIN"
-		}
-		kafkaExporter["auth"] = map[string]any{
-			"sasl": map[string]any{
-				"username":  kConfig.Username,
-				"password":  kConfig.Password,
-				"mechanism": kConfig.Sasl.SaslMechanism,
-			},
+		// Enables SASL authentication
+		if kConfig.Username != "" {
+			if kConfig.Sasl.SaslMechanism == "" {
+				kConfig.Sasl.SaslMechanism = "PLAIN"
+			}
+			kafkaExporter["auth"] = map[string]any{
+				"sasl": map[string]any{
+					"username":  kConfig.Username,
+					"password":  kConfig.Password,
+					"mechanism": kConfig.Sasl.SaslMechanism,
+				},
+			}
 		}
 	}
 
