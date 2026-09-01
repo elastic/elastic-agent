@@ -1,3 +1,0 @@
-kind: other
-summary: Update Otel collector dependencies to v0.157.0/v1.63.0
-component: elastic-agent
