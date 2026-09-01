@@ -231,7 +231,7 @@ compression: %s
 `, tc.compression)
 			cfg, err := config.NewConfigFrom(input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			gotMap, _, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
 			producer, ok := gotMap["producer"].(map[string]any)
