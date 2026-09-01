@@ -21,7 +21,6 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
@@ -346,6 +345,7 @@ func (r *RuntimeConfig) RuntimeManagerForInputType(inputType string, beatName st
 	}
 	return DefaultRuntimeManager
 }
+
 
 const (
 	// defaultUnitLogLevel is the default log level that a unit will get if one is not defined.
@@ -826,11 +826,14 @@ func (r *RuntimeSpecs) componentsForInputType(
 				if input.runtimeManager == "" {
 					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
-				// In the security-only variant all beat inputs must use the otel
-				// runtime — process mode is not possible (the beat subcommands
-				// are not compiled in).
-				if release.IsSecurityOnlyVariant() && inputSpec.BeatName() != "" {
-					input.runtimeManager = OtelRuntimeManager
+				// In the security-only variant, only beats compiled into the
+				// security-only elastic-otel-collector are supported.
+				if len(variantAllowedInputTypes) > 0 && inputSpec.BeatName() != "" {
+					if _, ok := variantAllowedInputTypes[inputType]; !ok {
+						componentErr = fmt.Errorf("input type %q is not supported in this variant", inputType)
+					} else {
+						input.runtimeManager = OtelRuntimeManager
+					}
 				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
@@ -887,9 +890,12 @@ func (r *RuntimeSpecs) componentsForInputType(
 			if input.runtimeManager == "" {
 				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 			}
-			// In the security-only variant all beat inputs must use the otel runtime.
-			if release.IsSecurityOnlyVariant() && inputSpec.BeatName() != "" {
-				input.runtimeManager = OtelRuntimeManager
+			if len(variantAllowedInputTypes) > 0 && inputSpec.BeatName() != "" {
+				if _, ok := variantAllowedInputTypes[inputType]; !ok {
+					componentErr = fmt.Errorf("input type %q is not supported in this variant", inputType)
+				} else {
+					input.runtimeManager = OtelRuntimeManager
+				}
 			}
 
 			var units []Unit
@@ -1148,10 +1154,10 @@ func toIntermediate(
 			default:
 				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
 			}
-			// The security-only variant cannot run beats in process mode: the beat
-			// subcommands are not compiled into the security-only variant collector binary.
-			if release.IsSecurityOnlyVariant() && runtimeManagerVal == ProcessRuntimeManager {
-				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', process runtime is not supported in the security-only distribution variant", idx)
+			// When a variant restricts input types, it also cannot run beats in
+			// process mode — the beat subcommands are not compiled in.
+			if len(variantAllowedInputTypes) > 0 && runtimeManagerVal == ProcessRuntimeManager {
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', process runtime is not supported in this variant", idx)
 			}
 			runtimeManager = runtimeManagerVal
 			delete(input, runtimeManagerKey)

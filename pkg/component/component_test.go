@@ -4999,3 +4999,126 @@ func TestRuntimeConfig_ValidateDynamicInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
+	linuxAMD64Platform := PlatformDetail{
+		Platform: Platform{
+			OS:   Linux,
+			Arch: AMD64,
+			GOOS: Linux,
+		},
+	}
+
+	basePolicy := map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":    "elasticsearch",
+				"enabled": true,
+			},
+		},
+	}
+
+	// aws-cloudwatch is backed by filebeat (allowed); add a second input type
+	// backed by a beat that is NOT in securityOnlyAllowedBeats to exercise the
+	// error path. We use the real testbeat spec which uses filebeat, so we
+	// construct a minimal in-memory spec with an auditbeat-backed input instead.
+	auditbeatSpec := RuntimeSpecs{
+		platform: linuxAMD64Platform,
+		inputSpecs: map[string]InputRuntimeSpec{
+			"auditd": {
+				InputType:  "auditd",
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Name:      "auditd",
+					Platforms: []string{"linux/amd64"},
+					Outputs:   []string{"elasticsearch"},
+					Command: &CommandSpec{
+						Name: "auditbeat",
+					},
+				},
+			},
+			"filestream": {
+				InputType:  "filestream",
+				BinaryName: "agentbeat",
+				Spec: InputSpec{
+					Name:      "filestream",
+					Platforms: []string{"linux/amd64"},
+					Outputs:   []string{"elasticsearch"},
+					Command: &CommandSpec{
+						Name: "filebeat",
+					},
+				},
+			},
+		},
+		aliasMapping: map[string]string{},
+		inputTypes:   []string{"auditd", "filestream"},
+	}
+
+	setAllowed := func(t *testing.T, m map[string]struct{}) {
+		t.Helper()
+		prev := variantAllowedInputTypes
+		variantAllowedInputTypes = m
+		t.Cleanup(func() { variantAllowedInputTypes = prev })
+	}
+
+	testAllowedTypes := map[string]struct{}{
+		"filestream": {},
+		"log":        {},
+		"syslog":     {},
+	}
+
+	t.Run("unsupported beat errors when variant has allowlist", func(t *testing.T) {
+		setAllowed(t, testAllowedTypes)
+
+		policy := copyMap(basePolicy)
+		policy["inputs"] = []interface{}{
+			map[string]interface{}{"type": "auditd", "id": "auditd-0"},
+		}
+
+		result, err := auditbeatSpec.ToComponents(
+			policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil, map[string]uint64{}, map[string]bool{})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		require.Error(t, result[0].Err)
+		assert.Contains(t, result[0].Err.Error(), `"auditd" is not supported in this variant`)
+	})
+
+	t.Run("allowed input type succeeds when variant has allowlist", func(t *testing.T) {
+		setAllowed(t, testAllowedTypes)
+
+		policy := copyMap(basePolicy)
+		policy["inputs"] = []interface{}{
+			map[string]interface{}{"type": "filestream", "id": "filestream-0"},
+		}
+
+		result, err := auditbeatSpec.ToComponents(
+			policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil, map[string]uint64{}, map[string]bool{})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		require.NoError(t, result[0].Err)
+		assert.Equal(t, OtelRuntimeManager, result[0].RuntimeManager)
+	})
+
+	t.Run("any input type allowed when no variant allowlist is set", func(t *testing.T) {
+		setAllowed(t, nil)
+
+		policy := copyMap(basePolicy)
+		policy["inputs"] = []interface{}{
+			map[string]interface{}{"type": "auditd", "id": "auditd-0"},
+		}
+
+		result, err := auditbeatSpec.ToComponents(
+			policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil, map[string]uint64{}, map[string]bool{})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.NoError(t, result[0].Err)
+	})
+}
+
+func copyMap(m map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}

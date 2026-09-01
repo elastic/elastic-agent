@@ -669,7 +669,7 @@ func (Format) License() error {
 // commit the downloaded binary was built at). Mixing the two produces
 // packages whose metadata disagrees with their binary contents.
 //
-// SNAPSHOT, FIPS, VERSION_QUALIFIER, DOCKER_VARIANTS, AGENT_DROP_PATH, and
+// SNAPSHOT, FIPS, VERSION_QUALIFIER, VARIANTS, DOCKER_VARIANTS, AGENT_DROP_PATH, and
 // KEEP_ARCHIVE apply as documented on their respective settings.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -722,20 +722,24 @@ func Package(ctx context.Context) error {
 		}
 	}
 
-	// When the security-only variant is also being packaged, prevent packageAgent
-	// from cleaning up the drop path so that packageAgentSecurity can reuse
-	// the already-downloaded component archives.
-	if os.Getenv("VARIANTS") == "security" {
+	selectedVariants := cfg.GetVariants()
+	buildBasic := slices.Contains(selectedVariants, "basic")
+	buildSecurity := slices.Contains(selectedVariants, "security")
+
+	// When both variants are built, keep the drop path alive so that
+	// packageAgentSecurity can reuse the already-downloaded component archives.
+	if buildSecurity {
 		cfg.Packaging.KeepArchive = true
 	}
 
-	if err := packageAgent(ctx, cfg, pkgSpec); err != nil {
-		return err
+	if buildBasic {
+		if err := packageAgent(ctx, cfg, pkgSpec); err != nil {
+			return err
+		}
 	}
 
-	// Run the security distribution packaging pass when VARIANTS=security is set.
-	// This builds elastic-agent-security-* artifacts alongside the standard ones.
-	if os.Getenv("VARIANTS") == "security" {
+	// Build elastic-agent-security-* artifacts.
+	if buildSecurity {
 		endpointSpec, err := devtools.LoadElasticAgentSecurityPackageSpec(cfg.ElasticBeatsDir)
 		if err != nil {
 			return fmt.Errorf("error loading endpoint package spec: %w", err)
@@ -1386,7 +1390,7 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 }
 
 // packageAgentSecurity packages the security-only distribution variant of the elastic-agent.
-// It mirrors packageAgent but extracts from elastic-agent-security-core (build/core-endpoint/)
+// It mirrors packageAgent but extracts from elastic-agent-security-core (build/core-security/)
 // and uses the security-only packaging spec.
 func packageAgentSecurity(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) error {
 	fmt.Println("--- Package elastic-agent-security")
@@ -1410,7 +1414,7 @@ func packageAgentSecurity(ctx context.Context, cfg *devtools.Settings, pkgSpecs 
 
 	platforms := cfg.GetPlatforms().Names()
 
-	// Reuse the drop path kept alive by Package (KeepArchive=true when VARIANTS=security).
+	// Reuse the drop path kept alive by Package (KeepArchive=true when VARIANTS includes security).
 	// The standard packaging run already downloaded and moved component archives into
 	// dropPath/archives/; calling collectPackageDependencies again would call
 	// movePackagesToArchive which globs dropPath/*.tar.gz — but those files were
@@ -1854,7 +1858,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 }
 
 func extractAgentSecurityCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
-	return extractAgentCoreForPackageWith(ctx, cfg, version, devtools.AgentSecurityCoreProjectName, "core-endpoint")
+	return extractAgentCoreForPackageWith(ctx, cfg, version, devtools.AgentSecurityCoreProjectName, "core-security")
 }
 
 // extractAgentCoreForPackageWith extracts a core archive identified by projectName into

@@ -10,18 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 
 	"github.com/elastic/go-ucfg/yaml"
 	yamlv3 "gopkg.in/yaml.v3"
-
-	"github.com/elastic/elastic-agent/internal/pkg/release"
 )
-
-// securityOnlyAllowedBeats is the set of beat receiver names compiled into the
-// elastic-otel-collector binary for the security-only variant distribution.
-var securityOnlyAllowedBeats = []string{"filebeat", "metricbeat", "osquerybeat"}
 
 const (
 	specSuffix      = ".spec.yml"
@@ -170,14 +163,6 @@ func LoadRuntimeSpecs(dir string, platform PlatformDetail, opts ...LoadRuntimeOp
 			if !containsStr(input.Platforms, platform.String()) {
 				// input spec doesn't support this platform
 				continue
-			}
-			// In the security-only variant, skip beat inputs whose receiver is not
-			// compiled into the security-only elastic-otel-collector.
-			if release.IsSecurityOnlyVariant() && input.Command != nil {
-				cmdName := input.Command.Name
-				if strings.HasSuffix(cmdName, "beat") && !slices.Contains(securityOnlyAllowedBeats, cmdName) {
-					continue
-				}
 			}
 			if existing, exists := inputSpecs[input.Name]; exists {
 				return RuntimeSpecs{}, fmt.Errorf("failed loading spec '%s': input '%s' already exists in spec '%s'", path, input.Name, existing.BinaryName)

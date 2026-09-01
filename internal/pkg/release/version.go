@@ -92,6 +92,14 @@ func FIPSDistribution() bool {
 // VariantSecurityOnly is the variant string stamped into security-only builds.
 const VariantSecurityOnly = "security"
 
+// SetVariantForTesting overrides the variant for the duration of a test.
+// Returns a restore function that must be called (typically via t.Cleanup).
+func SetVariantForTesting(v string) func() {
+	prev := variant
+	variant = v
+	return func() { variant = prev }
+}
+
 // Variant returns the distribution variant stamped at build time.
 // Returns an empty string for the standard distribution.
 func Variant() string {

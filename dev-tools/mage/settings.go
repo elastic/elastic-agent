@@ -1208,6 +1208,10 @@ type CrossBuildSettings struct {
 	// DockerVariants is the comma-separated list of Docker variants (from DOCKER_VARIANTS env var)
 	DockerVariants string
 
+	// Variants is the comma-separated list of distribution variants to build (from VARIANTS env var).
+	// Accepted values: "basic", "security". Defaults to "basic" when unset.
+	Variants string
+
 	// DevOS is the target OS for config generation (from DEV_OS env var, default "linux")
 	DevOS string
 
@@ -1633,6 +1637,9 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 	}
 	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
 		s.CrossBuild.DockerVariants = v
+	}
+	if v := os.Getenv("VARIANTS"); v != "" {
+		s.CrossBuild.Variants = v
 	}
 	if v := os.Getenv("DEV_OS"); v != "" {
 		s.CrossBuild.DevOS = v
@@ -2082,6 +2089,16 @@ func (s *Settings) GetDockerVariants() []DockerVariant {
 		}
 	}
 	return variants
+}
+
+// GetVariants returns the distribution variants to build, parsed from the
+// VARIANTS env var. Defaults to ["basic"] when unset.
+func (s *Settings) GetVariants() []string {
+	v := s.CrossBuild.Variants
+	if v == "" {
+		return []string{"basic"}
+	}
+	return strings.Split(v, ",")
 }
 
 // IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
