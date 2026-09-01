@@ -121,6 +121,14 @@ func TestArtifactFileName(t *testing.T) {
 			version:      agtversion.NewParsedSemVer(9, 1, 0, "SNAPSHOT", ""),
 			expectedName: "elastic-agent-security-9.1.0-SNAPSHOT-linux-x86_64.tar.gz",
 		},
+		"linux_security_fips_x86_64": {
+			variant:      "security",
+			fips:         true,
+			arch:         "amd64",
+			os:           "linux",
+			version:      agtversion.NewParsedSemVer(9, 1, 0, "", ""),
+			expectedName: "elastic-agent-security-fips-9.1.0-linux-x86_64.tar.gz",
+		},
 	}
 
 	for name, test := range tests {
