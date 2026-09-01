@@ -18,9 +18,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
 	// Receivers:
+	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
+
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
-	nopreceiver "go.opentelemetry.io/collector/receiver/nopreceiver"
 
 	// Processors:
 	"go.opentelemetry.io/collector/processor/batchprocessor"

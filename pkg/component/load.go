@@ -12,8 +12,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/elastic/go-ucfg/yaml"
 	yamlv3 "gopkg.in/yaml.v3"
+
+	"github.com/elastic/go-ucfg/yaml"
 )
 
 const (
