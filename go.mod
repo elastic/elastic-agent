@@ -428,3 +428,5 @@ tool (
 	golang.org/x/tools/cmd/stringer
 	gotest.tools/gotestsum
 )
+
+replace github.com/elastic/elastic-agent-libs => github.com/orestisfl/elastic-agent-libs v0.0.0-20260901124045-5af8d15cb723
