@@ -99,13 +99,12 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 	}
 
-	// Set SASL authentication
+	// Set SASL and/or Kerberos authentication
+	auth := map[string]any{}
 	if strings.ToUpper(kConfig.Sasl.SaslMechanism) == "OAUTHBEARER" {
-		kafkaExporter["auth"] = map[string]any{
-			"sasl": map[string]any{
-				"mechanism":                "OAUTHBEARER",
-				"oauthbearer_token_source": getOauth2ClientExtensionID(outputName).String(),
-			},
+		auth["sasl"] = map[string]any{
+			"mechanism":                "OAUTHBEARER",
+			"oauthbearer_token_source": getOauth2ClientExtensionID(outputName).String(),
 		}
 
 		oauthCfg, err := config.Child("auth", -1)
@@ -138,27 +137,20 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		}
 
 	} else if kConfig.Username != "" {
-		// Enables SASL authentication
-		if kConfig.Username != "" {
-			if kConfig.Sasl.SaslMechanism == "" {
-				kConfig.Sasl.SaslMechanism = "PLAIN"
-			}
-			kafkaExporter["auth"] = map[string]any{
-				"sasl": map[string]any{
-					"username":  kConfig.Username,
-					"password":  kConfig.Password,
-					"mechanism": kConfig.Sasl.SaslMechanism,
-				},
-			}
+		if kConfig.Sasl.SaslMechanism == "" {
+			kConfig.Sasl.SaslMechanism = "PLAIN"
+		}
+		auth["sasl"] = map[string]any{
+			"username":  kConfig.Username,
+			"password":  kConfig.Password,
+			"mechanism": kConfig.Sasl.SaslMechanism,
 		}
 	}
 
-	// Enables Kerberos authentication
 	if kConfig.Kerberos.IsEnabled() {
-		kafkaExporter["auth"] = map[string]any{
-			"kerberos": getKerberosConfig(kConfig),
-		}
+		auth["kerberos"] = getKerberosConfig(kConfig)
 	}
+	setIfNotNil(kafkaExporter, "auth", auth)
 
 	tlsCfg, err := TLSToOTel(kConfig.TLS, logger)
 	if err != nil {
