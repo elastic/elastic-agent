@@ -85,6 +85,12 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeVM
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
+}
+
+func (p *provisioner) SupportsLocalStack() bool { return true }
+
 // Supported returns true if the docker provisioner supports this OS.
 //
 // Only Ubuntu on the same architecture as the host is supported: the container
@@ -249,6 +255,21 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 		if _, err := p.docker(ctx, nil, "rm", "-fv", id); err != nil {
 			p.logger.Logf("Delete leftover container %s failed: %s", id, err)
 		}
+	}
+	return nil
+}
+
+// AttachInstanceToNetwork connects the instance's container to an additional docker
+// network so it can reach a stack running on that network (see
+// common.InstanceNetworkAttacher). It is idempotent: re-attaching an
+// already-connected container is treated as success.
+func (p *provisioner) AttachInstanceToNetwork(ctx context.Context, instance common.Instance, network string) error {
+	out, err := p.docker(ctx, nil, "network", "connect", network, instance.Name)
+	if err != nil {
+		if strings.Contains(out, "already exists in network") || strings.Contains(out, "already connected") {
+			return nil
+		}
+		return fmt.Errorf("failed to connect container %s to network %s: %w", instance.Name, network, err)
 	}
 	return nil
 }

@@ -2120,25 +2120,30 @@ func (Integration) Clean(ctx context.Context) error {
 	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
-	// Clean out .integration-cache always
-	defer os.RemoveAll(".integration-cache")
-
 	_, err := os.Stat(".integration-cache")
 	if err != nil {
-		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
-		return nil
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+			return nil
+		}
+		return err
 	}
 	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	// If INSTANCE_PROVISIONER is not explicitly set, detect it from the saved state
-	// so that the right provisioner's Clean method is called instead of defaulting to gcloud.
-	if cfg.IntegrationTest.InstanceProvisioner == "" {
-		if state, stateErr := readFrameworkState(); stateErr == nil && len(state.Instances) > 0 {
+	// Detect provisioners from saved state when they are not explicitly selected,
+	// so cleanup reconstructs the same provisioners that created the resources.
+	if state, stateErr := readFrameworkState(); stateErr == nil {
+		if cfg.IntegrationTest.InstanceProvisioner == "" && len(state.Instances) > 0 {
 			detected := state.Instances[0].Provisioner
 			fmt.Printf(">>> Detected instance provisioner from state: %s\n", detected)
 			cfg = cfg.WithInstanceProvisioner(detected)
+		}
+		if cfg.IntegrationTest.StackProvisioner == "" && len(state.Stacks) > 0 {
+			detected := state.Stacks[0].Provisioner
+			fmt.Printf(">>> Detected stack provisioner from state: %s\n", detected)
+			cfg = cfg.WithStackProvisioner(detected)
 		}
 	}
 
@@ -2149,6 +2154,9 @@ func (Integration) Clean(ctx context.Context) error {
 	err = r.Clean()
 	if err != nil {
 		return fmt.Errorf("error running clean: %w", err)
+	}
+	if err := os.RemoveAll(".integration-cache"); err != nil {
+		return fmt.Errorf("error removing integration cache: %w", err)
 	}
 	fmt.Println(">>> runner.Clean completed")
 	return nil
@@ -3139,21 +3147,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
 	}
-	essToken, ok, err := ess.GetESSAPIKey()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
-	}
-
-	// Possible to change the region for deployment, default is gcp-us-west2 which is
-	// the CFT region.
-	essRegion := cfg.IntegrationTest.ESSRegion
-	if essRegion == "" {
-		essRegion = "gcp-us-west2"
-	}
-
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
 	var identifier string
@@ -3201,33 +3194,18 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
-	provisionCfg := ess.ProvisionerConfig{
-		Identifier: identifier,
-		APIKey:     essToken,
-		Region:     essRegion,
+	// The local stack provisioner runs elastic-package locally and needs no ESS
+	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
+	var provisionCfg ess.ProvisionerConfig
+	if cfg.IntegrationTest.StackProvisioner != ess.ProvisionerLocal {
+		provisionCfg, err = essProvisionerConfig(cfg, identifier)
+		if err != nil {
+			return nil, err
+		}
 	}
-
-	var stackProvisioner tcommon.StackProvisioner
-	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	switch stackProvisionerMode {
-	case "", ess.ProvisionerStateful:
-		stackProvisionerMode = ess.ProvisionerStateful
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	case ess.ProvisionerServerless:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
-			ess.ProvisionerStateful,
-			ess.ProvisionerServerless,
-			stackProvisionerMode)
+	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := cfg.IntegrationTest.TimestampEnabled
@@ -3298,6 +3276,57 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
 	return r, nil
+}
+
+// essProvisionerConfig builds the ESS provisioner configuration (API key + region)
+// used by both the stateful and serverless stack provisioners.
+func essProvisionerConfig(cfg *devtools.Settings, identifier string) (ess.ProvisionerConfig, error) {
+	essToken, ok, err := ess.GetESSAPIKey()
+	if err != nil {
+		return ess.ProvisionerConfig{}, err
+	}
+	if !ok {
+		return ess.ProvisionerConfig{}, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+	}
+
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
+	essRegion := cfg.IntegrationTest.ESSRegion
+	if essRegion == "" {
+		essRegion = "gcp-us-west2"
+	}
+
+	return ess.ProvisionerConfig{
+		Identifier: identifier,
+		APIKey:     essToken,
+		Region:     essRegion,
+	}, nil
+}
+
+// newStackProvisioner creates the stack provisioner selected by STACK_PROVISIONER
+// (defaulting to stateful), returning the provisioner and its resolved mode.
+func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerConfig) (tcommon.StackProvisioner, string, error) {
+	mode := cfg.IntegrationTest.StackProvisioner
+	switch mode {
+	case "", ess.ProvisionerStateful:
+		mode = ess.ProvisionerStateful
+		sp, err := ess.NewProvisioner(provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerServerless:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerLocal:
+		sp, err := ess.NewLocalProvisioner()
+		return sp, mode, err
+	default:
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			ess.ProvisionerLocal,
+			mode)
+	}
 }
 
 func shouldBuildAgent(cfg *devtools.Settings) bool {
