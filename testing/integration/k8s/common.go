@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	securityv1 "github.com/openshift/api/security/v1"
 	"github.com/stretchr/testify/require"
 	helmKube "helm.sh/helm/v3/pkg/kube"
 	appsv1 "k8s.io/api/apps/v1"
@@ -133,6 +134,10 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	require.NoError(t, err, "failed to create fleet enroll params")
 
 	openshift := os.Getenv("INSTANCE_PROVISIONER") == microshift.Name
+	if openshift {
+		err := securityv1.Install(client.Resources().GetScheme())
+		require.NoError(t, err)
+	}
 
 	return k8sContext{
 		client:          client,

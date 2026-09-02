@@ -101146,11 +101146,12 @@ Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentele
 
 --------------------------------------------------------------------------------
 Dependency : github.com/openshift/api
-Version: v0.0.0-20180801171038-322a19404e37
+Version: v0.0.0-20251015095338-264e80a2b6e7
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20180801171038-322a19404e37/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20251015095338-264e80a2b6e7/LICENSE:
+
 
                                  Apache License
                            Version 2.0, January 2004
@@ -101329,18 +101330,7 @@ Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20
 
    END OF TERMS AND CONDITIONS
 
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "{}"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright {yyyy} {name of copyright owner}
+   Copyright 2020 Red Hat, Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.

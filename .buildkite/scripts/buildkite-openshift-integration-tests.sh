@@ -29,6 +29,7 @@ IFS=',' read -r -a docker_variants <<< "${DOCKER_VARIANTS}"
 
 echo "~~~ Loading Docker images"
 for variant in "${docker_variants[@]}"; do
+  # construct image archive path
   image_archive="elastic-agent-${variant}-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   if [[ "${variant}" == "basic" ]]; then
     image_archive="elastic-agent-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
@@ -37,7 +38,25 @@ for variant in "${docker_variants[@]}"; do
   elif [[ "${variant}" == "elastic-otel-collector-wolfi" ]]; then
     image_archive="elastic-otel-collector-wolfi-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   fi
-  BUILDKIT_PROGRESS=plain docker load -i "${DOCKER_IMAGE_ARCHIVES_DIR}/${image_archive}"
+  image_archive_path="${DOCKER_IMAGE_ARCHIVES_DIR}/${image_archive}"
+
+  # Check that manifest.json is present in image archive
+  # NOTE: Do not use --wildcards option because it is not supported on MacOS
+  # NOTE: Do not pipe tar output directly to grep as the former might take some
+  #       time before printing all contents, especially for large archives, and
+  #       the latter might exit pre-maturely
+  if ! tar_output=$(tar -tf "${image_archive_path}"); then
+      echo "Error: Failed to read tar archive ${image_archive_path}" >&2
+      exit 1
+  fi
+  if ! echo "$tar_output" | grep -q "manifest.json"; then
+      echo "Error: manifest.json not found in ${image_archive_path}" >&2
+      exit 1
+  fi
+
+  # load image
+  echo "Loading Docker image from ${image_archive_path}"
+  BUILDKIT_PROGRESS=plain docker load -i "${image_archive_path}"
 done
 
 TESTS_EXIT_STATUS=0

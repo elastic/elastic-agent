@@ -310,7 +310,10 @@ func parsePublishedPort(portOut string) (uint16, error) {
 }
 
 func (p *provisioner) stopContainer(ctx context.Context, containerName string) error {
-	if err := p.run(ctx, "docker", "stop", "--timeout", "0", containerName); err != nil {
+	if _, err := p.output(ctx, "docker", "stop", "--timeout", "0", containerName); err != nil {
+		if strings.Contains(err.Error(), "No such container") {
+			return nil
+		}
 		return fmt.Errorf("stopping MicroShift container %s: %w", containerName, err)
 	}
 	return nil

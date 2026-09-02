@@ -164,14 +164,18 @@ share similar leavers as the packaging process.
  - `SNAPSHOT=true|false`: Use snapshot build when running Kubernetes
    tests.
 
+ - `BUILD_AGENT=true|false`: Build the agent for the current platform before running.
+
  - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
    instances, possible values are:
      - `gcloud`: Uses the `gcloud` CLI to create VMs on GCP, if not set, that's the default.
      - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
        create local VMs.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
-       in Docker. This needs to be set if running Kubernetes integration
-       tests.
+       in Docker. Use this to run Kubernetes integration tests on Kind.
+     - `microshift`: Uses [MicroShift](https://microshift.io/) to run
+       OpenShift locally. Use this to run Kubernetes integration tests on
+       MicroShift.
      - `docker`: Runs each test batch in a local, systemd-enabled Docker
        container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
        runner drives the container over SSH exactly like a VM. Requires Docker.
@@ -182,68 +186,18 @@ share similar leavers as the packaging process.
        ESS API key (`mage integration:auth`).
      - `serverless`: Provisions a cloud serverless project. Also requires an ESS
        API key.
-     - `local`: Brings up a fully local stack with
-       [`elastic-package stack up`](https://github.com/elastic/elastic-package) —
-       no cloud account needed. Requires the `elastic-package` binary on `PATH`
-       (`go install github.com/elastic/elastic-package@latest`, or point
-       `ELASTIC_PACKAGE_BIN` at it). It uses a dedicated elastic-package profile
-       (`elastic-agent-integration`, override with `ELASTIC_PACKAGE_PROFILE`) so it
-       does not disturb a stack you may run yourself in the `default` profile.
-
-       The stack pulls Elastic images from `docker.elastic.co`, including the
-       package-registry image, which requires authentication. Run a one-time
-       `docker login docker.elastic.co` before first use. (elastic-package has no
-       supported way to skip the package-registry — Kibana depends on it — and its
-       image has no override, so authenticating is currently the simplest path.)
-
-   The `local` stack is designed to pair with the `docker` instance provisioner.
-   The local stack serves Elasticsearch/Kibana/Fleet over HTTPS with a self-signed
-   CA, so the runner:
-     - installs that CA into the test container's system trust store, so both the
-       test clients and the agent under test trust the stack with no `--insecure`
-       or per-test certificate configuration (both fall back to the system trust
-       store when no CA is configured); and
-     - attaches the test container to elastic-package's compose network, so the
-       container reaches the stack by service name (`https://elasticsearch:9200`,
-       `https://kibana:5601`, `https://fleet-server:8220`) — the names covered by
-       each service certificate's SANs, so TLS hostname verification passes; and
-     - relaxes a couple of Elasticsearch cluster settings on the single-node local
-       stack (disables disk-watermark-based allocation and raises the per-node shard
-       cap), since the suites create many data streams and would otherwise hit
-     `503 no_shard_available_action_exception`.
-
-   It also works with `mage integration:local`: host-mode tests use the stack's
-   published loopback endpoints and trust its CA via `SSL_CERT_FILE`, without
-   modifying the host's system trust store.
-
-   Remote stack provisioners work with both local and remote instance
-   provisioners. The local stack provisioner requires a local instance
-   provisioner with an implemented connectivity bridge; currently `docker` and
-   the host-local runner are supported. Multipass and Kind are rejected before
-   provisioning until their local-stack networking support is implemented.
-
-   **macOS limitation:** the `local` stack provisioner does not currently work
-   on macOS. On macOS, Docker runs inside the Docker Desktop VM, so containers
-   (including the test instances spun up by the `docker` provisioner) are not
-   reachable from the host by their container IP. The provisioner relies on
-   containers being attachable to the elastic-package compose network and
-   reachable over that network — a model that assumes Docker is running on the
-   host itself, not inside a VM. Use the cloud (`stateful` / `serverless`)
-   provisioners on macOS instead.
-
-   Example (no cloud account required):
-   ```
-   STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
-     TEST_PLATFORMS="linux/amd64/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
-     TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
-   ```
-
-When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
+     - `external`: Uses an existing stack supplied via environment variables.
+     No cloud account or local stack needed. Useful in CI where a stack is
+     provisioned separately before tests run.
+     - `local`: Brings up a fully local Elastic Stack without cloud account needed.
 
 An example for running a single test, including packaging the artifacts for it is:
-```
-DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
-INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
+```shell
+# Create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
+DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package 
+
+# Run TEST_NAME on a multipass VM
+INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME 
 ```
 
 ### TL;DR: Packaging and running tests
@@ -281,11 +235,11 @@ SNAPSHOT=true INSTANCE_PROVISIONER=kind mage -v integration:testKubernetesSingle
 
 #### Kubernetes oriented tests
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
 
 #### Serverless oriented tests
 
@@ -315,7 +269,8 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04" mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022" mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.36.1/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.36.1 with wolfi docker variant under kind cluster.
+- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/amd64/1.36.1/wolfi" mage integration:testKubernetes` to execute Kubernetes tests on Kubernetes version 1.36.1 with the wolfi Docker variant under a Kind cluster.
+- `INSTANCE_PROVISIONER="microshift" TEST_PLATFORMS="kubernetes/amd64/4.22.0/basic" mage integration:testKubernetes` to execute Kubernetes tests on OpenShift version 4.22.0 with the basic Docker variant under a MicroShift cluster. Use the **OpenShift** version (for example `4.20.0`, `4.21.0`, `4.22.0`), not the Kubernetes version that the OpenShift release maps to.
 
 > [!NOTE]
 > This only filters down the tests based on the platform. It will not execute a tests on a platform unless
@@ -400,6 +355,32 @@ for `integration:test`/`integration:single` as well. For the local provisioners
 (`multipass`/`kind`/`docker`) and `mage integration:local`, `standard-verbose` is the
 default (a human is watching); set `GOTESTSUM_FORMAT` explicitly to override. CI
 (`gcloud`) keeps the quiet default unless the variable is set.
+
+### Stack provisioners<a name="stack-provisioners"></a>
+
+#### Local stack provisioner<a name="local-stack-provisioner"></a>
+
+Brings up a fully local Elastic Stack with [`elastic-package stack up`](https://github.com/elastic/elastic-package) — no cloud account needed. Requires the `elastic-package` binary on `PATH` (`go install github.com/elastic/elastic-package@latest`, or point `ELASTIC_PACKAGE_BIN` at it). It uses a dedicated elastic-package profile (`elastic-agent-integration`, override with `ELASTIC_PACKAGE_PROFILE`) so it does not disturb a stack you may already run in the `default` profile.
+
+The stack pulls Elastic images from `docker.elastic.co`, including the package-registry image, which requires authentication. Run a one-time `docker login docker.elastic.co` before first use. (elastic-package has no supported way to skip the package-registry — Kibana depends on it — and its image has no override, so authenticating is currently the simplest path.)
+
+The `local` stack is designed to pair with the `docker` instance provisioner. The local stack serves Elasticsearch/Kibana/Fleet over HTTPS with a self-signed CA, so the runner:
+- installs that CA into the test container's system trust store, so both the test clients and the agent under test trust the stack with no `--insecure` or per-test certificate configuration (both fall back to the system trust store when no CA is configured); and
+- attaches the test container to elastic-package's compose network, so the container reaches the stack by service name (`https://elasticsearch:9200`, `https://kibana:5601`, `https://fleet-server:8220`) — the names covered by each service certificate's SANs, so TLS hostname verification passes; and
+- relaxes a couple of Elasticsearch cluster settings on the single-node local stack (disables disk-watermark-based allocation and raises the per-node shard cap), since the suites create many data streams and would otherwise hit `503 no_shard_available_action_exception`.
+
+It also works with `mage integration:local`: host-mode tests use the stack's published loopback endpoints and trust its CA via `SSL_CERT_FILE`, without modifying the host's system trust store.
+
+Remote stack provisioners work with both local and remote instance provisioners. The local stack provisioner requires a local instance provisioner with an implemented connectivity bridge; currently `docker` and the host-local runner are supported. Multipass, Kind, and MicroShift are rejected before provisioning until their local-stack networking support is implemented.
+
+**macOS limitation:** the `local` stack provisioner does not currently work on macOS. On macOS, Docker runs inside the Docker Desktop VM, so containers (including the test instances spun up by the `docker` provisioner) are not reachable from the host by their container IP. The provisioner relies on containers being attachable to the elastic-package compose network and reachable over that network — a model that assumes Docker is running on the host itself, not inside a VM. Use the cloud (`stateful` / `serverless`) provisioners on macOS instead.
+
+Example (no cloud account required):
+```
+STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
+  TEST_PLATFORMS="linux/amd64/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
+  TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
+```
 
 ### Cleaning up resources
 
@@ -672,6 +653,11 @@ not cause already provisioned resources to be replaced with an instance created 
 Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
 
 - `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
+
+### MicroShift Instance Provisioner
+Use only when running Kubernetes tests on OpenShift. Uses local installed MicroShift to create OpenShift clusters on the fly.
+
+- `INSTANCE_PROVISIONER="microshift" mage integration:testKubernetes`
 
 ### Docker Instance Provisioner
 Runs each test batch in a local, systemd-enabled Docker container (running `sshd`)

@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v3/pkg/cli/values"
 
+	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -1053,7 +1054,12 @@ type k8sKustomizeOverrides struct {
 // to further adjust the k8s objects
 func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		kustomizeYaml, err := os.ReadFile(AgentKustomizePath)
+		kustomizePath := AgentKustomizePath
+		if kCtx.openshift {
+			kustomizePath = AgentKustomizeOpenShiftPath
+		}
+
+		kustomizeYaml, err := os.ReadFile(kustomizePath)
 		require.NoError(t, err, "failed to read kustomize manifest")
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
@@ -1133,7 +1139,25 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					}
 				}
 				pod.Volumes = append(pod.Volumes, overrides.agentPodVolumes...)
-			})
+			},
+		)
+
+		// The overlay ships an SCC that only admits the daemonset as it is. Widen it
+		// for the security context that overrides requests.
+		for _, object := range objects {
+			scc, ok := object.(*securityv1.SecurityContextConstraints)
+			if !ok {
+				continue
+			}
+			if overrides.agentContainerRunUser != nil && *overrides.agentContainerRunUser != 0 {
+				scc.RunAsUser = securityv1.RunAsUserStrategyOptions{Type: securityv1.RunAsUserStrategyRunAsAny}
+			}
+			if len(overrides.agentContainerCapabilitiesAdd) > 0 {
+				allowPrivilegeEscalation := true
+				scc.AllowedCapabilities = overrides.agentContainerCapabilitiesAdd
+				scc.AllowPrivilegeEscalation = &allowPrivilegeEscalation
+			}
+		}
 
 		t.Cleanup(func() {
 			if t.Failed() {

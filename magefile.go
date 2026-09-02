@@ -2335,12 +2335,26 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	}
 
 	// render elastic-agent-standalone kustomize
-	kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"))
-	if err != nil {
-		return fmt.Errorf("failed to render kustomize: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
-		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	for _, kustomize := range []struct {
+		overlay []string
+		target  string
+	}{
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizePath,
+		},
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "openshift", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizeOpenShiftPath,
+		},
+	} {
+		kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join(kustomize.overlay...))
+		if err != nil {
+			return fmt.Errorf("failed to render kustomize %q: %w", filepath.Join(kustomize.overlay...), err)
+		}
+		if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", kustomize.target), kustomizeYaml, 0o644); err != nil {
+			return fmt.Errorf("failed to write %q: %w", kustomize.target, err)
+		}
 	}
 
 	return nil
