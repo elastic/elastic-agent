@@ -128,7 +128,7 @@ common:
       - v1.33.0
       - v1.34.0
       - v1.35.0
-    variants: &k8s_test_variants
+    all_variants: &k8s_test_all_variants
       - basic
       - complete
       - complete-wolfi
@@ -142,6 +142,13 @@ common:
       - wolfi
       - complete
       - elastic-otel-collector
+    extended_variants: &k8s_test_extended_variants
+      - basic
+      - complete-wolfi
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
@@ -174,7 +181,7 @@ common:
       - &openshift_max_test_version v4.22.0
     versions_without_min_max: &openshift_test_versions_without_min_max
       - v4.21.0
-    variants: &openshift_test_variants
+    all_variants: &openshift_test_all_variants
       - basic
       - complete
       - complete-wolfi
@@ -188,6 +195,13 @@ common:
       - wolfi
       - complete
       - elastic-otel-collector
+    extended_variants: &openshift_test_extended_variants
+      - basic
+      - complete-wolfi
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
     env: &openshift_test_env
       OPENSHIFT_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
@@ -964,7 +978,6 @@ steps:
 
   - group: ":kubernetes: Kubernetes (tier 1)"
     key: integration-tests-kubernetes-tier-1
-    if: build.pull_request.id != null
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes - tier 1"
@@ -1054,7 +1067,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_extended_variants
             version:
               - *k8s_min_test_version
               - *k8s_max_test_version
@@ -1079,7 +1092,7 @@ steps:
         matrix:
           setup:
             variants:
-              *openshift_test_variants
+              *openshift_test_extended_variants
             version:
               - *openshift_min_test_version
               - *openshift_max_test_version
@@ -1114,7 +1127,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants
             version:
               *k8s_test_versions_without_min_max
 
@@ -1138,7 +1151,7 @@ steps:
         matrix:
           setup:
             variants:
-              *openshift_test_variants
+              *openshift_test_all_variants
             version:
               *openshift_test_versions_without_min_max
 
