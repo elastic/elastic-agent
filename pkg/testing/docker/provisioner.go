@@ -264,8 +264,6 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 	return nil
 }
 
-<<<<<<< HEAD
-=======
 // AttachInstanceToNetwork connects the instance's container to an additional docker
 // network so it can reach a stack running on that network (see
 // common.InstanceNetworkAttacher). It is idempotent: re-attaching an
@@ -281,7 +279,6 @@ func (p *provisioner) AttachInstanceToNetwork(ctx context.Context, instance comm
 	return nil
 }
 
->>>>>>> ca84444 (Replace Docker CLI shell-out with github.com/moby/moby/client SDK in local test provisioner (#16371))
 // launch creates (or recreates) the container for a batch and returns its instance.
 // modCache, when non-empty, is the host Go module download cache to share read-only.
 func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imageBuild, publicKey []byte, modCache string) (common.Instance, error) {
