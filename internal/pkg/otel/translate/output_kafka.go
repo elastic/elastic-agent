@@ -63,10 +63,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			"queue_size": getQueueSize(logger, config),
 		},
 		"producer": map[string]any{
-			"compression": kConfig.Compression,
-			"compression_params": map[string]any{
-				"level": kConfig.CompressionLevel,
-			},
+			"compression":       kConfig.Compression,
 			"max_message_bytes": maxMessageBytes,
 			"required_acks":     requiredAcks,
 		},
@@ -84,6 +81,15 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		},
 	}
 
+	// Compression
+	if kConfig.Compression == "gzip" {
+		// compression_level is only available for gzip compression
+		kafkaExporter["producer"].(map[string]any)["compression_params"] = map[string]any{
+			"level": kConfig.CompressionLevel,
+		}
+	}
+
+	// Enables SASL authentication
 	if kConfig.Username != "" {
 		if kConfig.Sasl.SaslMechanism == "" {
 			kConfig.Sasl.SaslMechanism = "PLAIN"
@@ -94,6 +100,13 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 				"password":  kConfig.Password,
 				"mechanism": kConfig.Sasl.SaslMechanism,
 			},
+		}
+	}
+
+	// Enables Kerberos authentication
+	if kConfig.Kerberos.IsEnabled() {
+		kafkaExporter["auth"] = map[string]any{
+			"kerberos": getKerberosConfig(kConfig),
 		}
 	}
 
@@ -122,6 +135,25 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		return kafkaExporter, processor, nil
 	}
 	return kafkaExporter, nil, nil
+}
+
+func getKerberosConfig(kConfig *kafka.KafkaConfig) map[string]any {
+	if !kConfig.Kerberos.IsEnabled() {
+		return nil
+	}
+
+	useKeyTab := kConfig.Kerberos.AuthType.String() == "keytab"
+
+	return map[string]any{
+		"service_name":             kConfig.Kerberos.ServiceName,
+		"realm":                    kConfig.Kerberos.Realm,
+		"username":                 kConfig.Kerberos.Username,
+		"password":                 kConfig.Kerberos.Password,
+		"config_file":              kConfig.Kerberos.ConfigPath,
+		"disable_fast_negotiation": !kConfig.Kerberos.EnableFAST,
+		"keytab_file":              kConfig.Kerberos.KeyTabPath,
+		"use_keytab":               useKeyTab,
+	}
 }
 
 // dynamicTopicSetterProcessor parses topic field with dynamic values such as %{[data_stream.type]}

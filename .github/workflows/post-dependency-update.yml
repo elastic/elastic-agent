@@ -7,7 +7,7 @@ on:
   push:
     branches:
       - "dependabot/go_modules/**"
-      - "renovate/golang/**"
+      - "renovate/*golang/**"
 
 permissions:
   contents: read
@@ -76,7 +76,7 @@ jobs:
           git commit -m "Update archive-proxy go.mod"
 
       - name: update NOTICE.txt and NOTICE-fips.txt
-        run: make notice
+        run: mage notice
 
       - name: check for modified NOTICE.txt or NOTICE-fips.txt
         id: notice-check

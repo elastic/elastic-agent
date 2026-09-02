@@ -80,7 +80,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: '3.14'
           cache: 'pip'
 
       - name: Install dependencies
@@ -116,7 +116,7 @@ jobs:
             This PR updates the generated documentation based on the latest released version **${{ needs.check-latest.outputs.version }}**.
 
             ## Changes
-            - Updates EDOT Collector component tables
+            - Updates Elastic Agent component tables
             - Updates OpenTelemetry Collector Builder (OCB) configuration
             - Uses data from the latest released version tag: `${{ needs.check-latest.outputs.version }}`
 

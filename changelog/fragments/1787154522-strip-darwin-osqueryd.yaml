@@ -1,0 +1,5 @@
+kind: enhancement
+
+summary: Reduce the size of osquery.app on macOS by 75% by stripping the unused architecture slice
+
+component: elastic-agent

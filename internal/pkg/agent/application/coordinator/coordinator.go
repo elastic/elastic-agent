@@ -1928,17 +1928,67 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	return nil
 }
 
-// getDynamicInputs returns the set of dynamic inputs based on a map from input id to the dynamic provider used.
-// Currently, this simply checks if the provider really is dynamic, but this may become more complex in the future.
+// getDynamicInputs returns the set of dynamic inputs based on the information recorded while
+// rendering the inputs.
+//
+// An input is dynamic when it was rendered from a dynamic variable provider and it resolved at
+// least one variable owned by that provider which isn't listed in staticVariables. If no provider
+// variables were recorded for an input we can't tell whether it is static, so it stays flagged
+// as dynamic.
 // Returns a map of input ID to bool.
-func getDynamicInputs(inputToDynamicProvider map[string]string) map[string]bool {
+func getDynamicInputs(
+	log *logger.Logger,
+	renderedInputs map[string]transpiler.RenderedInputInfo,
+	staticVariables []string,
+) map[string]bool {
 	dynamicInputs := make(map[string]bool)
-	for inputId, dynamicProvider := range inputToDynamicProvider {
-		if composable.IsDynamic(dynamicProvider) {
-			dynamicInputs[inputId] = true
+	for inputId, info := range renderedInputs {
+		if !composable.IsDynamic(info.DynamicProvider) {
+			continue
 		}
+		// keep inputs without recorded variables flagged as dynamic
+		isDynamic := len(info.ProviderVars) == 0
+		for _, name := range info.ProviderVars {
+			if !isStaticVariable(staticVariables, name) {
+				isDynamic = true
+				break
+			}
+		}
+		if !isDynamic {
+			log.Debugf(
+				"Input %s is not treated as dynamic, all %s provider variables it uses (%v) are configured as static",
+				inputId, info.DynamicProvider, info.ProviderVars,
+			)
+			continue
+		}
+		dynamicInputs[inputId] = true
 	}
 	return dynamicInputs
+}
+
+// isStaticVariable reports whether the variable name is covered by one of the configured static
+// variables, either by an exact match or as a '.'-separated path prefix. For example
+// `kubernetes.node` covers `kubernetes.node.name` but not `kubernetes.nodename`.
+func isStaticVariable(staticVariables []string, name string) bool {
+	for _, static := range staticVariables {
+		if name == static || strings.HasPrefix(name, static+".") {
+			return true
+		}
+	}
+	return false
+}
+
+// renderedInputsForLog turns the variable introspection results into a value suitable for
+// structured logging.
+func renderedInputsForLog(renderedInputs map[string]transpiler.RenderedInputInfo) map[string]any {
+	loggable := make(map[string]any, len(renderedInputs))
+	for inputId, info := range renderedInputs {
+		loggable[inputId] = map[string]any{
+			"dynamic_provider": info.DynamicProvider,
+			"provider_vars":    info.ProviderVars,
+		}
+	}
+	return loggable
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -2249,8 +2299,8 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *compone
 
 		// check if the component is dynamic and use the right runtime
 		// dynamic components can cause problems for the otel collector because of its expensive configuration reloading
-		dynamicRuntimeManager := component.RuntimeManager(runtimeCfg.DynamicInputs)
-		if runtimeCfg.DynamicInputs != "" && comp.Dynamic && comp.RuntimeManager != dynamicRuntimeManager {
+		dynamicRuntimeManager := runtimeCfg.DynamicInputs.RuntimeManagerForDynamicInput(comp.BeatName(), comp.InputType)
+		if dynamicRuntimeManager != "" && comp.Dynamic && comp.RuntimeManager != dynamicRuntimeManager {
 			logger.Warnf("Component %s uses dynamic variable providers, switching to %s runtime", comp.ID, dynamicRuntimeManager)
 			comp.RuntimeManager = dynamicRuntimeManager
 		}
@@ -2297,10 +2347,10 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
-	var inputToDynamicProvider map[string]string
+	var renderedInputInfo map[string]transpiler.RenderedInputInfo
 	if ok {
 		var renderedInputs transpiler.Node
-		renderedInputs, inputToDynamicProvider, err = transpiler.RenderInputs(inputs, c.vars)
+		renderedInputs, renderedInputInfo, err = transpiler.RenderInputs(inputs, c.vars)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
@@ -2344,8 +2394,15 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		}
 		return comps, nil
 	}
-	dynamicInputs := getDynamicInputs(inputToDynamicProvider)
-	c.logger.With("dynamic_inputs", dynamicInputs).Debugf("Dynamic inputs found")
+	dynamicInputs := getDynamicInputs(
+		c.logger, renderedInputInfo, c.currentCfg.Settings.Internal.Runtime.DynamicInputs.StaticVariables)
+	if c.logger.IsDebug() {
+		// building the introspection details isn't free, only do it when it can be logged
+		c.logger.With(
+			"dynamic_inputs", dynamicInputs,
+			"rendered_dynamic_inputs", renderedInputsForLog(renderedInputInfo),
+		).Debugf("Dynamic inputs found")
+	}
 	comps, err := c.specs.ToComponents(
 		cfg,
 		c.currentCfg.Settings.Internal.Runtime,
