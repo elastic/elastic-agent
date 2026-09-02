@@ -294,6 +294,18 @@ func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, container
 			continue
 		}
 
+		hasTargetContainer := false
+		for _, c := range podSpec.Containers {
+			if c.Name == containerName {
+				hasTargetContainer = true
+				break
+			}
+		}
+
+		if !hasTargetContainer {
+			continue
+		}
+
 		if cbPod != nil {
 			cbPod(podSpec)
 		}
