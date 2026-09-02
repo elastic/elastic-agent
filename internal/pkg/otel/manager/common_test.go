@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -44,6 +45,35 @@ func TestFindRandomPort(t *testing.T) {
 	}
 	_, err = findRandomTCPPorts(portCount)
 	assert.Error(t, err, "failed to find random port")
+}
+
+// TestFindRandomTCPPorts_AvoidsWildcardBoundPorts verifies that findRandomTCPPorts never returns
+// a port already bound on 0.0.0.0. Third-party services such as HP OpenView Agent bind on the
+// wildcard address; on some Linux kernels the ephemeral-port allocator can hand back a port number
+// that is already occupied on 0.0.0.0 when the availability probe is made only against 127.0.0.1.
+// If this test fails it means the supervised collector will receive a port that it cannot bind,
+// triggering the restart loop described in https://github.com/elastic/elastic-agent/issues/16142.
+func TestFindRandomTCPPorts_AvoidsWildcardBoundPorts(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("wildcard vs loopback port-allocation behaviour is Linux-specific")
+	}
+
+	// Simulate a third-party service holding a port on all interfaces.
+	l, err := net.Listen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+	boundPort := l.Addr().(*net.TCPAddr).Port
+
+	const iterations = 100
+	for i := 0; i < iterations; i++ {
+		ports, err := findRandomTCPPorts(1)
+		require.NoError(t, err)
+		require.Len(t, ports, 1)
+		assert.NotEqualf(t, boundPort, ports[0],
+			"findRandomTCPPorts returned port %d which is already bound on 0.0.0.0; "+
+				"the loopback-only availability check does not exclude wildcard-bound ports",
+			boundPort)
+	}
 }
 
 func testComponent(componentId string) agentcomponent.Component {
