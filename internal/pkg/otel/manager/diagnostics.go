@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
@@ -130,7 +132,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
 		componentIDs := diagnosticComponentIDsFromName(extDiag.Name, currentComponents)
 		if len(componentIDs) == 0 {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: it cannot be associated with an active component", extDiag.Name)
+			m.managerLogger.Debugf("skipping EDOT diagnostic for %q: it cannot be associated with an active component", extDiag.Name)
 			continue
 		}
 		if len(componentIDs) > 1 {
@@ -138,7 +140,9 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		}
 		for _, compID := range componentIDs {
 			if idx, ok := diagIdxByCompID[compID]; ok {
-				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+				if result := streamPrefixedDiagnostic(extDiag, streamIDForComponent(extDiag.Name, compID)); result != nil {
+					diagnostics[idx].Results = append(diagnostics[idx].Results, result)
+				}
 			}
 		}
 	}
@@ -169,3 +173,41 @@ func diagnosticComponentIDsFromName(name string, components []component.Componen
 	slices.Sort(componentIDs)
 	return componentIDs
 }
+
+// streamIDForComponent returns the receiver-name suffix after compID. The
+// single_receiver placeholder is not a policy stream.
+func streamIDForComponent(name, compID string) string {
+	_, suffix, found := strings.Cut(name, "/"+translate.OtelNamePrefix)
+	if !found || suffix == "" || suffix == compID {
+		return ""
+	}
+	return strings.TrimPrefix(suffix, compID+"/")
+}
+
+// streamPrefixedDiagnostic returns a copy of res whose Filename is prefixed
+// with the stream ID so ZipArchive writes unique paths under the component
+// directory (components/<comp.ID>/<streamID>/<filename>). Without this, two
+// receivers for the same component both produce beat_metrics.json and unzip
+// overwrites one of them. See https://github.com/elastic/elastic-agent/issues/16287.
+// The single_receiver placeholder is not a policy stream ID, so those results
+// are omitted rather than written under a "single/" directory.
+func streamPrefixedDiagnostic(res *proto.ActionDiagnosticUnitResult, streamID string) *proto.ActionDiagnosticUnitResult {
+	if res == nil || streamID == "" {
+		return res
+	}
+	if streamID == singleReceiverStreamID {
+		return nil
+	}
+	return &proto.ActionDiagnosticUnitResult{
+		Name:        res.GetName(),
+		Filename:    strings.ReplaceAll(streamID, "/", "-") + "/" + res.GetFilename(),
+		Description: res.GetDescription(),
+		ContentType: res.GetContentType(),
+		Content:     res.GetContent(),
+		Generated:   res.GetGenerated(),
+	}
+}
+
+// singleReceiverStreamID matches translate.singleReceiverStreamID, the
+// placeholder stream segment used when single_receiver: true.
+const singleReceiverStreamID = "single"

@@ -180,7 +180,7 @@ func TestBeatMetrics(t *testing.T) {
 		beatMetrics := compDiag.Results[0]
 		assert.Equal(t, receiverName, beatMetrics.Name)
 		assert.Equal(t, "Metrics from the default monitoring namespace and expvar.", beatMetrics.Description)
-		assert.Equal(t, "beat_metrics.json", beatMetrics.Filename)
+		assert.Equal(t, "stream-1/beat_metrics.json", beatMetrics.Filename)
 		assert.Equal(t, "application/json", beatMetrics.ContentType)
 		assert.Equal(t, expectedMetricData, beatMetrics.Content)
 	})
@@ -189,7 +189,7 @@ func TestBeatMetrics(t *testing.T) {
 		inputMetrics := compDiag.Results[1]
 		assert.Equal(t, receiverName, inputMetrics.Name)
 		assert.Equal(t, "Metrics from active inputs.", inputMetrics.Description)
-		assert.Equal(t, "input_metrics.json", inputMetrics.Filename)
+		assert.Equal(t, "stream-1/input_metrics.json", inputMetrics.Filename)
 		assert.Equal(t, "application/json", inputMetrics.ContentType)
 		assert.Equal(t, expectedMetricData, inputMetrics.Content)
 	})
@@ -239,14 +239,18 @@ func TestBeatMetricsComponentIDContainingSlash(t *testing.T) {
 	require.Len(t, diags, 2)
 
 	resultsByComp := make(map[string][]string)
+	filenamesByComp := make(map[string][]string)
 	for _, d := range diags {
 		for _, result := range d.Results {
 			resultsByComp[d.Component.ID] = append(resultsByComp[d.Component.ID], result.Name)
+			filenamesByComp[d.Component.ID] = append(filenamesByComp[d.Component.ID], result.Filename)
 		}
 	}
 
 	assert.Equal(t, []string{systemReceiver}, resultsByComp[systemComp.ID])
 	assert.Equal(t, []string{httpReceiver}, resultsByComp[httpComp.ID])
+	assert.Equal(t, []string{"system-metrics-system.cpu-policy-id/beat_metrics.json"}, filenamesByComp[systemComp.ID])
+	assert.Equal(t, []string{"metrics-monitoring-agent/beat_metrics.json"}, filenamesByComp[httpComp.ID])
 }
 
 func TestBeatMetricsAmbiguousComponentIDsPreserveResults(t *testing.T) {
@@ -285,10 +289,14 @@ func TestBeatMetricsAmbiguousComponentIDsPreserveResults(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, called)
 	require.Len(t, diags, 2)
+	filenamesByComp := make(map[string]string)
 	for _, diag := range diags {
 		require.Len(t, diag.Results, 1)
 		assert.Equal(t, receiverName, diag.Results[0].Name)
+		filenamesByComp[diag.Component.ID] = diag.Results[0].Filename
 	}
+	assert.Equal(t, "bar-baz/beat_metrics.json", filenamesByComp[parentComp.ID])
+	assert.Equal(t, "baz/beat_metrics.json", filenamesByComp[nestedComp.ID])
 	assert.NotEmpty(t, obs.FilterLevelExact(zapcore.WarnLevel).FilterMessageSnippet("associated with multiple components").All())
 }
 
@@ -360,6 +368,160 @@ func TestBeatMetricsPrefixOverlap(t *testing.T) {
 
 	assert.Equal(t, []string{shortReceiver}, resultsByComp[shortComp.ID], "short comp must get only its own result")
 	assert.Equal(t, []string{longReceiver}, resultsByComp[longComp.ID], "long comp must get only its own result")
+}
+
+// TestBeatMetricsMultipleStreamsSameComponent verifies that two receivers for the
+// same component keep distinct filenames so the diagnostics zip does not overwrite
+// one with the other. See https://github.com/elastic/elastic-agent/issues/16287.
+func TestBeatMetricsMultipleStreamsSameComponent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip test on Windows.",
+			"It's technically cumbersome to set up an npipe http server.",
+			"And it doesn't have anything to do with the code paths being tested.",
+		)
+	}
+	setTemporaryAgentPath(t)
+	logger, _ := loggertest.New("test")
+
+	filebeatComp := testComponent("filestream-default")
+	filebeatComp.InputSpec.Spec.Command.Args = []string{"filebeat"}
+
+	streamA := translate.GetReceiverID(otelcomponent.MustNewType("filebeatreceiver"), filebeatComp.ID+"/stream-a").String()
+	streamB := translate.GetReceiverID(otelcomponent.MustNewType("filebeatreceiver"), filebeatComp.ID+"/stream-b").String()
+
+	metricA, err := json.MarshalIndent(map[string]any{"stream": "a"}, "", "  ")
+	require.NoError(t, err)
+	metricB, err := json.MarshalIndent(map[string]any{"stream": "b"}, "", "  ")
+	require.NoError(t, err)
+
+	expectedResponse := elasticdiagnostics.Response{
+		ComponentDiagnostics: []*proto.ActionDiagnosticUnitResult{
+			{Name: streamA, Filename: "beat_metrics.json", ContentType: "application/json", Content: metricA},
+			{Name: streamA, Filename: "input_metrics.json", ContentType: "application/json", Content: metricA},
+			{Name: streamB, Filename: "beat_metrics.json", ContentType: "application/json", Content: metricB},
+			{Name: streamB, Filename: "input_metrics.json", ContentType: "application/json", Content: metricB},
+		},
+	}
+
+	m := &OTelManager{
+		managerLogger: logger,
+		components:    []component.Component{filebeatComp},
+	}
+
+	called := false
+	server := handlers.NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, &expectedResponse)
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
+	})
+
+	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Len(t, diags, 1)
+	require.Len(t, diags[0].Results, 4)
+
+	filenames := make([]string, 0, len(diags[0].Results))
+	contentByFilename := make(map[string][]byte)
+	for _, r := range diags[0].Results {
+		filenames = append(filenames, r.Filename)
+		contentByFilename[r.Filename] = r.Content
+	}
+	assert.ElementsMatch(t, []string{
+		"stream-a/beat_metrics.json",
+		"stream-a/input_metrics.json",
+		"stream-b/beat_metrics.json",
+		"stream-b/input_metrics.json",
+	}, filenames)
+	assert.Equal(t, metricA, contentByFilename["stream-a/beat_metrics.json"])
+	assert.Equal(t, metricB, contentByFilename["stream-b/beat_metrics.json"])
+}
+
+// TestBeatMetricsSingleReceiver verifies that a single_receiver component
+// (osquerybeat) does not include diagnostics named with the placeholder stream ID.
+func TestBeatMetricsSingleReceiver(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip test on Windows.",
+			"It's technically cumbersome to set up an npipe http server.",
+			"And it doesn't have anything to do with the code paths being tested.",
+		)
+	}
+	setTemporaryAgentPath(t)
+	logger, _ := loggertest.New("test")
+
+	osqueryComp := testComponent("osquery-default")
+	osqueryComp.InputType = "osquery"
+	osqueryComp.InputSpec.Spec.Command.Args = []string{"osquerybeat"}
+	osqueryComp.InputSpec.Spec.SingleReceiver = true
+
+	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("osquerybeatreceiver"), osqueryComp.ID+"/"+singleReceiverStreamID).String()
+
+	metricData, err := json.MarshalIndent(map[string]any{"test": "test"}, "", "  ")
+	require.NoError(t, err)
+
+	expectedResponse := elasticdiagnostics.Response{
+		ComponentDiagnostics: []*proto.ActionDiagnosticUnitResult{
+			{Name: receiverName, Filename: "beat_metrics.json", ContentType: "application/json", Content: metricData},
+			{Name: receiverName, Filename: "input_metrics.json", ContentType: "application/json", Content: metricData},
+		},
+	}
+
+	m := &OTelManager{
+		managerLogger: logger,
+		components:    []component.Component{osqueryComp},
+	}
+
+	called := false
+	server := handlers.NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, &expectedResponse)
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
+	})
+
+	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Len(t, diags, 1)
+	assert.Empty(t, diags[0].Results)
+}
+
+func TestStreamPrefixedDiagnostic(t *testing.T) {
+	res := &proto.ActionDiagnosticUnitResult{
+		Name:        "filebeatreceiver/_agent-component/filestream-default/stream-a",
+		Filename:    "beat_metrics.json",
+		Description: "metrics",
+		ContentType: "application/json",
+		Content:     []byte(`{}`),
+	}
+
+	t.Run("empty stream id is unchanged", func(t *testing.T) {
+		got := streamPrefixedDiagnostic(res, "")
+		assert.Same(t, res, got)
+		assert.Equal(t, "beat_metrics.json", got.Filename)
+	})
+
+	t.Run("prefixes stream id", func(t *testing.T) {
+		got := streamPrefixedDiagnostic(res, "stream-a")
+		assert.NotSame(t, res, got)
+		assert.Equal(t, "stream-a/beat_metrics.json", got.Filename)
+		assert.Equal(t, "beat_metrics.json", res.Filename)
+	})
+
+	t.Run("replaces slashes in stream id", func(t *testing.T) {
+		got := streamPrefixedDiagnostic(res, "system/cpu")
+		assert.Equal(t, "system-cpu/beat_metrics.json", got.Filename)
+	})
+
+	t.Run("single_receiver placeholder is omitted", func(t *testing.T) {
+		got := streamPrefixedDiagnostic(res, singleReceiverStreamID)
+		assert.Nil(t, got)
+		assert.Equal(t, "beat_metrics.json", res.Filename)
+	})
+}
+
+func TestStreamIDForComponent(t *testing.T) {
+	name := translate.GetReceiverID(otelcomponent.MustNewType("metricbeatreceiver"), "system/metrics-default/system/metrics-system.cpu").String()
+	assert.Equal(t, "system/metrics-system.cpu", streamIDForComponent(name, "system/metrics-default"))
+	assert.Equal(t, "", streamIDForComponent(name, "system/metrics-default/system/metrics-system.cpu"))
+	assert.Equal(t, "", streamIDForComponent("not-a-receiver", "system/metrics-default"))
 }
 
 // TestPerformComponentDiagnosticsUnexpectedError verifies that when EDOT returns an error other than
