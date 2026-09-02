@@ -1196,7 +1196,7 @@ func TestOTelElasticsearchInvalidAPIKeyBackoff(t *testing.T) {
 
 	const (
 		initialBackoff = time.Second
-		maxBackoff     = 2 * time.Second
+		maxBackoff     = 4 * time.Second
 		invalidAPIKey  = "invalid-api-key"
 	)
 	expectedEncodedAPIKey := base64.StdEncoding.EncodeToString([]byte(invalidAPIKey))
