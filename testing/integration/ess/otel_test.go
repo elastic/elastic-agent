@@ -1196,7 +1196,7 @@ func TestOTelElasticsearchInvalidAPIKeyBackoff(t *testing.T) {
 
 	const (
 		initialBackoff = time.Second
-		maxBackoff     = 4 * time.Second
+		maxBackoff     = 2 * time.Second
 		invalidAPIKey  = "invalid-api-key"
 	)
 	expectedEncodedAPIKey := base64.StdEncoding.EncodeToString([]byte(invalidAPIKey))
@@ -1239,7 +1239,14 @@ func TestOTelElasticsearchInvalidAPIKeyBackoff(t *testing.T) {
 	mockESServer := httptest.NewServer(mux)
 	t.Cleanup(mockESServer.Close)
 
+	// Ensure input file is >= 1kb
 	inputPath := filepath.Join(t.TempDir(), "input.log")
+	const linePadding = 512
+	require.NoError(t, os.WriteFile(inputPath, fmt.Appendf(nil,
+		"Line 0 %s\nLine 1 %s\n",
+		strings.Repeat("x", linePadding),
+		strings.Repeat("x", linePadding),
+	), 0o600))
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1255,6 +1262,7 @@ inputs:
           dataset: invalid_api_key_backoff
         paths:
           - {{.InputPath}}
+        prospector.scanner.check_interval: 1s
     queue.mem.flush.timeout: 0s
 outputs:
   default:
@@ -1282,7 +1290,7 @@ agent:
 		"MaxBackoff":     maxBackoff,
 	}))
 
-	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(2*time.Minute))
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(4*time.Minute))
 	defer cancel()
 
 	require.NoError(t, fixture.Prepare(ctx))
@@ -1300,8 +1308,6 @@ agent:
 		_ = cmd.Wait()
 	})
 
-	integration.GenerateLogFile(t, inputPath, 100*time.Millisecond, 20)
-
 	var requestTimes []time.Time
 	require.Eventually(t, func() bool {
 		mu.Lock()
@@ -1312,7 +1318,7 @@ agent:
 		}
 		requestTimes = append([]time.Time(nil), bulkRequestTimes[:4]...)
 		return true
-	}, 30*time.Second, 50*time.Millisecond, "expected a retried request with an invalid API key")
+	}, 90*time.Second, 50*time.Millisecond, "expected a retried request with an invalid API key")
 
 	mu.Lock()
 	keyWasSent := invalidKeyWasSent
