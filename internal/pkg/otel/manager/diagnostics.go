@@ -130,7 +130,7 @@ func (m *OTelManager) PerformComponentDiagnostics(
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
 		componentIDs := diagnosticComponentIDsFromName(extDiag.Name, currentComponents)
 		if len(componentIDs) == 0 {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: it cannot be associated with an active component", extDiag.Name)
+			m.managerLogger.Debugf("skipping EDOT diagnostic for %q: it cannot be associated with an active component", extDiag.Name)
 			continue
 		}
 		if len(componentIDs) > 1 {
