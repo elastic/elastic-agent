@@ -136,7 +136,7 @@ func k8sStepDeployStatefulSet(statefulSet *appsv1.StatefulSet) k8sTestStep {
 
 		// OpenShift's restricted-v2 SCC forbids hostPath volumes and running as root.
 		if kCtx.openshift {
-			objects = append([]k8s.Object{k8sPrivilegedSCCBinding(statefulSet)}, objects...)
+			objects = append([]k8s.Object{fleetServerPrivilegedSCCBinding(statefulSet)}, objects...)
 		}
 
 		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{
@@ -145,28 +145,6 @@ func k8sStepDeployStatefulSet(statefulSet *appsv1.StatefulSet) k8sTestStep {
 			waitTimeout: 5 * time.Minute,
 		}, objects...)
 		require.NoError(t, err, "failed to create statefulset %q objects", statefulSet.Name)
-	}
-}
-
-// k8sPrivilegedSCCBinding returns a RoleBinding that grants the privileged SCC to the
-// ServiceAccount used by the given StatefulSet.
-func k8sPrivilegedSCCBinding(statefulSet *appsv1.StatefulSet) *rbacv1.RoleBinding {
-	saName := statefulSet.Spec.Template.Spec.ServiceAccountName
-	if saName == "" {
-		saName = "default"
-	}
-	return &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: statefulSet.Name + "-privileged-scc",
-		},
-		Subjects: []rbacv1.Subject{
-			{Kind: "ServiceAccount", Name: saName},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "system:openshift:scc:privileged",
-		},
 	}
 }
 
@@ -288,6 +266,28 @@ func fleetServerStatefulSet(kCtx k8sContext, name string, namespace string, poli
 					},
 				},
 			},
+		},
+	}
+}
+
+// fleetServerPrivilegedSCCBinding returns a RoleBinding that grants the privileged SCC to the
+// ServiceAccount used by the given StatefulSet.
+func fleetServerPrivilegedSCCBinding(statefulSet *appsv1.StatefulSet) *rbacv1.RoleBinding {
+	saName := statefulSet.Spec.Template.Spec.ServiceAccountName
+	if saName == "" {
+		saName = "default"
+	}
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: statefulSet.Name + "-privileged-scc",
+		},
+		Subjects: []rbacv1.Subject{
+			{Kind: "ServiceAccount", Name: saName},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:openshift:scc:privileged",
 		},
 	}
 }

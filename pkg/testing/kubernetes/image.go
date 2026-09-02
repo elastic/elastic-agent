@@ -72,7 +72,7 @@ func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage str
 		return "", err
 	}
 
-	cli, err := getDockerClient()
+	cli, err := NewDockerClient()
 	if err != nil {
 		return "", err
 	}
@@ -165,11 +165,11 @@ func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage str
 	return outputImage, nil
 }
 
-// getDockerClient returns an instance of the Docker client. It first checks
+// NewDockerClient returns an instance of the Docker client. It first checks
 // if there is a current context inside $/.docker/config.json and instantiates
 // a client based on it. Otherwise, it fallbacks to a docker client with values
 // from environment variables.
-func getDockerClient() (*client.Client, error) {
+func NewDockerClient() (*client.Client, error) {
 
 	envClient := func() (*client.Client, error) {
 		return client.New(client.FromEnv)
@@ -180,7 +180,7 @@ func getDockerClient() (*client.Client, error) {
 	}
 
 	configFile := filepath.Join(os.Getenv("HOME"), ".docker", "config.json")
-	file, err := os.Open(configFile)
+	file, err := os.Open(configFile) //nolint:gosec // G703 the path is $HOME plus constant segments, not user input
 	if err != nil {
 		if os.IsNotExist(err) {
 			return envClient()
@@ -212,12 +212,12 @@ func getDockerClient() (*client.Client, error) {
 	for _, f := range files {
 		if f.IsDir() {
 			metaFile := filepath.Join(contextDir, f.Name(), "meta.json")
-			if _, err := os.Stat(metaFile); err == nil {
+			if _, err := os.Stat(metaFile); err == nil { //nolint:gosec // G703 the path is the Docker context directory plus constant segments
 				if os.IsNotExist(err) {
 					return envClient()
 				}
 				var dockerContext DockerContext
-				content, err := os.ReadFile(metaFile)
+				content, err := os.ReadFile(metaFile) //nolint:gosec // G703 the path is the Docker context directory plus constant segments
 				if err != nil {
 					return nil, fmt.Errorf("unable to read Docker context meta file: %w", err)
 				}

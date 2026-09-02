@@ -2172,7 +2172,7 @@ func (Integration) Clean(ctx context.Context) error {
 		}
 	}
 
-	r, err := createTestRunner(cfg, false, "", "")
+	r, err := createTestRunner(ctx, cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -3112,7 +3112,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(cfg, matrix, singleTest, goTestFlags, batches...)
+	r, err := createTestRunner(ctx, cfg, matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -3170,7 +3170,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	return agentVersion, agentStackVersion, nil
 }
 
-func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(ctx context.Context, cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion := cfg.GoVersion()
 
 	agentVersion, agentStackVersion, err := getTestRunnerVersions(cfg)
@@ -3220,7 +3220,11 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = kind.NewProvisioner()
 		identifier = localIdentifier()
 	case microshift.Name:
-		instanceProvisioner = microshift.NewProvisioner()
+		var err error
+		instanceProvisioner, err = microshift.NewProvisioner(ctx)
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()
