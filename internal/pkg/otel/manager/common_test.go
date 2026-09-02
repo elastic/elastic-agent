@@ -59,7 +59,8 @@ func TestFindRandomTCPPorts_AvoidsWildcardBoundPorts(t *testing.T) {
 	}
 
 	// Simulate a third-party service holding a port on all interfaces.
-	l, err := net.Listen("tcp", "0.0.0.0:0")
+	// netListen is used (rather than net.Listen directly) to satisfy the noctx linter.
+	l, err := netListen("tcp", "0.0.0.0:0")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = l.Close() })
 	boundPort := l.Addr().(*net.TCPAddr).Port
