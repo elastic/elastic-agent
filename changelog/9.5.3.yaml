@@ -1,0 +1,104 @@
+version: 9.5.3
+entries:
+    - kind: enhancement
+      summary: Make the dynamic inputs runtime override configurable per beat, input type and variable
+      description: |
+        `agent.internal.runtime.dynamic_inputs` now accepts a map in addition to the existing
+        runtime name, allowing the runtime used by components with dynamic inputs to be set per
+        beat and per input type. It also accepts a `static_variables` list of dynamic provider
+        variables that cannot change at runtime; an input resolving only such variables is no
+        longer treated as dynamic.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16347
+        - https://github.com/elastic/elastic-agent/pull/16421
+        - https://github.com/elastic/elastic-agent/pull/16422
+        - https://github.com/elastic/elastic-agent/pull/16409
+        - https://github.com/elastic/elastic-agent/pull/16436
+        - https://github.com/elastic/elastic-agent/pull/16460
+        - https://github.com/elastic/elastic-agent/pull/16461
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785503040
+      file:
+        name: 1785503040-make-the-dynamic-inputs-runtime-override-configurable.yaml
+        checksum: d91c69322d2c384f08c25b341c6e4cb034a9b842
+    - kind: bug-fix
+      summary: Align OTel Elasticsearch exporter request and document retry behavior with Beats Elasticsearch output
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16347
+        - https://github.com/elastic/elastic-agent/pull/16421
+        - https://github.com/elastic/elastic-agent/pull/16422
+        - https://github.com/elastic/elastic-agent/pull/16409
+        - https://github.com/elastic/elastic-agent/pull/16436
+        - https://github.com/elastic/elastic-agent/pull/16460
+        - https://github.com/elastic/elastic-agent/pull/16461
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/14531
+      impact: ""
+      action: ""
+      timestamp: 1786144369
+      file:
+        name: 1786144369-retry-otel-elasticsearch-request-authentication-failures-without-retrying-rejected-documents.yaml
+        checksum: f7b549af7e1cf9032b1688638cef4129e0380c5b
+    - kind: bug-fix
+      summary: diagnostics now collects component trace logs in container deployments
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16347
+        - https://github.com/elastic/elastic-agent/pull/16421
+        - https://github.com/elastic/elastic-agent/pull/16422
+        - https://github.com/elastic/elastic-agent/pull/16409
+        - https://github.com/elastic/elastic-agent/pull/16436
+        - https://github.com/elastic/elastic-agent/pull/16460
+        - https://github.com/elastic/elastic-agent/pull/16461
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786552448
+      file:
+        name: 1786552448-fix-diagnostics-collect-component-trace-logs-in-container-deployments.yaml
+        checksum: 9d9b61b0990a91b60c9dc772954552e2b6eee639
+    - kind: enhancement
+      summary: Reduce the size of osquery.app on macOS by 75% by stripping the unused architecture slice
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16347
+        - https://github.com/elastic/elastic-agent/pull/16421
+        - https://github.com/elastic/elastic-agent/pull/16422
+        - https://github.com/elastic/elastic-agent/pull/16409
+        - https://github.com/elastic/elastic-agent/pull/16436
+        - https://github.com/elastic/elastic-agent/pull/16460
+        - https://github.com/elastic/elastic-agent/pull/16461
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1787154522
+      file:
+        name: 1787154522-strip-darwin-osqueryd.yaml
+        checksum: d3ebd38ba8138a012af6d23f85c31ba44bcad9f4
+    - kind: bug-fix
+      summary: Fix Kafka lz4/snappy compression failing in the OTel runtime after 9.5
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16347
+        - https://github.com/elastic/elastic-agent/pull/16421
+        - https://github.com/elastic/elastic-agent/pull/16422
+        - https://github.com/elastic/elastic-agent/pull/16409
+        - https://github.com/elastic/elastic-agent/pull/16436
+        - https://github.com/elastic/elastic-agent/pull/16460
+        - https://github.com/elastic/elastic-agent/pull/16461
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16239
+      impact: ""
+      action: ""
+      timestamp: 1787733895
+      file:
+        name: 1787733895-fix-kafka-lz4-compression-failing-in-the-otel-runtime.yaml
+        checksum: e6dd7fb2253c6a3dcaf40201f7b450389061a431
