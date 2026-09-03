@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Add integration test for kubernetes metrics receiver STOPPING deadlock with insufficient RBAC
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/15666
