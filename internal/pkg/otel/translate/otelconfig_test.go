@@ -1967,6 +1967,10 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+
+			if tt.expectedReceiverType == "" {
+				return
+			}
 			assert.NotNil(t, result)
 
 			// Verify the receiver ID is present

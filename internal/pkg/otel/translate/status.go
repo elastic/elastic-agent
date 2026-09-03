@@ -388,9 +388,16 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 
 // getComponentUnitState extracts component unit state from otel status.
 func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
+	if unit.Config == nil {
+		return runtime.ComponentUnitState{
+			State:   client.UnitStateDegraded,
+			Message: "unit configuration is nil",
+		}
+	}
+
 	topLevelState, topLevelMessage := StateWithMessage(otelUnitStatus)
 
-	if unit.Config == nil || unit.Type == client.UnitTypeOutput {
+	if unit.Type == client.UnitTypeOutput {
 		return runtime.ComponentUnitState{
 			State:   topLevelState,
 			Message: topLevelMessage,
