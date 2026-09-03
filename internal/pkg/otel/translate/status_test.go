@@ -552,6 +552,17 @@ func TestGetComponentUnitState(t *testing.T) {
 			assert.Equal(t, tt.expected.Payload, result.Payload)
 		})
 	}
+
+	t.Run("nil config is degraded", func(t *testing.T) {
+		nilConfigUnit := component.Unit{
+			ID:     "nil-config-unit",
+			Type:   client.UnitTypeInput,
+			Config: nil,
+		}
+		result := getComponentUnitState(nil, nil, nilConfigUnit, comp)
+		assert.Equal(t, client.UnitStateDegraded, result.State)
+		assert.Equal(t, "unit configuration is nil", result.Message)
+	})
 }
 
 func TestParseEntityStatusId(t *testing.T) {
