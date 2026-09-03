@@ -25,7 +25,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
-	helmKube "helm.sh/helm/v3/pkg/kube"
+	helmKube "helm.sh/helm/v4/pkg/kube"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -424,7 +424,7 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 	if err != nil {
 		return fmt.Errorf("error creating clientset: %w", err)
 	}
-	readyChecker := helmKube.NewReadyChecker(clientSet, func(s string, i ...interface{}) {})
+	readyChecker := helmKube.NewReadyChecker(clientSet)
 
 	ctxTimeout, cancel := context.WithTimeout(ctx, waitDuration)
 	defer cancel()
