@@ -34,7 +34,8 @@ import (
 )
 
 const (
-	defaultRetryTimeout       = 15 * time.Minute
+	defaultRetryTimeout       = 15 * time.Minute // stop retrying after this time
+	totalTimeout              = 240 * time.Minute // max possible time spent retrying/downloading all sources
 	defaultRemoteSourceSubdir = "beats/elastic-agent"
 	snapshotURIFormat         = "https://snapshots.elastic.co/%s-%s/downloads/"
 )
@@ -44,8 +45,9 @@ type artifactDownloader struct {
 	settings       *artifact.Config
 	fleetServerURI string
 	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
-	retryTimeout   time.Duration
-	fileOps        download.FileOps
+	retryTimeout time.Duration
+	totalTimeout time.Duration
+	fileOps      download.FileOps
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
@@ -54,6 +56,7 @@ func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artif
 		settings:      settings,
 		getPGPSources: download.AppendFallbackPGP,
 		retryTimeout:  defaultRetryTimeout,
+		totalTimeout:  totalTimeout,
 		fileOps: download.FileOps{
 			CopyFile: io.Copy,
 			OpenFile: os.OpenFile,
@@ -118,6 +121,9 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	}
 
 	a.log.Infow("Getting upgrade artifact", "filename", fileName, "version", target.Version, "drop_path", settings.DropPath, "target_path", targetPath, "install_path", settings.InstallPath)
+
+	ctx, cancel := context.WithTimeout(ctx, a.totalTimeout)
+	defer cancel()
 
 	retryTimeout := min(a.retryTimeout, settings.Timeout)
 	retryDeadline := time.Now().Add(retryTimeout)
