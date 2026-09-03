@@ -318,6 +318,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"auth": map[string]any{
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
+			"timeout": 90 * time.Second,
 		}
 	}
 
