@@ -224,8 +224,18 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	// Dynamic routing is disabled if output.elasticsearch.index is set
 	setIfNotNil(otelYAMLCfg, "logs_index", escfg.Index) // index
 
-	// idle_connection_timeout, timeout, ssl block,
-	// proxy_url, proxy_headers, proxy_disable are handled by beatsauthextension https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/beatsauthextension
+	// timeout is enforced by the ES exporter via timeoutInterceptor, which wraps each request
+	// context with context.WithTimeout. beatsauthextension exposes only the beats http.Client's
+	// Transport (not the client itself), so http.Client.Timeout is never applied — the exporter
+	// must carry this value. The beats default is 90s and this should never be zero; a zero value
+	// passed to timeoutInterceptor immediately cancels every request (upstream fix tracked at
+	// https://github.com/open-telemetry/opentelemetry-collector/issues/15677).
+	if escfg.Transport.Timeout > 0 {
+		otelYAMLCfg["timeout"] = escfg.Transport.Timeout
+	}
+
+	// ssl block, idle_connection_timeout, proxy_url, proxy_headers, and proxy_disable
+	// are handled by beatsauthextension https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/beatsauthextension
 	// caller of this method should take care of integrating the extension
 
 	return otelYAMLCfg, nil, nil
