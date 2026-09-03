@@ -282,13 +282,8 @@ func getReceiversConfigForComponent(
 	// we run a single receiver for each component to mirror what beats processes do
 	var inputs []map[string]any
 	for _, unit := range comp.Units {
-<<<<<<< HEAD
-		if unit.Type == client.UnitTypeInput {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
-=======
 		if unit.Type == client.UnitTypeInput && unit.Config != nil {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp)
->>>>>>> 94b8469 (skip if unit.Config is nil (#16472))
+			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
 			if err != nil {
 				return nil, err
 			}

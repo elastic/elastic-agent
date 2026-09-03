@@ -1281,7 +1281,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				ID:         "nil-config-comp",
 				InputType:  "filestream",
 				OutputType: "elasticsearch",
-				OutputName: "default",
 				InputSpec: &component.InputRuntimeSpec{
 					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{

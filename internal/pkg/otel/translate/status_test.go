@@ -559,7 +559,7 @@ func TestGetComponentUnitState(t *testing.T) {
 			Type:   client.UnitTypeInput,
 			Config: nil,
 		}
-		result := getComponentUnitState(nil, nil, nilConfigUnit, comp)
+		result := getComponentUnitState(nil, nilConfigUnit)
 		assert.Equal(t, client.UnitStateDegraded, result.State)
 		assert.Equal(t, "unit configuration is nil", result.Message)
 	})

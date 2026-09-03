@@ -407,6 +407,12 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 
 // getComponentUnitState extracts component unit state from otel status.
 func getComponentUnitState(otelUnitStatus *status.AggregateStatus, unit component.Unit) runtime.ComponentUnitState {
+	if unit.Config == nil {
+		return runtime.ComponentUnitState{
+			State:   client.UnitStateDegraded,
+			Message: "unit configuration is nil",
+		}
+	}
 	unitStatus, unitMessage := StateWithMessage(otelUnitStatus)
 	var streamStatus map[string]map[string]string
 
