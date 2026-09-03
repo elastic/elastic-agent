@@ -3611,8 +3611,6 @@ func TestComponent_WorkDir(t *testing.T) {
 // https://github.com/elastic/elastic-agent/issues/16226: component IDs derived
 // from externally supplied input IDs must be validated before any filesystem
 // operation so that a crafted ID cannot escape the Agent runtime directory.
-//
-// All sub-tests except the last currently FAIL — no validation exists yet.
 func TestComponent_WorkDir_PathTraversal(t *testing.T) {
 	runtimeDir := t.TempDir()
 	sentinelDir := t.TempDir()
@@ -3667,7 +3665,6 @@ func TestComponent_WorkDir_PathTraversal(t *testing.T) {
 		err := c.PrepareWorkDir(runtimeDir)
 		require.Error(t, err, "PrepareWorkDir must reject '.' component ID")
 	})
-
 
 	t.Run("WorkDirPath stays within runtimeDir for benign ID", func(t *testing.T) {
 		c := &Component{ID: "filebeat-default"}

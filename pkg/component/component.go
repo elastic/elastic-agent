@@ -631,26 +631,30 @@ func (c *Component) WorkDirPath(parentDirPath string) string {
 	return filepath.Join(parentDirPath, c.WorkDirName())
 }
 
-// validateWorkDir verifies that the component's working directory ($parentDirPath/$ID)
-// resolves strictly inside parentDirPath. Both paths are resolved to absolute form
-// so that ".", "..", and multi-segment traversal are normalised by the path library
-// before comparison.
-func (c *Component) validateWorkDir(parentDirPath string) error {
-	if c.ID == "" {
+// validateComponentID verifies that joining parentDirPath with id stays strictly inside
+// parentDirPath. Both paths are resolved to absolute form before comparison so that
+// ".", "..", and multi-segment traversal are all normalised by the path library.
+func validateComponentID(parentDirPath, id string) error {
+	if id == "" {
 		return errors.New("component ID must not be empty")
 	}
 	absParent, err := filepath.Abs(parentDirPath)
 	if err != nil {
 		return fmt.Errorf("failed to resolve runtime directory %q: %w", parentDirPath, err)
 	}
-	absCandidate, err := filepath.Abs(filepath.Join(absParent, c.ID))
+	absCandidate, err := filepath.Abs(filepath.Join(absParent, id))
 	if err != nil {
-		return fmt.Errorf("failed to resolve component working directory for ID %q: %w", c.ID, err)
+		return fmt.Errorf("failed to resolve component working directory for ID %q: %w", id, err)
 	}
-	if !strings.HasPrefix(absCandidate, absParent+string(filepath.Separator)) {
-		return fmt.Errorf("component ID %q resolves outside the runtime directory", c.ID)
+	rel, err := filepath.Rel(absParent, absCandidate)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return fmt.Errorf("component ID %q must resolve strictly inside the runtime directory", id)
 	}
 	return nil
+}
+
+func (c *Component) validateWorkDir(parentDirPath string) error {
+	return validateComponentID(parentDirPath, c.ID)
 }
 
 // PrepareWorkDir prepares the component working directory under the provided parent path. This involves creating
@@ -840,6 +844,9 @@ func (r *RuntimeSpecs) componentsForInputType(
 			componentID = inputType
 		}
 
+		if componentErr == nil {
+			componentErr = validateComponentID(paths.Run(), componentID)
+		}
 		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 			// This output is unsupported.
 			componentErr = ErrOutputNotSupported
@@ -900,6 +907,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
 			}
 
+			var componentErr error
+			if err := validateComponentID(paths.Run(), componentID); err != nil {
+				componentErr = err
+			}
 			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
