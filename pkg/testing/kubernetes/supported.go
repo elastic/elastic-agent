@@ -26,7 +26,7 @@ var kubernetesVersions = []define.OS{
 	// Kubernetes 1.36
 	{
 		Type:    define.Kubernetes,
-		Version: "1.36.0",
+		Version: "1.36.1",
 	},
 	// Kubernetes 1.35
 	{
@@ -56,17 +56,17 @@ var kubernetesVersions = []define.OS{
 	// Kubernetes 1.30
 	{
 		Type:    define.Kubernetes,
-		Version: "1.30.2",
+		Version: "1.30.0",
 	},
 	// Kubernetes 1.29
 	{
 		Type:    define.Kubernetes,
-		Version: "1.29.4",
+		Version: "1.29.14",
 	},
 	// Kubernetes 1.28
 	{
 		Type:    define.Kubernetes,
-		Version: "1.28.9",
+		Version: "1.28.15",
 	},
 	// Kubernetes 1.27
 	{
