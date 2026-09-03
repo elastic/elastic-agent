@@ -182,6 +182,11 @@ share similar leavers as the packaging process.
        ESS API key (`mage integration:auth`).
      - `serverless`: Provisions a cloud serverless project. Also requires an ESS
        API key.
+     - `external`: Uses an existing stack supplied via environment variables
+       (`ELASTICSEARCH_HOST`, `KIBANA_HOST`, `ELASTICSEARCH_USERNAME`,
+       `ELASTICSEARCH_PASSWORD`). It creates and deletes nothing, and needs no
+       cloud account or local stack. Useful in CI, where a stack is provisioned
+       separately before the tests run.
      - `local`: Brings up a fully local stack with
        [`elastic-package stack up`](https://github.com/elastic/elastic-package) —
        no cloud account needed. Requires the `elastic-package` binary on `PATH`
