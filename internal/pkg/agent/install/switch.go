@@ -16,6 +16,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+// ProgressDescriber is used to describe execution progress
+type ProgressDescriber interface {
+	Describe(string)
+}
+
 // SwitchExecutingMode switches the executing mode of the installed Elastic Agent.
 //
 // When username and groupName are blank then it switched back to root/Administrator and when a username/groupName is
