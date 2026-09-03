@@ -25,6 +25,7 @@ const (
 // config separately during *Config.Unpack
 type configWithoutHTTPTransportSettings struct {
 	// Sources: an ordered list of source URIs for retrieving upgrade artifacts
+	// defaults to official Elastic artifact registry if unspecified
 	Sources []string `json:"sources" config:"sources"`
 
 	// TargetDirectory: path to the directory containing downloaded packages
@@ -49,6 +50,7 @@ type configWithoutHTTPTransportSettings struct {
 // Config is a configuration used for verifier and downloader
 type Config struct {
 	// Sources: an ordered list of source URIs for retrieving upgrade artifacts
+	// defaults to official Elastic artifact registry if unspecified
 	Sources []string `json:"sources" config:"sources"`
 
 	// TargetDirectory: path to the directory containing downloaded packages
