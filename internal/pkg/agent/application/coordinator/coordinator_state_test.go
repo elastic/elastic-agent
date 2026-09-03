@@ -265,7 +265,13 @@ func TestRecoverableActionsError(t *testing.T) {
 			state := coord.generateReportableState()
 			assert.Equal(t, tc.expected, state.State)
 			if tc.err != nil {
-				assert.Equal(t, "Actions: "+tc.err.Error(), state.Message)
+				var expectedMsg string
+				if tc.expected == agentclient.Degraded {
+					expectedMsg = "Actions degraded: " + tc.err.Error()
+				} else {
+					expectedMsg = "Actions failed: " + tc.err.Error()
+				}
+				assert.Equal(t, expectedMsg, state.Message)
 			}
 		})
 	}
