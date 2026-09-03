@@ -33,7 +33,7 @@ changelog/fragments/
 /.github/workflows/validate-docs-structure.yml @elastic/ski-docs @elastic/docs-engineering
 /docs/reference/edot-collector @elastic/ski-docs
 /docs/scripts/update-docs @elastic/ski-docs
-/internal/edot/samples @elastic/ski-docs
+/internal/edot/samples @elastic/obs-signals-team @elastic/ski-docs
 /internal/edot/components.yml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
 /internal/edot/samples/darwin/autoops_es*.yml @elastic/opex
