@@ -252,10 +252,11 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.actionsErr != nil {
 		if errors.IsRecoverable(c.actionsErr) {
 			s.State = agentclient.Degraded
+			s.Message = fmt.Sprintf("Actions degraded: %s", c.actionsErr.Error())
 		} else {
 			s.State = agentclient.Failed
+			s.Message = fmt.Sprintf("Actions failed: %s", c.actionsErr.Error())
 		}
-		s.Message = fmt.Sprintf("Actions: %s", c.actionsErr.Error())
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
