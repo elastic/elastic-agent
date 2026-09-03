@@ -631,9 +631,34 @@ func (c *Component) WorkDirPath(parentDirPath string) string {
 	return filepath.Join(parentDirPath, c.WorkDirName())
 }
 
+// validateWorkDir verifies that the component's working directory ($parentDirPath/$ID)
+// resolves strictly inside parentDirPath. Both paths are resolved to absolute form
+// so that ".", "..", and multi-segment traversal are normalised by the path library
+// before comparison.
+func (c *Component) validateWorkDir(parentDirPath string) error {
+	if c.ID == "" {
+		return errors.New("component ID must not be empty")
+	}
+	absParent, err := filepath.Abs(parentDirPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime directory %q: %w", parentDirPath, err)
+	}
+	absCandidate, err := filepath.Abs(filepath.Join(absParent, c.ID))
+	if err != nil {
+		return fmt.Errorf("failed to resolve component working directory for ID %q: %w", c.ID, err)
+	}
+	if !strings.HasPrefix(absCandidate, absParent+string(filepath.Separator)) {
+		return fmt.Errorf("component ID %q resolves outside the runtime directory", c.ID)
+	}
+	return nil
+}
+
 // PrepareWorkDir prepares the component working directory under the provided parent path. This involves creating
 // it under the right ownership and ACLs. This method is idempotent.
 func (c *Component) PrepareWorkDir(parentDirPath string) error {
+	if err := c.validateWorkDir(parentDirPath); err != nil {
+		return err
+	}
 	uid, gid := os.Geteuid(), os.Getegid()
 	path := c.WorkDirPath(parentDirPath)
 	err := os.MkdirAll(path, workDirPathMod)
@@ -656,6 +681,9 @@ func (c *Component) PrepareWorkDir(parentDirPath string) error {
 
 // RemoveWorkDir removes the component working directory under the provided parent path. This method is idempotent.
 func (c *Component) RemoveWorkDir(parentDirPath string) error {
+	if err := c.validateWorkDir(parentDirPath); err != nil {
+		return err
+	}
 	return os.RemoveAll(c.WorkDirPath(parentDirPath))
 }
 
