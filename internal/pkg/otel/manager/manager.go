@@ -138,6 +138,10 @@ type OTelManager struct {
 
 	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
+
+	// nativeK8sFilelog controls whether kubernetes container-log inputs are
+	// translated to a native OTel filelog receiver instead of a filebeatreceiver.
+	nativeK8sFilelog bool
 }
 
 // NewOTelManager returns a OTelManager.
@@ -151,6 +155,7 @@ func NewOTelManager(
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
 	enablePartialReload bool,
+	nativeK8sFilelog bool,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -216,6 +221,7 @@ func NewOTelManager(
 		collectorRunErr:   make(chan error, 1),
 		stopTimeout:       stopTimeout,
 		collectorLogLevel: collectorLogLevel,
+		nativeK8sFilelog: nativeK8sFilelog,
 	}, nil
 }
 
@@ -459,7 +465,7 @@ func (m *OTelManager) buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger, m.nativeK8sFilelog)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}

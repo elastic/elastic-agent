@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	k8sutil "github.com/elastic/elastic-agent/internal/pkg/otel/k8s"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -93,8 +94,9 @@ func GetOtelConfig(
 	model *component.Model,
 	info info.Agent,
 	logger *logp.Logger,
+	nativeK8sFilelog bool,
 ) (*confmap.Conf, error) {
-	components := getSupportedComponents(logger, model)
+	components := getSupportedComponents(logger, model, nativeK8sFilelog)
 	if len(components) == 0 {
 		return nil, nil
 	}
@@ -102,7 +104,7 @@ func GetOtelConfig(
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger, nativeK8sFilelog)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -173,14 +175,12 @@ func OTelLevelToLogp(lvl string) (logp.Level, error) {
 
 // VerifyComponentIsOtelSupported verifies that the given component can be run in an Otel Collector. It returns an error
 // indicating what the problem is, if it can't.
-func VerifyComponentIsOtelSupported(comp *component.Component) error {
+func VerifyComponentIsOtelSupported(comp *component.Component, nativeK8sFilelog bool) error {
 	if !slices.Contains(OtelSupportedOutputTypes, comp.OutputType) {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	// check if the actual configuration is supported. We need to actually generate the config and look for
-	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger())
+	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger(), nativeK8sFilelog)
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -213,11 +213,11 @@ func VerifyOutputIsOtelSupported(outputType string, outputCfg map[string]any) er
 }
 
 // getSupportedComponents returns components from the given model that can be run in an Otel Collector.
-func getSupportedComponents(logger *logp.Logger, model *component.Model) []*component.Component {
+func getSupportedComponents(logger *logp.Logger, model *component.Model, nativeK8sFilelog bool) []*component.Component {
 	var supportedComponents []*component.Component
 
 	for _, comp := range model.Components {
-		if err := VerifyComponentIsOtelSupported(&comp); err == nil {
+		if err := VerifyComponentIsOtelSupported(&comp, nativeK8sFilelog); err == nil {
 			supportedComponents = append(supportedComponents, &comp)
 		} else {
 			logger.Errorf("unsupported component %s submitted to otel manager, skipping: %v", comp.ID, err)
@@ -279,7 +279,12 @@ func getCollectorConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	logger *logp.Logger,
+	nativeK8sFilelog bool,
 ) (*confmap.Conf, error) {
+	if nativeK8sFilelog && k8sutil.IsContainerLogComponent(comp) {
+		return getKubernetesContainerLogConfig(comp, info, logger)
+	}
+
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
 	if err != nil {
 		return nil, err

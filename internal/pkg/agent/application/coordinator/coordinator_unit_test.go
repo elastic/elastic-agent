@@ -2775,7 +2775,7 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 	t.Run("no change when DynamicInputs is empty", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{}
 		comp := otelSupportedComponent(true)
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, false, &comp)
 		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 
@@ -2786,7 +2786,7 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 			},
 		}
 		comp := otelSupportedComponent(false)
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, false, &comp)
 		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 
@@ -2797,7 +2797,7 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 			},
 		}
 		comp := otelSupportedComponent(true)
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, false, &comp)
 		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
 	})
 
@@ -2815,21 +2815,21 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 		filestream := otelSupportedComponent(true)
 		filestream.InputSpec = &pkgcomponent.InputRuntimeSpec{BinaryName: "filebeat"}
 		filestream.InputType = "filestream"
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &filestream)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, false, &filestream)
 		assert.Equal(t, pkgcomponent.OtelRuntimeManager, filestream.RuntimeManager)
 
 		// another filebeat input type falls back to the global default
 		logInput := otelSupportedComponent(true)
 		logInput.InputSpec = &pkgcomponent.InputRuntimeSpec{BinaryName: "filebeat"}
 		logInput.InputType = "log"
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &logInput)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, false, &logInput)
 		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, logInput.RuntimeManager)
 	})
 
 	t.Run("default configuration leaves dynamic otel components on otel runtime", func(t *testing.T) {
 		runtimeCfg := pkgcomponent.DefaultRuntimeConfig()
 		comp := otelSupportedComponent(true)
-		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, false, &comp)
 		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
 	})
 }

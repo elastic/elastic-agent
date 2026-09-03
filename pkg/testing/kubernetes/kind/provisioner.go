@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,7 +33,9 @@ const (
 	Name = "kind"
 )
 
-const clusterCfg string = `
+// clusterCfgLegacy is used for Kubernetes <= 1.31 where the scheduler and
+// controller-manager still accept --bind-address and --secure-port flags.
+const clusterCfgLegacy string = `
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -49,6 +52,27 @@ nodes:
         bind-address: "0.0.0.0"
         secure-port: "10257"
 `
+
+const clusterCfgModern string = `
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+`
+
+// clusterConfig returns the kind cluster config appropriate for the given
+// Kubernetes version. The --bind-address and --secure-port extraArgs were
+// removed from kube-scheduler and kube-controller-manager in 1.32.
+func clusterConfig(k8sVersion string) string {
+	// k8sVersion is "v1.36.4" — strip leading "v", split on "."
+	parts := strings.Split(strings.TrimPrefix(k8sVersion, "v"), ".")
+	if len(parts) >= 2 {
+		if minor, err := strconv.Atoi(parts[1]); err == nil && minor <= 31 {
+			return clusterCfgLegacy
+		}
+	}
+	return clusterCfgModern
+}
 
 func NewProvisioner() common.InstanceProvisioner {
 	return &provisioner{}
@@ -108,9 +132,9 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 		if !exists {
 			p.logger.Logf("Provisioning kind cluster %s", instanceName)
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
-			clusterConfig := strings.NewReader(clusterCfg)
+			clusterCfg := strings.NewReader(clusterConfig(k8sVersion))
 
-			ret, err := p.kindCmd(clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			ret, err := p.kindCmdContext(ctx, clusterCfg, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
 			if err != nil {
 				return nil, fmt.Errorf("kind: failed to create cluster %s: %s", instanceName, ret.stderr)
 			}
@@ -164,7 +188,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 }
 
 func (p *provisioner) LoadImage(ctx context.Context, clusterName string, image string) error {
-	ret, err := p.kindCmd(nil, "load", "docker-image", "--name", clusterName, image)
+	ret, err := p.kindCmdContext(ctx, nil, "load", "docker-image", "--name", clusterName, image)
 	if err != nil {
 		return fmt.Errorf("kind: load docker-image %s failed: %w: %s", image, err, ret.stderr)
 	}
@@ -228,7 +252,7 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 			p.logger.Logf("Tried to delete instance, but it was not found: %s", instance.Name)
 			continue
 		}
-		err = p.deleteCluster(instance.Name)
+		err = p.deleteCluster(ctx, instance.Name)
 		if err != nil {
 			// prevent a failure from stopping the other instances and clean
 			p.logger.Logf("Delete instance %s failed: %s", instance.Name, err)
@@ -279,10 +303,13 @@ type cmdResult struct {
 }
 
 func (p *provisioner) kindCmd(stdIn io.Reader, args ...string) (cmdResult, error) {
-
-	var stdout, stderr bytes.Buffer
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	return p.kindCmdContext(ctx, stdIn, args...)
+}
+
+func (p *provisioner) kindCmdContext(ctx context.Context, stdIn io.Reader, args ...string) (cmdResult, error) {
+	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "kind", args...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -296,7 +323,7 @@ func (p *provisioner) kindCmd(stdIn io.Reader, args ...string) (cmdResult, error
 	}, err
 }
 
-func (p *provisioner) deleteCluster(name string) error {
-	_, err := p.kindCmd(nil, "delete", "cluster", "--name", name)
+func (p *provisioner) deleteCluster(ctx context.Context, name string) error {
+	_, err := p.kindCmdContext(ctx, nil, "delete", "cluster", "--name", name)
 	return err
 }
