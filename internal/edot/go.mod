@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260831172839-7fe45170d562
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260901223012-36f46e8aeecd
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.3
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
@@ -101,7 +101,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.83.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.54.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.52.6 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.7.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.8.0 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/brunoscheufler/aws-ecs-metadata-go v0.0.0-20221221133751-67e37ae746cd // indirect
@@ -111,7 +111,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.20.0 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
 	github.com/elastic/ebpfevents v0.10.0 // indirect
-	github.com/elastic/entcollect v0.0.0-20260720203654-e61fb8788d9a // indirect
+	github.com/elastic/entcollect v0.0.0-20260901073829-6510b053b36d // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
 	github.com/elastic/go-quark v0.6.0 // indirect
@@ -328,8 +328,8 @@ require (
 	github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.45.1
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.33.1
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.1
+	github.com/aws/aws-sdk-go-v2/config v1.33.2
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.2
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.1 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.1 // indirect
@@ -342,7 +342,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.325.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.60.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/health v1.42.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.61.1
+	github.com/aws/aws-sdk-go-v2/service/iam v1.62.0
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.1 // indirect
@@ -354,9 +354,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.109.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/servicediscovery v1.43.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.48.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.35.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.40.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.47.1
+	github.com/aws/aws-sdk-go-v2/service/sso v1.36.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.41.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.48.0
 	github.com/aws/smithy-go v1.28.1
 	github.com/axiomhq/hyperloglog v0.2.6 // indirect
 	github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 // indirect
