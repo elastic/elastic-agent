@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	defaultRetryTimeout       = 15 * time.Minute // stop retrying after this time
+	defaultRetryTimeout       = 15 * time.Minute  // stop retrying after this time
 	totalTimeout              = 240 * time.Minute // max possible time spent retrying/downloading all sources
 	defaultRemoteSourceSubdir = "beats/elastic-agent"
 	snapshotURIFormat         = "https://snapshots.elastic.co/%s-%s/downloads/"
@@ -45,9 +45,9 @@ type artifactDownloader struct {
 	settings       *artifact.Config
 	fleetServerURI string
 	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
-	retryTimeout time.Duration
-	totalTimeout time.Duration
-	fileOps      download.FileOps
+	retryTimeout   time.Duration
+	totalTimeout   time.Duration
+	fileOps        download.FileOps
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
