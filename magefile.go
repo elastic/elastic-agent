@@ -3202,7 +3202,11 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = multipass.NewProvisioner()
 		identifier = localIdentifier()
 	case kind.Name:
-		instanceProvisioner = kind.NewProvisioner()
+		var err error
+		instanceProvisioner, err = kind.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()

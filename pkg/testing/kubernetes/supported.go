@@ -142,8 +142,8 @@ func GetSupported() []define.OS {
 	return supported
 }
 
-// VariantToImage returns the image name from the variant.
-func VariantToImage(variant string) (string, error) {
+// variantRepository returns the untagged image repository for the variant.
+func variantRepository(variant string) (string, error) {
 	for _, v := range variants {
 		if v.Name == variant {
 			return v.Image, nil

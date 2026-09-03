@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 
+	dockerclient "github.com/moby/moby/client"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/e2e-framework/klient"
@@ -49,12 +50,17 @@ nodes:
         secure-port: "10257"
 `
 
-func NewProvisioner() common.InstanceProvisioner {
-	return &provisioner{}
+func NewProvisioner() (common.InstanceProvisioner, error) {
+	client, err := kubernetes.NewDockerClient()
+	if err != nil {
+		return nil, fmt.Errorf("creating Docker client: %w", err)
+	}
+	return &provisioner{client: client}, nil
 }
 
 type provisioner struct {
 	logger common.Logger
+	client *dockerclient.Client
 }
 
 func (p *provisioner) Name() string {
@@ -90,14 +96,14 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 		k8sVersion := fmt.Sprintf("v%s", batch.OS.Version)
 		instanceName := fmt.Sprintf("%s-%s", k8sVersion, batch.Batch.Group)
 
-		agentImageName, err := kubernetes.VariantToImage(batch.OS.DockerVariant)
+		agentImage, err := kubernetes.FindVariantImage(ctx, p.client, batch.OS.DockerVariant, cfg.AgentVersion, runtime.GOARCH)
 		if err != nil {
 			return nil, err
 		}
-		agentImageName = fmt.Sprintf("%s:%s", agentImageName, cfg.AgentVersion)
-		agentImage, err := kubernetes.AddK8STestsToImage(ctx, p.logger, agentImageName, runtime.GOARCH)
+
+		testsImage, err := kubernetes.BuildInnerTestsImage(ctx, p.logger, p.client, agentImage, runtime.GOARCH)
 		if err != nil {
-			return nil, fmt.Errorf("failed to add k8s tests to image %s: %w", agentImageName, err)
+			return nil, fmt.Errorf("building inner tests image from %s: %w", agentImage, err)
 		}
 
 		exists, err := p.clusterExists(ctx, instanceName)
@@ -136,11 +142,11 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			return nil, err
 		}
 
-		if err := p.WaitForControlPlane(ctx, c); err != nil {
+		if err := p.waitForControlPlane(ctx, c); err != nil {
 			return nil, err
 		}
 
-		if err := p.LoadImage(ctx, instanceName, agentImage); err != nil {
+		if err := p.loadImage(ctx, instanceName, testsImage); err != nil {
 			return nil, err
 		}
 
@@ -154,7 +160,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			Internal: map[string]interface{}{
 				"config":      kConfigPath,
 				"version":     k8sVersion,
-				"agent_image": agentImage,
+				"agent_image": testsImage,
 			},
 		})
 	}
@@ -162,7 +168,7 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 	return instances, nil
 }
 
-func (p *provisioner) LoadImage(ctx context.Context, clusterName string, image string) error {
+func (p *provisioner) loadImage(ctx context.Context, clusterName string, image string) error {
 	ret, err := p.kindCmd(ctx, nil, "load", "docker-image", "--name", clusterName, image)
 	if err != nil {
 		return fmt.Errorf("kind: load docker-image %s failed: %w: %s", image, err, ret.stderr)
@@ -170,7 +176,7 @@ func (p *provisioner) LoadImage(ctx context.Context, clusterName string, image s
 	return nil
 }
 
-func (p *provisioner) WaitForControlPlane(ctx context.Context, client klient.Client) error {
+func (p *provisioner) waitForControlPlane(ctx context.Context, client klient.Client) error {
 	r, err := resources.New(client.RESTConfig())
 	if err != nil {
 		return err
