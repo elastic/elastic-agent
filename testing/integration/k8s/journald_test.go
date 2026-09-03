@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -79,7 +80,7 @@ func TestKubernetesJournaldInput(t *testing.T) {
 						Name: "journald-mount",
 						VolumeSource: corev1.VolumeSource{
 							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/run/log/journal",
+								Path: journaldHostPath(kCtx),
 								Type: &hostPathType,
 							},
 						},
@@ -162,7 +163,7 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 						Name: "journald-mount",
 						VolumeSource: corev1.VolumeSource{
 							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/run/log/journal",
+								Path: journaldHostPath(kCtx),
 								Type: &hostPathType,
 							},
 						},
@@ -229,4 +230,17 @@ func journaldTest(
 		)
 	})
 	require.NotEmpty(t, docs, "expected logs to be found in Elasticsearch")
+}
+
+// journaldHostPath returns the host directory that holds the systemd journal.
+func journaldHostPath(kCtx k8sContext) string {
+	if kCtx.openshift {
+		// TODO(samuelvl): always return /var/log/journal once 4.22 uses the
+		// microshift-io image instead of minc.
+		if strings.HasPrefix(os.Getenv("K8S_VERSION"), "4.22.") {
+			return "/run/log/journal"
+		}
+		return "/var/log/journal"
+	}
+	return "/run/log/journal"
 }
