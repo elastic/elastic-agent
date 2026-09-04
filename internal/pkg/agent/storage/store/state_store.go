@@ -158,20 +158,22 @@ func readState(reader io.ReadCloser) (state, error) {
 	return st, nil
 }
 
+// isNilAction reports whether a is nil, including the typed-nil case where a
+// non-nil interface holds a nil pointer. A plain `a == nil` check is not
+// sufficient because a typed nil (e.g. (*ActionPolicyChange)(nil)) stored in
+// a fleetapi.Action interface is never equal to untyped nil. See
+// https://go.dev/ref/spec#Type_switches for details.
+func isNilAction(a fleetapi.Action) bool {
+	return a == nil || reflect.ValueOf(a).IsNil()
+}
+
 // SetAction sets the current action. It accepts ActionPolicyChange or
 // ActionUnenroll. Any other type will be silently discarded.
 func (s *StateStore) SetAction(a fleetapi.Action) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	// the reflect.ValueOf(v).IsNil() is required as the type of 'v' on switch
-	// clause with multiple types will, in this case, preserve the original type.
-	// See details on https://go.dev/ref/spec#Type_switches
-	// Without using reflect accessing the concrete type stored in the interface
-	// isn't possible and as a is of type fleetapi.Action and has a concrete
-	// value, a is never nil, neither v is nil as it has the same type of a
-	// on both clauses.
-	if a == nil || reflect.ValueOf(a).IsNil() {
+	if isNilAction(a) {
 		s.log.Debugf("trying to set an nil '%T' action, ignoring the action", a)
 		return
 	}
@@ -260,6 +262,45 @@ func (s *StateStore) Queue() []fleetapi.ScheduledAction {
 	q := make([]fleetapi.ScheduledAction, len(s.state.Queue))
 	copy(q, s.state.Queue)
 	return q
+}
+
+// SaveAction atomically persists the action to disk and, on success, updates
+// the in-memory state. Concurrent reads always observe either the old or the
+// new action — never a partially committed state.
+// If the action is already current (same ID), the call is a no-op and returns nil.
+func (s *StateStore) SaveAction(a fleetapi.Action) error {
+	if isNilAction(a) {
+		return fmt.Errorf("cannot save nil action")
+	}
+	switch a.(type) {
+	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
+		// ok
+	default:
+		return fmt.Errorf("incompatible action type %T, expected ActionPolicyChange or ActionUnenroll", a)
+	}
+
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	// Skip if the action is already current.
+	if current := s.state.ActionSerializer.Action; current != nil && current.ID() == a.ID() {
+		return nil
+	}
+
+	// tmp is a shallow copy; safe because the write lock is held throughout.
+	tmp := s.state
+	tmp.ActionSerializer.Action = a
+	reader, err := jsonToReader(&tmp)
+	if err != nil {
+		return fmt.Errorf("could not marshal state: %w", err)
+	}
+	if err := s.store.Save(reader); err != nil {
+		return err
+	}
+
+	s.state.ActionSerializer.Action = a
+	s.dirty = false
+	return nil
 }
 
 // Action the action to execute. See SetAction for the possible action types.
