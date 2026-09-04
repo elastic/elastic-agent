@@ -9,9 +9,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
+=======
+	"github.com/elastic/beats/v7/libbeat/beat"
+
+	"github.com/elastic/elastic-agent/internal/pkg/util"
+>>>>>>> 09ae1f4 (Allow overriding Elastic Agent hostname via environment variable (#15686))
 )
 
 func TestPrepareCollectorSettings(t *testing.T) {
@@ -77,5 +84,41 @@ func TestPrepareCollectorSettings(t *testing.T) {
 		settings, err := prepareCollectorSettings(nil, false, "info", nil)
 		require.NoError(t, err)
 		require.NotNil(t, settings)
+	})
+}
+
+// TestInitBeatHostnameFromEnv tests must not run in parallel: they share the
+// process-wide Beat hostname override.
+func TestInitBeatHostnameFromEnv(t *testing.T) {
+	reset := func() { beat.SetHostnameOverride("") }
+
+	t.Run("plain_value", func(t *testing.T) {
+		t.Cleanup(reset)
+		t.Setenv(util.EnvHostName, "custom-node")
+		initBeatHostnameFromEnv()
+		assert.Equal(t, "custom-node", beat.GetHostnameOverride())
+	})
+
+	t.Run("whitespace_trimmed", func(t *testing.T) {
+		t.Cleanup(reset)
+		t.Setenv(util.EnvHostName, "  custom-node  ")
+		initBeatHostnameFromEnv()
+		assert.Equal(t, "custom-node", beat.GetHostnameOverride())
+	})
+
+	t.Run("whitespace_only_clears_stale_override", func(t *testing.T) {
+		t.Cleanup(reset)
+		beat.SetHostnameOverride("stale-node")
+		t.Setenv(util.EnvHostName, "   ")
+		initBeatHostnameFromEnv()
+		assert.Equal(t, "", beat.GetHostnameOverride())
+	})
+
+	t.Run("unset_env_clears_stale_override", func(t *testing.T) {
+		t.Cleanup(reset)
+		t.Setenv(util.EnvHostName, "")
+		beat.SetHostnameOverride("stale-node")
+		initBeatHostnameFromEnv()
+		assert.Equal(t, "", beat.GetHostnameOverride())
 	})
 }

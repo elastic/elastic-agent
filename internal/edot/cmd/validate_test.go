@@ -34,8 +34,18 @@ func TestValidateCommand(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
+<<<<<<< HEAD
 			err := validateOtelConfig(context.Background(), tc.ConfigPaths, components.Default())
 			require.Equal(t, tc.ExpectingErr, err != nil)
+=======
+			err := validateOtelConfig(context.Background(), tc.ConfigPaths, nil)
+
+			if tc.ExpectingErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+>>>>>>> 09ae1f4 (Allow overriding Elastic Agent hostname via environment variable (#15686))
 		})
 	}
 }

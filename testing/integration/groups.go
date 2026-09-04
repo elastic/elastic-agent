@@ -32,8 +32,8 @@ const (
 	// upgrading to a build built from the PR being tested.
 	FleetUpgradeToPRBuild = "fleet-upgrade-to-pr-build"
 
-	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
-	FQDN = "fqdn"
+	// Hostname group of tests. Used for testing Elastic Agent hostname behaviour (FQDN, env override).
+	Hostname = "hostname"
 
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
