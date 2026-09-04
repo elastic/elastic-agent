@@ -961,11 +961,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 		}
 
 		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
-		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
-		// the error to ErrInsufficientDiskSpace so that the error message is
+		// If ErrDiskSpaceFull is in the error chain, we want to set the
+		// the error to ErrDiskSpaceFull so that the error message is
 		// more concise and clear.
-		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
-			err = upgradeErrors.ErrInsufficientDiskSpace
+		if errors.Is(err, upgradeErrors.ErrDiskSpaceFull) {
+			err = upgradeErrors.ErrDiskSpaceFull
 		}
 
 		// MarkUpgradeFailed updates det in-memory and, when an upgrade marker
