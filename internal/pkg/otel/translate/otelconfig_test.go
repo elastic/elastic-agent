@@ -1079,7 +1079,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				ID:        "nil-config-test-id",
 				InputType: "filestream",
 				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "elastic-otel-collector",
+					BinaryName: "agentbeat",
 					Spec: component.InputSpec{
 						Name: "filestream",
 						Command: &component.CommandSpec{
@@ -1102,8 +1102,9 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 					},
 				},
 			},
-			outputQueueConfig: nil,
-			// No expectedReceiverID - nil config input is skipped
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			// No expectedReceiverType - nil config input is skipped
 		},
 		{
 			name: "unsupported component type",
@@ -1134,6 +1135,10 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+
+			if tt.expectedReceiverType == "" {
+				return
+			}
 			assert.NotNil(t, result)
 
 			// Verify the receiver ID is present
