@@ -642,7 +642,7 @@ func validateComponentID(parentDirPath, id string) error {
 	if err != nil {
 		return fmt.Errorf("failed to resolve runtime directory %q: %w", parentDirPath, err)
 	}
-	absCandidate, err := filepath.Abs(filepath.Join(absParent, id))
+	absCandidate := filepath.Clean(filepath.Join(absParent, id))
 	if err != nil {
 		return fmt.Errorf("failed to resolve component working directory for ID %q: %w", id, err)
 	}
