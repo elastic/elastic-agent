@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+//go:build !securityonly
+
 // Package components hosts the default EDOT collector component registry. It
 // is intentionally split out of the otelcol package so that callers (such as
 // the manager unit-test binary) can wire up a smaller component set without
@@ -64,9 +66,7 @@ import (
 	akamaisiemreceiver "github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver"
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
 
-	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
-	hbreceiver "github.com/elastic/beats/v7/x-pack/heartbeat/hbreceiver"
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
@@ -173,9 +173,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			zipkinreceiver.NewFactory(),
 			elasticmonitoringreceiver.NewFactory(),
 			verifierreceiver.NewFactory(),
-			abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
-			hbreceiver.NewFactoryWithSettings(hbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
 			apachereceiver.NewFactory(),
@@ -211,6 +209,9 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
 		receivers = addNonFipsReceivers(receivers)
+
+		// auditbeat and heartbeat receivers are excluded from the security-only variant build
+		receivers = addFullBeatReceivers(receivers)
 		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
 		if err != nil {
 			return otelcol.Factories{}, err
