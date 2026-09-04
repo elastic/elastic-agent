@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20260901213939-5249b57337db
+Version: v7.0.0-alpha2.0.20260903164842-d56a62754699
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
