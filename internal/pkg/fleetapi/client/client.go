@@ -138,13 +138,23 @@ func CheckRemote(ctx context.Context, c Sender) error {
 		return fmt.Errorf("fail to communicate with Fleet Server API client hosts: %w", err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
-	}
+	// discard body for proper cancellation and connection reuse.
+	defer func() {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
-	// discard body for proper cancellation and connection reuse
-	_, _ = io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		err := fmt.Errorf("fleet server ping returned a bad status code: %d", resp.StatusCode)
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+			// treat 429, 503 as potentially recoverable so they don't cause a failed state
+			// 502 (Bad Gateway) and 504 (Gateway Timeout) are intentionally
+			// not included for this check as they may indicate a
+			// misconfiguration issue despite being considered retryable
+			return errors.NewRecoverable(err)
+		}
+		return err
+	}
 
 	return nil
 }
