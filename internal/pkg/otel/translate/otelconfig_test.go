@@ -3263,115 +3263,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 	}
 }
 
-func TestGetBeatsAuthExtensionConfig(t *testing.T) {
-	tests := []struct {
-		name          string
-		outputCfg     map[string]any
-		expected      map[string]any
-		expectedError string
-	}{
-		{
-			name:      "empty config",
-			outputCfg: map[string]any{},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"timeout":                 "1m30s",
-			},
-		},
-		{
-			name: "with proxy_url and timeout",
-			outputCfg: map[string]any{
-				"proxy_url": "http://proxy.example.com:8080",
-				"timeout":   "2m",
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"proxy_url":               "http://proxy.example.com:8080",
-				"timeout":                 "2m0s",
-			},
-		},
-		{
-			name: "with ssl enabled",
-			outputCfg: map[string]any{
-				"ssl.enabled": true,
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"ssl": map[string]interface{}{
-					"ca_sha256":                  []interface{}{},
-					"ca_trusted_fingerprint":     "",
-					"certificate":                "",
-					"certificate_authorities":    []interface{}{},
-					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
-					"cipher_suites":              []interface{}{},
-					"disable_legacy_pem_support": false,
-					"curve_types":                []interface{}{},
-					"enabled":                    true,
-					"key":                        "",
-					"key_passphrase":             "",
-					"key_passphrase_path":        "",
-					"renegotiation":              int64(0),
-					"supported_protocols":        []interface{}{},
-					"verification_mode":          uint64(0),
-				},
-				"timeout": "1m30s",
-			},
-		},
-		{
-			name: "with ssl enabled and verification_mode certificate",
-			outputCfg: map[string]any{
-				"ssl.enabled":           true,
-				"ssl.verification_mode": "certificate",
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"ssl": map[string]interface{}{
-					"ca_sha256":                  []interface{}{},
-					"ca_trusted_fingerprint":     "",
-					"certificate":                "",
-					"certificate_authorities":    []interface{}{},
-					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
-					"cipher_suites":              []interface{}{},
-					"disable_legacy_pem_support": false,
-					"curve_types":                []interface{}{},
-					"enabled":                    true,
-					"key":                        "",
-					"key_passphrase":             "",
-					"key_passphrase_path":        "",
-					"renegotiation":              int64(0),
-					"supported_protocols":        []interface{}{},
-					"verification_mode":          uint64(2),
-				},
-				"timeout": "1m30s",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.NewConfigFrom(tt.outputCfg)
-			require.NoError(t, err)
-
-			actual, err := getBeatsAuthExtensionConfig(cfg)
-			if tt.expectedError != "" {
-				require.Error(t, err)
-				assert.Equal(t, tt.expectedError, err.Error())
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, actual)
-			}
-		})
-	}
-}
-
 func TestVerifyOutputIsOtelSupported(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -3446,17 +3337,33 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, error) {
+		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, map[string]any, error) {
 			if c.HasField("unsupported") {
-				return nil, nil, errors.New("unsupported config")
+				return nil, nil, nil, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
+
 			cfgMap["translated"] = true
-			return cfgMap, nil, nil
+
+			// Perform beats auth extension translation
+			cfgMap["auth"] = map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			}
+
+			// return extension config
+			beatsAuthCfg, err := getBeatsAuthExtensionConfig(c)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			extensionConfig := make(map[string]any)
+			extensionConfig[getBeatsAuthExtensionID("default").String()] = beatsAuthCfg
+
+			return cfgMap, nil, extensionConfig, nil
 		},
 		kafkaExporterType: KafkaToOTelConfig,
 	}
