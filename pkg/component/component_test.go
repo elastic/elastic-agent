@@ -3607,6 +3607,95 @@ func TestComponent_WorkDir(t *testing.T) {
 	})
 }
 
+// TestComponent_WorkDir_PathTraversal asserts the fix for
+// https://github.com/elastic/elastic-agent/issues/16226: component IDs derived
+// from externally supplied input IDs must be validated before any filesystem
+// operation so that a crafted ID cannot escape the Agent runtime directory.
+func TestComponent_WorkDir_PathTraversal(t *testing.T) {
+	runtimeDir := t.TempDir()
+	sentinelDir := t.TempDir()
+	sentinelBase := filepath.Base(sentinelDir)
+
+	require.Equal(t, filepath.Dir(runtimeDir), filepath.Dir(sentinelDir),
+		"test setup: runtimeDir and sentinelDir must share the same parent")
+
+	t.Run("PrepareWorkDir rejects dotdot traversal", func(t *testing.T) {
+		c := &Component{ID: filepath.Join("..", sentinelBase, "escaped")}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.Error(t, err, "PrepareWorkDir must reject a '..' component ID")
+		assert.NoDirExists(t, filepath.Join(sentinelDir, "escaped"),
+			"no directory must be created outside runtimeDir")
+	})
+
+	t.Run("PrepareWorkDir rejects multi-level dotdot traversal", func(t *testing.T) {
+		nestedRuntime := filepath.Join(runtimeDir, "sub", "nested")
+		require.NoError(t, os.MkdirAll(nestedRuntime, 0o755))
+
+		c := &Component{ID: filepath.Join("..", "..", sentinelBase, "escaped-deep")}
+
+		err := c.PrepareWorkDir(nestedRuntime)
+		require.Error(t, err, "PrepareWorkDir must reject multi-level '..' component IDs")
+		assert.NoDirExists(t, filepath.Join(sentinelDir, "escaped-deep"),
+			"no directory must be created outside runtimeDir")
+	})
+
+	t.Run("RemoveWorkDir rejects dotdot traversal", func(t *testing.T) {
+		victim := filepath.Join(sentinelDir, "victim-dir")
+		require.NoError(t, os.MkdirAll(victim, 0o755))
+
+		c := &Component{ID: filepath.Join("..", sentinelBase, "victim-dir")}
+
+		err := c.RemoveWorkDir(runtimeDir)
+		require.Error(t, err, "RemoveWorkDir must reject a '..' component ID")
+		assert.DirExists(t, victim, "RemoveWorkDir must not delete directories outside runtimeDir")
+	})
+
+	t.Run("PrepareWorkDir rejects empty ID", func(t *testing.T) {
+		c := &Component{ID: ""}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.Error(t, err, "PrepareWorkDir must reject an empty component ID")
+	})
+
+	t.Run("PrepareWorkDir rejects single dot ID", func(t *testing.T) {
+		// "." resolves to runtimeDir itself, not strictly beneath it.
+		c := &Component{ID: "."}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.Error(t, err, "PrepareWorkDir must reject '.' component ID")
+	})
+
+	t.Run("PrepareWorkDir allows absolute path ID safely contained inside runtimeDir", func(t *testing.T) {
+		// In Go, filepath.Join(absParent, "/abs/path") embeds the absolute path
+		// under absParent rather than replacing it, so "/etc/passwd" resolves to
+		// runtimeDir+"/etc/passwd" — still inside runtimeDir.
+		c := &Component{ID: "/etc/passwd"}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.NoError(t, err, "absolute path ID is safe in Go — resolves inside runtimeDir")
+		assert.DirExists(t, filepath.Join(runtimeDir, "etc", "passwd"),
+			"absolute path ID must create a directory inside runtimeDir, not at the root")
+		_ = c.RemoveWorkDir(runtimeDir)
+	})
+
+	t.Run("WorkDirPath stays within runtimeDir for benign ID", func(t *testing.T) {
+		c := &Component{ID: "filebeat-default"}
+		resolved := c.WorkDirPath(runtimeDir)
+
+		assert.True(t,
+			strings.HasPrefix(resolved, runtimeDir+string(filepath.Separator)),
+			"WorkDirPath for a normal ID must be strictly inside runtimeDir, got %q", resolved)
+	})
+
+	t.Run("PrepareWorkDir allows cloudbeat-style nested ID", func(t *testing.T) {
+		c := &Component{ID: "cloudbeat/cis_aws-default-my-input"}
+		err := c.PrepareWorkDir(runtimeDir)
+		require.NoError(t, err, "PrepareWorkDir must allow legitimate nested IDs like cloudbeat/cis_aws-default-*")
+		_ = c.RemoveWorkDir(runtimeDir)
+	})
+}
+
 func TestRuntimeConfigValidate(t *testing.T) {
 	tests := []struct {
 		name    string
