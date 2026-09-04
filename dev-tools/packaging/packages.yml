@@ -554,83 +554,42 @@ shared:
   - &agent_binary_spec_no_component_files
     <<: *common
     files:
-      <<: *agent_binary_files
-      <<: *linux_otel_files
-      <<: *agent_otel_collector_binary_spec
+      <<: [*agent_binary_files, *linux_otel_files, *agent_otel_collector_binary_spec]
 
   - &agent_binary_spec
-    <<: *common
-    <<: *elastic_agent_components
+    <<: [*common, *elastic_agent_components]
     files:
-      <<: *agent_binary_files
-      <<: *linux_otel_files
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec
-      <<: *metricbeat_lightweight_module
-      <<: *osquerybeat_osquery_certs
-      <<: *osquerybeat_osquery_lenses
-      <<: *osquerybeat_osqueryd
-      <<: *osquerybeat_extension
+      <<: [*agent_binary_files, *linux_otel_files, *agent_unpacked_components_files, *agent_otel_collector_binary_spec, *metricbeat_lightweight_module, *osquerybeat_osquery_certs, *osquerybeat_osquery_lenses, *osquerybeat_osqueryd, *osquerybeat_extension]
 
   - &agent_cloud_binary_spec
-    <<: *common
-    <<: *elastic_agent_cloud_components
+    <<: [*common, *elastic_agent_cloud_components]
     files:
-      <<: *agent_binary_files
-      <<: *linux_otel_files
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec
-      <<: *metricbeat_lightweight_module
+      <<: [*agent_binary_files, *linux_otel_files, *agent_unpacked_components_files, *agent_otel_collector_binary_spec, *metricbeat_lightweight_module]
 
   - &agent_binary_fips_spec
-    <<: *common_fips
-    <<: *elastic_agent_fips_components
+    <<: [*common_fips, *elastic_agent_fips_components]
     files:
-      <<: *agent_binary_files
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec
-      <<: *metricbeat_lightweight_module
+      <<: [*agent_binary_files, *agent_unpacked_components_files, *agent_otel_collector_binary_spec, *metricbeat_lightweight_module]
       NOTICE.txt:
         source: '{{ repo.RootDir }}/NOTICE-fips.txt'
         mode: 0644
 
   - &agent_darwin_binary_spec
-    <<: *common
-    <<: *elastic_agent_components
+    <<: [*common, *elastic_agent_components]
     files:
-      <<: *agent_darwin_binary_files
-      <<: *agent_unpacked_components_files
-      <<: *agent_otel_collector_binary_spec
-      <<: *metricbeat_lightweight_module
-      <<: *osquerybeat_osquery_certs
-      <<: *osquerybeat_osquery_lenses
-      <<: *osquerybeat_osqueryapp
-      <<: *osquerybeat_extension
+      <<: [*agent_darwin_binary_files, *agent_unpacked_components_files, *agent_otel_collector_binary_spec, *metricbeat_lightweight_module, *osquerybeat_osquery_certs, *osquerybeat_osquery_lenses, *osquerybeat_osqueryapp, *osquerybeat_extension]
 
   # Binary package spec (zip for windows).
   - &agent_windows_binary_spec
-    <<: *common
-    <<: *elastic_agent_components
+    <<: [*common, *elastic_agent_components]
     files:
-      <<: *agent_binary_files
-      <<: *agent_unpacked_windows_components_files
-      <<: *agent_otel_collector_binary_spec
-      <<: *metricbeat_lightweight_module
-      <<: *osquerybeat_osquery_certs
-      <<: *osquerybeat_osqueryd
-      <<: *osquerybeat_extension_windows
-      <<: *agent_windows_otel_scripts_samples
+      <<: [*agent_binary_files, *agent_unpacked_windows_components_files, *agent_otel_collector_binary_spec, *metricbeat_lightweight_module, *osquerybeat_osquery_certs, *osquerybeat_osqueryd, *osquerybeat_extension_windows, *agent_windows_otel_scripts_samples]
 
 # Binary package spec (zip for windows).
   - &agent_windows_binary_fips_spec
-    <<: *common_fips
-    <<: *elastic_agent_fips_components
+    <<: [*common_fips, *elastic_agent_fips_components]
     files:
-      <<: *agent_binary_files
-      <<: *agent_unpacked_windows_components_files
-      <<: *agent_otel_collector_binary_spec
-      <<: *metricbeat_lightweight_module
-      <<: *agent_windows_otel_scripts_samples
+      <<: [*agent_binary_files, *agent_unpacked_windows_components_files, *agent_otel_collector_binary_spec, *metricbeat_lightweight_module, *agent_windows_otel_scripts_samples]
     NOTICE.txt:
       source: '{{ repo.RootDir }}/NOTICE-fips.txt'
       mode: 0644
@@ -878,8 +837,7 @@ specs:
     - os: windows
       types: [zip]
       spec:
-        <<: *agent_windows_binary_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_windows_binary_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/elastic-agent-archive-root.exe'
@@ -891,8 +849,7 @@ specs:
     - os: darwin
       types: [tgz]
       spec:
-        <<: *agent_darwin_binary_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_darwin_binary_spec, *elastic_license_for_binaries]
         files:
           'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent':
             template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
@@ -905,8 +862,7 @@ specs:
     - os: linux
       types: [tgz]
       spec:
-        <<: *agent_binary_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_binary_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
@@ -916,14 +872,12 @@ specs:
     - os: linux
       types: [deb, rpm]
       spec:
-        <<: *deb_rpm_agent_spec
-        <<: *elastic_license_for_deb_rpm
+        <<: [*deb_rpm_agent_spec, *elastic_license_for_deb_rpm]
 
     - os: aix
       types: [ tgz ]
       spec:
-        <<: *agent_binary_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_binary_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
@@ -939,83 +893,51 @@ specs:
       arch: amd64
       types: [docker]
       spec:
-        <<: *docker_ubi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_complete_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_spec, *docker_builder_spec, *agent_docker_complete_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: amd64
       types: [docker]
       spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_wolfi_complete_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_wolfi_complete_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *docker_ubi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_complete_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_arm_spec, *docker_builder_arm_spec, *agent_docker_complete_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_wolfi_complete_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_wolfi_complete_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: amd64
       types: [docker]
       spec:
-        <<: *docker_ubi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_spec, *docker_builder_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
         docker_variant: 'ubi'
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *docker_ubi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_arm_spec, *docker_builder_arm_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
         docker_variant: 'ubi'
 
     - os: linux
       arch: amd64
       types: [docker]
       spec:
-        <<: *docker_ubi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_spec, *docker_builder_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *docker_ubi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_arm_spec, *docker_builder_arm_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     #### wolfi-based ####
     #### Slim docker images ####
@@ -1023,105 +945,65 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *docker_ubi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_slim_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_spec, *docker_builder_spec, *agent_docker_slim_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_ubi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_slim_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_arm_spec, *docker_builder_arm_spec, *agent_docker_slim_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_slim_wolfi_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_slim_wolfi_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_slim_wolfi_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_slim_wolfi_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     #### EDOT collector docker images ####
     - os: linux
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *docker_ubi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_edot_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_spec, *docker_builder_spec, *agent_docker_edot_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_ubi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_edot_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_ubi_arm_spec, *docker_builder_arm_spec, *agent_docker_edot_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_edot_wolfi_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_edot_wolfi_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_edot_wolfi_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_edot_wolfi_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     #### Cloud specific docker images ####
     - os: linux
       arch: amd64
       types: [docker]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_spec, *docker_builder_spec, *agent_docker_cloud_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_cloud_spec
-        <<: *elastic_license_for_binaries
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_cloud_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_cloud_spec
-        <<: *elastic_license_for_binaries
     #### End Cloud specific docker images ####
 
     #### Service specific docker images ####
@@ -1129,46 +1011,28 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_spec, *docker_builder_spec, *agent_docker_cloud_spec, *agent_docker_service_spec, *elastic_license_for_binaries]
         # The service image is always based on Wolfi
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_cloud_spec
-        <<: *agent_docker_service_spec
-        <<: *elastic_license_for_binaries
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *agent_cloud_docker_spec
+        <<: [*agent_cloud_docker_spec, *docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_cloud_spec, *agent_docker_service_spec, *elastic_license_for_binaries]
         # The service image is always based on Wolfi
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_cloud_spec
-        <<: *agent_docker_service_spec
-        <<: *elastic_license_for_binaries
     #### End Service specific docker images ####
 
     - os: linux
       arch: amd64
       types: [docker]
       spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [docker]
       spec:
-        <<: *docker_wolfi_arm_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_arm_spec, *docker_builder_arm_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     ######## End Docker images ########
 
@@ -1176,8 +1040,7 @@ specs:
     - os: linux
       types: [tgz]
       spec:
-        <<: *agent_binary_fips_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_binary_fips_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
@@ -1187,8 +1050,7 @@ specs:
     - os: windows
       types: [zip]
       spec:
-        <<: *agent_windows_binary_fips_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_windows_binary_fips_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/elastic-agent-archive-root.exe'
@@ -1201,32 +1063,20 @@ specs:
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *docker_fips_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_fips_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_fips_spec, *docker_builder_spec, *agent_docker_fips_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_fips_spec
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_fips_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_fips_spec, *docker_builder_arm_spec, *agent_docker_fips_spec, *docker_elastic_spec, *elastic_license_for_binaries]
 
     - os: linux
       arch: amd64
       types: [ docker ]
       spec:
-        <<: *docker_fips_spec
-        <<: *agent_docker_fips_spec
+        <<: [*docker_fips_spec, *agent_docker_fips_spec, *docker_builder_spec, *agent_docker_cloud_fips_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: *docker_builder_spec
-        <<: *agent_docker_cloud_fips_spec
-        <<: *elastic_license_for_binaries
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
 
@@ -1234,12 +1084,8 @@ specs:
       arch: arm64
       types: [ docker ]
       spec:
-        <<: *docker_fips_spec
-        <<: *agent_docker_fips_spec
+        <<: [*docker_fips_spec, *agent_docker_fips_spec, *docker_builder_arm_spec, *agent_docker_cloud_fips_spec, *elastic_license_for_binaries]
         # The cloud image is always based on Wolfi
-        <<: *docker_builder_arm_spec
-        <<: *agent_docker_cloud_fips_spec
-        <<: *elastic_license_for_binaries
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
 
@@ -1254,8 +1100,7 @@ specs:
     - os: linux
       types: [tgz]
       spec:
-        <<: *agent_binary_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_binary_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1263,11 +1108,7 @@ specs:
     - os: linux
       types: [docker]
       spec:
-        <<: *docker_wolfi_spec
-        <<: *docker_builder_spec
-        <<: *agent_docker_spec
-        <<: *docker_elastic_spec
-        <<: *elastic_license_for_binaries
+        <<: [*docker_wolfi_spec, *docker_builder_spec, *agent_docker_spec, *docker_elastic_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1275,8 +1116,7 @@ specs:
     - os: aix
       types: [tgz]
       spec:
-        <<: *agent_binary_spec
-        <<: *elastic_license_for_binaries
+        <<: [*agent_binary_spec, *elastic_license_for_binaries]
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
@@ -1291,8 +1131,7 @@ specs:
     - os: windows
       types: [zip]
       spec:
-        <<: *common
-        <<: *elastic_license_for_binaries
+        <<: [*common, *elastic_license_for_binaries]
         version: '{{ agent_core_version }}'
         # this is a way to place 'core' in the correct place for both the archive and the root dir, see defaultRootDir in dev-tools/mage/pkgtypes.go
         qualifier: core
@@ -1301,83 +1140,58 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           'elastic-agent-archive-root.exe':
             source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
-          <<: *osquerybeat_osquery_certs_core
-          <<: *osquerybeat_osqueryd_core
-          <<: *osquerybeat_extension_windows_core
+          <<: [*agent_otel_collector_binary_spec_core, *metricbeat_lightweight_module_core, *osquerybeat_osquery_certs_core, *osquerybeat_osqueryd_core, *osquerybeat_extension_windows_core]
 
     - os: darwin
       types: [tgz]
       spec:
-        <<: *common
-        <<: *elastic_license_for_binaries
+        <<: [*common, *elastic_license_for_binaries]
         version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
-          <<: *osquerybeat_osquery_certs_core
-          <<: *osquerybeat_osquery_lenses_core
-          <<: *osquerybeat_osqueryapp_core
-          <<: *osquerybeat_extension_core
+          <<: [*agent_otel_collector_binary_spec_core, *metricbeat_lightweight_module_core, *osquerybeat_osquery_certs_core, *osquerybeat_osquery_lenses_core, *osquerybeat_osqueryapp_core, *osquerybeat_extension_core]
 
     - os: linux
       types: [tgz]
       spec:
-        <<: *common
-        <<: *elastic_license_for_binaries
+        <<: [*common, *elastic_license_for_binaries]
         version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
-          <<: *osquerybeat_osquery_certs_core
-          <<: *osquerybeat_osquery_lenses_core
-          <<: *osquerybeat_osqueryd_core
-          <<: *osquerybeat_extension_core
+          <<: [*agent_otel_collector_binary_spec_core, *metricbeat_lightweight_module_core, *osquerybeat_osquery_certs_core, *osquerybeat_osquery_lenses_core, *osquerybeat_osqueryd_core, *osquerybeat_extension_core]
 
     - os: aix
       types: [tgz]
       spec:
-        <<: *common
-        <<: *elastic_license_for_binaries
+        <<: [*common, *elastic_license_for_binaries]
         version: '{{ agent_core_version }}'
         qualifier: core
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
-          <<: *osquerybeat_osquery_certs_core
-          <<: *osquerybeat_osquery_lenses_core
-          <<: *osquerybeat_osqueryd_core
-          <<: *osquerybeat_extension_core
+          <<: [*agent_otel_collector_binary_spec_core, *metricbeat_lightweight_module_core, *osquerybeat_osquery_certs_core, *osquerybeat_osquery_lenses_core, *osquerybeat_osqueryd_core, *osquerybeat_extension_core]
 
     ######## Start FIPS Specs ########
     - os: linux
       types: [tgz]
       spec:
-        <<: *common_fips
-        <<: *elastic_license_for_binaries
+        <<: [*common_fips, *elastic_license_for_binaries]
         name: '{{.BeatName}}'
         version: '{{ agent_core_version }}'
         qualifier: 'core-fips'
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
+          <<: [*agent_otel_collector_binary_spec_core, *metricbeat_lightweight_module_core]
 
     - os: windows
       types: [ zip ]
       spec:
-        <<: *common_fips
-        <<: *elastic_license_for_binaries
+        <<: [*common_fips, *elastic_license_for_binaries]
         name: '{{.BeatName}}'
         version: '{{ agent_core_version }}'
         qualifier: core-fips
@@ -1386,6 +1200,5 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           'elastic-agent-archive-root.exe':
             source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
-          <<: *agent_otel_collector_binary_spec_core
-          <<: *metricbeat_lightweight_module_core
+          <<: [*agent_otel_collector_binary_spec_core, *metricbeat_lightweight_module_core]
     ######## End FIPS Specs ########
