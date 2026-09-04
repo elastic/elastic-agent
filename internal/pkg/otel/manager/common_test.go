@@ -77,6 +77,26 @@ func TestFindRandomTCPPorts_AvoidsWildcardBoundPorts(t *testing.T) {
 	}
 }
 
+// TestFindRandomTCPPorts_PortsVary verifies that findRandomTCPPorts returns different port numbers
+// across sequential calls. If the OS ephemeral-port allocator deterministically hands back the same
+// "first free" port every time, the function would always return the same port — making it
+// vulnerable to repeatedly colliding with a service that transiently occupies that specific port.
+// See https://github.com/elastic/sdh-beats/issues/7463#issuecomment-5541484862.
+func TestFindRandomTCPPorts_PortsVary(t *testing.T) {
+	const iterations = 50
+	seen := make(map[int]struct{}, iterations)
+	for i := 0; i < iterations; i++ {
+		ports, err := findRandomTCPPorts(1)
+		require.NoError(t, err)
+		require.Len(t, ports, 1)
+		seen[ports[0]] = struct{}{}
+	}
+	assert.Greater(t, len(seen), 1,
+		"findRandomTCPPorts returned the same port on all %d sequential calls; "+
+			"the OS ephemeral-port allocator appears deterministic rather than random",
+		iterations)
+}
+
 func testComponent(componentId string) agentcomponent.Component {
 	fileStreamConfig := map[string]any{
 		"id":         "test",
