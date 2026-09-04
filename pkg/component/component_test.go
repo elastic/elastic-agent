@@ -3666,6 +3666,19 @@ func TestComponent_WorkDir_PathTraversal(t *testing.T) {
 		require.Error(t, err, "PrepareWorkDir must reject '.' component ID")
 	})
 
+	t.Run("PrepareWorkDir allows absolute path ID safely contained inside runtimeDir", func(t *testing.T) {
+		// In Go, filepath.Join(absParent, "/abs/path") embeds the absolute path
+		// under absParent rather than replacing it, so "/etc/passwd" resolves to
+		// runtimeDir+"/etc/passwd" — still inside runtimeDir.
+		c := &Component{ID: "/etc/passwd"}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.NoError(t, err, "absolute path ID is safe in Go — resolves inside runtimeDir")
+		assert.DirExists(t, filepath.Join(runtimeDir, "etc", "passwd"),
+			"absolute path ID must create a directory inside runtimeDir, not at the root")
+		_ = c.RemoveWorkDir(runtimeDir)
+	})
+
 	t.Run("WorkDirPath stays within runtimeDir for benign ID", func(t *testing.T) {
 		c := &Component{ID: "filebeat-default"}
 		resolved := c.WorkDirPath(runtimeDir)
