@@ -1,6 +1,6 @@
 # For installation and configuration options, refer to the [installation instructions](https://www.elastic.co/docs/solutions/observability/get-started/opentelemetry/quickstart/self-managed/k8s#manual-installation)
 
-# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/opentelemetry-kube-stack-0.16.0/charts/opentelemetry-kube-stack/values.yaml)
 # This file has been tested together with opentelemetry-kube-stack helm chart version: 0.16.0
 
 # Apply this file on top of values.yaml when deploying on OpenShift:
@@ -15,6 +15,42 @@
 cleanupJob:
   image:
     repository: docker.io/rancher/kubectl
+
+# RBAC for the collectors, with RBAC for the OpenShift specific APIs.
+clusterRole:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get"]
+    # Required by the k8s_events receiver
+    - apiGroups: [""]
+      resources: ["events"]
+      verbs: ["get", "list", "watch"]
+    # Required by the openshift resource detector
+    - apiGroups: ["config.openshift.io"]
+      resources: ["infrastructures/status"]
+      verbs: ["get"]
+
+# The openshift detector reads the cluster name from the OpenShift API instead of cloud metadata.
+collectors:
+  cluster:
+    config:
+      processors:
+        resourcedetection/cloud:
+          detectors: [openshift]
+          openshift:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+  daemon:
+    config:
+      processors:
+        resourcedetection/cloud:
+          detectors: [openshift]
+          openshift:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
 
 extraObjects:
   # Allow the OTel Operator to run as non-root (UID 65532) on OpenShift.

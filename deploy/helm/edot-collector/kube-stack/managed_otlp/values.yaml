@@ -1,6 +1,6 @@
 # For installation and configuration options, refer to the [installation instructions](https://www.elastic.co/docs/solutions/observability/get-started/opentelemetry/quickstart/self-managed/k8s#manual-installation)
 
-# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/opentelemetry-kube-stack-0.16.0/charts/opentelemetry-kube-stack/values.yaml)
 # This file has been tested together with opentelemetry-kube-stack helm chart version: 0.16.0
 opentelemetry-operator:
   manager:
@@ -59,25 +59,15 @@ collectors:
           detectors: [env]
           timeout: 2s
           override: false
-        resourcedetection/eks:
-          # Detects resources from EKS (Elastic Kubernetes Service).
-          detectors: [eks]
+        resourcedetection/cloud:
+          # Detects resources from the cloud provider that hosts the cluster.
+          detectors: [eks, gcp, aks]
           timeout: 15s
           override: true
           eks:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
-        resourcedetection/gcp:
-          # Detects resources from GCP (Google Cloud Platform).
-          detectors: [gcp]
-          timeout: 2s
-          override: true
-        resourcedetection/aks:
-          # Detects resources from AKS (Azure Kubernetes Service).
-          detectors: [aks]
-          timeout: 2s
-          override: true
           aks:
             resource_attributes:
               k8s.cluster.name:
@@ -163,9 +153,7 @@ collectors:
             processors:
               - k8s_attributes
               - resourcedetection/env
-              - resourcedetection/eks
-              - resourcedetection/gcp
-              - resourcedetection/aks
+              - resourcedetection/cloud
               - resource/hostname
             receivers:
               - k8s_cluster
@@ -174,9 +162,7 @@ collectors:
               - k8s_events
             processors:
               - resourcedetection/env
-              - resourcedetection/eks
-              - resourcedetection/gcp
-              - resourcedetection/aks
+              - resourcedetection/cloud
               - resource/hostname
             exporters:
               - debug
@@ -224,25 +210,15 @@ collectors:
           detectors: [env]
           timeout: 2s
           override: false
-        resourcedetection/eks:
-          # Detects resources from EKS (Elastic Kubernetes Service).
-          detectors: [eks]
+        resourcedetection/cloud:
+          # Detects resources from the cloud provider that hosts the cluster.
+          detectors: [eks, gcp, aks]
           timeout: 15s
           override: true
           eks:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
-        resourcedetection/gcp:
-          # Detects resources from GCP (Google Cloud Platform).
-          detectors: [gcp]
-          timeout: 2s
-          override: true
-        resourcedetection/aks:
-          # Detects resources from AKS (Azure Kubernetes Service).
-          detectors: [aks]
-          timeout: 2s
-          override: true
           aks:
             resource_attributes:
               k8s.cluster.name:
@@ -490,9 +466,7 @@ collectors:
               - k8s_attributes
               - resourcedetection/env
               - resourcedetection/system
-              - resourcedetection/eks
-              - resourcedetection/gcp
-              - resourcedetection/aks
+              - resourcedetection/cloud
               - resource/hostname
               - resource/cloud
             exporters:
@@ -506,9 +480,7 @@ collectors:
               - k8s_attributes
               - resourcedetection/env
               - resourcedetection/system
-              - resourcedetection/eks
-              - resourcedetection/gcp
-              - resourcedetection/aks
+              - resourcedetection/cloud
               - resource/hostname
               - resource/cloud
             exporters:
