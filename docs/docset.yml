@@ -29,6 +29,7 @@ subs:
   ech:   "Elastic Cloud Hosted"
   ess:   "Elasticsearch Service"
   ece:   "Elastic Cloud Enterprise"
+  eck:   "Elastic Cloud Kubernetes"
   serverless-full:   "Elastic Cloud Serverless"
   stack:   "Elastic Stack"
   kib:   "Kibana"
