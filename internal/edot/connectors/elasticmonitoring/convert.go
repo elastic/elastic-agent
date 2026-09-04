@@ -27,6 +27,10 @@ type exporterMetrics struct {
 	failedSpans   *int64
 	failedMetrics *int64
 
+	enqueueFailedLogs    *int64
+	enqueueFailedSpans   *int64
+	enqueueFailedMetrics *int64
+
 	docsProcessed *int64
 	docsRetried   *int64
 	bulkRequests  *int64
@@ -45,19 +49,22 @@ const (
 	beatsOutputEventsBatchesKey = "beat.stats.libbeat.output.events.batches"
 	beatsOutputWriteBytesKey    = "beat.stats.libbeat.output.write.bytes"
 
-	otelQueueCapacityKey       = "otelcol_exporter_queue_capacity"
-	otelQueueSizeKey           = "otelcol_exporter_queue_size"
-	otelSentLogsKey            = "otelcol_exporter_sent_log_records"
-	otelSentSpansKey           = "otelcol_exporter_sent_spans"
-	otelSentMetricsKey         = "otelcol_exporter_sent_metric_points"
-	otelFailedLogsKey          = "otelcol_exporter_send_failed_log_records"
-	otelFailedSpansKey         = "otelcol_exporter_send_failed_spans"
-	otelFailedMetricsKey       = "otelcol_exporter_send_failed_metric_points"
-	otelDocsProcessedKey       = "otelcol.elasticsearch.docs.processed"
-	otelDocsRetriedKey         = "otelcol.elasticsearch.docs.retried"
-	otelDocsRetriedHTTPRequest = "otelcol.elasticsearch.docs.retried_http_request"
-	otelBulkRequestsKey        = "otelcol.elasticsearch.bulk_requests.count"
-	otelFlushedBytesKey        = "otelcol.elasticsearch.flushed.bytes"
+	otelQueueCapacityKey        = "otelcol_exporter_queue_capacity"
+	otelQueueSizeKey            = "otelcol_exporter_queue_size"
+	otelSentLogsKey             = "otelcol_exporter_sent_log_records"
+	otelSentSpansKey            = "otelcol_exporter_sent_spans"
+	otelSentMetricsKey          = "otelcol_exporter_sent_metric_points"
+	otelFailedLogsKey           = "otelcol_exporter_send_failed_log_records"
+	otelFailedSpansKey          = "otelcol_exporter_send_failed_spans"
+	otelFailedMetricsKey        = "otelcol_exporter_send_failed_metric_points"
+	otelEnqueueFailedLogsKey    = "otelcol_exporter_enqueue_failed_log_records"
+	otelEnqueueFailedSpansKey   = "otelcol_exporter_enqueue_failed_spans"
+	otelEnqueueFailedMetricsKey = "otelcol_exporter_enqueue_failed_metric_points"
+	otelDocsProcessedKey        = "otelcol.elasticsearch.docs.processed"
+	otelDocsRetriedKey          = "otelcol.elasticsearch.docs.retried"
+	otelDocsRetriedHTTPRequest  = "otelcol.elasticsearch.docs.retried_http_request"
+	otelBulkRequestsKey         = "otelcol.elasticsearch.bulk_requests.count"
+	otelFlushedBytesKey         = "otelcol.elasticsearch.flushed.bytes"
 
 	otelComponentIDKey   = "otelcol.component.id"
 	otelComponentKindKey = "otelcol.component.kind"
@@ -122,6 +129,12 @@ func addValue(em *exporterMetrics, name string, value int64) {
 		add(&em.failedSpans, &value)
 	case otelFailedMetricsKey:
 		add(&em.failedMetrics, &value)
+	case otelEnqueueFailedLogsKey:
+		add(&em.enqueueFailedLogs, &value)
+	case otelEnqueueFailedSpansKey:
+		add(&em.enqueueFailedSpans, &value)
+	case otelEnqueueFailedMetricsKey:
+		add(&em.enqueueFailedMetrics, &value)
 	case otelDocsProcessedKey:
 		add(&em.docsProcessed, &value)
 	case otelDocsRetriedKey, otelDocsRetriedHTTPRequest:
@@ -191,22 +204,42 @@ func addMetricsToEventFields(logger *zap.Logger, em exporterMetrics, event *maps
 	}
 	mapstrSetWithErrorLog(logger, event, beatsOutputEventsAckedKey, sentTotal)
 
-	var failedTotal int64
+	// Send failures and enqueue failures are both losses, but they happen on
+	// opposite sides of the sending queue, so they cannot be pooled into a
+	// single total: docs.processed is recorded by the Elasticsearch bulk
+	// indexer, which runs downstream of the queue, so a doc rejected at
+	// enqueue never reaches it. Keep the two sums apart and use only the
+	// send-failed one where docs.processed is the reference point.
+	var sendFailedTotal int64
 	if em.failedLogs != nil {
-		failedTotal += *em.failedLogs
+		sendFailedTotal += *em.failedLogs
 	}
 	if em.failedSpans != nil {
-		failedTotal += *em.failedSpans
+		sendFailedTotal += *em.failedSpans
 	}
 	if em.failedMetrics != nil {
-		failedTotal += *em.failedMetrics
+		sendFailedTotal += *em.failedMetrics
 	}
-	mapstrSetWithErrorLog(logger, event, beatsOutputEventsDroppedKey, failedTotal)
+
+	var enqueueFailedTotal int64
+	if em.enqueueFailedLogs != nil {
+		enqueueFailedTotal += *em.enqueueFailedLogs
+	}
+	if em.enqueueFailedSpans != nil {
+		enqueueFailedTotal += *em.enqueueFailedSpans
+	}
+	if em.enqueueFailedMetrics != nil {
+		enqueueFailedTotal += *em.enqueueFailedMetrics
+	}
+	mapstrSetWithErrorLog(logger, event, beatsOutputEventsDroppedKey, sendFailedTotal+enqueueFailedTotal)
 
 	if em.docsProcessed != nil {
-		mapstrSetWithErrorLog(logger, event, beatsOutputEventsTotalKey, *em.docsProcessed)
+		// Enqueue-failed docs were handed to the output, so they belong in
+		// total even though the bulk indexer never counted them. Adding them
+		// keeps the Beats identity total = acked + dropped + active intact.
+		mapstrSetWithErrorLog(logger, event, beatsOutputEventsTotalKey, *em.docsProcessed+enqueueFailedTotal)
 
-		active := *em.docsProcessed - sentTotal - failedTotal
+		active := *em.docsProcessed - sentTotal - sendFailedTotal
 		mapstrSetWithErrorLog(logger, event, beatsOutputEventsActiveKey, active)
 	}
 	if em.docsRetried != nil {
