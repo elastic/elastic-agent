@@ -46,6 +46,25 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		// there is no upgrade marker (the rollback was requested after the watcher grace period had elapsed), we need
 		// to extract available rollbacks from agent installs
 		watcherExecutable, versionedHomeToRollbackTo, err = rollbackUsingAgentInstalls(u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, u.markUpgrade, action)
+		if err == nil {
+			// The coordinator may have removed the marker while the upgrade watcher is still
+			// in its cleanup phase (holding watcher.lock). The rollback watcher would exit
+			// immediately if it cannot acquire the lock.
+			// Check whether a watcher is still running and, if so, wait for it (or stop it).
+			quickLocker := filelock.NewAppLocker(topDir, watcherApplockerFileName)
+			if lockErr := quickLocker.TryLock(); lockErr == nil {
+				u.log.Debugw("no lingering upgrade watcher, proceeding with rollback")
+				_ = quickLocker.Unlock()
+			} else {
+				u.log.Infow("upgrade watcher is still running cleanup, waiting before starting rollback watcher")
+				if tErr := withTakeOverWatcher(ctx, u.log, topDir, u.watcherHelper, func() error { return nil }); tErr != nil {
+					if cleanErr := os.Remove(updateMarkerPath); cleanErr != nil {
+						u.log.Errorf("Error cleaning up fake upgrade marker: %v", cleanErr)
+					}
+					return nil, fmt.Errorf("waiting for upgrade watcher to release lock before rollback: %w", tErr)
+				}
+			}
+		}
 	} else {
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
 		// the TTL registry and then proceed with rollback
