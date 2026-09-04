@@ -1,0 +1,13 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: elastic-agent-standalone-scc
+  labels:
+    app.kubernetes.io/name: elastic-agent-standalone
+rules:
+  - apiGroups: ["security.openshift.io"]
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - elastic-agent-standalone
+    verbs: ["use"]

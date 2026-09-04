@@ -42,6 +42,21 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 
 	kCtx := k8sGetContext(t, info)
 
+	rotatedExpected := []expectedLogFile{
+		{
+			regex:       plainRegex,
+			description: "plain text rotated log (" + plainRegex.String() + ")",
+		},
+	}
+
+	// Kind compresses rotated log files.
+	if !kCtx.openshift {
+		rotatedExpected = append(rotatedExpected, expectedLogFile{
+			regex:       gzRegex,
+			description: "gzipped rotated log (" + gzRegex.String() + ")",
+		})
+	}
+
 	defaultValues := values.Options{
 		ValueFiles: []string{"../../../deploy/helm/elastic-agent/values.yaml"},
 		Values: []string{
@@ -111,10 +126,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 		// 7th - verify rotated logs are ingested
 		k8sStepCheckLogFilesIngested(info,
 			"logs", "kubernetes.container_logs", "default", "/var/log/pods/*flog*",
-			expectedLogFile{regex: plainRegex,
-				description: "plain text rotated log (" + plainRegex.String() + ")"},
-			expectedLogFile{regex: gzRegex,
-				description: "gzipped rotated log (" + gzRegex.String() + ")"},
+			rotatedExpected...,
 		),
 	}
 

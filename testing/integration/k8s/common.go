@@ -18,22 +18,29 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	configv1 "github.com/openshift/api/config/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 	"github.com/stretchr/testify/require"
 	helmKube "helm.sh/helm/v3/pkg/kube"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	cliResource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
@@ -42,6 +49,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
@@ -71,6 +79,8 @@ type k8sContext struct {
 	esEncodedAPIKey string
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
+	// openshift is true when the cluster is OpenShift
+	openshift bool
 	// createdAt is the time when the k8sContext was created
 	createdAt time.Time
 }
@@ -112,7 +122,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
-	err = os.MkdirAll(testLogsBasePath, 0o755) //nolint:gosec // path comes from a trusted test env var (K8S_TESTS_POD_LOGS_BASE)
+	err = os.MkdirAll(filepath.Clean(testLogsBasePath), 0o755)
 	require.NoError(t, err, "failed to create test logs directory")
 
 	esHost, err := integration.GetESHost()
@@ -128,6 +138,14 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
 	require.NoError(t, err, "failed to create fleet enroll params")
 
+	openshift := os.Getenv("INSTANCE_PROVISIONER") == microshift.Name
+	if openshift {
+		scheme := client.Resources().GetScheme()
+		require.NoError(t, securityv1.Install(scheme))
+		require.NoError(t, configv1.Install(scheme))
+		require.NoError(t, apiextensionsv1.AddToScheme(scheme))
+	}
+
 	return k8sContext{
 		client:          client,
 		clientSet:       clientSet,
@@ -139,6 +157,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		esAPIKey:        string(beatsStyleAPIKey),
 		esEncodedAPIKey: esAPIKey.Encoded,
 		enrollParams:    enrollParams,
+		openshift:       openshift,
 		createdAt:       time.Now(),
 	}
 }
@@ -293,6 +312,18 @@ func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, container
 			continue
 		}
 
+		hasTargetContainer := false
+		for _, c := range podSpec.Containers {
+			if c.Name == containerName {
+				hasTargetContainer = true
+				break
+			}
+		}
+
+		if !hasTargetContainer {
+			continue
+		}
+
 		if cbPod != nil {
 			cbPod(podSpec)
 		}
@@ -418,6 +449,42 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 	}
 	readyChecker := helmKube.NewReadyChecker(clientSet, func(s string, i ...interface{}) {})
 
+	httpClient, err := rest.HTTPClientFor(client.RESTConfig())
+	if err != nil {
+		return fmt.Errorf("create http client: %w", err)
+	}
+
+	mapper, err := apiutil.NewDynamicRESTMapper(client.RESTConfig(), httpClient)
+	if err != nil {
+		return fmt.Errorf("create rest mapper: %w", err)
+	}
+
+	scheme := client.Resources().GetScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	// newInfo builds the resource.Info that the ready checker needs to read an object.
+	newInfo := func(obj runtime.Object, name, namespace string) (*cliResource.Info, error) {
+		gvk, err := apiutil.GVKForObject(obj, scheme)
+		if err != nil {
+			return nil, fmt.Errorf("get group version kind of %s: %w", name, err)
+		}
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("get rest mapping of %s: %w", name, err)
+		}
+		restClient, err := apiutil.RESTClientForGVK(gvk, false, false, client.RESTConfig(), codecs, httpClient)
+		if err != nil {
+			return nil, fmt.Errorf("create rest client for %s: %w", name, err)
+		}
+		return &cliResource.Info{
+			Client:    restClient,
+			Mapping:   mapping,
+			Object:    obj,
+			Name:      name,
+			Namespace: namespace,
+		}, nil
+	}
+
 	ctxTimeout, cancel := context.WithTimeout(ctx, waitDuration)
 	defer cancel()
 
@@ -447,11 +514,12 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 			return fmt.Errorf("unable to convert k8s.Object %s to runtime.Object", o.GetName())
 		}
 
-		if err := waitFn(&cliResource.Info{
-			Object:    runtimeObj,
-			Name:      o.GetName(),
-			Namespace: o.GetNamespace(),
-		}); err != nil {
+		info, err := newInfo(runtimeObj, o.GetName(), o.GetNamespace())
+		if err != nil {
+			return err
+		}
+
+		if err := waitFn(info); err != nil {
 			return err
 		}
 		// extract pod label selector for all k8s objects that have underlying pods
@@ -470,11 +538,11 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 
 		// here we wait for the all pods to be ready
 		for _, pod := range podList.Items {
-			if err := waitFn(&cliResource.Info{
-				Object:    &pod,
-				Name:      pod.Name,
-				Namespace: pod.Namespace,
-			}); err != nil {
+			podInfo, err := newInfo(&pod, pod.Name, pod.Namespace)
+			if err != nil {
+				return err
+			}
+			if err := waitFn(podInfo); err != nil {
 				return err
 			}
 		}
@@ -546,7 +614,7 @@ func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgen
 	return &agentResp.Item, nil
 }
 
-func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamespace string) map[string]any {
+func queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value string) map[string]any {
 	return map[string]any{
 		"_source": []string{"message"},
 		"query": map[string]any{
@@ -569,7 +637,7 @@ func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamesp
 					},
 					map[string]any{
 						"term": map[string]any{
-							"resource.attributes.k8s.namespace.name": k8snamespace,
+							"resource.attributes." + attribute: value,
 						},
 					},
 				},

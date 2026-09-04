@@ -10,14 +10,22 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
+const (
+	// KubernetesDistro is the distro name for vanilla Kubernetes (Kind) clusters.
+	KubernetesDistro = "kubernetes"
+
+	// OpenShiftDistro is the distro name for OpenShift (MicroShift) clusters.
+	OpenShiftDistro = "openshift"
+)
+
 // ErrUnknownDockerVariant is the error returned when the variant is unknown.
 var ErrUnknownDockerVariant = errors.New("unknown docker variant type")
 
 // arches defines the list of supported architectures of Kubernetes
 var arches = []string{define.AMD64, define.ARM64}
 
-// versions defines the list of supported version of Kubernetes.
-var versions = []define.OS{
+// kubernetesVersions defines the list of supported versions of Kubernetes.
+var kubernetesVersions = []define.OS{
 	// Kubernetes 1.36
 	{
 		Type:    define.Kubernetes,
@@ -67,6 +75,25 @@ var versions = []define.OS{
 	{
 		Type:    define.Kubernetes,
 		Version: "1.27.16",
+	},
+}
+
+// versions defines the list of supported version of OpenShift.
+var openshiftVersions = []define.OS{
+	// OpenShift 4.20 (Kubernetes 1.33)
+	{
+		Type:    define.Kubernetes,
+		Version: "4.20.0",
+	},
+	// OpenShift 4.21 (Kubernetes 1.34)
+	{
+		Type:    define.Kubernetes,
+		Version: "4.21.0",
+	},
+	// OpenShift 4.22 (Kubernetes 1.35)
+	{
+		Type:    define.Kubernetes,
+		Version: "4.22.0",
 	},
 }
 
@@ -122,12 +149,22 @@ var variants = []struct {
 
 // GetSupported returns the list of supported OS types for Kubernetes.
 func GetSupported() []define.OS {
-	supported := make([]define.OS, 0, len(versions)*len(variants)*2)
+	supported := make([]define.OS, 0, (len(kubernetesVersions)+len(openshiftVersions))*len(variants)*len(arches))
 	for _, a := range arches {
-		for _, v := range versions {
+		for _, v := range kubernetesVersions {
 			for _, variant := range variants {
 				c := v
 				c.Arch = a
+				c.Distro = KubernetesDistro
+				c.DockerVariant = variant.Name
+				supported = append(supported, c)
+			}
+		}
+		for _, v := range openshiftVersions {
+			for _, variant := range variants {
+				c := v
+				c.Arch = a
+				c.Distro = OpenShiftDistro
 				c.DockerVariant = variant.Name
 				supported = append(supported, c)
 			}

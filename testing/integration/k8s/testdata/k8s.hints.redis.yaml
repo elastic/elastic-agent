@@ -12,9 +12,14 @@ metadata:
     app: redis
     app.kubernetes.io/name: redis # don't change this as integration tests depend on it
 spec:
+  terminationGracePeriodSeconds: 5
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: redis
-      image: redis:5.0.4
+      image: cgr.dev/chainguard/redis:8@sha256:f639a439f5ab4f14486d6c6404f388b9dc076a25f85c6939630f2f805dfad969
       command:
         - redis-server
         - "/redis-master/redis.conf"
@@ -26,6 +31,11 @@ spec:
       resources:
         limits:
           cpu: "0.1"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
       volumeMounts:
         - mountPath: /redis-master-data
           name: data
