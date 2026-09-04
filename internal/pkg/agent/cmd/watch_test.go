@@ -98,6 +98,7 @@ func Test_watchCmd(t *testing.T) {
 		setupUpgradeMarker func(t *testing.T, tmpDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier)
 		args               args
 		wantErr            assert.ErrorAssertionFunc
+		additionalAsserts  func(t *testing.T, tmpDir string)
 	}{
 		{
 			name: "no upgrade marker, no party",
@@ -139,17 +140,22 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil)
 
-				// on windows the marker is not removed immediately to allow for cleanup on restart
-				expectedRemoveMarkerFlag := runtime.GOOS != "windows"
-
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, topDir, expectedRemoveMarkerFlag, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
 					Return(nil)
 			},
 			args: args{
 				cfg: configuration.DefaultUpgradeConfig().Watcher,
 			},
 			wantErr: assert.NoError,
+			additionalAsserts: func(t *testing.T, tmpDir string) {
+				wm, err := upgrade.LoadWatcherMarker(paths.DataFrom(tmpDir))
+				require.NoError(t, err)
+				require.NotNil(t, wm, "watcher marker must be written on successful watch")
+				assert.Equal(t, details.StateCompleted, wm.Outcome)
+				assert.Equal(t, "4.5.6", wm.TargetVersion)
+				assert.Equal(t, "1.2.3", wm.PreviousVersion)
+			},
 		},
 		{
 			name: "unhappy path: error watching, rollback to previous install, leaving the upgrade marker",
@@ -192,6 +198,14 @@ func Test_watchCmd(t *testing.T) {
 				cfg: configuration.DefaultUpgradeConfig().Watcher,
 			},
 			wantErr: assert.NoError,
+			additionalAsserts: func(t *testing.T, tmpDir string) {
+				wm, err := upgrade.LoadWatcherMarker(paths.DataFrom(tmpDir))
+				require.NoError(t, err)
+				require.NotNil(t, wm, "watcher marker must be written before rollback")
+				assert.Equal(t, details.StateRollback, wm.Outcome)
+				assert.Equal(t, "9.3.0", wm.TargetVersion)
+				assert.Equal(t, "9.2.0", wm.PreviousVersion)
+			},
 		},
 		{
 			name: "unhappy path: error watching, rollback to previous install, removing upgrade marker if version is < 9.2.0-SNAPSHOT",
@@ -322,6 +336,14 @@ func Test_watchCmd(t *testing.T) {
 				},
 			},
 			wantErr: assert.NoError,
+			additionalAsserts: func(t *testing.T, tmpDir string) {
+				// No terminal state recorded — defaults to StateCompleted.
+				wm, err := upgrade.LoadWatcherMarker(paths.DataFrom(tmpDir))
+				require.NoError(t, err)
+				require.NotNil(t, wm, "watcher marker must be written on grace-elapsed cleanup")
+				assert.Equal(t, details.StateCompleted, wm.Outcome)
+				assert.Equal(t, "4.5.6", wm.TargetVersion)
+			},
 		},
 		{
 			name: "Default config, no rollback and simple cleanup",
@@ -371,6 +393,9 @@ func Test_watchCmd(t *testing.T) {
 			mockInstallModifier := newMockInstallationModifier(t)
 			tt.setupUpgradeMarker(t, tmpDir, mockWatcher, mockInstallModifier)
 			tt.wantErr(t, watchCmd(log, tmpDir, tt.args.cfg, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
+			if tt.additionalAsserts != nil {
+				tt.additionalAsserts(t, tmpDir)
+			}
 			t.Log("watchCmd logs:\n")
 			for _, osbLog := range obs.All() {
 				t.Logf("\t%s - %s - %v\n", osbLog.Level, osbLog.Message, osbLog.Context)
@@ -459,16 +484,10 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 		paths.BinaryPath(filepath.Join(topDir, liveHome), binName),
 		"live agent binary must survive cleanup")
 
-	// Sanity: watchCmd sets removeMarker = !isWindows() for the success
-	// branch, so the marker should be gone on non-Windows and preserved
-	// on Windows.
+	// The upgrade marker must be removed on all platforms after a successful watch.
 	loaded, loadErr := upgrade.LoadMarker(dataDir)
 	require.NoError(t, loadErr)
-	if runtime.GOOS == "windows" {
-		assert.NotNil(t, loaded, "marker should be preserved after successful watch on windows")
-	} else {
-		assert.Nil(t, loaded, "marker should be cleaned up after successful watch on non-windows")
-	}
+	assert.Nil(t, loaded, "marker should be removed after successful watch on all platforms")
 }
 
 // writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack
