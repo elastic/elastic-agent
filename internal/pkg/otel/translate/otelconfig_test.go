@@ -1074,6 +1074,39 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			expectedBeatName:           "filebeat",
 		},
 		{
+			name: "input unit with nil config is skipped without panic",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			outputQueueConfig:          nil,
+			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
+			// No expectedReceiverType - nil config input is skipped
+		},
+		{
 			name: "unsupported component type",
 			component: &component.Component{
 				ID:        "unsupported-test-id",
@@ -1102,6 +1135,10 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+
+			if tt.expectedReceiverType == "" {
+				return
+			}
 			assert.NotNil(t, result)
 
 			// Verify the receiver ID is present
@@ -1243,6 +1280,37 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				},
 			},
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
+		},
+		{
+			name: "input unit with nil config does not panic",
+			component: &component.Component{
+				ID:         "nil-config-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "filestream-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
 		},
 	}
 
