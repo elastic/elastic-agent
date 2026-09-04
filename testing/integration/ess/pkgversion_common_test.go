@@ -18,7 +18,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
@@ -96,7 +96,7 @@ func getAgentVersionOutput(t *testing.T, f *integrationtest.Fixture, ctx context
 		require.NoError(t, readingErr, "error reading agent version command stderr")
 	}()
 
-	stdout, err = versionCmd.Output()
+	stdout, _ = versionCmd.Output()
 	state = versionCmd.ProcessState
 	wg.Wait()
 	return

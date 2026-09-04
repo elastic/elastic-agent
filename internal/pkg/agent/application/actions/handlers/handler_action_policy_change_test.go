@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
@@ -1189,7 +1189,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
 			var got map[string]any
 			require.NoError(t, yaml.Unmarshal(capture.saved, &got))
-			agentSection, ok := got["agent"].(map[any]any)
+			agentSection, ok := got["agent"].(map[string]any)
 			require.True(t, ok, "saved yaml must contain agent section")
 			assert.Equal(t, tt.policyLevel, agentSection["logging.level"], "agent.logging.level should be persisted to fleet.enc")
 
