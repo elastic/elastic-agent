@@ -17,6 +17,7 @@ import yaml
 import re
 from pathlib import Path
 import subprocess
+import json
 import os
 import tempfile
 
@@ -404,6 +405,7 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
     # Get since data from local components.yml (disk, not git tag)
     component_since = get_component_since()
     print(f"Found {len(component_since)} component since entries")
+    newly_stamped = []
 
     lines = elastic_agent_go_mod.splitlines()
     components_type = ['receiver', 'connector', 'processor', 'exporter', 'extension', 'provider']
@@ -470,6 +472,7 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
             stamped = f'v{latest_version}'
             comp['since'] = stamped
             component_since[since_key] = stamped
+            newly_stamped.append(since_key)
             print(f"  Stamped new component '{since_key}' with since={stamped}")
         else:
             comp['since'] = ''
@@ -501,6 +504,7 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
         'grouped_components': components_grouped,
         'annotations': annotation_list,
         'component_since': component_since,
+        'newly_stamped': newly_stamped,
     }
 
 def find_files_with_substring(directory, substring):
@@ -723,6 +727,16 @@ def generate_markdown():
 
     # Persist any newly stamped 'since' entries back to components.yml
     write_component_since(components_result['component_since'])
+
+    # If running in CI, write the list of newly stamped components to a file
+    # so the workflow can include a review prompt in the PR description.
+    new_components_file = os.environ.get('NEW_COMPONENTS_FILE')
+    if new_components_file and components_result['newly_stamped']:
+        Path(new_components_file).write_text(
+            json.dumps({'newly_stamped': sorted(components_result['newly_stamped'])}),
+            encoding='utf-8',
+        )
+        print(f"\nNew components written to {new_components_file}: {components_result['newly_stamped']}")
 
     otel_col_version = get_otel_col_upstream_version()
     data = {
