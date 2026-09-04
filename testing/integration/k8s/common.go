@@ -245,10 +245,10 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	}
 }
 
-// k8sGetAgentID returns the agent ID for the given agent pod
-func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
+// k8sGetAgentStatus returns the status for the agent in the given pod.
+func k8sGetAgentStatus(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
 	namespace string, agentPodName string, containerName string,
-) (string, error) {
+) (atesting.AgentStatusOutput, error) {
 	command := []string{"elastic-agent", "status", "--output=json"}
 
 	status := atesting.AgentStatusOutput{} // clear status output
@@ -258,13 +258,24 @@ func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buff
 	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
 	cancel()
 	if err != nil {
-		return "", err
+		return atesting.AgentStatusOutput{}, err
 	}
 
 	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-		return "", err
+		return atesting.AgentStatusOutput{}, err
 	}
 
+	return status, nil
+}
+
+// k8sGetAgentID returns the agent ID for the given agent pod.
+func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
+	namespace string, agentPodName string, containerName string,
+) (string, error) {
+	status, err := k8sGetAgentStatus(ctx, client, stdout, stderr, namespace, agentPodName, containerName)
+	if err != nil {
+		return "", err
+	}
 	return status.Info.ID, nil
 }
 
