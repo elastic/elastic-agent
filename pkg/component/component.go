@@ -650,14 +650,10 @@ func validateComponentID(parentDirPath, id string) error {
 	return nil
 }
 
-func (c *Component) validateWorkDir(parentDirPath string) error {
-	return validateComponentID(parentDirPath, c.ID)
-}
-
 // PrepareWorkDir prepares the component working directory under the provided parent path. This involves creating
 // it under the right ownership and ACLs. This method is idempotent.
 func (c *Component) PrepareWorkDir(parentDirPath string) error {
-	if err := c.validateWorkDir(parentDirPath); err != nil {
+	if err := validateComponentID(parentDirPath, c.ID); err != nil {
 		return err
 	}
 	uid, gid := os.Geteuid(), os.Getegid()
@@ -682,7 +678,7 @@ func (c *Component) PrepareWorkDir(parentDirPath string) error {
 
 // RemoveWorkDir removes the component working directory under the provided parent path. This method is idempotent.
 func (c *Component) RemoveWorkDir(parentDirPath string) error {
-	if err := c.validateWorkDir(parentDirPath); err != nil {
+	if err := validateComponentID(parentDirPath, c.ID); err != nil {
 		return err
 	}
 	return os.RemoveAll(c.WorkDirPath(parentDirPath))
