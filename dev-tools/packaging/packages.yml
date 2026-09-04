@@ -52,6 +52,8 @@ settings:
         - *linux-arm64
         - *windows-amd64
         - *windows-arm64
+        - *darwin-amd64
+        - *darwin-arm64
 
 # List *all* the components available for packaging in elastic-agent
 components:
@@ -86,6 +88,8 @@ components:
       - *linux-arm64
       - *windows-amd64
       - *windows-arm64
+      - *darwin-amd64
+      - *darwin-arm64
     packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
@@ -1360,6 +1364,20 @@ specs:
 
     ######## Start FIPS Specs ########
     - os: linux
+      types: [tgz]
+      spec:
+        <<: *common_fips
+        <<: *elastic_license_for_binaries
+        name: '{{.BeatName}}'
+        version: '{{ agent_core_version }}'
+        qualifier: 'core-fips'
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_collector_binary_spec_core
+          <<: *metricbeat_lightweight_module_core
+
+    - os: darwin
       types: [tgz]
       spec:
         <<: *common_fips
