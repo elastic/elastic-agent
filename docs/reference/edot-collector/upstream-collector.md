@@ -9,11 +9,12 @@ applies_to:
     edot_collector: ga
 products:
   - id: cloud-serverless
+  - id: cloud-hosted
   - id: observability
   - id: edot-collector
 ---
 
-# Send data to {{serverless-full}} using the contrib Collector
+# Send data to {{product.observability}} using the contrib Collector
 
 While {{agent}} provides a streamlined experience with pre-selected components, you can also use the contrib OpenTelemetry Collector or a custom distribution to send data to {{product.observability}}. This approach requires more configuration but gives you more control over your OpenTelemetry setup.
 
@@ -32,16 +33,16 @@ The configuration requirements vary depending on your use case and the Elastic d
 
 ### {{serverless-full}} [elastic-cloud-serverless]
 
-{{serverless-full}} provides a [Managed OTLP Endpoint](opentelemetry://reference/motlp.md) that accepts OpenTelemetry data in its native format. This makes it the simplest scenario for using contrib components because scaling and signal processing (for example producing metrics from events) is handled by Elastic.
+{{serverless-full}} provides a [{{motlp}}](opentelemetry://reference/managed-inputs/managed-otlp-endpoint.md) that accepts OpenTelemetry data in its native format. This makes it the simplest scenario for using contrib components because scaling and signal processing (for example producing metrics from events) is handled by Elastic.
 
-The following configuration example shows how to send data to the Managed OTLP Endpoint:
+The following configuration example shows how to send data to the {{motlp}}:
 
 ```yaml
 exporters:
   otlp:
-    endpoint: "https://your-deployment.elastic-cloud.com:443"
+    endpoint: "https://<motlp-endpoint>"
     headers:
-      authorization: "Bearer YOUR_API_KEY"
+      Authorization: "ApiKey <your-api-key>"
 
 service:
   pipelines:
@@ -53,17 +54,27 @@ service:
       exporters: [otlp]
 ```
 
+To find your endpoint and create an API key, refer to [{{motlp}}](opentelemetry://reference/managed-inputs/managed-otlp-endpoint.md).
+
 ### {{ech}} [elastic-cloud-hosted-ech]
 
-Because {{motlp}} is not yet available for {{ech}}, you need to set up {{agent}} as a gateway, handling processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writing data directly to {{es}}.
+{{ech}} provides a [{{motlp}}](opentelemetry://reference/managed-inputs/managed-otlp-endpoint.md). Point your contrib Collector OTLP exporter at the endpoint using the same configuration as {{serverless-full}}.
 
-Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
+:::{note}
+On {{ech}}, the {{motlp}} requires a deployment version 9.0 or later.
+:::
+
+If you need local processing before ingest, such as deriving metrics from events in {{product.apm}}, you can set up {{agent}} as a gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode).
 
 ### {{product.self}} [self-managed-elastic-stack]
 
-Self-managed deployments have similar requirements to {{ech}} but with your own {{es}} instance. The configuration is similar to {{ech}}. You also need to:
+The {{motlp}} is not available for self-managed, {{ece}}, or {{eck}} deployments. With these deployment methods, set up {{agent}} as a gateway. The gateway handles processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writes data directly to {{es}}.
 
-- Point to your self-managed {{es}} instance.
+Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) and [Gateway mode](/reference/edot-collector/modes.md#edot-collector-as-gateway).
+
+You also need to:
+
+- Point the gateway to your {{es}} instance.
 - Configure appropriate security settings.
 - Ensure your {{es}} version is compatible.
 - Set up proper index templates and mappings.
