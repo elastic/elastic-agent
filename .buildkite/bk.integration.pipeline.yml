@@ -165,6 +165,7 @@ common:
       - build/*
       - build/diagnostics/**
       - build/*.pod_logs_dump/*
+      - build/k8s-logs-*/**
 
 steps:
   - label: "Custom ECH Testing"
