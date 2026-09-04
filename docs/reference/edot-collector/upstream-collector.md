@@ -2,7 +2,7 @@
 navigation_title: Use the contrib Collector
 description: Learn how to send data to Elastic Observability using the contrib OpenTelemetry Collector instead of Elastic Agent.
 applies_to:
-  stack:
+  stack: ga
   serverless:
     observability:
   product:
@@ -32,7 +32,7 @@ The configuration requirements vary depending on your use case and the Elastic d
 
 ### {{serverless-full}} [elastic-cloud-serverless]
 
-{{serverless-full}} provides a [Managed OTLP Endpoint](opentelemetry://reference/motlp.md) that accepts OpenTelemetry data in its native format. This makes it the simplest scenario for using contrib components because scaling and signal processing (for example producing metrics from events) is handled by Elastic.
+{{serverless-full}} provides the [{{motlp}}](opentelemetry://reference/motlp.md) that accepts OpenTelemetry data in its native format. This makes it the simplest scenario for using contrib components because scaling and signal processing (for example producing metrics from events) is handled by Elastic.
 
 The following configuration example shows how to send data to the Managed OTLP Endpoint:
 
@@ -55,18 +55,30 @@ service:
 
 ### {{ech}} [elastic-cloud-hosted-ech]
 
-Because {{motlp}} is not yet available for {{ech}}, you need to set up {{agent}} as a gateway, handling processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writing data directly to {{es}}.
+{{ech}} supports the [Managed OTLP Endpoint](opentelemetry://reference/motlp.md), which accepts OpenTelemetry data natively. To find your endpoint URL, go to the [{{ecloud}} Console](https://cloud.elastic.co/), select your deployment, and in the **Application endpoints** section, select **Managed OTLP**.
 
-Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
+The following configuration example shows how to send data to the Managed OTLP Endpoint:
+
+```yaml
+exporters:
+  otlp:
+    endpoint: "https://your-deployment.elastic-cloud.com:443"
+    headers:
+      authorization: "Bearer YOUR_API_KEY"
+
+service:
+  pipelines:
+    traces:
+      exporters: [otlp]
+    metrics:
+      exporters: [otlp]
+    logs:
+      exporters: [otlp]
+```
 
 ### {{product.self}} [self-managed-elastic-stack]
 
-Self-managed deployments have similar requirements to {{ech}} but with your own {{es}} instance. The configuration is similar to {{ech}}. You also need to:
-
-- Point to your self-managed {{es}} instance.
-- Configure appropriate security settings.
-- Ensure your {{es}} version is compatible.
-- Set up proper index templates and mappings.
+The [{{motlp}}](opentelemetry://reference/motlp.md) is not available for self-managed Elastic, ECE, or ECK deployments. You need to set up {{agent}} as a gateway, handling processing required for use cases like deriving metrics from events in {{product.apm}}, and writing data directly to {{es}}. Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) for more information.
 
 ## Configuration best practices
 
