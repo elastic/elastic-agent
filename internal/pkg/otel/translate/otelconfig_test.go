@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -2801,6 +2802,38 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			// No expectedReceiverID - no inputs means no receivers
 		},
 		{
+			name: "input unit with nil config is skipped without panic",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			outputQueueConfig: nil,
+			// No expectedReceiverID - nil config input is skipped
+		},
+		{
 			name: "unsupported component type",
 			component: &component.Component{
 				ID:        "unsupported-test-id",
@@ -3182,6 +3215,38 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				},
 			},
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
+		},
+		{
+			name: "input unit with nil config does not panic",
+			component: &component.Component{
+				ID:         "nil-config-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "filestream-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
 		},
 	}
 
@@ -4060,4 +4125,78 @@ func TestInjectOsqueryConfig(t *testing.T) {
 			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
 		})
 	}
+}
+
+func TestGetReceiversConfigHostnameOverride(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-hostname-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-hostname-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	t.Run("env_set", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "override-node")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be injected into receiver config", id)
+		}
+	})
+
+	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "  override-node  ")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be trimmed before injection", id)
+		}
+	})
+
+	t.Run("env_unset", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "")
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.NotContains(t, cfg, "hostname",
+				"receiver %s: hostname should not be present when env var is unset", id)
+		}
+	})
 }
