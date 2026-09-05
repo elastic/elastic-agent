@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -2768,3 +2769,316 @@ func TestLogLevelConversion(t *testing.T) {
 		})
 	}
 }
+<<<<<<< HEAD
+=======
+
+func TestResolveStreamID(t *testing.T) {
+	tests := []struct {
+		name         string
+		streamID     string
+		streamSource map[string]any
+		unitID       string
+		index        int
+		expected     string
+	}{
+		{
+			name:     "uses proto stream ID when set",
+			streamID: "my-stream-id",
+			unitID:   "my-unit",
+			index:    0,
+			expected: "my-stream-id",
+		},
+		{
+			name:         "falls back to source id when proto stream ID is empty",
+			streamID:     "",
+			streamSource: map[string]any{"id": "source-id"},
+			unitID:       "my-unit",
+			index:        0,
+			expected:     "source-id",
+		},
+		{
+			name:         "generates ID when both proto and source are empty",
+			streamID:     "",
+			streamSource: map[string]any{},
+			unitID:       "system/metrics-default-unique-system-metrics-input",
+			index:        0,
+			expected:     "system/metrics-default-unique-system-metrics-input-0",
+		},
+		{
+			name:     "generates ID when source is nil",
+			streamID: "",
+			unitID:   "my-unit",
+			index:    2,
+			expected: "my-unit-2",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := resolveStreamID(tt.streamID, tt.streamSource, tt.unitID, tt.index)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestStripDefaultProcessors(t *testing.T) {
+	tests := []struct {
+		name     string
+		beatName string
+		raw      any
+		want     []any
+	}{
+		{
+			name:     "nil input returns nil",
+			beatName: "filebeat",
+			raw:      nil,
+			want:     nil,
+		},
+		{
+			name:     "non-list input returns nil",
+			beatName: "filebeat",
+			raw:      "not a list",
+			want:     nil,
+		},
+		{
+			name:     "heartbeat gets no defaults, list is unchanged",
+			beatName: "heartbeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": nil},
+			},
+		},
+		{
+			name:     "add_cloud_metadata null matches default and is stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_agent_metadata": map[string]any{"stream_id": "s1"}},
+				map[string]any{"add_cloud_metadata": nil},
+				map[string]any{"timestamp": map[string]any{"field": "datetime"}},
+			},
+			want: []any{
+				map[string]any{"add_agent_metadata": map[string]any{"stream_id": "s1"}},
+				map[string]any{"timestamp": map[string]any{"field": "datetime"}},
+			},
+		},
+		{
+			name:     "add_cloud_metadata with custom config is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": map[string]any{"overwrite": true}},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": map[string]any{"overwrite": true}},
+			},
+		},
+		{
+			name:     "add_host_metadata null does not match default (default has when.not.contains.tags) and is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_host_metadata": nil},
+			},
+			want: []any{
+				map[string]any{"add_host_metadata": nil},
+			},
+		},
+		{
+			name:     "add_host_metadata exact-match default config is stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_host_metadata": map[string]any{"when.not.contains.tags": "forwarded"}},
+			},
+			want: []any{},
+		},
+		{
+			name:     "multi-key processor entry is not a valid single-name proc and is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil, "extra_key": "value"},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": nil, "extra_key": "value"},
+			},
+		},
+		{
+			name:     "all default processors with null config are stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil},
+				map[string]any{"add_docker_metadata": nil},
+				map[string]any{"add_kubernetes_metadata": nil},
+			},
+			want: []any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripDefaultProcessors(tt.beatName, tt.raw)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestInjectOsqueryConfig verifies that injectOsqueryConfig mirrors the stream ordering
+// produced by osquerybeatCfgFromStreams: the osquery_manager.result stream is always moved
+// to position 0, and all other streams follow in their original relative order.
+func TestInjectOsqueryConfig(t *testing.T) {
+	makeStream := func(id string, isResult bool) receiverInput {
+		dataset := "osquery_manager.action.responses"
+		if isResult {
+			dataset = "osquery_manager.result"
+		}
+		return receiverInput{
+			streamID: id,
+			config: map[string]any{
+				"data_stream": map[string]any{
+					"dataset": dataset,
+				},
+			},
+		}
+	}
+
+	// unit carries the input-level osquery config, mirroring what osquerybeatCfgFromStreams
+	// receives as rawIn.Source when the integration has scheduled queries.
+	unit := component.Unit{
+		Config: component.MustExpectedConfig(map[string]interface{}{
+			"osquery": map[string]interface{}{
+				"queries": map[string]interface{}{},
+			},
+		}),
+	}
+
+	tests := []struct {
+		name          string
+		inputs        []receiverInput
+		wantStreamIDs []string
+	}{
+		{
+			name:          "1 stream: result only",
+			inputs:        []receiverInput{makeStream("result", true)},
+			wantStreamIDs: []string{"result"},
+		},
+		{
+			name:          "2 streams: result first",
+			inputs:        []receiverInput{makeStream("result", true), makeStream("action", false)},
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			name:          "2 streams: result second",
+			inputs:        []receiverInput{makeStream("action", false), makeStream("result", true)},
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			// swap(0,2) gives [result, other, action] — wrong relative order of non-result streams
+			name: "3 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other", false),
+				makeStream("result", true),
+			},
+			wantStreamIDs: []string{"result", "action", "other"},
+		},
+		{
+			// swap(0,3) gives [result, other1, other2, action] — wrong
+			name: "4 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other1", false),
+				makeStream("other2", false),
+				makeStream("result", true),
+			},
+			wantStreamIDs: []string{"result", "action", "other1", "other2"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := injectOsqueryConfig(tt.inputs, unit)
+			require.Len(t, got, len(tt.wantStreamIDs))
+			gotIDs := make([]string, len(got))
+			for i, ri := range got {
+				gotIDs[i] = ri.streamID
+			}
+			assert.Equal(t, tt.wantStreamIDs, gotIDs,
+				"stream ordering must match osquerybeatCfgFromStreams: result stream first, others in original relative order")
+			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
+		})
+	}
+}
+
+func TestGetReceiversConfigHostnameOverride(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-hostname-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-hostname-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	t.Run("env_set", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "override-node")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be injected into receiver config", id)
+		}
+	})
+
+	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "  override-node  ")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be trimmed before injection", id)
+		}
+	})
+
+	t.Run("env_unset", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "")
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.NotContains(t, cfg, "hostname",
+				"receiver %s: hostname should not be present when env var is unset", id)
+		}
+	})
+}
+>>>>>>> 09ae1f4 (Allow overriding Elastic Agent hostname via environment variable (#15686))
