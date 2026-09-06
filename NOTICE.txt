@@ -21919,11 +21919,11 @@ Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentele
 
 --------------------------------------------------------------------------------
 Dependency : github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver
-Version: v0.157.0
+Version: v0.159.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver@v0.157.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver@v0.159.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
