@@ -190,6 +190,55 @@ max_message_bytes: 1000000`,
 	}
 }
 
+func TestKafkaCompressionParamsOnlyForGzip(t *testing.T) {
+	tests := []struct {
+		name        string
+		compression string
+		wantParams  bool
+		wantLevel   int
+	}{
+		{
+			name:        "gzip includes compression_params",
+			compression: "gzip",
+			wantParams:  true,
+			wantLevel:   4,
+		},
+		{
+			name:        "lz4 omits compression_params",
+			compression: "lz4",
+		},
+		{
+			name:        "snappy omits compression_params",
+			compression: "snappy",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			input := fmt.Sprintf(`
+hosts: ["kafka1:9092"]
+topic: static-topic
+compression: %s
+`, tc.compression)
+			cfg, err := config.NewConfigFrom(input)
+			require.NoError(t, err, "error creating kafka config")
+			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			require.NoError(t, err, "error translating kafka to kafka exporter")
+
+			producer, ok := gotMap["producer"].(map[string]any)
+			require.True(t, ok, "producer config missing")
+			require.Equal(t, tc.compression, producer["compression"])
+			if !tc.wantParams {
+				require.NotContains(t, producer, "compression_params")
+				return
+			}
+			params, ok := producer["compression_params"].(map[string]any)
+			require.True(t, ok, "compression_params missing for gzip")
+			require.Equal(t, tc.wantLevel, params["level"])
+		})
+	}
+}
+
 func TestDynamicTopicSetter(t *testing.T) {
 	testCases := []struct {
 		name                 string

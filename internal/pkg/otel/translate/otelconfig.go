@@ -414,7 +414,7 @@ func getReceiversConfigForComponent(
 	// get inputs for all the units
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeInput {
+		if unit.Type == client.UnitTypeInput && unit.Config != nil {
 			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp)
 			if err != nil {
 				return nil, err
