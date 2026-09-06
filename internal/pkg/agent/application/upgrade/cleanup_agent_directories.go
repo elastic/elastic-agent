@@ -182,10 +182,19 @@ func cleanupAgentDirectories(
 
 	symlinkTarget, symlinkErr := liveVersionedHome(topDir)
 	if symlinkErr != nil {
-		log.Warnw("could not resolve live versioned home symlink during cleanup; orphan directories will be kept conservatively",
-			"error.message", symlinkErr.Error())
+		if errors.Is(symlinkErr, errSymlinkAbsent) && marker == nil && markerErr == nil {
+			// Fresh volume: symlink absent and no upgrade marker present. The
+			// agent creates the symlink on first start, after this cleanup pass
+			// runs. Log at debug — this is the expected state, not a degraded
+			// one.
+			log.Debugw("live versioned home symlink is absent; orphan directories will be kept conservatively",
+				"error.message", symlinkErr.Error())
+		} else {
+			log.Warnw("could not resolve live versioned home symlink during cleanup; orphan directories will be kept conservatively",
+				"error.message", symlinkErr.Error())
+			degraded = true
+		}
 		symlinkTarget = ""
-		degraded = true
 	}
 
 	dc := &dirClassifier{
