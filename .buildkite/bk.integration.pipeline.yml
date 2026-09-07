@@ -128,7 +128,7 @@ common:
       - v1.33.0
       - v1.34.0
       - v1.35.0
-    variants: &k8s_test_variants
+    all_variants: &k8s_test_all_variants
       - basic
       - complete
       - complete-wolfi
@@ -142,6 +142,13 @@ common:
       - complete
       - complete-wolfi
       - elastic-otel-collector
+    all_variants_without_default: &k8s_test_all_variants_without_default
+      - basic
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+      - wolfi
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
@@ -988,7 +995,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants_without_default
             version:
               - *k8s_min_test_version
               - *k8s_max_test_version
@@ -1023,7 +1030,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants
             version:
               *k8s_test_versions_without_min_max
 
