@@ -4,9 +4,8 @@ set -euo pipefail
 : "${K8S_PROVISIONER:?Error: Specify the Kubernetes provisioner via K8S_PROVISIONER env variable}"
 : "${K8S_VERSION:?Error: Specify the cluster version via K8S_VERSION env variable}"
 : "${TARGET_ARCH:?Error: Specify target architecture via TARGET_ARCH env variable}"
+: "${DOCKER_VARIANTS:?Error: Specify the Docker variants via DOCKER_VARIANTS env variable}"
 : "${DOCKER_IMAGE_ARCHIVES_DIR:=build/distributions}"
-
-DOCKER_VARIANTS="${DOCKER_VARIANTS:-basic,wolfi,complete,complete-wolfi,service,cloud}"
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
   if [[ -f "${WORKSPACE}/.package-version" ]]; then
