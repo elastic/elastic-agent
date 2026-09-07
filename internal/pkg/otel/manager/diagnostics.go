@@ -186,11 +186,7 @@ func streamIDForComponent(name, compID string) string {
 
 // streamPrefixedDiagnostic returns a copy of res whose Filename is prefixed
 // with the stream ID so ZipArchive writes unique paths under the component
-// directory (components/<comp.ID>/<streamID>/<filename>). Without this, two
-// receivers for the same component both produce beat_metrics.json and unzip
-// overwrites one of them. See https://github.com/elastic/elastic-agent/issues/16287.
-// The single_receiver placeholder is not a policy stream ID, so those results
-// are omitted rather than written under a "single/" directory.
+// directory (components/<comp.ID>/<streamID>/<filename>).
 func streamPrefixedDiagnostic(res *proto.ActionDiagnosticUnitResult, streamID string) *proto.ActionDiagnosticUnitResult {
 	if res == nil || streamID == "" {
 		return res
