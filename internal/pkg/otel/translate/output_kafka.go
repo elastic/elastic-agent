@@ -112,11 +112,16 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
 
-		if len(oauthCfg.GetFields()) == 0 {
+		fields := oauthCfg.GetFields()
+		if len(fields) == 0 {
 			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER")
 		}
 
-		switch oauthCfg.GetFields()[0] {
+		if len(fields) != 1 {
+			return nil, nil, nil, fmt.Errorf("auth must specify a single oauth type, got %v", fields)
+		}
+
+		switch fields[0] {
 		case oauth2ClientExtensionType:
 			oauth2ClientCfg, err := oauthCfg.Child(oauth2ClientExtensionType, -1)
 			if err != nil {
@@ -133,7 +138,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		// For example, azureauth extension https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension
 
 		default:
-			return nil, nil, nil, fmt.Errorf("unsupported oauth config: %v", oauthCfg.GetFields()[0])
+			return nil, nil, nil, fmt.Errorf("unsupported oauth config: %v", fields[0])
 		}
 
 	} else if kConfig.Username != "" {
@@ -145,9 +150,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			"password":  kConfig.Password,
 			"mechanism": kConfig.Sasl.SaslMechanism,
 		}
-	}
-
-	if kConfig.Kerberos.IsEnabled() {
+	} else if kConfig.Kerberos.IsEnabled() {
 		auth["kerberos"] = getKerberosConfig(kConfig)
 	}
 	setIfNotNil(kafkaExporter, "auth", auth)

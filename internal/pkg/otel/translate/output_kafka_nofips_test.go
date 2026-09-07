@@ -119,6 +119,22 @@ auth:
 `,
 			wantErr: "unsupported oauth config",
 		},
+		{
+			name: "multiple auth types",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+auth:
+  oauth2client:
+    client_id: my-client
+    client_secret: my-secret
+    token_url: https://example.com/oauth2/token
+  unknown:
+    client_id: other
+`,
+			wantErr: "auth must specify a single oauth type",
+		},
 	}
 
 	for _, tc := range testCases {
