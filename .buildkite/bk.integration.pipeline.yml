@@ -146,6 +146,7 @@ common:
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
       TARGET_ARCH: "amd64"
+      K8S_PROVISIONER: "kind"
     agent: &k8s_test_agent
       provider: "gcp"
       machineType: "n2-standard-8"
@@ -164,7 +165,6 @@ common:
     artifact_paths: &k8s_test_artifact_paths
       - build/*
       - build/diagnostics/**
-      - build/*.pod_logs_dump/*
       - build/k8s-logs-*/**
 
 steps:
