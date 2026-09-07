@@ -60,7 +60,12 @@ func NewDockerClient() (*client.Client, error) {
 		CurrentContext string `json:"currentContext"`
 	}
 
-	configFile := filepath.Join(os.Getenv("HOME"), ".docker", "config.json")
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return envClient()
+	}
+
+	configFile := filepath.Join(home, ".docker", "config.json")
 	file, err := os.Open(configFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -81,7 +86,7 @@ func NewDockerClient() (*client.Client, error) {
 		return envClient()
 	}
 
-	contextDir := filepath.Join(os.Getenv("HOME"), ".docker", "contexts", "meta")
+	contextDir := filepath.Join(home, ".docker", "contexts", "meta")
 	files, err := os.ReadDir(contextDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -94,9 +99,6 @@ func NewDockerClient() (*client.Client, error) {
 		if f.IsDir() {
 			metaFile := filepath.Join(contextDir, f.Name(), "meta.json")
 			if _, err := os.Stat(metaFile); err == nil {
-				if os.IsNotExist(err) {
-					return envClient()
-				}
 				var dockerContext DockerContext
 				content, err := os.ReadFile(metaFile)
 				if err != nil {
