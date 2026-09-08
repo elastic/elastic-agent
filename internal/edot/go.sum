@@ -1333,6 +1333,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsre
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/dockerstatsreceiver v0.159.0/go.mod h1:RdHR15IATaIcK27y6tqCJV0+yqc9X+DzMRmsbCBSJoY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.159.0 h1:/lYX40MOD7kvGFtR/jgV00wCCPqbufLnFTSYdBdoYfY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/filelogreceiver v0.159.0/go.mod h1:f9hfGbIkoc2q8zQzwp17jEotFFaIP4i0X/2MVTYXF88=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver v0.159.0 h1:kkXsSp4Fu3N2PyU/vO5kl6Z67HaPdvV1j6fAQmNxxpw=
+github.com/open-telemetry/opentelemetry-collector-contrib/receiver/googlecloudmonitoringreceiver v0.159.0/go.mod h1:fDZc9xeE01yp739qNcTNIXrEAhce++jYmU8ETmxklY0=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver v0.159.0 h1:N+X2Erpo8yUuiQZ5GKp8Nxgi+84q5xhOOlXbi03YNw8=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/haproxyreceiver v0.159.0/go.mod h1:d9G4JMqSTnDd/SeNkMCu1YLaALwy/A+V+mCxoIRWQHY=
 github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver v0.159.0 h1:L5zcKRlbIdfEKFlScBpqMlnTDWEmLRotqlgSNP54q2g=
