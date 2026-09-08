@@ -1782,10 +1782,6 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// filestream watching a glob path. This has to happen before AST rendering,
 	// because it is the ${kubernetes.*} references in the raw config that make the
 	// kubernetes provider render the input once per discovered container.
-	//
-	// The setting is read off the config being processed rather than c.currentCfg,
-	// which is only refreshed further down. A config that fails to unpack is left
-	// alone here and reported by the NewFromConfig call below.
 	if incomingCfg, cfgErr := configuration.NewFromConfig(cfg); cfgErr == nil &&
 		incomingCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput {
 		k8sutil.RewriteContainerLogInputs(m)
