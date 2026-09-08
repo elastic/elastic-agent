@@ -1014,8 +1014,12 @@ const (
 	otelDynamicVariableLogLineTemplate = "Component %s uses dynamic variable providers, switching to process runtime"
 )
 
-// TestBeatsReceiverDynamicInputProcessRuntimeFallback verifies that we fall back to the process runtime if the input
-// uses variables from a dynamic provider.
+// TestBeatsReceiverDynamicInputProcessRuntimeFallback verifies that we fall back to the process
+// runtime if the input uses variables from a dynamic provider, and the configurable parts of this
+// behavior:
+//   - the override runtime can be set per beat, and only affects components of that beat
+//   - variables listed in agent.internal.runtime.dynamic_inputs.static_variables don't make an input
+//     dynamic, so an input using only those keeps running as a beats receiver
 func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -1031,13 +1035,33 @@ func TestBeatsReceiverDynamicInputProcessRuntimeFallback(t *testing.T) {
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
 
+	// The local_dynamic provider emits two items which share the same `group` variable but have a
+	// different `id`. `group` is declared static, so the filestream input referencing only `${local_dynamic.group}`
+	// isn't considered dynamic and stays on the otel runtime, while the system/metrics input referencing
+	// `${local_dynamic.id}` is moved to the process runtime by the metricbeat override.
 	config := fmt.Sprintf(`agent.logging.to_stderr: true
 agent.logging.to_files: false
 agent.monitoring.enabled: false
-agent.internal.runtime.dynamic_inputs: process
+agent.internal.runtime:
+  filebeat:
+    filestream: otel
+  metricbeat:
+    system/metrics: otel
+  dynamic_inputs:
+    filebeat:
+      default: process
+    metricbeat:
+      default: process
+    static_variables:
+      - local_dynamic.group
 inputs:
+  - type: filestream
+    id: filestream-static-vars
+    data_stream.dataset: generic
+    paths:
+      - /var/log/${local_dynamic.group}/*.log
   - type: system/metrics
-    id: "${local_dynamic.id}"
+    id: "system-metrics-${local_dynamic.id}"
     streams:
       - metricsets:
         - cpu
@@ -1051,7 +1075,11 @@ providers:
   local_dynamic:
     items:
     - vars:
-        id: system-metrics-1
+        id: one
+        group: shared
+    - vars:
+        id: two
+        group: shared
 `, esURL.Host)
 
 	// this is the context for the whole test, with a global timeout defined
@@ -1070,30 +1098,50 @@ providers:
 	installOutput, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
 	require.NoError(t, err, "install failed, output: %s", string(installOutput))
 
-	var compId string
+	var filestreamCompId, metricsCompId string
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		var statusErr error
 		status, statusErr := fixture.ExecStatus(ctx)
 		assert.NoError(collect, statusErr)
-		// we should be running a single component in a beat process
 		assert.Equal(collect, int(cproto.State_HEALTHY), status.State)
-		require.Equal(collect, 1, len(status.Components))
-		comp := status.Components[0]
+		// one component per input type, each in a different runtime
+		require.Equal(collect, 2, len(status.Components))
 
-		assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
-		expectedComponentVersionInfoName := componentVersionInfoNameForRuntime(component.ProcessRuntimeManager)
-		assert.Equal(collect, expectedComponentVersionInfoName, comp.VersionInfo.Name)
-		for _, unit := range comp.Units {
-			assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+		for _, comp := range status.Components {
+			assert.Equal(collect, int(cproto.State_HEALTHY), comp.State)
+			for _, unit := range comp.Units {
+				assert.Equal(collect, int(cproto.State_HEALTHY), unit.State)
+			}
+			switch {
+			case strings.HasPrefix(comp.ID, "filestream"):
+				filestreamCompId = comp.ID
+				// only uses a static variable, so it isn't dynamic and stays a beats receiver
+				assert.Equal(collect, componentVersionInfoNameForRuntime(component.OtelRuntimeManager),
+					comp.VersionInfo.Name)
+			case strings.HasPrefix(comp.ID, "system/metrics"):
+				metricsCompId = comp.ID
+				// uses a variable that changes per provider item, so it's moved to the process runtime
+				assert.Equal(collect, componentVersionInfoNameForRuntime(component.ProcessRuntimeManager),
+					comp.VersionInfo.Name)
+			default:
+				assert.Fail(collect, "unexpected component", "component %s", comp.ID)
+			}
 		}
-		compId = comp.ID
 	}, 1*time.Minute, 1*time.Second)
 	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
 	require.NoError(t, err)
 
-	// verify we've logged a warning about using the process runtime
-	foundLogMessage := false
-	expectedMessage := fmt.Sprintf(otelDynamicVariableLogLineTemplate, compId)
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Log("Elastic-Agent logs seen by the test:")
+			t.Log(string(logsBytes))
+		}
+	})
+
+	// only the system/metrics component should have been switched to the process runtime
+	metricsMessage := fmt.Sprintf(otelDynamicVariableLogLineTemplate, metricsCompId)
+	filestreamMessage := fmt.Sprintf(otelDynamicVariableLogLineTemplate, filestreamCompId)
+	foundMetricsLogMessage := false
+	foundFilestreamLogMessage := false
 	for _, line := range strings.Split(string(logsBytes), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -1106,17 +1154,14 @@ providers:
 			continue
 		}
 
-		foundLogMessage = foundLogMessage || logRecord.Message == expectedMessage
+		foundMetricsLogMessage = foundMetricsLogMessage || logRecord.Message == metricsMessage
+		foundFilestreamLogMessage = foundFilestreamLogMessage || logRecord.Message == filestreamMessage
 	}
 
-	t.Cleanup(func() {
-		if t.Failed() {
-			t.Log("Elastic-Agent logs seen by the test:")
-			t.Log(string(logsBytes))
-		}
-	})
-
-	assert.True(t, foundLogMessage, "there should be a log line with a warning about falling back to process runtime")
+	assert.True(t, foundMetricsLogMessage,
+		"there should be a log line with a warning about falling back to process runtime for the system/metrics component")
+	assert.False(t, foundFilestreamLogMessage,
+		"the filestream component only uses static variables, it should not fall back to the process runtime")
 }
 
 // TestBeatsReceiverSubcomponentStatus verifies that we correctly reflect the status of beats inputs in the elastic

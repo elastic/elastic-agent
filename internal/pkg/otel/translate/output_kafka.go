@@ -63,10 +63,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			"queue_size": getQueueSize(logger, config),
 		},
 		"producer": map[string]any{
-			"compression": kConfig.Compression,
-			"compression_params": map[string]any{
-				"level": kConfig.CompressionLevel,
-			},
+			"compression":       kConfig.Compression,
 			"max_message_bytes": maxMessageBytes,
 			"required_acks":     requiredAcks,
 		},
@@ -82,6 +79,14 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			"topic":    kConfig.Topic,
 			"encoding": "raw",
 		},
+	}
+
+	// Compression
+	if kConfig.Compression == "gzip" {
+		// compression_level is only available for gzip compression
+		kafkaExporter["producer"].(map[string]any)["compression_params"] = map[string]any{
+			"level": kConfig.CompressionLevel,
+		}
 	}
 
 	// Enables SASL authentication

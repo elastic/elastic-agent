@@ -3607,6 +3607,95 @@ func TestComponent_WorkDir(t *testing.T) {
 	})
 }
 
+// TestComponent_WorkDir_PathTraversal asserts the fix for
+// https://github.com/elastic/elastic-agent/issues/16226: component IDs derived
+// from externally supplied input IDs must be validated before any filesystem
+// operation so that a crafted ID cannot escape the Agent runtime directory.
+func TestComponent_WorkDir_PathTraversal(t *testing.T) {
+	runtimeDir := t.TempDir()
+	sentinelDir := t.TempDir()
+	sentinelBase := filepath.Base(sentinelDir)
+
+	require.Equal(t, filepath.Dir(runtimeDir), filepath.Dir(sentinelDir),
+		"test setup: runtimeDir and sentinelDir must share the same parent")
+
+	t.Run("PrepareWorkDir rejects dotdot traversal", func(t *testing.T) {
+		c := &Component{ID: filepath.Join("..", sentinelBase, "escaped")}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.Error(t, err, "PrepareWorkDir must reject a '..' component ID")
+		assert.NoDirExists(t, filepath.Join(sentinelDir, "escaped"),
+			"no directory must be created outside runtimeDir")
+	})
+
+	t.Run("PrepareWorkDir rejects multi-level dotdot traversal", func(t *testing.T) {
+		nestedRuntime := filepath.Join(runtimeDir, "sub", "nested")
+		require.NoError(t, os.MkdirAll(nestedRuntime, 0o755))
+
+		c := &Component{ID: filepath.Join("..", "..", sentinelBase, "escaped-deep")}
+
+		err := c.PrepareWorkDir(nestedRuntime)
+		require.Error(t, err, "PrepareWorkDir must reject multi-level '..' component IDs")
+		assert.NoDirExists(t, filepath.Join(sentinelDir, "escaped-deep"),
+			"no directory must be created outside runtimeDir")
+	})
+
+	t.Run("RemoveWorkDir rejects dotdot traversal", func(t *testing.T) {
+		victim := filepath.Join(sentinelDir, "victim-dir")
+		require.NoError(t, os.MkdirAll(victim, 0o755))
+
+		c := &Component{ID: filepath.Join("..", sentinelBase, "victim-dir")}
+
+		err := c.RemoveWorkDir(runtimeDir)
+		require.Error(t, err, "RemoveWorkDir must reject a '..' component ID")
+		assert.DirExists(t, victim, "RemoveWorkDir must not delete directories outside runtimeDir")
+	})
+
+	t.Run("PrepareWorkDir rejects empty ID", func(t *testing.T) {
+		c := &Component{ID: ""}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.Error(t, err, "PrepareWorkDir must reject an empty component ID")
+	})
+
+	t.Run("PrepareWorkDir rejects single dot ID", func(t *testing.T) {
+		// "." resolves to runtimeDir itself, not strictly beneath it.
+		c := &Component{ID: "."}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.Error(t, err, "PrepareWorkDir must reject '.' component ID")
+	})
+
+	t.Run("PrepareWorkDir allows absolute path ID safely contained inside runtimeDir", func(t *testing.T) {
+		// In Go, filepath.Join(absParent, "/abs/path") embeds the absolute path
+		// under absParent rather than replacing it, so "/etc/passwd" resolves to
+		// runtimeDir+"/etc/passwd" — still inside runtimeDir.
+		c := &Component{ID: "/etc/passwd"}
+
+		err := c.PrepareWorkDir(runtimeDir)
+		require.NoError(t, err, "absolute path ID is safe in Go — resolves inside runtimeDir")
+		assert.DirExists(t, filepath.Join(runtimeDir, "etc", "passwd"),
+			"absolute path ID must create a directory inside runtimeDir, not at the root")
+		_ = c.RemoveWorkDir(runtimeDir)
+	})
+
+	t.Run("WorkDirPath stays within runtimeDir for benign ID", func(t *testing.T) {
+		c := &Component{ID: "filebeat-default"}
+		resolved := c.WorkDirPath(runtimeDir)
+
+		assert.True(t,
+			strings.HasPrefix(resolved, runtimeDir+string(filepath.Separator)),
+			"WorkDirPath for a normal ID must be strictly inside runtimeDir, got %q", resolved)
+	})
+
+	t.Run("PrepareWorkDir allows cloudbeat-style nested ID", func(t *testing.T) {
+		c := &Component{ID: "cloudbeat/cis_aws-default-my-input"}
+		err := c.PrepareWorkDir(runtimeDir)
+		require.NoError(t, err, "PrepareWorkDir must allow legitimate nested IDs like cloudbeat/cis_aws-default-*")
+		_ = c.RemoveWorkDir(runtimeDir)
+	})
+}
+
 func TestRuntimeConfigValidate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -4278,7 +4367,9 @@ func TestDefaultRuntimeConfig(t *testing.T) {
 	config := DefaultRuntimeConfig()
 	require.NotNil(t, config)
 	assert.Equal(t, string(DefaultRuntimeManager), config.Default)
-	assert.Equal(t, "", config.DynamicInputs)
+	assert.Equal(t, DefaultDynamicInputsConfig(), config.DynamicInputs)
+	assert.Equal(t, "", config.DynamicInputs.Default)
+	assert.Empty(t, config.DynamicInputs.StaticVariables)
 	assert.Equal(t, "otel", config.Auditbeat.Default)
 	assert.Empty(t, config.Auditbeat.InputType)
 	assert.Equal(t, "otel", config.Filebeat.Default)
@@ -4708,12 +4799,47 @@ func TestRuntimeConfig_UCFGUnpack(t *testing.T) {
 				c.Metricbeat.Default = "process"
 			},
 		},
-		"set_dynamic_inputs": {
+		"set_dynamic_inputs_legacy_scalar": {
 			input: map[string]interface{}{
 				"dynamic_inputs": "otel",
 			},
 			mutate: func(c *RuntimeConfig) {
-				c.DynamicInputs = "otel"
+				c.DynamicInputs.Default = "otel"
+			},
+		},
+		"set_dynamic_inputs_default": {
+			input: map[string]interface{}{
+				"dynamic_inputs": map[string]interface{}{
+					"default": "process",
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.DynamicInputs.Default = "process"
+			},
+		},
+		"set_dynamic_inputs_per_beat_and_input_type": {
+			input: map[string]interface{}{
+				"dynamic_inputs": map[string]interface{}{
+					"default": "process",
+					"filebeat": map[string]interface{}{
+						"default":    "process",
+						"filestream": "otel",
+					},
+					"metricbeat": map[string]interface{}{
+						"default": "otel",
+					},
+					"static_variables": []interface{}{
+						"local_dynamic.group",
+						"kubernetes.node",
+					},
+				},
+			},
+			mutate: func(c *RuntimeConfig) {
+				c.DynamicInputs.Default = "process"
+				c.DynamicInputs.Filebeat.Default = "process"
+				c.DynamicInputs.Filebeat.InputType["filestream"] = "otel"
+				c.DynamicInputs.Metricbeat.Default = "otel"
+				c.DynamicInputs.StaticVariables = []string{"local_dynamic.group", "kubernetes.node"}
 			},
 		},
 	}
@@ -4730,6 +4856,235 @@ func TestRuntimeConfig_UCFGUnpack(t *testing.T) {
 			tt.mutate(expected)
 
 			assert.Equal(t, expected, cfg)
+		})
+	}
+}
+
+func TestDynamicInputsConfig_Unpack(t *testing.T) {
+	t.Run("legacy scalar form sets the default", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack("process"))
+
+		expected := DefaultDynamicInputsConfig()
+		expected.Default = "process"
+		assert.Equal(t, expected, cfg)
+	})
+
+	t.Run("empty scalar keeps the feature disabled", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack(""))
+		assert.Equal(t, DefaultDynamicInputsConfig(), cfg)
+	})
+
+	t.Run("nil value leaves the configuration untouched", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		cfg.Default = "process"
+		require.NoError(t, cfg.Unpack(nil))
+		assert.Equal(t, "process", cfg.Default)
+	})
+
+	t.Run("map form unpacks all fields", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack(map[string]interface{}{
+			"default": "process",
+			"filebeat": map[string]interface{}{
+				"default":    "process",
+				"filestream": "otel",
+			},
+			"static_variables": []interface{}{"local_dynamic.group"},
+		}))
+
+		expected := DefaultDynamicInputsConfig()
+		expected.Default = "process"
+		expected.Filebeat.Default = "process"
+		expected.Filebeat.InputType["filestream"] = "otel"
+		expected.StaticVariables = []string{"local_dynamic.group"}
+		assert.Equal(t, expected, cfg)
+	})
+
+	t.Run("trailing dots are trimmed from static variables", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		require.NoError(t, cfg.Unpack(map[string]interface{}{
+			"static_variables": []interface{}{"kubernetes.node.", "local_dynamic.group"},
+		}))
+		assert.Equal(t, []string{"kubernetes.node", "local_dynamic.group"}, cfg.StaticVariables)
+	})
+
+	t.Run("unsupported type is rejected", func(t *testing.T) {
+		cfg := DefaultDynamicInputsConfig()
+		assert.Error(t, cfg.Unpack(true))
+	})
+}
+
+func TestDynamicInputsConfig_UnmarshalYAML(t *testing.T) {
+	t.Run("legacy scalar form", func(t *testing.T) {
+		var cfg struct {
+			DynamicInputs DynamicInputsConfig `yaml:"dynamic_inputs"`
+		}
+		cfg.DynamicInputs = DefaultDynamicInputsConfig()
+		require.NoError(t, yaml.Unmarshal([]byte("dynamic_inputs: process\n"), &cfg))
+		assert.Equal(t, "process", cfg.DynamicInputs.Default)
+	})
+
+	t.Run("map form", func(t *testing.T) {
+		var cfg struct {
+			DynamicInputs DynamicInputsConfig `yaml:"dynamic_inputs"`
+		}
+		cfg.DynamicInputs = DefaultDynamicInputsConfig()
+		require.NoError(t, yaml.Unmarshal([]byte(`dynamic_inputs:
+  default: process
+  metricbeat:
+    default: otel
+  static_variables:
+    - kubernetes.node.
+`), &cfg))
+		assert.Equal(t, "process", cfg.DynamicInputs.Default)
+		assert.Equal(t, "otel", cfg.DynamicInputs.Metricbeat.Default)
+		// trailing dots are trimmed from static variables
+		assert.Equal(t, []string{"kubernetes.node"}, cfg.DynamicInputs.StaticVariables)
+	})
+}
+
+func TestDynamicInputsConfig_RuntimeManagerForDynamicInput(t *testing.T) {
+	tests := []struct {
+		name      string
+		config    DynamicInputsConfig
+		beatName  string
+		inputType string
+		want      RuntimeManager
+	}{
+		{
+			name:      "disabled by default",
+			config:    DefaultDynamicInputsConfig(),
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      "",
+		},
+		{
+			name:      "global default applies to every beat",
+			config:    DynamicInputsConfig{Default: string(ProcessRuntimeManager)},
+			beatName:  "metricbeat",
+			inputType: "system/metrics",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "per beat default overrides the global default",
+			config: DynamicInputsConfig{
+				Default:    string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{Default: string(OtelRuntimeManager)},
+			},
+			beatName:  "metricbeat",
+			inputType: "system/metrics",
+			want:      OtelRuntimeManager,
+		},
+		{
+			name: "per beat default doesn't affect other beats",
+			config: DynamicInputsConfig{
+				Default:    string(ProcessRuntimeManager),
+				Metricbeat: BeatRuntimeConfig{Default: string(OtelRuntimeManager)},
+			},
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "per input type overrides the per beat default",
+			config: DynamicInputsConfig{
+				Default: string(OtelRuntimeManager),
+				Filebeat: BeatRuntimeConfig{
+					Default:   string(OtelRuntimeManager),
+					InputType: map[string]string{"filestream": string(ProcessRuntimeManager)},
+				},
+			},
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "per input type doesn't affect other input types of the same beat",
+			config: DynamicInputsConfig{
+				Filebeat: BeatRuntimeConfig{
+					InputType: map[string]string{"filestream": string(ProcessRuntimeManager)},
+				},
+			},
+			beatName:  "filebeat",
+			inputType: "log",
+			want:      "",
+		},
+		{
+			name: "per input type only needs the beat section",
+			config: DynamicInputsConfig{
+				Filebeat: BeatRuntimeConfig{
+					InputType: map[string]string{"filestream": string(ProcessRuntimeManager)},
+				},
+			},
+			beatName:  "filebeat",
+			inputType: "filestream",
+			want:      ProcessRuntimeManager,
+		},
+		{
+			name: "unknown beat falls back to the global default",
+			config: DynamicInputsConfig{
+				Default:  string(ProcessRuntimeManager),
+				Filebeat: BeatRuntimeConfig{Default: string(OtelRuntimeManager)},
+			},
+			beatName:  "",
+			inputType: "endpoint",
+			want:      ProcessRuntimeManager,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.config.RuntimeManagerForDynamicInput(tt.beatName, tt.inputType))
+		})
+	}
+}
+
+func TestRuntimeConfig_ValidateDynamicInputs(t *testing.T) {
+	tests := map[string]struct {
+		dynamicInputs func(*DynamicInputsConfig)
+		wantErr       bool
+	}{
+		"valid default": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Default = string(ProcessRuntimeManager) },
+		},
+		"empty default is allowed": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Default = "" },
+		},
+		"invalid default": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Default = "nonsense" },
+			wantErr:       true,
+		},
+		"invalid per beat default": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Filebeat.Default = "nonsense" },
+			wantErr:       true,
+		},
+		"invalid per input type": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.Metricbeat.InputType["system/metrics"] = "nonsense" },
+			wantErr:       true,
+		},
+		"valid static variables": {
+			dynamicInputs: func(c *DynamicInputsConfig) {
+				c.StaticVariables = []string{"kubernetes.node", "local_dynamic.group"}
+			},
+		},
+		"empty static variable": {
+			dynamicInputs: func(c *DynamicInputsConfig) { c.StaticVariables = []string{"kubernetes.node", "  "} },
+			wantErr:       true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := DefaultRuntimeConfig()
+			tt.dynamicInputs(&cfg.DynamicInputs)
+			err := cfg.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }
