@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -54,28 +54,27 @@ func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifa
 
 	expBo := backoff.NewExponentialBackOff()
 	expBo.InitialInterval = config.RetrySleepInitDuration
-	boCtx := backoff.WithContext(expBo, cancelCtx)
 
 	var attempt uint
-	opFn := func() error {
+	opFn := func() (struct{}, error) {
 		attempt++
 		log.Infof("download attempt %d", attempt)
 		if err := downloadFn(cancelCtx, source, dst); err != nil {
 			if upgradeErrors.IsPermanentHTTPError(err) {
-				return backoff.Permanent(err)
+				return struct{}{}, backoff.Permanent(err)
 			}
 			if upgradeErrors.IsDiskSpaceError(err) {
 				log.Infof("insufficient disk space error detected, stopping retries")
-				return backoff.Permanent(err)
+				return struct{}{}, backoff.Permanent(err)
 			}
 			var agentErr errors.Error
 			if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem {
 				log.Infof("filesystem error detected, stopping retries")
-				return backoff.Permanent(err)
+				return struct{}{}, backoff.Permanent(err)
 			}
-			return err
+			return struct{}{}, err
 		}
-		return nil
+		return struct{}{}, nil
 	}
 
 	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
@@ -84,7 +83,13 @@ func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifa
 		upgradeDetails.SetRetryableError(err)
 	}
 
-	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
+	if _, err := backoff.Retry(cancelCtx, opFn, backoff.WithBackOff(expBo), backoff.WithNotify(opFailureNotificationFn)); err != nil {
+		if cancelCtx.Err() != nil {
+			return cancelCtx.Err()
+		}
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return re.LastErr
+		}
 		return err
 	}
 
