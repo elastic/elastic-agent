@@ -2925,3 +2925,55 @@ func TestGetDynamicInputs(t *testing.T) {
 		}
 	})
 }
+
+type recordingReExecManager struct {
+	called bool
+}
+
+func (r *recordingReExecManager) ReExec(_ reexec.ShutdownCallbackFn, _ ...string) {
+	r.called = true
+}
+
+func TestCoordinator_Restart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	action := &fleetapi.ActionRestart{ActionID: "r1", ActionType: fleetapi.ActionTypeRestart}
+
+	t.Run("not restartable returns ErrNotRestartable and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			// buffered so SetOverrideState (via ReExec) never blocks without a run loop
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canReExec:         func() bool { return false },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrNotRestartable)
+		assert.False(t, reexecMgr.called, "should not re-exec when not restartable")
+	})
+
+	t.Run("restartable triggers re-exec and override state", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canReExec:         func() bool { return true },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.NoError(t, err)
+		assert.True(t, reexecMgr.called, "should re-exec when restartable")
+
+		select {
+		case os := <-coord.overrideStateChan:
+			require.NotNil(t, os, "restart should set an override state")
+			assert.Equal(t, agentclient.Stopping, os.state)
+		default:
+			t.Fatal("expected an override state to be set")
+		}
+	})
+}
