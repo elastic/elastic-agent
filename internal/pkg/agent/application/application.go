@@ -265,7 +265,6 @@ func New(
 		otelmanager.CollectorStopTimeout,
 		nil,
 		cfg.Settings.Internal.Runtime.OtelPartialConfigReload,
-		cfg.Settings.Internal.Kubernetes.NativeFilelogReceiver,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)

@@ -21,7 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	k8sutil "github.com/elastic/elastic-agent/internal/pkg/otel/k8s"
+	k8sutil "github.com/elastic/elastic-agent/internal/pkg/agent/application/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -85,8 +85,6 @@ var ErrNotUpgradable = errors.New(
 var ErrUpgradeInProgress = errors.New("upgrade already in progress")
 
 var enrollDelay = 1 * time.Second // max delay to start enrollment
-
-
 // ReExecManager provides an interface to perform re-execution of the entire agent.
 type ReExecManager interface {
 	ReExec(callback reexec.ShutdownCallbackFn, argOverrides ...string)
@@ -1780,10 +1778,17 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
 
-	// For the native filelog path, strip ${kubernetes.*} variable references from
-	// input stream paths before AST rendering.
-	if c.currentCfg.Settings.Internal.Kubernetes.NativeFilelogReceiver {
-		k8sutil.StripVarsFromInputPaths(m)
+	// Collapse the per-container kubernetes container-log inputs into a single
+	// filestream watching a glob path. This has to happen before AST rendering,
+	// because it is the ${kubernetes.*} references in the raw config that make the
+	// kubernetes provider render the input once per discovered container.
+	//
+	// The setting is read off the config being processed rather than c.currentCfg,
+	// which is only refreshed further down. A config that fails to unpack is left
+	// alone here and reported by the NewFromConfig call below.
+	if incomingCfg, cfgErr := configuration.NewFromConfig(cfg); cfgErr == nil &&
+		incomingCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput {
+		k8sutil.RewriteContainerLogInputs(m)
 	}
 
 	err = c.generateAST(cfg, m)
@@ -2293,25 +2298,17 @@ func (c *Coordinator) splitModelBetweenManagers(model *component.Model) (runtime
 // Normally, we use the runtime set in the component itself via the configuration, but
 // we may also fall back to the process runtime if the otel runtime is unsupported for
 // some reason. One example is the output using unsupported config options.
-func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *component.RuntimeConfig, nativeK8sFilelog bool, comp *component.Component) {
+func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *component.RuntimeConfig, comp *component.Component) {
 	if comp.RuntimeManager == component.ProcessRuntimeManager {
-		// Upgrade kubernetes container-log filestream inputs to the native OTel
-		// filelog receiver when the feature flag is on.
-		if nativeK8sFilelog && k8sutil.IsContainerLogComponent(comp) {
-			logger.Infof("upgrading component %s to otel runtime for native kubernetes filelog receiver", comp.ID)
-			comp.RuntimeManager = component.OtelRuntimeManager
-		} else {
-			// do nothing, the process runtime can handle any component
-			return
-		}
+		// do nothing, the process runtime can handle any component
+		return
 	}
 	if comp.RuntimeManager == component.OtelRuntimeManager {
 		// check if the component is actually supported
-		err := translate.VerifyComponentIsOtelSupported(comp, nativeK8sFilelog)
+		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
 			logger.Infof("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
-			return
 		}
 
 		// check if the component is dynamic and use the right runtime
@@ -2407,7 +2404,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i := range comps {
-			maybeOverrideRuntimeForComponent(c.logger, c.currentCfg.Settings.Internal.Runtime, c.currentCfg.Settings.Internal.Kubernetes.NativeFilelogReceiver, &comps[i])
+			maybeOverrideRuntimeForComponent(c.logger, c.currentCfg.Settings.Internal.Runtime, &comps[i])
 		}
 		return comps, nil
 	}

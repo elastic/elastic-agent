@@ -869,7 +869,7 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 			factory, testExec := testExecutionFactory(testBinary, innerFactory)
 
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true, false)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 			require.NoError(t, err, "could not create otel manager")
 			m.recoveryTimer = tc.restarter
 			if tc.makeExecFactory != nil {
@@ -947,7 +947,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	collectorLogger, err := logger.NewNamedLogger(CollectorLogFileName, logger.DefaultLoggingConfig(), logger.DefaultEventLoggingConfig())
 	require.NoError(t, err, "could not create collector logger")
 
-	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true, false)
+	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 	require.NoError(t, err, "could not create otel manager")
 
 	var wg sync.WaitGroup
@@ -1022,7 +1022,7 @@ func TestOTelManager_PartialReceiverReload(t *testing.T) {
 	l, _ := loggertest.New("otel-manager")
 
 	factory, _ := testExecutionFactory(testBinary, nil)
-	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true, false)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
@@ -1130,7 +1130,7 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 		return newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, false)
 	}
 	factory, _ := testExecutionFactory(testBinary, innerFactory)
-	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false, false)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
@@ -1269,7 +1269,6 @@ func TestOTelManager_Ports(t *testing.T) {
 				waitTimeForStop,
 				factory,
 				true,
-				false,
 			)
 			require.NoError(t, err, "could not create otel manager")
 
@@ -1390,7 +1389,6 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		waitTimeForStop,
 		factory,
 		true,
-		false,
 	)
 	require.NoError(t, err, "could not create otel manager")
 
@@ -2047,7 +2045,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		false,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2248,7 +2245,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	mockFactory := func(string, string, int) (collectorExecution, error) {
 		return execution, nil
 	}
-	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true, false)
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
 
@@ -2316,7 +2313,6 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		false,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2374,7 +2370,6 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		false,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2476,7 +2471,6 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		false,
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()

@@ -2323,7 +2323,7 @@ func TestGetOtelConfig(t *testing.T) {
 				}))
 				require.NoError(t, err)
 			}
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, logp.NewNopLogger(), false)
+			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -3187,7 +3187,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := VerifyComponentIsOtelSupported(tt.component, false)
+			err := VerifyComponentIsOtelSupported(tt.component)
 			if tt.expectedError != "" {
 				require.Error(t, err)
 				assert.Equal(t, err.Error(), tt.expectedError)

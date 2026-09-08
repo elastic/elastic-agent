@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -42,8 +43,6 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 	require.NoError(t, err, "failed to compile container log regex")
 	plainRegex, err := regexp.Compile(`\d+\.log\.\d{8}-\d{6}$`)
 	require.NoError(t, err, "failed to compile rotated plain log regex")
-	gzRegex, err := regexp.Compile(`\d+\.log\.\d{8}-\d{6}\.gz$`)
-	require.NoError(t, err, "failed to compile rotated gzip regex")
 
 	kCtx := k8sGetContext(t, info)
 
@@ -76,27 +75,33 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 		},
 	}
 
-	// testCases exercises both the native filelog receiver path (default, feature ON)
-	// and the legacy filebeatreceiver path (feature OFF via emergency env-var escape hatch).
-	// Both must produce ECS-compatible documents with equivalent field coverage.
+	// testCases exercises both the single glob filestream + add_kubernetes_metadata
+	// path (default, feature ON) and the per-container dynamic inputs the kubernetes
+	// provider renders (feature OFF via the emergency env-var escape hatch). Both
+	// must produce ECS-compatible documents with equivalent field coverage.
 	testCases := []struct {
-		name      string
-		helmExtra []string // appended to baseValues.Values
+		name            string
+		helmExtra       []string // appended to baseValues.Values (--set)
+		helmExtraString []string // appended as --set-string (forces string type)
 	}{
 		{
 			// Feature ON is the default — no Helm override needed.
-			name: "native_filelog_on",
+			name: "container_logs_glob_input_on",
 		},
 		{
-			// Feature OFF: set ELASTIC_AGENT_KUBERNETES_FILELOG=false via the DaemonSet
-			// extraEnvs. The preset lives at agent.presets.perNode (not
+			// Feature OFF: set ELASTIC_AGENT_KUBERNETES_CONTAINER_LOGS_GLOB=false via
+			// the DaemonSet extraEnvs. The preset lives at agent.presets.perNode (not
 			// kubernetes.presets.perNode). We also carry over ELASTIC_NETINFO (index 0)
 			// because --set replaces the whole array from the values file.
-			name: "native_filelog_off",
+			// env.value must be a string in the K8s API; use StringValues (--set-string)
+			// to prevent Helm from coercing "false" to a boolean.
+			name: "container_logs_glob_input_off",
 			helmExtra: []string{
 				"agent.presets.perNode.extraEnvs[0].name=ELASTIC_NETINFO",
+				"agent.presets.perNode.extraEnvs[1].name=ELASTIC_AGENT_KUBERNETES_CONTAINER_LOGS_GLOB",
+			},
+			helmExtraString: []string{
 				"agent.presets.perNode.extraEnvs[0].value=false",
-				"agent.presets.perNode.extraEnvs[1].name=ELASTIC_AGENT_KUBERNETES_FILELOG",
 				"agent.presets.perNode.extraEnvs[1].value=false",
 			},
 		},
@@ -105,6 +110,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 	type testCaseResult struct {
 		resources    resourceSample
 		churnLatency time.Duration
+		docFields    map[string]struct{}
 	}
 	results := make(map[string]testCaseResult)
 
@@ -116,14 +122,16 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 			deployValues := values.Options{
-				ValueFiles: baseValues.ValueFiles,
-				Values:     append(append([]string{}, baseValues.Values...), tc.helmExtra...),
+				ValueFiles:   baseValues.ValueFiles,
+				Values:       append(append([]string{}, baseValues.Values...), tc.helmExtra...),
+				StringValues: append([]string{}, tc.helmExtraString...),
 			}
 			// Upgrade must also carry the feature-flag env var so the restarted
 			// pods don't revert to the default.
 			upgradeValues := values.Options{
-				ValueFiles: deployValues.ValueFiles,
-				Values:     append(append([]string{}, deployValues.Values...), "kubernetes.containers.logs.rotated_logs=true"),
+				ValueFiles:   deployValues.ValueFiles,
+				Values:       append(append([]string{}, deployValues.Values...), "kubernetes.containers.logs.rotated_logs=true"),
+				StringValues: append([]string{}, deployValues.StringValues...),
 			}
 
 			steps := []k8sTestStep{
@@ -149,6 +157,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 				// check only passes for documents from THIS run, not leftover docs from
 				// a previous run sharing the same ES cluster.
 				k8sStepCheckLogFilesIngested(info,
+					2*time.Minute,
 					"logs", "kubernetes.container_logs", "default", "/var/log/containers/*flog*.log",
 					expectedLogFile{
 						regex:       containerRegex,
@@ -162,28 +171,46 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 				// 7 - validate ECS fields are present
 				k8sStepCheckK8sECSFieldsIngested(info, "kubernetes.container_logs"),
 
-				// 8 - deploy a brand-new flog deployment (previously unseen label) and
+				// 8 - every document, not just one, must carry the Kubernetes
+				// metadata. This is where the glob input could regress: it discovers
+				// files independently of the Kubernetes watcher, so a document could
+				// be shipped before the pod is cached.
+				k8sStepCheckEveryDocEnriched(info, "kubernetes.container_logs", 50),
+
+				// 9 - record the field shape of this arm's documents so the two arms
+				// can be compared once both have run.
+				k8sStepCaptureDocumentFields(info, "kubernetes.container_logs", &result.docFields),
+
+				// 10 - deploy a brand-new flog deployment (previously unseen label) and
 				// measure how long until its logs appear in ES — this forces the filebeat
-				// dynamic provider to detect a new pod type and reconfigure, while native
-				// filelog picks it up immediately via the existing glob pattern.
+				// dynamic provider to detect a new pod type and reconfigure, while the
+				// glob input picks it up immediately via the existing scanner.
 				k8sStepDeployNewFlogAndMeasureChurn(info, &result.churnLatency),
 
-				// 9 - upgrade the agent to enable rotated logs
+				// 11 - upgrade the agent to enable rotated logs
 				k8sStepHelmUpgrade(AgentHelmChartPath, "elastic-agent", upgradeValues),
 
-				// 10 - check that the agent pod is running
+				// 12 - check that the agent pod is running
 				k8sStepCheckRunningPods("name=agent-pernode-elastic-agent", 1, "agent"),
 
-				// 11 - verify rotated logs are ingested
+				// 13 - verify rotated logs are ingested.
+				// Plain-text rotated files appear under /var/log/pods/ after a
+				// single kubelet rotation (0.log → 0.log.YYYYMMDD-HHMMSS). Gzip
+				// files only appear after a second rotation, which is outside the
+				// practical test window here; gzip decompression is covered by
+				// compression:auto in the Helm template and unit tests.
+				//
+				// Note that rotated_logs=true moves collection to /var/log/pods/,
+				// where only the pod UID is recoverable from the path. Enrichment
+				// therefore stops at the pod: container.* and
+				// kubernetes.container.name are not expected on these documents,
+				// which is why the ECS field check runs before this upgrade.
 				k8sStepCheckLogFilesIngested(info,
+					5*time.Minute,
 					"logs", "kubernetes.container_logs", "default", "/var/log/pods/*flog*",
 					expectedLogFile{
 						regex:       plainRegex,
 						description: "plain text rotated log (" + plainRegex.String() + ")",
-					},
-					expectedLogFile{
-						regex:       gzRegex,
-						description: "gzipped rotated log (" + gzRegex.String() + ")",
 					},
 				),
 			}
@@ -200,13 +227,17 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 	}
 
 	// Print a side-by-side comparison after both sub-tests complete.
-	on, hasOn := results["native_filelog_on"]
-	off, hasOff := results["native_filelog_off"]
+	on, hasOn := results["container_logs_glob_input_on"]
+	off, hasOff := results["container_logs_glob_input_off"]
 	if hasOn && hasOff {
+		// The whole point of the rewrite: both arms must produce documents with
+		// the same field shape.
+		assertDocumentFieldParity(t, on.docFields, off.docFields)
+
 		t.Logf("=== Agent resource usage (sampled during active ingestion) ===")
-		t.Logf("%-22s  %12s  %12s", "Mode", "CPU (mCPU)", "Mem (MiB)")
-		t.Logf("%-22s  %12.2f  %12.1f", "native_filelog_on", on.resources.cpuMilliCores, on.resources.memMiB)
-		t.Logf("%-22s  %12.2f  %12.1f", "native_filelog_off", off.resources.cpuMilliCores, off.resources.memMiB)
+		t.Logf("%-30s  %12s  %12s", "Mode", "CPU (mCPU)", "Mem (MiB)")
+		t.Logf("%-30s  %12.2f  %12.1f", "container_logs_glob_input_on", on.resources.cpuMilliCores, on.resources.memMiB)
+		t.Logf("%-30s  %12.2f  %12.1f", "container_logs_glob_input_off", off.resources.cpuMilliCores, off.resources.memMiB)
 		if off.resources.cpuMilliCores > 0 {
 			t.Logf("CPU delta (on vs off): %+.1f%%", (on.resources.cpuMilliCores-off.resources.cpuMilliCores)/off.resources.cpuMilliCores*100)
 		}
@@ -216,9 +247,9 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 
 		if on.churnLatency > 0 || off.churnLatency > 0 {
 			t.Logf("=== New-pod log ingestion latency (pod scale → first ES doc) ===")
-			t.Logf("%-22s  %12s", "Mode", "Latency")
-			t.Logf("%-22s  %12s", "native_filelog_on", on.churnLatency.Round(time.Millisecond))
-			t.Logf("%-22s  %12s", "native_filelog_off", off.churnLatency.Round(time.Millisecond))
+			t.Logf("%-30s  %12s", "Mode", "Latency")
+			t.Logf("%-30s  %12s", "container_logs_glob_input_on", on.churnLatency.Round(time.Millisecond))
+			t.Logf("%-30s  %12s", "container_logs_glob_input_off", off.churnLatency.Round(time.Millisecond))
 			if off.churnLatency > 0 && on.churnLatency > 0 {
 				t.Logf("Churn latency improvement: %.1fx faster (on vs off)", float64(off.churnLatency)/float64(on.churnLatency))
 			}
@@ -238,6 +269,7 @@ type expectedLogFile struct {
 // so results only match documents produced by THIS run, not leftover docs from prior runs.
 func k8sStepCheckLogFilesIngested(
 	info *define.Info,
+	timeout time.Duration,
 	dsType, dataset, datastreamNamespace, wildcardPath string,
 	expectedFiles ...expectedLogFile,
 ) k8sTestStep {
@@ -322,7 +354,7 @@ func k8sStepCheckLogFilesIngested(
 					"expected to find %s, found only: %v",
 					expected.description, files)
 			}
-		}, 10*time.Minute, 10*time.Second, fmt.Sprintf("no documets found on datastream %s",
+		}, timeout, 5*time.Second, fmt.Sprintf("no documets found on datastream %s",
 			fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
 	}
 }
@@ -332,23 +364,25 @@ func k8sStepCheckLogFilesIngested(
 // exists filters so the query only returns documents that have ALL listed fields set;
 // a non-zero hit count proves complete field coverage.
 //
-// The same set of fields is expected from both the native filelog receiver path
-// (feature ON) and the legacy filebeatreceiver path (feature OFF), ensuring
+// The same set of fields is expected from both the single glob filestream path
+// (feature ON) and the per-container dynamic inputs (feature OFF), ensuring
 // transparent field parity across migration modes.
 func k8sStepCheckK8sECSFieldsIngested(info *define.Info, dataset string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		// Fields that must be present in every kubernetes.container_logs document,
-		// regardless of which ingestion path (native filelog or filebeatreceiver) was used.
+		// regardless of which ingestion path was used.
 		requiredFields := []string{
-			// Core Kubernetes metadata — from k8sattributes (native) or beats dynamic provider (legacy)
+			// Core Kubernetes metadata — from add_kubernetes_metadata (glob input) or
+			// the processors the kubernetes dynamic provider injects (per-container inputs)
 			"kubernetes.pod.name",
 			"kubernetes.namespace",
 			"kubernetes.container.name",
 			"kubernetes.node.name",
-			// Container metadata — from k8sattributes API lookup
+			// Container metadata — resolved from the container ID encoded in the
+			// /var/log/containers/ symlink name via the logs_path matcher
 			"container.id",
 			"container.image.name",
-			// Pod labels — k8sattributes wildcard extraction (native) or beats add_fields (legacy)
+			// Pod labels — add_kubernetes_metadata (glob input) or beats add_fields (per-container)
 			// flog.yaml sets app=flog-log-generator on its pods, so this label must appear.
 			"kubernetes.labels.app",
 			// Log provenance
@@ -384,7 +418,7 @@ func k8sStepCheckK8sECSFieldsIngested(info *define.Info, dataset string) k8sTest
 			assert.Greater(collectT, resp.Hits.Total.Value, 0,
 				"expected at least one document in %s with all required ECS fields present: %v",
 				dataset, requiredFields)
-		}, 10*time.Minute, 10*time.Second,
+		}, 2*time.Minute, 5*time.Second,
 			"required ECS fields never appeared together in dataset %s", dataset)
 	}
 }
@@ -394,9 +428,9 @@ func k8sStepCheckK8sECSFieldsIngested(info *define.Info, dataset string) k8sTest
 //
 // Using a new deployment (not just scaling an existing one) is important: the filebeat
 // dynamic provider must detect the new pod label, generate a new input config, and
-// reload filebeat before it starts collecting. The native OTel filelog receiver already
-// tails /var/log/containers/*.log, so it picks up the new pod's log file the moment
-// the container starts writing — no reconfiguration needed.
+// reload filebeat before it starts collecting. The single glob filestream already
+// scans /var/log/containers/*.log, so it picks up the new pod's log file on its next
+// scan — no reconfiguration needed.
 func k8sStepDeployNewFlogAndMeasureChurn(info *define.Info, dst *time.Duration) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		const churnName = "flog-churn-test"
@@ -475,7 +509,7 @@ func k8sStepDeployNewFlogAndMeasureChurn(info *define.Info, dst *time.Duration) 
 			resp, err := PerformQuery(ctx, query, ".ds-logs*", info.ESClient)
 			assert.NoError(ct, err)
 			assert.Greater(ct, resp.Hits.Total.Value, 0, "no docs from churn pod %s yet", newPodName)
-		}, 5*time.Minute, 5*time.Second, "logs from churn pod %s never appeared in ES", newPodName)
+		}, 2*time.Minute, 5*time.Second, "logs from churn pod %s never appeared in ES", newPodName)
 
 		*dst = time.Since(deployTime)
 		t.Logf("pod churn: first log from %s in ES after %s total (pod-ready: %s, ES-index lag: %s)",
@@ -655,4 +689,202 @@ func kubeletPollOnce(ctx context.Context, kCtx k8sContext, namespace, podName, n
 		}
 	}
 	return 0, 0, false
+}
+
+// k8sStepCheckEveryDocEnriched asserts that every kubernetes.container_logs
+// document produced by this test run carries the core Kubernetes metadata.
+//
+// This is the check that distinguishes the two ingestion paths. With the
+// per-container dynamic inputs, an input only exists once the provider knows the
+// pod, so enrichment is structurally guaranteed. With the single glob input the
+// file is discovered independently of the Kubernetes watcher, so a document can
+// be read and shipped before add_kubernetes_metadata has the pod cached. Asserting
+// on a non-zero count of unenriched documents — rather than on the presence of at
+// least one enriched document — is what actually catches that race.
+//
+// Documents are scoped by the namespace embedded in log.file.path rather than by
+// kubernetes.namespace, because an unenriched document has no kubernetes.* fields
+// to filter on.
+func k8sStepCheckEveryDocEnriched(info *define.Info, dataset string, minDocs int) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		// Fields that must be on every document; all come from the same beats
+		// metadata generator on both paths.
+		requiredFields := []string{
+			"kubernetes.pod.name",
+			"kubernetes.namespace",
+			"kubernetes.container.name",
+			"kubernetes.node.name",
+			"container.id",
+		}
+
+		scope := []any{
+			map[string]any{"term": map[string]any{"data_stream.dataset": dataset}},
+			map[string]any{"wildcard": map[string]any{
+				"log.file.path": map[string]any{"value": fmt.Sprintf("*%s*", namespace)},
+			}},
+			map[string]any{"wildcard": map[string]any{
+				"log.file.path": map[string]any{"value": "*flog*"},
+			}},
+		}
+
+		countQuery := func(mustNot []any) map[string]any {
+			boolQuery := map[string]any{"filter": scope}
+			if len(mustNot) > 0 {
+				boolQuery["must_not"] = mustNot
+			}
+			return map[string]any{
+				"size":  0,
+				"query": map[string]any{"bool": boolQuery},
+			}
+		}
+
+		// A document is unenriched when it is missing AT LEAST ONE required field.
+		// That is must_not(has-all), not must_not of each field individually:
+		// several exists clauses side by side in must_not would only match the
+		// documents missing every one of them, and the check would pass vacuously.
+		var hasAll []any
+		for _, field := range requiredFields {
+			hasAll = append(hasAll, map[string]any{"exists": map[string]any{"field": field}})
+		}
+		missing := []any{
+			map[string]any{"bool": map[string]any{"filter": hasAll}},
+		}
+
+		require.EventuallyWithT(t, func(collectT *assert.CollectT) {
+			total, err := PerformQuery(ctx, countQuery(nil), ".ds-logs*", info.ESClient)
+			require.NoError(collectT, err, "failed to count documents for dataset %s", dataset)
+			assert.GreaterOrEqual(collectT, total.Hits.Total.Value, minDocs,
+				"waiting for at least %d documents from namespace %s", minDocs, namespace)
+		}, 5*time.Minute, 5*time.Second,
+			"never ingested %d documents from namespace %s", minDocs, namespace)
+
+		// The count is only meaningful once ingestion has settled, so this runs
+		// after the wait above rather than inside it.
+		unenriched, err := PerformQuery(ctx, countQuery(missing), ".ds-logs*", info.ESClient)
+		require.NoError(t, err, "failed to count unenriched documents for dataset %s", dataset)
+		require.Equal(t, 0, unenriched.Hits.Total.Value,
+			"every document must carry %v, but %d documents from namespace %s are missing at least one",
+			requiredFields, unenriched.Hits.Total.Value, namespace)
+	}
+}
+
+// k8sStepCaptureDocumentFields records the union of field paths present on this
+// run's container-log documents into dst, so that the two feature-flag arms can be
+// compared field-for-field afterwards.
+func k8sStepCaptureDocumentFields(info *define.Info, dataset string, dst *map[string]struct{}) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		query := map[string]any{
+			"size": 200,
+			"query": map[string]any{
+				"bool": map[string]any{
+					"filter": []any{
+						map[string]any{"term": map[string]any{"data_stream.dataset": dataset}},
+						map[string]any{"wildcard": map[string]any{
+							"log.file.path": map[string]any{"value": fmt.Sprintf("*%s*", namespace)},
+						}},
+						map[string]any{"wildcard": map[string]any{
+							"log.file.path": map[string]any{"value": "*flog*"},
+						}},
+					},
+				},
+			},
+		}
+
+		resp, err := PerformQuery(ctx, query, ".ds-logs*", info.ESClient)
+		require.NoError(t, err, "failed to fetch documents for dataset %s", dataset)
+		require.NotEmpty(t, resp.Hits.Hits, "no documents to capture fields from in namespace %s", namespace)
+
+		fields := make(map[string]struct{})
+		for _, hit := range resp.Hits.Hits {
+			hitMap, ok := hit.(map[string]any)
+			if !ok {
+				continue
+			}
+			source, ok := hitMap["_source"].(map[string]any)
+			if !ok {
+				continue
+			}
+			collectFieldPaths("", source, fields)
+		}
+		require.NotEmpty(t, fields, "no field paths captured from namespace %s", namespace)
+		*dst = fields
+
+		t.Logf("captured %d distinct field paths from %d documents in namespace %s",
+			len(fields), len(resp.Hits.Hits), namespace)
+	}
+}
+
+// collectFieldPaths flattens a document into dotted field paths. Array elements
+// contribute the path of the array itself, so that a differing number of elements
+// between runs does not register as a field difference.
+func collectFieldPaths(prefix string, value any, out map[string]struct{}) {
+	switch v := value.(type) {
+	case map[string]any:
+		for key, item := range v {
+			path := key
+			if prefix != "" {
+				path = prefix + "." + key
+			}
+			collectFieldPaths(path, item, out)
+		}
+	case []any:
+		for _, item := range v {
+			collectFieldPaths(prefix, item, out)
+		}
+	default:
+		if prefix != "" {
+			out[prefix] = struct{}{}
+		}
+	}
+}
+
+// volatileFieldPaths are field paths whose presence legitimately varies between
+// two runs of the same test and therefore cannot be compared across the arms.
+var volatileFieldPaths = map[string]struct{}{
+	// Present only on the documents that happen to be the first read of a file.
+	"log.flags": {},
+	// Only emitted when a line exceeds the reader's buffer.
+	"log.file.truncated": {},
+	// Only emitted when the container runtime splits a long line.
+	"partial": {},
+}
+
+// assertDocumentFieldParity fails when the two feature-flag arms produced
+// documents with different field paths. This is the core guarantee of the
+// rewrite: replacing the per-container inputs with a single glob input plus
+// add_kubernetes_metadata must not change the shape of what reaches Elasticsearch.
+func assertDocumentFieldParity(t *testing.T, on, off map[string]struct{}) {
+	t.Helper()
+
+	// Two empty sets are trivially equal, so without this an arm that never
+	// managed to capture anything would report parity instead of a failure.
+	require.NotEmpty(t, on, "no fields captured with the glob input; parity was not actually verified")
+	require.NotEmpty(t, off, "no fields captured without the glob input; parity was not actually verified")
+
+	diff := func(a, b map[string]struct{}) []string {
+		var only []string
+		for field := range a {
+			if _, exists := b[field]; exists {
+				continue
+			}
+			if _, volatile := volatileFieldPaths[field]; volatile {
+				continue
+			}
+			only = append(only, field)
+		}
+		sort.Strings(only)
+		return only
+	}
+
+	onlyOn := diff(on, off)
+	onlyOff := diff(off, on)
+
+	t.Logf("=== Document field parity ===")
+	t.Logf("glob input ON:  %d field paths", len(on))
+	t.Logf("glob input OFF: %d field paths", len(off))
+
+	assert.Empty(t, onlyOn,
+		"fields present only with the glob input; the rewrite must not add fields: %v", onlyOn)
+	assert.Empty(t, onlyOff,
+		"fields lost by the glob input; the rewrite must not drop fields: %v", onlyOff)
 }

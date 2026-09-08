@@ -11,14 +11,21 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+// containerLogsGlobInputEnvVar is the emergency escape hatch for the glob input
+// rewrite. Setting it to "false" restores the per-container dynamic inputs.
+const containerLogsGlobInputEnvVar = "ELASTIC_AGENT_KUBERNETES_CONTAINER_LOGS_GLOB"
+
 // InternalKubernetesConfig controls agent-internal behaviour for Kubernetes
 // integrations. It lives under agent.internal.kubernetes in the policy.
 type InternalKubernetesConfig struct {
-	// NativeFilelogReceiver replaces the filebeat-based kubernetes container-log
-	// collection with a native OTel filelog receiver + k8sattributes processor.
-	// Defaults to true. Set to false or ELASTIC_AGENT_KUBERNETES_FILELOG=false to
-	// fall back to the legacy filebeat-based collection.
-	NativeFilelogReceiver bool `yaml:"native_filelog_receiver" config:"native_filelog_receiver" json:"native_filelog_receiver"`
+	// ContainerLogsGlobInput collapses the per-container kubernetes.container_logs
+	// filestream inputs produced by the kubernetes dynamic provider into a single
+	// static filestream watching a glob path, with an add_kubernetes_metadata
+	// processor supplying the Kubernetes metadata.
+	//
+	// Defaults to true. Set to false, or ELASTIC_AGENT_KUBERNETES_CONTAINER_LOGS_GLOB=false,
+	// to fall back to one filestream input per discovered container.
+	ContainerLogsGlobInput bool `yaml:"container_logs_glob_input" config:"container_logs_glob_input" json:"container_logs_glob_input"`
 }
 
 type InternalConfig struct {
@@ -27,17 +34,17 @@ type InternalConfig struct {
 }
 
 func DefaultInternalConfig() *InternalConfig {
-	// ELASTIC_AGENT_KUBERNETES_FILELOG=false is an emergency escape hatch.
-	// Evaluate it here (not just in container.go) so it works in every startup
-	// mode, including the Helm hybrid mode that starts via `elastic-agent run`.
-	nativeFilelog := true
-	if v, ok := os.LookupEnv("ELASTIC_AGENT_KUBERNETES_FILELOG"); ok && strings.TrimSpace(v) != "" {
-		nativeFilelog = strings.ToLower(strings.TrimSpace(v)) != "false"
+	// Evaluate the escape hatch here (not just in container.go) so it works in
+	// every startup mode, including the Helm hybrid mode that starts via
+	// `elastic-agent run`.
+	globInput := true
+	if v, ok := os.LookupEnv(containerLogsGlobInputEnvVar); ok && strings.TrimSpace(v) != "" {
+		globInput = !strings.EqualFold(strings.TrimSpace(v), "false")
 	}
 	return &InternalConfig{
 		Runtime: component.DefaultRuntimeConfig(),
 		Kubernetes: InternalKubernetesConfig{
-			NativeFilelogReceiver: nativeFilelog,
+			ContainerLogsGlobInput: globInput,
 		},
 	}
 }
