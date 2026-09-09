@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -39,6 +40,12 @@ Unless -f is used this command will ask confirmation before performing removal.
 	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
 	cmd.Flags().Bool("skip-fleet-audit", false, "Skip fleet audit/unenroll")
 
+	// Hidden: set by the agent when an uninstall is triggered by a Fleet
+	// UNINSTALL action. The action is acknowledged to Fleet at the point of no
+	// return by this (detached) uninstall process.
+	cmd.Flags().String(coordinator.UninstallFleetAckActionIDFlag, "", "Fleet UNINSTALL action ID to acknowledge after uninstalling")
+	_ = cmd.Flags().MarkHidden(coordinator.UninstallFleetAckActionIDFlag)
+
 	return cmd
 }
 
@@ -63,6 +70,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	force, _ := cmd.Flags().GetBool("force")
 	uninstallToken, _ := cmd.Flags().GetString("uninstall-token")
 	skipFleetAudit, _ := cmd.Flags().GetBool("skip-fleet-audit")
+	fleetAckActionID, _ := cmd.Flags().GetString(coordinator.UninstallFleetAckActionIDFlag)
 	if status == install.Broken {
 		if !force {
 			fmt.Fprintf(streams.Out, "%s is installed but currently broken: %s\n", paths.ServiceDisplayName(), reason)
@@ -97,7 +105,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
-	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar, skipFleetAudit)
+	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar, skipFleetAudit, fleetAckActionID)
 	if err != nil {
 		progBar.Describe("Failed to uninstall agent")
 		return fmt.Errorf("error uninstalling agent: %w", err)

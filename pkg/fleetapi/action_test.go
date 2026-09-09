@@ -246,6 +246,75 @@ func TestActionRestartMarshalMap(t *testing.T) {
 	}
 }
 
+func TestActionUninstallUnmarshalJSON(t *testing.T) {
+	t.Run("UNINSTALL maps to ActionUninstall", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"UNINSTALL","start_time":"2022-01-02T12:00:00Z","expiration":"2022-01-02T13:00:00Z"}]`)
+		a := &Actions{}
+		require.NoError(t, a.UnmarshalJSON(p))
+
+		action, ok := (*a)[0].(*ActionUninstall)
+		require.True(t, ok, "unable to cast action to ActionUninstall")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeUninstall, action.ActionType)
+		assert.Equal(t, "2022-01-02T12:00:00Z", action.ActionStartTime)
+		assert.Equal(t, "2022-01-02T13:00:00Z", action.ActionExpiration)
+
+		st, err := action.StartTime()
+		require.NoError(t, err)
+		assert.Equal(t, "2022-01-02T12:00:00Z", st.Format(time.RFC3339))
+
+		exp, err := action.Expiration()
+		require.NoError(t, err)
+		assert.Equal(t, "2022-01-02T13:00:00Z", exp.Format(time.RFC3339))
+	})
+
+	t.Run("UNINSTALL without start time or expiration", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"UNINSTALL"}]`)
+		a := &Actions{}
+		require.NoError(t, a.UnmarshalJSON(p))
+
+		action, ok := (*a)[0].(*ActionUninstall)
+		require.True(t, ok, "unable to cast action to ActionUninstall")
+
+		_, err := action.StartTime()
+		assert.ErrorIs(t, err, ErrNoStartTime)
+		_, err = action.Expiration()
+		assert.ErrorIs(t, err, ErrNoExpiration)
+	})
+}
+
+func TestNewActionUninstall(t *testing.T) {
+	a := NewAction(ActionTypeUninstall)
+	_, ok := a.(*ActionUninstall)
+	assert.True(t, ok, "NewAction(UNINSTALL) should return *ActionUninstall")
+}
+
+func TestActionUninstallMarshalMap(t *testing.T) {
+	action := ActionUninstall{
+		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		ActionType: "UNINSTALL",
+		Signed: &Signed{
+			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
+			Signature: "MEQCIGxsrI742xKL6OSI",
+		},
+	}
+
+	m, err := action.MarshalMap()
+	require.NoError(t, err)
+
+	diff := cmp.Diff(map[string]interface{}{
+		"id":   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		"type": "UNINSTALL",
+		"signed": map[string]interface{}{
+			"data":      "eyJAdGltZXN0YW1wIjoiMjAy",
+			"signature": "MEQCIGxsrI742xKL6OSI",
+		},
+	}, m)
+	if diff != "" {
+		t.Fatal(diff)
+	}
+}
+
 func TestActionUnenrollMarshalMap(t *testing.T) {
 	action := ActionUnenroll{
 		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
