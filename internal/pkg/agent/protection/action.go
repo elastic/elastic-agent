@@ -35,6 +35,28 @@ type actionWithData struct {
 	Agents     []string        `json:"agents"`
 }
 
+// VerifyActionSignature reports an error when the action's signature is required
+// but missing or invalid. When a signatureValidationKey is configured the action
+// must be signed and valid; when no key is configured an unsigned action is
+// accepted (no verification is performed). It is a thin gate over ValidateAction
+// used by callers that only care whether the action may proceed.
+//
+// On success it returns the verified, signed payload data (nil when the action
+// carries no signature). Callers should prefer this signed data over the action's
+// mutable outer fields so that fields covered by the signature (for example the
+// uninstall grace-period delay) cannot be tampered with while keeping a valid
+// signature.
+func VerifyActionSignature(a signedAction, signatureValidationKey []byte, agentID string) (json.RawMessage, error) {
+	data, err := ValidateAction(a, signatureValidationKey, agentID)
+	if len(signatureValidationKey) != 0 && errors.Is(err, ErrNotSigned) {
+		return nil, err
+	}
+	if err != nil && !errors.Is(err, ErrNotSigned) {
+		return nil, err
+	}
+	return data, nil
+}
+
 // ValidateAction validates action signature, checks the signed payload action id matches the action id, checks the agent id match
 // Returns decoded data.
 // In case data has no `signed` information ErrNotSigned error is returned.
