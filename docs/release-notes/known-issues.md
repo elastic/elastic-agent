@@ -29,7 +29,7 @@ Known issues are significant defects or limitations that may impact your impleme
 
 On August 28, 2026, a known issue was discovered where {{agent}} can enter a crash-restart loop immediately after startup
 or after a policy update when the agent policy is configured to use a remote {{es}} output .
-The {{agent}} crashes with
+The {{agent}} crashes with:
 
 ```shell
 panic: runtime error: index out of range [-1] in diagnostics.addSecretMarkers and exits with status INVALIDARGUMENT
