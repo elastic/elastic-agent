@@ -787,6 +787,12 @@ shared:
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
         mode: 0644
 
+  # FIPS-capable service build: the search connectors are not FIPS compliant,
+  # so unlike the non-FIPS service variant this one carries no connectors files
+  # (the Dockerfile also skips the connectors install for FIPS builds)
+  - &agent_docker_service_fips_spec
+    docker_variant: 'service'
+
   - &agent_docker_edot_spec
     <<: *agent_binary_spec_no_component_files
     docker_variant: 'elastic-otel-collector'
@@ -1242,6 +1248,34 @@ specs:
         <<: *elastic_license_for_binaries
         name: "elastic-agent-cloud-fips"
         docker_image_name_template: "{{.BeatName}}-cloud-fips"
+
+    #### Service FIPS docker images ####
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_fips_spec
+        <<: *agent_docker_fips_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_cloud_fips_spec
+        <<: *agent_docker_service_fips_spec
+        <<: *elastic_license_for_binaries
+        name: "elastic-agent-service-fips"
+        docker_image_name_template: "{{.BeatName}}-service-fips"
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_fips_spec
+        <<: *agent_docker_fips_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_cloud_fips_spec
+        <<: *agent_docker_service_fips_spec
+        <<: *elastic_license_for_binaries
+        name: "elastic-agent-service-fips"
+        docker_image_name_template: "{{.BeatName}}-service-fips"
+    #### End Service FIPS docker images ####
 
     ######## End FIPS Specs ########
 

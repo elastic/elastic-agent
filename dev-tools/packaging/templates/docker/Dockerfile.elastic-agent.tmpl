@@ -195,7 +195,8 @@ RUN mkdir /app && \
     chown {{ .user }}:{{ .user }} /app
 {{- end }}
 
-{{- if eq .Variant "service" }}
+# the search connectors are not FIPS compliant, so the FIPS service image ships without them
+{{- if and (eq .Variant "service") (not .fips) }}
 RUN apk add --no-cache git make python-3.11 py3.11-pip && \
     unzip {{ $beatHome }}/data/service/connectors-*.zip -d {{ $beatHome }}/data/service/connectors && \
     mv {{ $beatHome }}/data/service/connectors /usr/share/connectors && \
