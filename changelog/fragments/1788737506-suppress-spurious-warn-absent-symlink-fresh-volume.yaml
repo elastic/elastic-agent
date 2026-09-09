@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Suppress spurious warn log when live-install symlink is absent on a fresh volume
+component: elastic-agent

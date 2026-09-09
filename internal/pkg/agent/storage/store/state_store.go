@@ -49,8 +49,12 @@ type StateStore struct {
 type state struct {
 	Version          string           `json:"version"`
 	ActionSerializer actionSerializer `json:"action,omitempty"`
-	AckToken         string           `json:"ack_token,omitempty"`
-	Queue            actionQueue      `json:"action_queue,omitempty"`
+	// PendingAck holds an action that must be acknowledged after a restart.
+	// It is stored separately from ActionSerializer so it does not clobber the
+	// persisted policy-change action used to restore policy on startup.
+	PendingAck actionSerializer `json:"pending_ack,omitempty"`
+	AckToken   string           `json:"ack_token,omitempty"`
+	Queue      actionQueue      `json:"action_queue,omitempty"`
 }
 
 // actionSerializer is JSON Marshaler/Unmarshaler for fleetapi.Action.
@@ -194,6 +198,60 @@ func (s *StateStore) SetAction(a fleetapi.Action) {
 	}
 }
 
+// SetPendingAckAction stores an action that must be acknowledged after a
+// restart. It accepts ActionRestart. Any other type is silently discarded.
+func (s *StateStore) SetPendingAckAction(a fleetapi.Action) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	if a == nil || reflect.ValueOf(a).IsNil() {
+		s.log.Debugf("trying to set a nil '%T' pending-ack action, ignoring the action", a)
+		return
+	}
+
+	switch v := a.(type) {
+	// If any new action type is added, don't forget to update the method's
+	// description and Save.
+	case *fleetapi.ActionRestart:
+		if s.state.PendingAck.Action != nil &&
+			s.state.PendingAck.Action.ID() == v.ID() {
+			return
+		}
+		s.dirty = true
+		s.state.PendingAck.Action = a
+	default:
+		s.log.Debugw("trying to set invalid pending-ack action type on the state store, ignoring the action",
+			"action.type", a.Type(),
+			"action.id", a.ID())
+	}
+}
+
+// PendingAckAction returns the action that must be acknowledged after a
+// restart, or nil if there is none. See SetPendingAckAction for the
+// possible action types.
+func (s *StateStore) PendingAckAction() fleetapi.Action {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
+	if s.state.PendingAck.Action == nil {
+		return nil
+	}
+
+	return s.state.PendingAck.Action
+}
+
+// ClearPendingAckAction removes any stored pending-ack action.
+func (s *StateStore) ClearPendingAckAction() {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	if s.state.PendingAck.Action == nil {
+		return
+	}
+	s.dirty = true
+	s.state.PendingAck.Action = nil
+}
+
 // SetAckToken set ack token to the agent state
 func (s *StateStore) SetAckToken(ackToken string) {
 	s.mx.Lock()
@@ -239,6 +297,15 @@ func (s *StateStore) Save() (err error) {
 	default:
 		return fmt.Errorf("incompatible type, expected ActionPolicyChange, "+
 			"ActionUnenroll or nil, but received %T", a)
+	}
+
+	switch a := s.state.PendingAck.Action.(type) {
+	case *fleetapi.ActionRestart,
+		nil:
+		// ok
+	default:
+		return fmt.Errorf("incompatible pending-ack type, expected "+
+			"ActionRestart or nil, but received %T", a)
 	}
 
 	reader, err = jsonToReader(&s.state)
