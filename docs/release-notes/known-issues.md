@@ -45,7 +45,7 @@ For agents already stuck in a crash loop, stop the agent service and delete `sta
 then restart. Restarting clears the corrupted state without requiring re-enrollment.
 
 For more information, check [Issue #7739](https://github.com/elastic/fleet-server/issues/7739).
-::::
+:::
 
 ::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
 
