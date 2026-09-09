@@ -313,6 +313,27 @@ func (c *enrollCmd) fleetServerBootstrap(ctx context.Context, persistentConfig m
 	return token, nil
 }
 
+// fleetServerInternalHostPort returns the "host:port" the Fleet Server internal endpoint
+// listens on. It always binds to localhost; only the port is configurable, and changing it
+// is unsupported.
+func fleetServerInternalHostPort(internalPort uint16) string {
+	if internalPort == 0 {
+		internalPort = defaultFleetServerInternalPort
+	}
+	return net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(internalPort)))
+}
+
+// fleetServerInternalURL returns the URL of the Fleet Server internal endpoint, given the
+// "host:port" it listens on. Fleet Server only serves the endpoint over plain HTTP when it
+// runs insecure without a certificate of its own.
+func fleetServerInternalURL(internalHostPort string, insecure bool) string {
+	scheme := "https"
+	if insecure {
+		scheme = "http"
+	}
+	return scheme + "://" + internalHostPort
+}
+
 func (c *enrollCmd) prepareFleetTLS() error {
 	host := c.options.FleetServer.Host
 	if host == "" {
@@ -326,7 +347,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 		if c.options.FleetServer.InternalPort != defaultFleetServerInternalPort {
 			c.log.Warnf("Internal endpoint configured to: %d. Changing this value is not supported.", c.options.FleetServer.InternalPort)
 		}
-		c.options.InternalURL = net.JoinHostPort(defaultFleetServerInternalHost, strconv.Itoa(int(c.options.FleetServer.InternalPort)))
+		c.options.InternalURL = fleetServerInternalHostPort(c.options.FleetServer.InternalPort)
 	}
 
 	if c.options.FleetServer.Cert != "" && c.options.FleetServer.CertKey == "" {
@@ -343,7 +364,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 			}
 			c.options.URL = "http://" + net.JoinHostPort(host, strconv.Itoa(int(port)))
 			if c.options.FleetServer.ConnStr != "" && c.options.InternalURL != "" {
-				c.options.URL = "http://" + c.options.InternalURL
+				c.options.URL = fleetServerInternalURL(c.options.InternalURL, true)
 			}
 			c.options.Insecure = true
 			return nil
@@ -374,7 +395,7 @@ func (c *enrollCmd) prepareFleetTLS() error {
 
 	// Use internalURL if available
 	if c.options.FleetServer.ConnStr != "" && c.options.InternalURL != "" {
-		c.options.URL = "https://" + c.options.InternalURL
+		c.options.URL = fleetServerInternalURL(c.options.InternalURL, false)
 	}
 
 	return nil

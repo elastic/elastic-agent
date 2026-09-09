@@ -130,7 +130,7 @@ func TestBuildReceiverPipelineEvents(t *testing.T) {
 
 	require.Len(t, events, 1)
 	assert.Equal(t, "filestream-default", eventValue(t, events[0], "component.id"))
-	assert.Equal(t, int64(7), eventValue(t, events[0], "beat.stats.filebeat.libbeat.output.events.acked"))
+	assert.Equal(t, int64(7), eventValue(t, events[0], "beat.stats.libbeat.output.events.acked"))
 }
 
 func TestBuildReceiverPipelineEvents_NoData(t *testing.T) {

@@ -596,8 +596,9 @@ func TestUpdateStatusPartialReloadReceiverRemoved(t *testing.T) {
 
 func TestGetComponentStateSingleReceiver(t *testing.T) {
 	// A component with single_receiver: true has exactly one receiver whose name is
-	// OtelNamePrefix+comp.ID (no stream suffix). getComponentState must map all input
-	// streams to that receiver so the input unit is included in the component state.
+	// OtelNamePrefix+comp.ID+"/single" (placeholder stream suffix). getComponentState
+	// must map all input streams to that receiver so the input unit is included in the
+	// component state.
 	comp := component.Component{
 		ID:             "osquery-default",
 		RuntimeManager: component.OtelRuntimeManager,
@@ -624,8 +625,8 @@ func TestGetComponentStateSingleReceiver(t *testing.T) {
 		},
 	}
 
-	// Receiver name is exactly OtelNamePrefix+comp.ID with no stream suffix.
-	receiverKey := fmt.Sprintf("receiver:osquerybeatreceiver/%sosquery-default", OtelNamePrefix)
+	// Receiver name is OtelNamePrefix+comp.ID with the placeholder "single" stream suffix.
+	receiverKey := fmt.Sprintf("receiver:osquerybeatreceiver/%sosquery-default/single", OtelNamePrefix)
 	exporterKey := fmt.Sprintf("exporter:elasticsearch/%soutput-osquery-default", OtelNamePrefix)
 
 	pipelineStatus := &status.AggregateStatus{
@@ -910,6 +911,17 @@ func TestGetComponentUnitState(t *testing.T) {
 			assert.Equal(t, tt.expected.Payload, result.Payload)
 		})
 	}
+
+	t.Run("nil config is degraded", func(t *testing.T) {
+		nilConfigUnit := component.Unit{
+			ID:     "nil-config-unit",
+			Type:   client.UnitTypeInput,
+			Config: nil,
+		}
+		result := getComponentUnitState(nil, nil, nilConfigUnit, comp)
+		assert.Equal(t, client.UnitStateDegraded, result.State)
+		assert.Equal(t, "unit configuration is nil", result.Message)
+	})
 }
 
 func TestParseEntityStatusId(t *testing.T) {

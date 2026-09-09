@@ -1786,6 +1786,10 @@ type AgentInspectOutput struct {
 			Files    struct {
 				Path string `yaml:"path"`
 			} `yaml:"files"`
+			EventData struct {
+				ToFiles  bool `yaml:"to_files"`
+				ToStderr bool `yaml:"to_stderr"`
+			} `yaml:"event_data"`
 		} `yaml:"logging"`
 		Monitoring struct {
 			Enabled bool `yaml:"enabled"`

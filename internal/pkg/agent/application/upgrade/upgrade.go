@@ -137,7 +137,7 @@ type Upgrader struct {
 func IsUpgradeable() bool {
 	// only upgradeable if running from Agent installer and running under the
 	// control of the system supervisor (or built specifically with upgrading enabled)
-	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
+	return release.Upgradeable() || reexec.CanReExec()
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
@@ -400,7 +400,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	target, err := artifact.New(AgentName, release.FIPSDistribution(), parsedVersion, u.settings.OS(), u.settings.Arch())
+	target, err := artifact.New(AgentName, release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
 	}

@@ -148,6 +148,102 @@ func TestMonitoringFull(t *testing.T) {
 	}
 }
 
+// TestGetAgentFilestreamStream pins the exact set of log-file glob
+// patterns produced by getAgentFilestreamStream. We only want to
+// collect the elastic-agent, elastic-agent-watcher, and
+// elastic-otel-collector log files. We don't want the
+// elastic-agent-metrics files.
+func TestGetAgentFilestreamStream(t *testing.T) {
+	logsDrop := t.TempDir()
+
+	tcs := []struct {
+		name      string
+		namespace string
+	}{
+		{name: "default namespace", namespace: ""},
+		{name: "custom namespace", namespace: "prod"},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := monitoringcfg.DefaultConfig()
+			cfg.Namespace = tc.namespace
+			mon := &BeatsMonitor{
+				enabled: true,
+				config:  &monitoringConfig{C: cfg},
+				logger:  logp.NewNopLogger(),
+			}
+
+			stream, ok := mon.getAgentFilestreamStream(logsDrop).(map[string]any)
+			require.True(t, ok, "getAgentFilestreamStream must return a map[string]any")
+
+			assert.Equal(t, fmt.Sprintf("%s-agent", monitoringFilesUnitsID), stream[idKey], "stream id")
+			assert.Equal(t, "filestream", stream["type"], "stream type")
+
+			wantPaths := []any{
+				filepath.Join(logsDrop, agentName+"-[0-9]*.ndjson"),
+				filepath.Join(logsDrop, agentName+"-watcher-*.ndjson"),
+				filepath.Join(logsDrop, collectorName+"-*.ndjson"),
+			}
+			assert.Equal(t, wantPaths, stream["paths"],
+				"paths must be exactly these three globs; the agent pattern uses [0-9]* "+
+					"so it does not match the metrics file")
+
+			wantNamespace := tc.namespace
+			if wantNamespace == "" {
+				wantNamespace = defaultMonitoringNamespace
+			}
+			ds, ok := stream["data_stream"].(map[string]any)
+			require.True(t, ok, "data_stream must be a map[string]any")
+			assert.Equal(t, "logs", ds["type"], "data_stream.type")
+			assert.Equal(t, "elastic_agent", ds["dataset"], "data_stream.dataset")
+			assert.Equal(t, wantNamespace, ds["namespace"], "data_stream.namespace")
+		})
+	}
+}
+
+func TestMonitoringConfigWatchesCollectorLog(t *testing.T) {
+	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+	require.NoError(t, err, "Error creating agent info")
+
+	testMon := BeatsMonitor{
+		enabled:   true,
+		config:    &monitoringConfig{C: monitoringcfg.DefaultConfig()},
+		agentInfo: agentInfo,
+		logger:    logp.NewNopLogger(),
+	}
+
+	policy := map[string]any{
+		"outputs": map[string]any{
+			"default": map[string]any{},
+		},
+	}
+	compList := []component.Component{
+		{ID: "filebeat-default", InputSpec: &component.InputRuntimeSpec{BinaryName: "filebeat"}},
+	}
+
+	outCfg, err := testMon.MonitoringConfig(policy, compList, nil)
+	require.NoError(t, err)
+
+	var agentStream map[string]any
+	for _, cfg := range outCfg["inputs"].([]any) {
+		inputCfg := cfg.(map[string]any)
+		if inputCfg[idKey] == fmt.Sprintf("%s-agent", monitoringFilesUnitsID) {
+			agentStream = inputCfg
+			break
+		}
+	}
+	require.NotNil(t, agentStream, "expected to find the %s-agent input", monitoringFilesUnitsID)
+
+	paths, ok := agentStream["streams"].([]any)
+	require.True(t, ok, "expected streams to be a []any")
+	require.Len(t, paths, 1, "expected exactly one stream in the agent input")
+	streamPaths, ok := paths[0].(map[string]any)["paths"].([]any)
+	require.True(t, ok, "expected paths to be a []any")
+
+	assert.Contains(t, streamPaths, filepath.Join(filepath.Dir(loggingPath("unit", "")), collectorName+"-*.ndjson"))
+}
+
 func TestMonitoringWithEndpoint(t *testing.T) {
 	agentInfo, err := info.NewAgentInfo(context.Background(), false)
 	require.NoError(t, err, "Error creating agent info")
@@ -1079,5 +1175,69 @@ func TestMonitoringConfigParameterParsing(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLogsGlobs(t *testing.T) {
+	tests := []struct {
+		glob       string
+		matches    []string
+		nonMatches []string
+	}{
+		{
+			glob: agentLogsGlob,
+			matches: []string{
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+				"elastic-agent-metrics.ndjson",
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+		},
+		{
+			glob: watcherLogsGlob,
+			matches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+				"elastic-agent-metrics.ndjson",
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+		},
+		{
+			glob: collectorLogsGlob,
+			matches: []string{
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+				"elastic-agent-metrics.ndjson",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		for _, name := range tc.matches {
+			matched, err := filepath.Match(tc.glob, name)
+			require.NoError(t, err)
+			assert.Truef(t, matched, "expected %q to match glob %q", name, tc.glob)
+		}
+		for _, name := range tc.nonMatches {
+			matched, err := filepath.Match(tc.glob, name)
+			require.NoError(t, err)
+			assert.Falsef(t, matched, "expected %q to NOT match glob %q", name, tc.glob)
+		}
 	}
 }

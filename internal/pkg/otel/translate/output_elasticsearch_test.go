@@ -8,6 +8,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -20,6 +21,26 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
 )
+
+func TestGetRetryConfig(t *testing.T) {
+	escfg := defaultOptions
+	expectedRequestStatuses := defaultRetryOnStatus()
+	expectedDocumentStatuses := defaultRetryOnDocumentStatus
+
+	retryConfig := getRetryConfig(escfg)
+
+	assert.Equal(t,
+		expectedRequestStatuses,
+		retryConfig["retry_on_status"],
+		"the defaults for 'retry_on_status' must be preserved",
+	)
+	assert.Equal(
+		t,
+		expectedDocumentStatuses,
+		retryConfig["retry_on_document_status"],
+		"the defaults for 'retry_on_document_status' must be preserved",
+	)
+}
 
 func TestToOtelConfig(t *testing.T) {
 	logger := logptest.NewTestingLogger(t, "")
@@ -43,6 +64,8 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -57,6 +80,8 @@ retry:
   max_interval: 7m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -77,10 +102,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
@@ -96,7 +122,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -111,6 +137,8 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200
 logs_index: some-index
@@ -122,6 +150,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -142,10 +172,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -159,7 +190,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -175,6 +206,8 @@ parameters:
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200?somekey=somevalue
 logs_index: some-index
@@ -186,6 +219,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -206,10 +241,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -223,7 +259,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -234,13 +270,15 @@ logs_dynamic_pipeline:
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
-ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+ssl.certificate_authorities: "testdata/certs/rootCA.crt"
 ssl.supported_protocols: "TLSv1.3"
-ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
+ssl.cipher_suites: "ECDHE-ECDSA-AES-128-GCM-SHA256"
 ssl.curve_types: "P-256"
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200
 logs_index: some-index
@@ -252,6 +290,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -272,10 +312,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -289,7 +330,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -309,6 +350,8 @@ preset: %s
 `
 
 		commonOTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -319,6 +362,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -361,10 +406,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
-  queue_size: 3200
+  num_consumers: 2
+  queue_size: 6400
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -379,15 +425,18 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
-  queue_size: 12800
+  num_consumers: 8
+  queue_size: 25600
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
 				presetName: "scale",
 				output: `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -398,6 +447,8 @@ retry:
   max_interval: 5m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -422,10 +473,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
-  queue_size: 3200
+  num_consumers: 2
+  queue_size: 6400
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
@@ -449,10 +501,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 4100
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -467,10 +520,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 1
+  num_consumers: 2
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 		}
@@ -478,7 +532,7 @@ suppress_conflict_errors: true
 		for _, test := range tests {
 			t.Run("config translation w/"+test.presetName, func(t *testing.T) {
 				cfg := config.MustNewConfigFrom(fmt.Sprintf(commonBeatCfg, test.presetName))
-				got, _, err := ESToOTelConfig(cfg, "", logger)
+				got, _, _, err := ESToOTelConfig(cfg, "", logger)
 				require.NoError(t, err, "error translating elasticsearch output to OTel ES exporter type")
 				expOutput := newFromYamlString(t, test.output)
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -506,6 +560,8 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -520,6 +576,8 @@ retry:
   max_interval: 7m0s
   max_retries: 5
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -540,10 +598,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
@@ -559,7 +618,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -585,6 +644,8 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
@@ -603,10 +664,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 60
+  num_consumers: 120
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
@@ -622,7 +684,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -642,6 +704,8 @@ index: "some-index"
 compression_level: %d`
 
 	otelConfig := `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -655,6 +719,8 @@ retry:
   max_interval: 1m0s
   max_retries: 3
   retry_on_status:
+__REQUEST_RETRY_STATUSES__
+  retry_on_document_status:
   - 429
   - 500
   - 501
@@ -677,10 +743,11 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 2
+  num_consumers: 4
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 {{ if gt . 0 }}
 compression: gzip
@@ -699,7 +766,7 @@ logs_dynamic_pipeline:
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
 			cfg := config.MustNewConfigFrom(fmt.Sprintf(compressionConfig, level))
-			got, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+			got, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 			var otelBuffer bytes.Buffer
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
@@ -729,19 +796,101 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 			cfg, err := config.NewConfigFrom(c.cfg)
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 
-			_, _, err = ESToOTelConfig(cfg, "", logger)
+			_, _, _, err = ESToOTelConfig(cfg, "", logger)
 			require.ErrorContains(t, err, c.wantErrContains)
+		})
+	}
+}
+
+func TestCalcNamedPresetSizing(t *testing.T) {
+	cases := []struct {
+		name          string
+		maxConns      int
+		batchSize     int
+		floor         int
+		wantQueueSize int
+		wantConsumers int
+	}{
+		{
+			name:          "balanced single host",
+			maxConns:      1,
+			batchSize:     1600,
+			floor:         3200,
+			wantQueueSize: 6400, // 2*1600*2=6400 > floor 3200
+			wantConsumers: 2,
+		},
+		{
+			name:          "throughput single host",
+			maxConns:      4,
+			batchSize:     1600,
+			floor:         12800,
+			wantQueueSize: 25600, // 2*1600*8=25600 > floor 12800
+			wantConsumers: 8,
+		},
+		{
+			name:      "latency preset floor kicks in without cap",
+			maxConns:  1,
+			batchSize: 50,
+			floor:     4100,
+			// formula gives 2*50*2=200, below floor 4100 but no cap applied;
+			// queueSize takes the floor, numConsumers stays at connection-model value
+			wantQueueSize: 4100,
+			wantConsumers: 2,
+		},
+		{
+			name:          "large host list capped at maxQueueEvents",
+			maxConns:      30,
+			batchSize:     1600,
+			floor:         3200,
+			wantQueueSize: maxQueueEvents,                  // 2*1600*60=192000 > 64000
+			wantConsumers: max(1, maxQueueEvents/(2*1600)), // 20
+		},
+		{
+			name:      "cap applies then floor above ceiling recalculates consumers",
+			maxConns:  30,
+			batchSize: 1600,
+			floor:     maxQueueEvents + 10000, // hypothetical: preset floor above memory ceiling
+			// formula 192000 > 64000: cap to 64000, numConsumers=20;
+			// then floor 74000 > 64000: apply floor and recalculate
+			wantQueueSize: maxQueueEvents + 10000,
+			wantConsumers: max(1, (maxQueueEvents+10000)/(2*1600)),
+		},
+		{
+			name:          "zero batchSize guarded",
+			maxConns:      1,
+			batchSize:     0,
+			floor:         0,
+			wantQueueSize: 4, // batchSize clamped to 1: 2*1*2=4
+			wantConsumers: 2,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			gotQueueSize, gotConsumers := calcNamedPresetSizing(c.maxConns, c.batchSize, c.floor)
+			assert.Equal(t, c.wantQueueSize, gotQueueSize, "queueSize")
+			assert.Equal(t, c.wantConsumers, gotConsumers, "numConsumers")
 		})
 	}
 }
 
 func newFromYamlString(t *testing.T, input string) *confmap.Conf {
 	t.Helper()
+	input = strings.ReplaceAll(input, "__REQUEST_RETRY_STATUSES__", requestRetryStatusesYAML())
 	var rawConf map[string]any
 	err := yaml.Unmarshal([]byte(input), &rawConf)
 	require.NoError(t, err)
 
 	return confmap.NewFromStringMap(rawConf)
+}
+
+func requestRetryStatusesYAML() string {
+	statuses := defaultRetryOnStatus()
+	lines := make([]string, len(statuses))
+	for i, status := range statuses {
+		lines[i] = fmt.Sprintf("  - %d", status)
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *confmap.Conf) {
@@ -753,4 +902,113 @@ func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *con
 	require.NoError(t, err)
 
 	assert.Equal(t, string(want), string(got))
+}
+
+func TestGetBeatsAuthExtensionConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		outputCfg     map[string]any
+		expected      map[string]any
+		expectedError string
+	}{
+		{
+			name:      "empty config",
+			outputCfg: map[string]any{},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"timeout":                 "1m30s",
+			},
+		},
+		{
+			name: "with proxy_url and timeout",
+			outputCfg: map[string]any{
+				"proxy_url": "http://proxy.example.com:8080",
+				"timeout":   "2m",
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"proxy_url":               "http://proxy.example.com:8080",
+				"timeout":                 "2m0s",
+			},
+		},
+		{
+			name: "with ssl enabled",
+			outputCfg: map[string]any{
+				"ssl.enabled": true,
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"ssl": map[string]interface{}{
+					"ca_sha256":                  []interface{}{},
+					"ca_trusted_fingerprint":     "",
+					"certificate":                "",
+					"certificate_authorities":    []interface{}{},
+					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
+					"cipher_suites":              []interface{}{},
+					"disable_legacy_pem_support": false,
+					"curve_types":                []interface{}{},
+					"enabled":                    true,
+					"key":                        "",
+					"key_passphrase":             "",
+					"key_passphrase_path":        "",
+					"renegotiation":              int64(0),
+					"supported_protocols":        []interface{}{},
+					"verification_mode":          uint64(0),
+				},
+				"timeout": "1m30s",
+			},
+		},
+		{
+			name: "with ssl enabled and verification_mode certificate",
+			outputCfg: map[string]any{
+				"ssl.enabled":           true,
+				"ssl.verification_mode": "certificate",
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"ssl": map[string]interface{}{
+					"ca_sha256":                  []interface{}{},
+					"ca_trusted_fingerprint":     "",
+					"certificate":                "",
+					"certificate_authorities":    []interface{}{},
+					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
+					"cipher_suites":              []interface{}{},
+					"disable_legacy_pem_support": false,
+					"curve_types":                []interface{}{},
+					"enabled":                    true,
+					"key":                        "",
+					"key_passphrase":             "",
+					"key_passphrase_path":        "",
+					"renegotiation":              int64(0),
+					"supported_protocols":        []interface{}{},
+					"verification_mode":          uint64(2),
+				},
+				"timeout": "1m30s",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(tt.outputCfg)
+			require.NoError(t, err)
+
+			actual, err := getBeatsAuthExtensionConfig(cfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedError, err.Error())
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
 }

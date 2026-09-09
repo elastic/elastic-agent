@@ -375,26 +375,75 @@ func collectComponentInputMetrics(md pmetric.Metrics) map[string]componentInputD
 	return components
 }
 
+// baseComponentID strips the per-container stream ID suffix from an agent
+// component ID so that all receivers sharing the same base component
+// (e.g. "filestream-default/<streamID>" or "http/metrics-monitoring/<streamID>")
+// are aggregated into a single entry. The stream ID is always the last
+// slash-delimited segment, so we cut at the last "/" rather than the first.
+func baseComponentID(compID string) string {
+	i := strings.LastIndexByte(compID, '/')
+	if i < 0 {
+		return compID
+	}
+	return compID[:i]
+}
+
+// receiverMetricField builds the Beats monitoring field path for a metric
+// emitted by the RegistryBridge. The RegistryBridge uses raw monitoring registry
+// keys as OTel metric names, which already carry a namespace prefix:
+//
+//   - "libbeat.*" keys are generic across all beat types: beat.stats.libbeat.*
+//   - "<beatType>.*" keys already carry the type prefix; adding it again would
+//     produce a double prefix.
+//   - Unqualified names get the beat-type prefix: beat.stats.<beatType>.<name>.
+func receiverMetricField(beatType, metricName string) string {
+	if strings.HasPrefix(metricName, "libbeat.") || strings.HasPrefix(metricName, beatType+".") {
+		return "beat.stats." + metricName
+	}
+	return "beat.stats." + beatType + "." + metricName
+}
+
 // addReceiverDataPoint records a single data point from a RegistryBridge metric
 // into the components map. otelID is the receiver's OTel component ID.
+// Per-container receivers (e.g. "filestream-default/<hash>") are aggregated into
+// a single entry keyed by the base component ID, with values summed.
 func addReceiverDataPoint(components map[string]map[string]any, dp pmetric.NumberDataPoint, otelID string, metricName string) {
-	compID := agentComponentID(otelID)
+	compID := baseComponentID(agentComponentID(otelID))
 	if compID == "" {
 		return
 	}
-	field := "beat.stats." + beatTypeFromOtelID(otelID) + "." + metricName
+	field := receiverMetricField(beatTypeFromOtelID(otelID), metricName)
 	if _, exists := components[compID]; !exists {
 		components[compID] = map[string]any{}
 	}
-	if val, ok := numberDataPointValue(dp); ok {
-		components[compID][field] = val
+	val, ok := numberDataPointValue(dp)
+	if !ok {
+		return
 	}
+	// Accumulate values from multiple per-container receivers into the same field.
+	if existing, exists := components[compID][field]; exists {
+		switch ev := existing.(type) {
+		case int64:
+			if v, ok := val.(int64); ok {
+				components[compID][field] = ev + v
+				return
+			}
+		case float64:
+			if v, ok := val.(float64); ok {
+				components[compID][field] = ev + v
+				return
+			}
+		}
+	}
+	components[compID][field] = val
 }
 
 // collectReceiverMetrics collects all metrics emitted by the RegistryBridge
 // (scope name: registryBridgeScopeName). Each data point carries a "receiver"
-// attribute containing the OTel component ID. Metrics are mapped to fields as
-// "beat.stats.{beatType}.{metricName}", matching the standard Beats monitoring schema.
+// attribute containing the OTel component ID. Metrics are mapped using
+// receiverMetricField so that libbeat.* and <beatType>.* prefixes are handled
+// correctly. Per-container receivers sharing the same base component ID are
+// aggregated into a single entry with summed values.
 func collectReceiverMetrics(md pmetric.Metrics) map[string]map[string]any {
 	components := map[string]map[string]any{}
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {

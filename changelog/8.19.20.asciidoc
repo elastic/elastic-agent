@@ -1,0 +1,50 @@
+// begin 8.19.20 relnotes
+
+[[release-notes-8.19.20]]
+==  8.19.20
+
+Review important information about the  8.19.20 release.
+
+[discrete]
+[[security-updates-8.19.20]]
+=== Security updates
+
+
+
+
+* Redact sensitive values in JSON diagnostic files. https://github.com/elastic/elastic-agent/pull/15904[#15904] 
+
+
+
+
+
+
+
+
+
+
+[discrete]
+[[enhancements-8.19.20]]
+=== Enhancements
+
+
+
+
+* Add environment variables to collector diagnostics. https://github.com/elastic/elastic-agent/pull/15661[#15661] 
+* Update OTel Collector components to v0.156.0. https://github.com/elastic/elastic-agent/pull/15812[#15812] 
+
+
+
+
+[discrete]
+[[bug-fixes-8.19.20]]
+=== Bug fixes
+
+
+
+
+* Stop upgrade rollback from being triggered by slow service component restarts. https://github.com/elastic/elastic-agent/pull/15865[#15865] 
+* Fix getting current user failing on Windows when no profile directory is present. https://github.com/elastic/elastic-agent/pull/16007[#16007] 
+* Bake Synthetics browser binaries into the `elastic-agent-complete` image. https://github.com/elastic/elastic-agent/pull/16017[#16017] https://github.com/elastic/elastic-agent/issues/15993[#15993]
+
+// end 8.19.20 relnotes

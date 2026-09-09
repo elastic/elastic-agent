@@ -43,7 +43,7 @@ func InstallGolangciLint() error {
 	}
 	fmt.Printf(">> install golangci-lint %s\n", wantVer)
 	return sh.RunV("bash", "-c",
-		fmt.Sprintf("curl -sSfL --retry 5 --retry-delay 5 --retry-all-errors https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s %s", wantVer))
+		fmt.Sprintf("curl -sSfL --retry 5 --retry-delay 5 --retry-all-errors https://golangci-lint.run/install.sh | sh -s %s", wantVer))
 }
 
 // golangciLintInstalledVersion returns the version of the locally installed

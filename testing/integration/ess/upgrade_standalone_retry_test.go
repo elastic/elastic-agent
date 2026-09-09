@@ -57,7 +57,8 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 	srcPackage, err := endFixture.SrcPackage(ctx)
 	require.NoError(t, err)
 
-	l, err := net.Listen("tcp", ":0")
+	var lc net.ListenConfig
+	l, err := lc.Listen(ctx, "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	defer l.Close()
 	port := l.Addr().(*net.TCPAddr).Port
@@ -71,24 +72,31 @@ func TestStandaloneUpgradeRetryDownload(t *testing.T) {
 		if !strings.HasPrefix(upath, "/") {
 			upath = "/" + upath
 		}
-		if strings.HasPrefix(upath, "/beats/elastic-agent/") {
-			upath = strings.TrimPrefix(upath, "/beats/elastic-agent/")
-		}
+		upath = strings.TrimPrefix(upath, "/beats/elastic-agent/")
 		r.URL.Path = upath
 
 		if path.Base(r.URL.Path) == filepath.Base(srcPackage) && count < 2 {
-			// first 2 requests return 404
+			// the first 2 requests fail with a retryable error
 			count += 1
-			t.Logf("request #%d; returning not found", count)
-			rw.WriteHeader(http.StatusNotFound)
+			t.Logf("request #%d; returning internal server error", count)
+			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
 		fs.ServeHTTP(rw, r)
 	})
 
+	server := &http.Server{
+		Handler:      handler,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  10 * time.Second,
+	}
+	t.Cleanup(func() {
+		_ = server.Close()
+	})
 	go func() {
-		_ = http.Serve(l, handler)
+		_ = server.Serve(l)
 	}()
 
 	sourceURI := fmt.Sprintf("http://localhost:%d", port)

@@ -64,6 +64,10 @@ func (prov *ServerlessProvisioner) Name() string {
 	return ProvisionerServerless
 }
 
+func (prov *ServerlessProvisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationRemote
+}
+
 // SetLogger sets the logger for the
 func (prov *ServerlessProvisioner) SetLogger(l common.Logger) {
 	prov.log = l

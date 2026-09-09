@@ -735,12 +735,13 @@ func (s *Settings) setCrossBuildDefaults() {
 
 // setPackagingDefaults sets default values for PackagingSettings.
 func (s *Settings) setPackagingDefaults() {
-	// Default to reading .package-version so `mage package` works from a
-	// fresh checkout without ceremony: the loader below will pull in the
-	// manifest URL, version and snapshot flag for the branch. Flows that
-	// need version.go's version instead (notably the binary-DRA builder
-	// in .buildkite/scripts/steps/build-agent-core.sh) set
-	// USE_PACKAGE_VERSION=false explicitly.
+	// Reading .package-version is opt-in per mage target: only targets that
+	// call WithPackageVersionOverrides consume it. Default it to on so that
+	// `mage package` works from a fresh checkout without ceremony (the
+	// override pulls in the manifest URL, version and snapshot flag for the
+	// branch), while targets that never call WithPackageVersionOverrides
+	// ignore .package-version entirely. USE_PACKAGE_VERSION=false disables
+	// the overrides for the opt-in targets too.
 	s.Packaging.UsePackageVersion = true
 }
 
@@ -914,6 +915,82 @@ func (s *Settings) WithManifestInfo(ctx context.Context) (*Settings, error) {
 	return clone, nil
 }
 
+// WithPackageVersionOverrides returns a copy of the settings with the
+// .package-version file's contents applied: the manifest URL, the package and
+// core versions, the snapshot flag, the integration-test agent/stack versions,
+// and a default agent drop path. Values provided explicitly via the
+// environment (AGENT_PACKAGE_VERSION, BEAT_VERSION, AGENT_VERSION,
+// AGENT_STACK_VERSION, AGENT_DROP_PATH) win over the file's.
+//
+// Reading .package-version is opt-in per mage target: only targets whose
+// output must stay consistent with the published snapshot build call this
+// (package and the targets built on it, downloadManifest, ironbank, the cloud
+// image targets, and the integration-test runners). All other targets never
+// read the file, so for example `SNAPSHOT=false mage helm:package` behaves as
+// written.
+//
+// USE_PACKAGE_VERSION=false disables the overrides for opt-in targets too. An
+// explicit MANIFEST_URL also disables them, since the manifest is then
+// authoritative for versions (combining MANIFEST_URL with an explicit
+// USE_PACKAGE_VERSION=true is rejected during settings loading).
+//
+// An explicit SNAPSHOT value that contradicts .package-version is an error
+// rather than silently overridden: packaging snapshot dependencies into an
+// artifact labeled as a release build (or vice versa) produces a broken
+// package.
+func (s *Settings) WithPackageVersionOverrides() (*Settings, error) {
+	if !s.Packaging.UsePackageVersion || s.Packaging.ManifestURL != "" {
+		return s, nil
+	}
+
+	pv, err := GetPackageVersionInfo(s)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", PackageVersionFilename, err)
+	}
+	if pv == nil {
+		return s, nil
+	}
+
+	parsedVersion, err := version.ParseVersion(pv.Version)
+	if err != nil {
+		return nil, fmt.Errorf("parsing version %q from %s: %w", pv.Version, PackageVersionFilename, err)
+	}
+	snapshot := parsedVersion.IsSnapshot()
+	if s.Build.SnapshotSet && s.Build.Snapshot != snapshot {
+		return nil, fmt.Errorf(
+			"SNAPSHOT=%v conflicts with %s (version %s): the package's snapshot flag must match its dependencies; "+
+				"set USE_PACKAGE_VERSION=false or provide MANIFEST_URL instead",
+			s.Build.Snapshot, PackageVersionFilename, pv.Version)
+	}
+
+	clone := s.Clone()
+	clone.Packaging.ManifestURL = pv.ManifestURL
+	clone.Build.Snapshot = snapshot
+	// AgentPackageVersion and AgentCoreVersion are both set from pv.CoreVersion
+	// because the full package's agent_package_version must match the core
+	// archive's agent_core_version (extractAgentCoreForPackage looks up the
+	// core archive by the same version). For packageAgentCore running as a
+	// dependency of package, this means the core archive is named with
+	// .package-version's version rather than version/version.go's; that is
+	// intentional.
+	if os.Getenv("AGENT_PACKAGE_VERSION") == "" {
+		clone.Packaging.AgentPackageVersion = pv.CoreVersion
+	}
+	if os.Getenv("BEAT_VERSION") == "" {
+		clone.Build.AgentCoreVersion = pv.CoreVersion
+	}
+	if os.Getenv("AGENT_VERSION") == "" {
+		clone.IntegrationTest.AgentVersion = pv.Version
+	}
+	if os.Getenv("AGENT_STACK_VERSION") == "" {
+		clone.IntegrationTest.AgentStackVersion = pv.StackVersion
+	}
+	if clone.Packaging.AgentDropPath == "" {
+		clone.Packaging.AgentDropPath = filepath.Join(clone.RepoInfo.RootDir, "build", "distributions", "elastic-agent-drop")
+	}
+	return clone, nil
+}
+
 // WithAgentDropPath returns a copy of the settings with the specified agent drop path.
 func (s *Settings) WithAgentDropPath(path string) *Settings {
 	clone := s.Clone()
@@ -969,6 +1046,12 @@ type BuildSettings struct {
 
 	// Snapshot indicates whether this is a snapshot build (from SNAPSHOT env var, default true)
 	Snapshot bool
+
+	// SnapshotSet indicates whether the SNAPSHOT env var was explicitly set.
+	// This is needed to distinguish "not set" from "explicitly set to the
+	// default" so that WithPackageVersionOverrides can error on an explicit
+	// value that contradicts .package-version instead of silently ignoring it.
+	SnapshotSet bool
 
 	// DevBuild indicates whether this is a development build (from DEV env var)
 	DevBuild bool
@@ -1162,8 +1245,15 @@ type PackagingSettings struct {
 	// Manifest is the downloaded manifest response. Populated by WithManifestInfo when ManifestURL is set.
 	Manifest *manifest.Build
 
-	// UsePackageVersion enables reading version from .package-version file (from USE_PACKAGE_VERSION env var)
+	// UsePackageVersion enables reading version from .package-version file (from USE_PACKAGE_VERSION env var).
+	// Only consulted by targets that call WithPackageVersionOverrides; it has no
+	// effect on any other target.
 	UsePackageVersion bool
+
+	// UsePackageVersionSet indicates whether the USE_PACKAGE_VERSION env var was
+	// explicitly set, distinguishing an explicit opt-in from the default when
+	// combined with MANIFEST_URL (explicit true + MANIFEST_URL is an error).
+	UsePackageVersionSet bool
 
 	// AgentDropPath is the path for dropping agent artifacts (from AGENT_DROP_PATH env var)
 	AgentDropPath string
@@ -1421,6 +1511,7 @@ func (s *Settings) loadBuildSettingsFromEnv() error {
 
 	var err error
 
+	_, s.Build.SnapshotSet = os.LookupEnv("SNAPSHOT")
 	s.Build.Snapshot, err = parseBoolEnv("SNAPSHOT", s.Build.Snapshot)
 	if err != nil {
 		return fmt.Errorf("failed to parse SNAPSHOT: %w", err)
@@ -1561,14 +1652,18 @@ func (s *Settings) loadPackagingSettingsFromEnv() error {
 		manifestURLSet = true
 	}
 	var err error
+	_, s.Packaging.UsePackageVersionSet = os.LookupEnv("USE_PACKAGE_VERSION")
 	s.Packaging.UsePackageVersion, err = parseBoolEnv("USE_PACKAGE_VERSION", s.Packaging.UsePackageVersion)
 	if err != nil {
 		return fmt.Errorf("failed to parse USE_PACKAGE_VERSION: %w", err)
 	}
-	if manifestURLSet && s.Packaging.UsePackageVersion {
+	// An explicit MANIFEST_URL is authoritative and makes
+	// WithPackageVersionOverrides a no-op, so only reject the combination when
+	// USE_PACKAGE_VERSION=true was explicitly requested alongside it.
+	if manifestURLSet && s.Packaging.UsePackageVersionSet && s.Packaging.UsePackageVersion {
 		return errors.New("MANIFEST_URL and USE_PACKAGE_VERSION=true are mutually exclusive: " +
 			"USE_PACKAGE_VERSION reads .package-version to set the manifest URL; " +
-			"set USE_PACKAGE_VERSION=false when providing MANIFEST_URL explicitly")
+			"unset USE_PACKAGE_VERSION when providing MANIFEST_URL explicitly")
 	}
 	if v := os.Getenv("AGENT_DROP_PATH"); v != "" {
 		s.Packaging.AgentDropPath = v
@@ -1585,31 +1680,6 @@ func (s *Settings) loadPackagingSettingsFromEnv() error {
 		return fmt.Errorf("unknown AGENT_CORE_SOURCE=%s", v)
 	}
 
-	// Apply .package-version overrides when USE_PACKAGE_VERSION is set.
-	// AgentPackageVersion and AgentCoreVersion are both set from pv.CoreVersion
-	// because the full package's agent_package_version must match the core
-	// archive's agent_core_version (extractAgentCoreForPackage looks up the
-	// core archive by the same version). For standalone packageAgentCore, this
-	// means the core archive is named with .package-version's version rather
-	// than version/version.go's; that is intentional.
-	if s.Packaging.UsePackageVersion {
-		pv, err := GetPackageVersionInfo(s)
-		if err != nil {
-			log.Printf("Warning: failed to get package version info: %v", err)
-		}
-		if pv != nil {
-			s.Packaging.ManifestURL = pv.ManifestURL
-			s.Packaging.AgentPackageVersion = pv.CoreVersion
-			s.Build.AgentCoreVersion = pv.CoreVersion
-			s.Build.Snapshot = true
-			s.IntegrationTest.AgentVersion = pv.Version
-			s.IntegrationTest.AgentStackVersion = pv.StackVersion
-
-			if s.Packaging.AgentDropPath == "" {
-				s.Packaging.AgentDropPath = filepath.Join(s.RepoInfo.RootDir, "build", "distributions", "elastic-agent-drop")
-			}
-		}
-	}
 	return nil
 }
 

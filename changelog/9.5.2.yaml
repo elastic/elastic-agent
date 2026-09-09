@@ -1,0 +1,189 @@
+version: 9.5.2
+entries:
+    - kind: bug-fix
+      summary: Fix getting current user failing on Windows when no profile directory is present
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16005
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784257071
+      file:
+        name: 1784257071-fix-windows-no-profile-directory.yaml
+        checksum: 36263e1ed203ce3566233fae445e9add923626a3
+    - kind: bug-fix
+      summary: Size the in-flight event budget for the Elasticsearch exporter's concurrency in OTel mode
+      description: |
+        For Beats in the otel runtime (the default), the Elasticsearch output now runs two exporter consumers per connection and
+        sizes `queue.mem.events` against that consumer count rather than the output's configured
+        worker count. The performance preset budgets are sized for the process runtime, which holds
+        un-acknowledged events in fewer places, so the OTel runtime ran short of in-flight events and
+        left the connection idle waiting on Elasticsearch. The `balanced`, `scale` and `latency`
+        presets roughly double their event rate as a result, at an unchanged connection count.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16204
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785446506
+      file:
+        name: 1785446506-size-beat-receiver-queue-for-otel-exporter-concurrency.yaml
+        checksum: 9489918fdc3460bbf87f0a3664b280e08ca57985
+    - kind: other
+      summary: Update Otel collector dependencies to v0.157.0/v1.63.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16024
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785505890
+      file:
+        name: 1785505890-update-otel-collector-dependencies-to-v0.157.0-v1.63.0.yaml
+        checksum: dda5c5bcd833e8a17f082bdacf762b8309ade13d
+    - kind: bug-fix
+      summary: Stop Fleet Server containers from re-enrolling on every restart
+      description: |
+        A container started with FLEET_SERVER_ENABLE=1 and a persisted state directory
+        enrolled again on every restart, leaving an offline agent record in Fleet each
+        time. The restart check compared the persisted Fleet host against FLEET_URL,
+        which is not used in this topology, so it never matched. The check now compares
+        against the Fleet Server internal endpoint that enrollment actually persists.
+        Additionally, a failure to reach Fleet Server while validating the stored API
+        key no longer aborts startup or discards the enrollment; only a revoked API key
+        triggers a re-enrollment.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16020
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15922
+      impact: ""
+      action: ""
+      timestamp: 1785700000
+      file:
+        name: 1785700000-fix-fleet-server-container-re-enrollment.yaml
+        checksum: df1405bda5aa015323b6b1643e5a132194f9e12c
+    - kind: bug-fix
+      summary: exclude elastic-agent-metrics.ndjson file from log ingestion
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16084
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785868582
+      file:
+        name: 1785868582-exclude-new-elastic-agent-metrics.ndjson-file-from-log-ingestion.yaml
+        checksum: 88f7d92f0d863cc0662681dd82af76c19adc333a
+    - kind: enhancement
+      summary: Bump github.com/kardianos/service to v1.3.0 and update Linux systemd template for new mini template engine
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16046
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785938601
+      file:
+        name: 1785938601-bump-github.com-kardianos-service-to-v1.3.0.yaml
+        checksum: 09456961c2184d39cf6afc2376147ad5b5cacb32
+    - kind: security
+      summary: Fix local privilege escalation via binary tampering on Windows unprivileged installs
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16153
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786027979
+      file:
+        name: 1786027979-fix-local-privilege-escalation-via-binary-tampering-on-windows-unprivileged-installs.yaml
+        checksum: 80ae62807a1f4847ab2a35b31a2bbd1cc5088ba2
+    - kind: bug-fix
+      summary: Fix Windows FIPS upgrade failure caused by mismatched directory name
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16086
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786061388
+      file:
+        name: 1786061388-strip-fips-from-zip-filename-prefix.yaml
+        checksum: 2b38a814f1550f33801e053d727df044171af602
+    - kind: other
+      summary: Bump Node.js to 22.23.2 and npm to 12.0.2 in Elastic Agent complete Docker images.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16077
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786098015
+      file:
+        name: 1786098015-bump-heartbeat-nodejs-22.23.2-npm-12.0.2.yaml
+        checksum: e07e98ee08db9123aeecb7474dce702bacce435e
+    - kind: other
+      summary: Restore process runtime as the default for Heartbeat
+      description: |
+        Heartbeat no longer uses the OTel runtime by default and instead returns to the
+        process runtime. This temporarily reverts the default while functionality gaps
+        in the OTel runtime are addressed.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16139
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786436533
+      file:
+        name: 1786436533-disable-otel-heartbeat-default-runtime.yaml
+        checksum: 46bac0d054ff051cc50969aedec764ec778a61d2
+    - kind: bug-fix
+      summary: Inputs running in OTel runtime with kafka output and Kerberos authentication enabled will now fallback to process runtime.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16165
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786460214
+      file:
+        name: 1786460214-fallback-process-runtime-kerberos.yaml
+        checksum: 4bdb4163b380e56325e65d3884f22266711d01c4
+    - kind: bug-fix
+      summary: Allow the current Windows Agent user to write component executables
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16175
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786546956
+      file:
+        name: 1786546956-allow-current-windows-agent-user-to-write-components.yaml
+        checksum: 41ed34a45401af3ed3c43d0d0fae2e4db5c643a1
+    - kind: enhancement
+      summary: Update Go to 1.26.6
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16203
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1786744535
+      file:
+        name: 1786744535-updatecli_main_bump-golang-version.yaml
+        checksum: 9e2ddf07095b7c79c869ebc8e6d5254bec6eec55

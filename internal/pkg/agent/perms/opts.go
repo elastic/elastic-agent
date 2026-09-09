@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultMask = 0770
+	defaultMask = 0750
 )
 
 type opts struct {

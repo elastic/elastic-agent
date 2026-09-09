@@ -80,6 +80,8 @@ pull_request_rules:
       - -closed
       - conflict
       - label=automation
+      - "author!=elastic-renovate-prod[bot]"
+      - "author!=dependabot[bot]"
     actions:
       close:
         message: |

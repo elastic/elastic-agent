@@ -1,6 +1,6 @@
-# EDOT Collector docs automation scripts
+# Elastic Agent docs automation scripts
 
-This directory contains automation scripts for generating and updating EDOT Collector documentation.
+This directory contains automation scripts for generating and updating Elastic Agent documentation.
 
 ## Overview
 

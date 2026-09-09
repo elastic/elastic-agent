@@ -155,6 +155,14 @@ func getFlushMinEvents(logger *logp.Logger, output *config.C) int {
 	return int(minEvents)
 }
 
+func getBulkMaxSize(output *config.C) int {
+	size, err := output.Int("bulk_max_size", -1)
+	if err != nil {
+		return 1600 // default bulk_max_size from elasticsearch.DefaultConfig
+	}
+	return int(size)
+}
+
 // TLSCommonToOTel converts a tlscommon.Config into the OTel configtls.ClientConfig
 // ca_trusted_fingerprint, ca_sha_256 and verification_mode: strict/certificate are not handled by this method
 func TLSToOTel(tlsConfig *tlscommon.Config, logger *logp.Logger) (map[string]any, error) {

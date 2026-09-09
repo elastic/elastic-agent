@@ -1,18 +1,18 @@
 ---
 navigation_title: Monitor internal metrics
-description: Monitor the health and performance of the EDOT Collector using its internal OpenTelemetry metrics.
+description: Monitor the health and performance of the {{agent}} using its internal OpenTelemetry metrics.
 applies_to:
   product:
     edot_collector: ga
 ---
 
-# Monitor the EDOT Collector with internal metrics
+# Monitor the {{agent}} with internal metrics
 
-The EDOT Collector exposes internal OpenTelemetry metrics that provide visibility into its health, performance, and telemetry pipeline behavior. Monitoring these metrics can help you proactively detect backpressure, exporter failures, dropped spans, and resource saturation before they impact data ingestion.
+The {{agent}} exposes internal OpenTelemetry metrics that provide visibility into its health, performance, and telemetry pipeline behavior. Monitoring these metrics can help you proactively detect backpressure, exporter failures, dropped spans, and resource saturation before they impact data ingestion.
 
 ## Enable internal metrics
 
-The EDOT Collector exposes internal metrics in Prometheus format by default at `http://127.0.0.1:8888/metrics`. To expose metrics on all interfaces or customize the endpoint, update the `service.telemetry.metrics` section in your Collector configuration.
+The {{agent}} exposes internal metrics in Prometheus format by default at `http://127.0.0.1:8888/metrics`. To expose metrics on all interfaces or customize the endpoint, update the `service.telemetry.metrics` section in your Collector configuration.
 
 ### Expose metrics for scraping
 
@@ -36,7 +36,7 @@ The exact configuration might vary based on deployment mode and whether metrics 
 
 ## Collect internal metrics
 
-To collect internal metrics, use the EDOT Collector's Prometheus receiver (`prometheusreceiver`) to scrape the Prometheus endpoint exposed by the Collector. Unlike the metricbeat-style `prometheus/metrics` input, this contrib, OTLP-native receiver doesn't add ECS fields as metadata.
+To collect internal metrics, use the {{agent}}'s Prometheus receiver (`prometheusreceiver`) to scrape the Prometheus endpoint exposed by the Collector. Unlike the metricbeat-style `prometheus/metrics` input, this contrib, OTLP-native receiver doesn't add ECS fields as metadata.
 
 ### Scrape internal metrics with the Prometheus receiver
 
@@ -65,7 +65,7 @@ Replace `127.0.0.1:8888` with `<collector-host>:8888` if scraping from another h
 
 ## Key metrics to monitor
 
-The EDOT Collector emits internal metrics under the `otelcol.*` namespace (refer to the [Collector service metadata](https://github.com/open-telemetry/opentelemetry-collector/blob/main/service/metadata.yaml) for more information). However, when you scrape the Prometheus endpoint, metric names are normalized to Prometheus format and appear with the `otelcol_*` prefix (dots become underscores). Use them to monitor the Collector’s internal state and surface operational issues.
+The {{agent}} emits internal metrics under the `otelcol.*` namespace (refer to the [Collector service metadata](https://github.com/open-telemetry/opentelemetry-collector/blob/main/service/metadata.yaml) for more information). However, when you scrape the Prometheus endpoint, metric names are normalized to Prometheus format and appear with the `otelcol_*` prefix (dots become underscores). Use them to monitor the Collector’s internal state and surface operational issues.
 
 ### Pipeline throughput
 
@@ -147,7 +147,7 @@ Resolution:
 - Review ingestion limits and retry logic  
 - Investigate latency or firewall constraints
 
-For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/trace-export-errors.md) (export failures, retries), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting), [Connectivity issues with EDOT](docs-content://troubleshoot/ingest/opentelemetry/connectivity.md) (network, authorization, firewall).
+For more information, refer to [Export failures when sending telemetry data](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/trace-export-errors.md) (export failures, retries), [429 errors when using the mOTLP endpoint](docs-content://troubleshoot/ingest/opentelemetry/429-errors-motlp.md) (rate limiting), [Connectivity issues with {{agent}}](docs-content://troubleshoot/ingest/opentelemetry/connectivity.md) (network, authorization, firewall).
 
 ### Excessive memory or CPU usage
 
@@ -182,5 +182,5 @@ Example alert scenarios:
 
 - [Contrib OpenTelemetry Collector internal telemetry documentation](https://opentelemetry.io/docs/collector/internal-telemetry/)
 - [Contrib OpenTelemetry metrics reference](https://opentelemetry.io/docs/specs/otel/metrics/)
-- [EDOT Collector configuration reference](/reference/edot-collector/config/index.md)
-- [EDOT Collector troubleshooting](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/index.md)
+- [{{agent}} configuration reference](/reference/edot-collector/config/index.md)
+- [{{agent}} troubleshooting](docs-content://troubleshoot/ingest/opentelemetry/edot-collector/index.md)

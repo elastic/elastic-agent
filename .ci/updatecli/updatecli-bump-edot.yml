@@ -22,9 +22,10 @@ actions:
     spec:
       automerge: false
       labels:
+        - automation
+        - dependencies
         - backport-active-8
         - backport-active-9
-        - dependencies
         - skip-changelog
         - Team:Elastic-Agent-Control-Plane
       title: '[otel/kube-stack] Update EDOT SDK k8s auto-instrumentation images to their latest versions'

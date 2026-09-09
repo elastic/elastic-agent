@@ -18,6 +18,9 @@ const (
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
+	// Container group of tests. Used for testing Elastic Agent in container mode.
+	Container = "container"
+
 	// FleetPrivileged group of tests. Used for testing Elastic Agent with Fleet installed privileged.
 	FleetPrivileged = "fleet-privileged"
 
@@ -32,8 +35,8 @@ const (
 	// upgrading to a build built from the PR being tested.
 	FleetUpgradeToPRBuild = "fleet-upgrade-to-pr-build"
 
-	// FQDN group of tests. Used for testing Elastic Agent with FQDN enabled.
-	FQDN = "fqdn"
+	// Hostname group of tests. Used for testing Elastic Agent hostname behaviour (FQDN, env override).
+	Hostname = "hostname"
 
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"

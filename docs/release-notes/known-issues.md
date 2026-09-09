@@ -23,6 +23,144 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
+
+**Applies to: {{agent}} 9.4.0 to 9.4.5, 9.5.0 to 9.5.1**
+
+On August 10, 2026, a known issue was discovered where Kafka outputs configured with Kerberos authentication do not fall back to the process runtime. The OTel runtime starts successfully but silently drops Kerberos settings during config translation, so Kafka authentication fails. A fix will be included in {{agent}} 9.4.6 and 9.5.2.
+
+**Workaround**
+
+Force the process runtime for Kafka outputs:
+
+```yaml
+agent.internal.runtime.output:
+  kafka: process
+```
+
+Alternatively, set `_runtime_experimental: process` on the affected inputs.
+
+For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
+::::
+
+:::{dropdown} GCP integration data collected through Pub/Sub is silently dropped on the OTel runtime
+
+**Applies to: {{agent}} 9.5.0 to 9.5.1**
+
+On August 5, 2026, a known issue was discovered where the Filebeat OTel runtime converts values with the Go type `map[string]string` to the string `unknown type: map[string]string` instead of an object. When the destination data stream maps the field as an object, {{es}} rejects the document with a `document_parsing_exception`.
+
+The GCP Pub/Sub input uses a `map[string]string` value for the top-level `labels` field. As a result, this issue affects all GCP integration data streams collected through Pub/Sub, including `gcp.audit`, `gcp.vpcflow`, and `gcp.firewall`.
+
+**Symptoms**
+
+{{fleet}} reports the {{agent}} status as **Healthy**, and agent logs do not contain related errors. The Pub/Sub subscription consumes and acknowledges messages, so no backlog appears. If the destination data stream has the Failure Store enabled, the rejected documents are redirected there and the bulk response reports success. The only visible symptom is that no new documents are searchable.
+
+**Workaround**
+
+Force Filebeat to use the process runtime instead of the OTel runtime:
+
+```yaml
+agent:
+  internal.runtime.filebeat.default: process
+```
+
+**Resolution**
+
+Upgrade to {{agent}} 9.5.2 or later.
+
+For more information, check [Issue #52460](https://github.com/elastic/beats/issues/52460).
+:::
+
+:::{dropdown} Osquery live and scheduled query results are missing in Kibana on {{agent}} 9.5.0
+
+**Applies to: {{agent}} 9.5.0**
+
+On August 3, 2026, a known issue was confirmed where {{agent}} 9.5.0 running the `osquery_manager` integration (version 1.30 or later) with default settings causes live and scheduled query results to not appear in the Kibana Osquery UI. Queries appear stuck in "pending" status and the Results column shows 0.
+
+The issue occurs because the OTel runtime, which is the default runtime for Osquerybeat in {{agent}} 9.5, incorrectly routes action response documents to the `osquery_manager.query_profile` data stream instead of `osquery_manager.action.responses`. This only affects agents using a three-stream `osquery_manager` policy, which is the default for newly created policies with `osquery_manager` 1.30 or later.
+
+Agents using policies created before osquery_manager 1.30 added the `query_profile` data stream are not affected.
+
+**Workaround**
+
+Pin Osquerybeat back to the process runtime on the {{fleet}} agent policy using the `osquery_manager` integration:
+
+1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy.
+
+2. On the **Settings** tab, expand **Advanced settings** and locate **Advanced internal YAML settings**.
+
+3. Enter the following, then select **Save changes**:
+
+    ```yaml
+    runtime:
+      osquerybeat:
+        default: process
+    ```
+
+For more information, check [Issue #15964](https://github.com/elastic/elastic-agent/issues/15964).
+:::
+
+::::{dropdown} {{agent}} Synthetics browser monitors fail on private locations on 9.5.0
+
+**Applies to: {{agent}} 9.5.0**
+
+**Do not upgrade private location {{agents}} that run Synthetics browser (journey) monitors to 9.5.0.** Keep those agents on **9.4.x** (for example 9.4.4) and wait for **9.5.1**. It is supported to run an older {{agent}} version (such as 9.4.4) against a 9.5.0 {{stack}}. Lightweight monitors (HTTP, TCP, and ICMP) and Elastic-managed locations are not affected.
+
+On 9.5.0, browser monitors on {{fleet}}-managed private locations fail for two independent reasons:
+
+1. **Missing Playwright browser binaries** in the `elastic-agent-complete` image. Journeys fail at launch with `browserType.launch: Executable doesn't exist at .../chromium_headless_shell-<rev>/...`. For more information, check [Issue #15993](https://github.com/elastic/elastic-agent/issues/15993).
+
+2. **OTel Heartbeat runtime** rejects browser monitor config and reports the component as permanently failed with `missing required field accessing 'heartbeat.monitors.0.schedule'`. For more information, check [Issue #15968](https://github.com/elastic/elastic-agent/issues/15968).
+
+Both issues are addressed in 9.5.1. There is no supported workaround on 9.5.0 that restores browser monitors without changing the agent version.
+::::
+
+:::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
+
+**Applies to: {{agent}} 9.3.7, 9.3.8, 9.4.3, 9.4.4**
+
+On July 9, 2026, a known issue was discovered where {{agent}} can restart repeatedly when it is deployed in a {{fleet}}-managed container. When it processes a policy update, the agent uses the default logging values instead of the configuration already active in the container. It incorrectly detects a logging change, restarts and repeats this process indefinitely.
+
+This restart does not increment the container restart count. On Linux, the agent replaces its own process image in place (`execve`), so the PID and container stay alive while the agent loops. Confirm the issue by counting the initialization banner in the agent logs — a healthy agent prints it once, a looping agent prints it tens or hundreds of times within minutes:
+
+```bash
+grep -c 'agent container initialisation - chown paths' <agent-container-logs>
+```
+
+**Workaround**
+
+Update the agent policy to set `agent.logging.to_stderr` to `true` and `agent.logging.to_files` to `false`, so the policy matches the container's logging configuration. Use the {{fleet}} API to apply these settings:
+
+```bash
+curl -u <user>:<password> \
+  -X PUT https://<kibana-host>/api/fleet/agent_policies/<policy-id> \
+  -H 'Content-Type: application/json' \
+  -H 'kbn-xsrf: true' \
+  -d '{
+    "name": "<policy-name>",
+    "namespace": "<policy-namespace>",
+    "overrides": {
+      "agent": {
+        "logging": {
+          "to_stderr": true,
+          "to_files": false
+        }
+      }
+    }
+  }'
+```
+
+The `name` and `namespace` values are required by the API and must match the existing policy. Retrieve them first with a GET request to `/api/fleet/agent_policies/<policy-id>`.
+
+After updating the policy, clear the agent state to break the loop. An agent already looping replays the cached policy action faster than a {{fleet}} check-in interval, so the corrected policy never reaches it. Clear the state by removing `/usr/share/elastic-agent/state/fleet.yml` — from inside the running container, from the mounted volume on the host, or by recreating the container. Alternatively, set the `FLEET_FORCE=1` environment variable and restart to force re-enrollment regardless of existing state.
+
+**Alternative workaround**
+
+Instead of updating the agent policy with the API call, you can prevent the loop from occurring by setting the `LOGS_PATH` environment variable on the container before it starts. This stops the container entrypoint from injecting a logging configuration, so no mismatch between the container and the policy can occur. Note that when `LOGS_PATH` is set, agent logs are written to files rather than stderr.
+
+For more information, check [Issue #15432](https://github.com/elastic/elastic-agent/issues/15432).
+:::
+
 :::{dropdown} {{agent}} logs a "failed to unmarshal checkin actions" error on almost every {{fleet}} check-in
 
 **Applies to: {{agent}} 8.19.17, 8.19.18, 9.3.6, 9.3.7, 9.4.3**

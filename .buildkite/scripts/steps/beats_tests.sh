@@ -11,6 +11,9 @@ set -euo pipefail
 source .buildkite/scripts/common.sh
 STACK_PROVISIONER="${1:-"serverless"}"
 
+# We don't want any metadata from .package-version in these tests
+export USE_PACKAGE_VERSION=false
+
 run_test_for_beat(){
     export GOFLAGS='-buildvcs=false'
     local beat_name=$1
@@ -20,6 +23,7 @@ run_test_for_beat(){
     pushd $WORKSPACE
     whoami
     ls -la
+    unset BEAT_VERSION # prevent EA workspace version from leaking into the Beats build
     SNAPSHOT=true PLATFORMS=linux/amd64 PACKAGES=tar.gz,zip mage package
     popd
 
@@ -43,7 +47,8 @@ mage -l
 mkdir -p /tmp/beats-build
 pushd /tmp/beats-build
 
-git clone --depth=1 git@github.com:elastic/beats.git
+BEATS_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-${BUILDKITE_BRANCH}}"
+git clone --depth=1 --branch "${BEATS_BRANCH}" git@github.com:elastic/beats.git
 popd
 
 # export WORKSPACE=beats/x-pack/metricbeat

@@ -84,6 +84,7 @@ jobs:
         delete-branch: true
         labels: |
           automation
+          dependencies
           skip-changelog
           Team:Elastic-Agent-Control-Plane
 

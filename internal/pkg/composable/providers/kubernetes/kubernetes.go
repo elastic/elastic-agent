@@ -7,7 +7,7 @@ package kubernetes
 import (
 	"fmt"
 
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
+	"github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
 
 	k8s "k8s.io/client-go/kubernetes"
 

@@ -9,7 +9,7 @@ metadata:
 
 spec:
   type: tool
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   lifecycle: production
 
@@ -26,7 +26,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -63,7 +63,7 @@ spec:
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "false"
         SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -83,7 +83,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -106,7 +106,7 @@ spec:
         SLACK_NOTIFICATIONS_ALL_BRANCHES: "false"
         SLACK_NOTIFICATIONS_ON_SUCCESS: "false"
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -126,7 +126,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -142,7 +142,7 @@ spec:
       cancel_intermediate_builds: false
       skip_intermediate_builds: false
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -162,7 +162,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -178,7 +178,7 @@ spec:
       cancel_intermediate_builds: false
       skip_intermediate_builds: false
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -198,7 +198,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -219,7 +219,7 @@ spec:
           cronline: "0 0 * * 2" # every Tuesday at 00:00
           message: MacOS Elastic Agent Scheduled tests
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -238,7 +238,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -267,7 +267,7 @@ spec:
       cancel_intermediate_builds: false
       skip_intermediate_builds: false
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         artifact-management:
           access_level: BUILD_AND_READ
@@ -291,7 +291,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -319,7 +319,7 @@ spec:
           cronline: "@daily"
           message: Builds daily `main` dra
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -339,7 +339,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -363,7 +363,7 @@ spec:
           cronline: "0 0 * * 4" # every Thursday at 00:00
           message: Integration test matrix
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -383,7 +383,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -397,7 +397,7 @@ spec:
         trigger_mode: none # don't trigger jobs from github activity
       repository: elastic/elastic-agent
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -424,7 +424,7 @@ metadata:
 
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -439,7 +439,7 @@ spec:
         trigger_mode: none # don't trigger jobs from github activity
       repository: elastic/elastic-agent
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -465,7 +465,7 @@ metadata:
       url: https://buildkite.com/elastic/elastic-agent-version-bump
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -486,7 +486,7 @@ spec:
       skip_intermediate_builds: true
       skip_intermediate_builds_branch_filter: "!main"
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ
@@ -512,7 +512,7 @@ metadata:
       url: https://buildkite.com/elastic/elastic-agent-pipeline-scheduler
 spec:
   type: buildkite-pipeline
-  owner: group:ingest-fp
+  owner: group:streams
   system: platform-ingest
   implementation:
     apiVersion: buildkite.elastic.dev/v1
@@ -535,7 +535,7 @@ spec:
       provider_settings:
         trigger_mode: none
       teams:
-        ingest-fp:
+        streams:
           access_level: MANAGE_BUILD_AND_READ
         observablt-robots:
           access_level: MANAGE_BUILD_AND_READ

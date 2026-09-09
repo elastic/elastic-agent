@@ -89,8 +89,8 @@ func (_c *MockAgent_AgentID_Call) RunAndReturn(run func() string) *MockAgent_Age
 }
 
 // ECSMetadata provides a mock function for the type MockAgent
-func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ecsmeta.ECSMeta, error) {
-	ret := _mock.Called(v)
+func (_mock *MockAgent) ECSMetadata(logger1 *logger.Logger) (*ecsmeta.ECSMeta, error) {
+	ret := _mock.Called(logger1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ECSMetadata")
@@ -99,17 +99,17 @@ func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ecsmeta.ECSMeta, error) 
 	var r0 *ecsmeta.ECSMeta
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ecsmeta.ECSMeta, error)); ok {
-		return returnFunc(v)
+		return returnFunc(logger1)
 	}
 	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ecsmeta.ECSMeta); ok {
-		r0 = returnFunc(v)
+		r0 = returnFunc(logger1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*ecsmeta.ECSMeta)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(*logger.Logger) error); ok {
-		r1 = returnFunc(v)
+		r1 = returnFunc(logger1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -122,12 +122,12 @@ type MockAgent_ECSMetadata_Call struct {
 }
 
 // ECSMetadata is a helper method to define mock.On call
-//   - v *logger.Logger
-func (_e *MockAgent_Expecter) ECSMetadata(v any) *MockAgent_ECSMetadata_Call {
-	return &MockAgent_ECSMetadata_Call{Call: _e.mock.On("ECSMetadata", v)}
+//   - logger1 *logger.Logger
+func (_e *MockAgent_Expecter) ECSMetadata(logger1 any) *MockAgent_ECSMetadata_Call {
+	return &MockAgent_ECSMetadata_Call{Call: _e.mock.On("ECSMetadata", logger1)}
 }
 
-func (_c *MockAgent_ECSMetadata_Call) Run(run func(v *logger.Logger)) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) Run(run func(logger1 *logger.Logger)) *MockAgent_ECSMetadata_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *logger.Logger
 		if args[0] != nil {
@@ -145,7 +145,7 @@ func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ecsmeta.ECSMeta, err error
 	return _c
 }
 
-func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(v *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(logger1 *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
 	_c.Call.Return(run)
 	return _c
 }
