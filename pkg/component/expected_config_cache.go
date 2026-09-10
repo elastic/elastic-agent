@@ -134,7 +134,7 @@ func hashConfigValue(v interface{}) uint64 {
 		for _, e := range t {
 			h = mix64(h ^ hashConfigValue(e))
 		}
-		return h
+		return mix64(h)
 	default:
 		if f, ok := numberValue(v); ok {
 			return mix64(tagNumber ^ math.Float64bits(f))
