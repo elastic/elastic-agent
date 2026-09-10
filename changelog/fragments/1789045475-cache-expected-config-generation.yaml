@@ -16,13 +16,7 @@ summary: Reduce CPU and memory churn when regenerating the component model
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: |
-  Unit configurations are no longer converted through mapstructure and go-ucfg on every
-  component model refresh, and the configurations of units that did not change are reused
-  from the previous refresh. Feature flags and limits are parsed from the agent section of the
-  policy only. A negative unit revision is now rejected instead of wrapping around, and the
-  computed configuration in diagnostics keeps the keys consumed while generating components
-  (use_output, enabled, log_level).
+#description:
 
 # Affected component; a word indicating the component this changeset affects.
 component: elastic-agent
