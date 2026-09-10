@@ -336,6 +336,20 @@
                                             "description": "Use Symlinks.",
                                             "default": true
                                         },
+                                        "read_until_eof": {
+                                            "type": "object",
+                                            "description": "Filestream read_until_eof settings for the container logs stream. Controls whether a removed pod log file is read to EOF before it is closed; set enabled to false on clusters with heavy pod churn.",
+                                            "properties": {
+                                                "enabled": {
+                                                    "type": "boolean",
+                                                    "description": "Read a removed log file to EOF before closing it."
+                                                },
+                                                "timeout": {
+                                                    "type": "string",
+                                                    "description": "Maximum time to wait for EOF to be reached, as a duration (for example 5m)."
+                                                }
+                                            }
+                                        },
                                         "additionalParsersConfig": {
                                             "type": "array",
                                             "description": "Additional parsers configuration.",
