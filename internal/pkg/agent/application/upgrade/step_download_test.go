@@ -534,6 +534,44 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
+			name: "multiple remote sourceURIs stops when totalTimeout is exceeded before per-source retries complete",
+			run: func(t *testing.T, fx *fixture) {
+				// totalTimeout sits between one and two requestDelays so the
+				// first source completes but the second is interrupted mid-download.
+				const requestDelay = 120 * time.Millisecond
+				fx.settings.Timeout = 150 * time.Millisecond
+				fx.downloader.totalTimeout = 180 * time.Millisecond
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				firstRequests := map[string]int{}
+				secondRequests := map[string]int{}
+
+				makeServer := func(counts map[string]int) *httptest.Server {
+					return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						select {
+						case <-time.After(requestDelay):
+							counts[r.URL.Path]++
+							w.WriteHeader(http.StatusInternalServerError)
+						case <-r.Context().Done():
+						}
+					}))
+				}
+				firstServer := makeServer(firstRequests)
+				t.Cleanup(firstServer.Close)
+				secondServer := makeServer(secondRequests)
+				t.Cleanup(secondServer.Close)
+
+				upgradeDetails, _, _, _ := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServer.URL, secondServer.URL}, upgradeDetails, false, true, pgpSource)
+				require.Error(t, err)
+				require.Positive(t, firstRequests[remotePath])
+				require.Zero(t, secondRequests[remotePath])
+				require.NoFileExists(t, artifactPath)
+			},
+		},
+		{
 			name: "multiple remote sourceURIs stop retrying entirely when the target path cannot be written",
 			run: func(t *testing.T, fx *fixture) {
 				fx.downloader.retryTimeout = 200 * time.Millisecond
