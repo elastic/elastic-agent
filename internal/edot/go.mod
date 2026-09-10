@@ -8,7 +8,6 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260908185001-060efad3b235
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.46.3
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.67.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.67.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.70.0
@@ -85,7 +84,6 @@ require (
 	github.com/huandu/go-clone v1.7.3 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/joeshaw/multierror v0.0.0-20140124173710-69b34d4ec901 // indirect
-	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/moby/moby/api v1.55.0 // indirect
 	github.com/moby/moby/client v0.5.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding v0.159.0 // indirect
@@ -669,7 +667,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.45.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.45.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.21.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.45.0
+	go.opentelemetry.io/otel/sdk/metric v1.45.0 // indirect
 	go.opentelemetry.io/otel/trace v1.45.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
