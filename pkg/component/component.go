@@ -794,7 +794,9 @@ func (r *RuntimeSpecs) ToComponents(
 
 	// every unit configuration of the model has been generated (or reused); drop the cached
 	// ones that are no longer part of it
-	options.cache.Sweep()
+	if options.cache != nil {
+		options.cache.Sweep()
+	}
 
 	return components, nil
 }
