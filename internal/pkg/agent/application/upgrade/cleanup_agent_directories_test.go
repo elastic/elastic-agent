@@ -244,15 +244,15 @@ func TestCleanupAgentDirectories_AbsentSymlink_WithMarker_NotDegraded(t *testing
 	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
 	source := ttl.NewTTLMarkerRegistry(log, topDir)
 
-	// Write an upgrade marker — models an RPM/DEB install that has been upgraded
-	// at least once and therefore has a marker, but no live symlink.
+	// Write an upgrade marker — exercises the code path where the symlink is
+	// absent but a marker is present (e.g. the symlink was deleted externally).
 	require.NoError(t, os.MkdirAll(filepath.Join(topDir, "data"), 0o750))
 	require.NoError(t,
 		SaveMarker(paths.DataFrom(topDir), &UpdateMarker{Version: "1.0.0", Hash: "aaaaaa"}, true),
 		"writing upgrade marker fixture")
 
 	// No symlink. callerProtected covers the live versioned home, so cleanup must
-	// proceed without degrading — this is the normal state on RPM/DEB installs.
+	// proceed without degrading even when a marker is present.
 	callerProtected := map[string]bool{filepath.Clean(relHome): true}
 	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: true})
 	require.NoError(t, err, "absent symlink with callerProtected must not be treated as degraded")
