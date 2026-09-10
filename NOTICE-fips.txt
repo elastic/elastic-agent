@@ -36490,11 +36490,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/grpc-ecosystem/grpc-gateway/v2
-Version: v2.29.0
+Version: v2.30.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/grpc-ecosystem/grpc-gateway/v2@v2.29.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/grpc-ecosystem/grpc-gateway/v2@v2.30.0/LICENSE:
 
 Copyright (c) 2015, Gengo, Inc.
 All rights reserved.
@@ -39801,11 +39801,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/oapi-codegen/runtime
-Version: v1.4.0
+Version: v1.6.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/oapi-codegen/runtime@v1.6.0/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
