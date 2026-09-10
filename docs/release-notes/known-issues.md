@@ -23,9 +23,6 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
-<<<<<<< HEAD
-::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
-=======
 :::{dropdown} Elastic Agent crash-loop when a remote Elasticsearch monitoring output is configured.
 
 **Applies to: {{agent}} 9.4.6, 9.5.3**
@@ -143,7 +140,8 @@ Both issues are addressed in 9.5.1. There is no supported workaround on 9.5.0 th
 ::::
 
 :::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
->>>>>>> 0a8a212 ([docs] Add known issue for elastic/fleet-server#7739 (#16542))
+
+::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
 
 **Applies to: {{agent}} 9.3.7, 9.3.8, 9.4.3, 9.4.4**
 
