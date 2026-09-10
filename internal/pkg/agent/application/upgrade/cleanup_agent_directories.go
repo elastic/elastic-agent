@@ -182,13 +182,14 @@ func cleanupAgentDirectories(
 
 	symlinkTarget, symlinkErr := liveVersionedHome(topDir)
 	if symlinkErr != nil {
-		if errors.Is(symlinkErr, errSymlinkAbsent) && marker == nil && markerErr == nil {
-			// Fresh volume: symlink absent and no upgrade marker present. The
-			// agent creates the symlink on first start, after this cleanup pass
-			// runs. Log at debug — this is the expected state, not a degraded
-			// one.
-			log.Debugw("live versioned home symlink is absent; orphan directories will be kept conservatively",
+		if errors.Is(symlinkErr, errSymlinkAbsent) {
+			// Symlink absent — callerProtected already covers the live versioned home,
+			// so cleanup can proceed safely without it. This is the expected state on
+			// package-managed installs (RPM/DEB), which never create this symlink.
+			// Clear symlinkErr so shouldRemove does not conservatively preserve everything.
+			log.Debugw("live versioned home symlink is absent; cleanup will rely on caller-protected list",
 				"error.message", symlinkErr.Error())
+			symlinkErr = nil
 		} else {
 			log.Warnw("could not resolve live versioned home symlink during cleanup; orphan directories will be kept conservatively",
 				"error.message", symlinkErr.Error())
