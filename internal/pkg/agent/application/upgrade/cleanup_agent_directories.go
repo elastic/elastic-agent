@@ -187,7 +187,7 @@ func cleanupAgentDirectories(
 			// so cleanup can proceed safely without it. This is the expected state on
 			// package-managed installs (RPM/DEB), which never create this symlink.
 			// Clear symlinkErr so shouldRemove does not conservatively preserve everything.
-			log.Debugw("live versioned home symlink is absent; cleanup will rely on caller-protected list",
+			log.Debugw("live versioned home symlink is absent; live install identified via running process executable",
 				"error.message", symlinkErr.Error())
 			symlinkErr = nil
 		} else {
