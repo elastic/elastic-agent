@@ -259,6 +259,13 @@ shared:
       - *comp-apm_server-fips
       - *comp-fleet-server-fips
 
+  # components for the FIPS-capable service variant
+  - &elastic_agent_service_fips_components
+    components:
+      - *comp-apm_server-fips
+      - *comp-fleet-server-fips
+      - *comp-connectors
+
   # Deb/RPM spec.
   - &deb_rpm_agent_spec
     <<: *common
@@ -787,11 +794,12 @@ shared:
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
         mode: 0644
 
-  # FIPS-capable service build: the search connectors are not FIPS compliant,
-  # so unlike the non-FIPS service variant this one carries no connectors files
-  # (the Dockerfile also skips the connectors install for FIPS builds)
+  # FIPS service build: same recipe as the service variant, with FIPS components.
+  # The connectors run in FIPS mode, see ELASTICSEARCH_CONNECTORS_FIPS_MODE in the
+  # Dockerfile template.
   - &agent_docker_service_fips_spec
-    docker_variant: 'service'
+    <<: *agent_docker_service_spec
+    <<: *elastic_agent_service_fips_components
 
   - &agent_docker_edot_spec
     <<: *agent_binary_spec_no_component_files
