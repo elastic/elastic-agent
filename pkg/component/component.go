@@ -1146,8 +1146,7 @@ func toIntermediate(
 		if !ok {
 			return nil, fmt.Errorf("invalid 'outputs.%s', expected a map not a %T", name, outputRaw)
 		}
-		// ParseOutput removes and injects keys; work on a copy so the policy handed to us is
-		// left untouched
+		// copy so the policy handed to us is left untouched
 		output = maps.Clone(output)
 		parsedOutput, err := ParseOutput(name, output, ll, headers)
 		if err != nil {
@@ -1172,8 +1171,7 @@ func toIntermediate(
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d', expected a map not a %T", idx, inputRaw)
 		}
-		// the keys consumed below are removed from the input before it becomes a unit
-		// configuration; work on a copy so the policy handed to us is left untouched
+		// copy so the policy handed to us is left untouched
 		input = maps.Clone(input)
 		typeRaw, ok := input[typeKey]
 		if !ok {
