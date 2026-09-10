@@ -1110,19 +1110,23 @@ func TestLiveVersionedHome(t *testing.T) {
 }
 
 // TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable encodes the
-// graceful-degradation contract: when the symlink cannot be resolved, cleanup
-// must still proceed (sweeping directories that the parsed TTL marks as
-// removable) but flag the run as degraded via errCleanupDegraded. The upgrade
-// marker is preserved so that the next run can revisit cleanup with full
-// verification.
+// graceful-degradation contract: when the symlink cannot be resolved but an
+// upgrade marker is present, cleanup must still proceed (sweeping directories
+// that the parsed TTL marks as removable) but flag the run as degraded via
+// errCleanupDegraded. The upgrade marker is preserved so that the next run can
+// revisit cleanup with full verification.
+//
+// When the symlink is absent AND there is no upgrade marker (a fresh volume),
+// no degraded error is returned — that is the expected state at first start.
 func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
-	t.Run("removeMarker=false: degraded error returned, expired TTL swept, orphan kept", func(t *testing.T) {
+	t.Run("no marker: not degraded, expired TTL swept, orphan kept", func(t *testing.T) {
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
-		// Two installs:
-		// - expired: has an expired TTL, no symlink target -> should be swept
-		// - orphan : has no TTL, no symlink target          -> must be kept
+		// Two installs, no symlink, no upgrade marker — models a fresh EFS volume
+		// that has prior versioned directories but the symlink was cleaned:
+		// - expired: has an expired TTL -> should be swept
+		// - orphan : has no TTL         -> must be kept (cannot verify it isn't live)
 		expiredHome := createFakeAgentInstall(t, topDir, "1.2.3", "expire", true)
 		orphanHome := createFakeAgentInstall(t, topDir, "4.5.6", "orphan", true)
 		now := time.Now()
@@ -1132,18 +1136,18 @@ func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
 			}),
 			"writing TTL registry with expired entry")
 
-		// No symlink.
+		// No symlink, no upgrade marker.
 
 		err := cleanup(testLogger, topDir, false, false, 0)
-		require.Error(t, err)
-		require.ErrorIs(t, err, errCleanupDegraded)
+		// No marker means this is a fresh-volume start, not a degraded state.
+		require.NoError(t, err)
 
-		// Expired TTL is swept even when the symlink is unresolvable.
+		// Expired TTL is swept even without a symlink.
 		assert.NoDirExists(t, filepath.Join(topDir, expiredHome),
-			"expired TTL entry should be swept even when symlink is unresolvable")
+			"expired TTL entry should be swept even without a symlink")
 		// Orphan is preserved because we cannot verify it isn't the live install.
 		assert.DirExists(t, filepath.Join(topDir, orphanHome),
-			"orphan must be preserved when symlink is unresolvable")
+			"orphan must be preserved when symlink is absent")
 	})
 
 	t.Run("removeMarker=true: marker survives because verification was degraded", func(t *testing.T) {
@@ -1165,12 +1169,12 @@ func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
 	})
 }
 
-// TestCleanAvailableRollbacks_DegradesGracefullyWhenSymlinkUnresolvable
-// verifies that CleanAvailableRollbacks proceeds with degraded verification
-// when the agent symlink cannot be resolved: expired TTL entries are swept,
-// orphans are kept conservatively, unexpired TTL entries are returned, and
-// the error wraps errCleanupDegraded.
-func TestCleanAvailableRollbacks_DegradesGracefullyWhenSymlinkUnresolvable(t *testing.T) {
+// TestCleanAvailableRollbacks_AbsentSymlink_NoMarker verifies that
+// CleanAvailableRollbacks succeeds (not degraded) when the agent symlink is
+// absent and no upgrade marker is present — the expected state on a fresh
+// volume. Expired TTL entries are swept, orphans are kept conservatively, and
+// unexpired TTL entries are returned.
+func TestCleanAvailableRollbacks_AbsentSymlink_NoMarker(t *testing.T) {
 	testLogger, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
@@ -1184,7 +1188,7 @@ func TestCleanAvailableRollbacks_DegradesGracefullyWhenSymlinkUnresolvable(t *te
 	relC := createFakeAgentInstall(t, topDir, versionC.version, versionC.hash, true)
 	relD := createFakeAgentInstall(t, topDir, versionD.version, versionD.hash, true)
 
-	// No symlink.
+	// No symlink, no upgrade marker.
 
 	now := time.Now()
 	validUntil := now.Add(24 * time.Hour)
@@ -1197,9 +1201,8 @@ func TestCleanAvailableRollbacks_DegradesGracefullyWhenSymlinkUnresolvable(t *te
 
 	leftover, err := CleanAvailableRollbacks(testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
 
-	require.Error(t, err)
-	require.ErrorIs(t, err, errCleanupDegraded,
-		"symlink-unresolvable cleanup must return errCleanupDegraded")
+	// No marker means this is a fresh-volume start, not a degraded state.
+	require.NoError(t, err)
 	if assert.Len(t, leftover, 1, "unexpired rollback must be returned for future cleanup") {
 		m := leftover[relA]
 		assert.Equal(t, versionA.version, m.Version)

@@ -3115,6 +3115,12 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
+	const (
+		oauthClientID     = "kafka-test-client"
+		oauthClientSecret = "kafka-test-secret" //nolint:gosec // G101: dummy secret for the mock OAuth2 token server
+	)
+	tokenServer := newOAuth2TokenMockServer(t, oauthClientID, oauthClientSecret)
+
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get current file path")
 	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
@@ -3142,16 +3148,25 @@ services:
 	tableTests := []struct {
 		name                string
 		runtimeExperimental string
+		namespace           string
+		saslMechanism       string
 	}{
-		{name: "agent", runtimeExperimental: "process"},
-		{name: "otel", runtimeExperimental: "otel"},
+		{name: "agent", runtimeExperimental: "process", namespace: "process", saslMechanism: "SCRAM-SHA-256"},
+		{name: "otel", runtimeExperimental: "otel", namespace: "otel", saslMechanism: "SCRAM-SHA-256"},
+		// Beats process runtime cannot fetch OAuth2 tokens yet, so OAUTHBEARER is otel-only.
+		{name: "otel-oauth2", runtimeExperimental: "otel", namespace: "otel-oauth2", saslMechanism: "OAUTHBEARER"},
 	}
 
 	for _, tt := range tableTests {
 		type otelConfigOptions struct {
 			RuntimeExperimental string
+			Namespace           string
 			Broker              string
 			CaCert              string
+			SaslMechanism       string
+			TokenURL            string
+			ClientID            string
+			ClientSecret        string
 		}
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -3170,7 +3185,7 @@ inputs:
       period: 1s
       data_stream:
         dataset: e2e
-        namespace: {{.RuntimeExperimental}}
+        namespace: {{.Namespace}}
 outputs:
   default:
     type: kafka
@@ -3186,10 +3201,19 @@ outputs:
       supported_protocols:
        - TLSv1.3
       verification_mode: full
+    protocol: https
+{{- if eq .SaslMechanism "OAUTHBEARER"}}
+    sasl.mechanism: OAUTHBEARER
+    auth:
+      oauth2client:
+        client_id: {{.ClientID}}
+        client_secret: {{.ClientSecret}}
+        token_url: "{{.TokenURL}}"
+{{- else}}
     username: beats
     password: KafkaTest
-    protocol: https
-    sasl.mechanism: SCRAM-SHA-256
+    sasl.mechanism: {{.SaslMechanism}}
+{{- end}}
     headers:
     - some-key: some-value
     - some-key: another-value
@@ -3205,8 +3229,13 @@ agent.monitoring:
 			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 				otelConfigOptions{
 					RuntimeExperimental: tt.runtimeExperimental,
+					Namespace:           tt.namespace,
 					Broker:              "localhost:9093",
 					CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
+					SaslMechanism:       tt.saslMechanism,
+					TokenURL:            tokenServer.URL,
+					ClientID:            oauthClientID,
+					ClientSecret:        oauthClientSecret,
 				}))
 
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -3246,7 +3275,7 @@ agent.monitoring:
 		consumer, err := sarama.NewConsumer([]string{"localhost:9094"}, sarama.NewConfig())
 		require.NoError(t, err)
 
-		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.runtimeExperimental, 0, sarama.OffsetNewest)
+		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.namespace, 0, sarama.OffsetNewest)
 		require.NoError(t, err)
 
 		// Make sure find the logs
@@ -3270,6 +3299,10 @@ agent.monitoring:
 				}
 			}, 2*time.Minute, 5*time.Second,
 			"Expected at least 1 document")
+
+		if tt.saslMechanism == "OAUTHBEARER" {
+			require.Greater(t, tokenServer.RequestCount(), int64(0), "oauth2client should have fetched a token from the mock token endpoint")
+		}
 
 		cancel()
 		_ = cmd.Wait()
@@ -3805,4 +3838,82 @@ func parseFirstJSONLine(data []byte) mapstr.M {
 		return m
 	}
 	return nil
+}
+
+// oauth2TokenMockServer is a client-credentials token endpoint used by
+// TestSystemMetricsWithKafkaOutput. It returns an unsecured JWT that the
+// Kafka test broker's OAUTHBEARER unsecured validator will accept.
+type oauth2TokenMockServer struct {
+	URL          string
+	server       *httptest.Server
+	mu           sync.Mutex
+	requestCount int64
+	clientID     string
+	clientSecret string
+}
+
+func newOAuth2TokenMockServer(t *testing.T, clientID, clientSecret string) *oauth2TokenMockServer {
+	t.Helper()
+	mock := &oauth2TokenMockServer{
+		clientID:     clientID,
+		clientSecret: clientSecret,
+	}
+
+	mock.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mock.mu.Lock()
+		mock.requestCount++
+		mock.mu.Unlock()
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		_ = r.ParseForm()
+		user, pass, ok := r.BasicAuth()
+		if !ok {
+			user = r.Form.Get("client_id")
+			pass = r.Form.Get("client_secret")
+		}
+		if user != mock.clientID || pass != mock.clientSecret {
+			http.Error(w, `{"error":"invalid_client"}`, http.StatusUnauthorized)
+			return
+		}
+		if r.Form.Get("grant_type") != "client_credentials" {
+			http.Error(w, `{"error":"unsupported_grant_type"}`, http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": unsecuredJWT("beats", time.Hour),
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		})
+	}))
+	mock.URL = mock.server.URL
+	t.Cleanup(mock.server.Close)
+
+	return mock
+}
+
+func (m *oauth2TokenMockServer) RequestCount() int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.requestCount
+}
+
+// unsecuredJWT builds an alg=none JWT that Kafka's OAUTHBEARER unsecured
+// validator accepts. The empty signature segment (trailing ".") is required.
+func unsecuredJWT(sub string, ttl time.Duration) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	now := time.Now()
+	payload, err := json.Marshal(map[string]any{
+		"sub": sub,
+		"iat": now.Unix(),
+		"exp": now.Add(ttl).Unix(),
+	})
+	if err != nil {
+		return ""
+	}
+	return header + "." + base64.RawURLEncoding.EncodeToString(payload) + "."
 }
