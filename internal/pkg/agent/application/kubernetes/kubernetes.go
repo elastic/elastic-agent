@@ -80,7 +80,12 @@ func translateVarPathToGlob(path string) string {
 // or anything carrying a condition — are left untouched. Streams that do not
 // belong to the container-logs integration are left untouched, and an input is
 // only rewritten when all of its streams belong to it.
-func RewriteContainerLogInputs(m map[string]interface{}) {
+//
+// globInput false leaves the per-container inputs in place, but still annotates
+// them so the setting can be toggled without losing read positions: see
+// markContainerLogTakeOver. Eligibility is evaluated identically either way, so
+// an input that would not be collapsed is also never annotated.
+func RewriteContainerLogInputs(m map[string]interface{}, globInput bool) {
 	inputList, ok := m["inputs"].([]interface{})
 	if !ok {
 		return
@@ -93,7 +98,11 @@ func RewriteContainerLogInputs(m map[string]interface{}) {
 		if !isRewritableContainerLogInput(inputMap) {
 			continue
 		}
-		rewriteContainerLogInput(inputMap)
+		if globInput {
+			rewriteContainerLogInput(inputMap)
+			continue
+		}
+		markContainerLogTakeOver(inputMap)
 	}
 }
 
@@ -157,6 +166,9 @@ func rewriteContainerLogInput(input map[string]interface{}) {
 	streams, _ := input["streams"].([]interface{})
 	for _, stream := range streams {
 		streamMap, _ := stream.(map[string]interface{})
+		// The ids this input is replacing were generated per container, so they
+		// cannot be enumerated here; from_any_id reclaims them without needing to.
+		enableTakeOverFromAnyID(streamMap)
 		stripVarsFromIDField(streamMap, "id")
 		paths := rewriteStreamPaths(streamMap)
 		processors, annotations := filterVarProcessors(streamMap["processors"])
@@ -164,6 +176,32 @@ func rewriteContainerLogInput(input map[string]interface{}) {
 			[]interface{}{buildAddKubernetesMetadataProcessor(paths, annotations)},
 			processors...,
 		)
+	}
+}
+
+// markContainerLogTakeOver leaves an eligible input rendering per container, but
+// has each of its streams reclaim whatever the glob input wrote.
+//
+// Turning the glob input on moves read positions from many per-container
+// registry keys onto one; turning it back off has to move them the other way, or
+// everything collected while it was on would be re-read from the start. Because
+// the two directions are configured on different inputs, the reverse hand-off
+// has to be declared here, while the setting is off, rather than at the moment
+// it is switched.
+func markContainerLogTakeOver(input map[string]interface{}) {
+	streams, _ := input["streams"].([]interface{})
+	for _, stream := range streams {
+		streamMap, _ := stream.(map[string]interface{})
+		id, isString := streamMap["id"].(string)
+		if !isString {
+			continue
+		}
+		if _, changes := containerLogGlobID(id); !changes {
+			// A static id is unaffected by the glob rewrite, so both settings
+			// produce the same input and there is nothing to reclaim.
+			continue
+		}
+		enableTakeOverFromAnyID(streamMap)
 	}
 }
 
@@ -273,23 +311,74 @@ func includedAnnotations(cfg map[string]interface{}) []string {
 	return annotations
 }
 
-// stripVarsFromIDField removes ${kubernetes.*} references from an id-like field
-// so that the input renders identically for every variable set. Separator runs
-// left behind by the removed references are collapsed and trimmed. The field is
-// left untouched when stripping would empty it.
-func stripVarsFromIDField(m map[string]interface{}, key string) {
-	value, ok := m[key].(string)
-	if !ok {
-		return
-	}
+// containerLogGlobID returns the id an id-like field takes once the glob rewrite
+// removes its ${kubernetes.*} references. Separator runs left behind by the
+// removed references are collapsed and trimmed, so
+// "kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}"
+// becomes "kubernetes-container-logs".
+//
+// Returns ok=false when the value has no references, or when stripping would
+// empty it — in both cases the rewrite leaves the field alone, so there is no
+// distinct glob id.
+func containerLogGlobID(value string) (string, bool) {
 	stripped := strings.TrimRight(k8sVarPattern.ReplaceAllString(value, ""), "-_.")
 	stripped = separatorRunPattern.ReplaceAllStringFunc(stripped, func(run string) string {
 		return run[:1]
 	})
-	if stripped == "" {
+	if stripped == "" || stripped == value {
+		return "", false
+	}
+	return stripped, true
+}
+
+// stripVarsFromIDField collapses an id-like field to its glob id so that the
+// input renders identically for every variable set. The field is left untouched
+// when there is no distinct glob id.
+func stripVarsFromIDField(m map[string]interface{}, key string) {
+	value, isString := m[key].(string)
+	if !isString {
+		return
+	}
+	stripped, ok := containerLogGlobID(value)
+	if !ok {
 		return
 	}
 	m[key] = stripped
+}
+
+const (
+	takeOverField     = "take_over"
+	takeOverEnabled   = "enabled"
+	takeOverFromIDs   = "from_ids"
+	takeOverFromAnyID = "from_any_id"
+)
+
+// ensureTakeOver returns the stream's take_over map, creating and enabling it if
+// absent. A take_over set to the legacy boolean form is replaced by the map form,
+// which is the only shape that can carry the settings below.
+func ensureTakeOver(stream map[string]interface{}) map[string]interface{} {
+	takeOver, _ := stream[takeOverField].(map[string]interface{})
+	if takeOver == nil {
+		takeOver = map[string]interface{}{}
+		stream[takeOverField] = takeOver
+	}
+	takeOver[takeOverEnabled] = true
+	return takeOver
+}
+
+// enableTakeOverFromAnyID makes the stream reclaim registry state from every
+// previous filestream input, whatever its id was.
+//
+// The ids being reclaimed were generated one per discovered container, so they
+// cannot be listed here — from_any_id exists precisely for that case.
+//
+// Filebeat rejects a take_over carrying both from_any_id and from_ids, so any
+// list the policy configured is dropped. That loses nothing: reclaiming from any
+// id is a superset of reclaiming from an enumerated set.
+func enableTakeOverFromAnyID(stream map[string]interface{}) {
+	takeOver := ensureTakeOver(stream)
+	takeOver[takeOverFromAnyID] = true
+	delete(takeOver, takeOverFromIDs)
 }
 
 // walkStrings calls fn for every string found in the value tree, descending into

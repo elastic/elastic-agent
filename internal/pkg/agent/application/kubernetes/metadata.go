@@ -66,6 +66,15 @@ func buildAddKubernetesMetadataProcessor(paths []string, annotations []string) m
 		// simply produced no input at all when the API was unreachable. Failing
 		// loudly reproduces that dependency instead of degrading quietly.
 		"wait_for_metadata": true,
+
+		// Fill in only the fields an event is missing rather than skipping it.
+		// By default the processor returns early from any event that already
+		// carries a kubernetes field, so a single kubernetes.* key set upstream —
+		// by a processor the policy configured, or by whatever else touched the
+		// event first — suppresses the whole enrichment. Merging instead means a
+		// partially annotated event still ends up with the same fields as every
+		// other one, which is the property the per-container inputs gave for free.
+		"append_fields": true,
 	}
 
 	var indexers, matchers []interface{}

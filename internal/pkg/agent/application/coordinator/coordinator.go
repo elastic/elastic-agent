@@ -20,8 +20,8 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
-	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	k8sutil "github.com/elastic/elastic-agent/internal/pkg/agent/application/kubernetes"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -1782,9 +1782,18 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// filestream watching a glob path. This has to happen before AST rendering,
 	// because it is the ${kubernetes.*} references in the raw config that make the
 	// kubernetes provider render the input once per discovered container.
-	if incomingCfg, cfgErr := configuration.NewFromConfig(cfg); cfgErr == nil &&
-		incomingCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput {
-		k8sutil.RewriteContainerLogInputs(m)
+	//
+	// This runs whether or not the glob input is enabled: when it is disabled the
+	// inputs stay per-container but are annotated so that read positions survive
+	// the setting being toggled back off.
+	//
+	// The setting is read off the config being processed rather than c.currentCfg,
+	// which is only assigned further down. That assignment reuses this unpack, so a
+	// policy change costs one parse; reporting its error stays where it was, to
+	// keep the ordering of everything in between unchanged.
+	currentCfg, currentCfgErr := configuration.NewFromConfig(cfg)
+	if currentCfgErr == nil {
+		k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput)
 	}
 
 	err = c.generateAST(cfg, m)
@@ -1806,9 +1815,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 	c.setProtection(protectionConfig)
 
-	currentCfg, err := configuration.NewFromConfig(cfg)
-	if err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
+	if currentCfgErr != nil {
+		return fmt.Errorf("invalid configuration: %w", currentCfgErr)
 	}
 	c.currentCfg = currentCfg
 

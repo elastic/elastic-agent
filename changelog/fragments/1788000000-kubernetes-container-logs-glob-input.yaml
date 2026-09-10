@@ -13,28 +13,17 @@ kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Collect Kubernetes container logs with a single filestream input
+summary: Reduce Elastic Agent resource usage when collecting Kubernetes container logs
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 description: >
-  The kubernetes.container_logs integration previously rendered one filestream
-  input per discovered container, because its paths, ids and processors are
-  templated with ${kubernetes.*} variable references. Every pod event re-rendered
-  the component model and reconfigured Filebeat.
-
-  Those references are now stripped before the policy is rendered, so the
-  integration collapses into a single filestream watching a glob path, and an
-  add_kubernetes_metadata processor supplies the Kubernetes metadata the dynamic
-  provider used to inject. New pods are picked up by the existing file scanner
-  with no reconfiguration.
-
-  Hints-based autodiscovery inputs and any input carrying a condition are left
-  per-container, as before. Set
-  ELASTIC_AGENT_KUBERNETES_CONTAINER_LOGS_GLOB=false, or
-  agent.internal.kubernetes.container_logs_glob_input to false in the policy, to
-  restore the previous behaviour.
+  Kubernetes container logs are now collected by a single log input watching all
+  container log files, instead of one input per running container. Agent uses
+  noticeably less CPU and memory on busy nodes, and no longer reconfigures itself
+  every time a pod starts or stops. Existing read positions are preserved, so no
+  logs are re-read or missed.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
