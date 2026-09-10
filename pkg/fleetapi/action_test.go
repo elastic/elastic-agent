@@ -7,6 +7,7 @@ package fleetapi
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -174,6 +175,75 @@ func TestActionsUnmarshalJSON(t *testing.T) {
 		require.Len(t, action.Data.AdditionalMetrics, 1)
 		assert.Equal(t, "CPU", action.Data.AdditionalMetrics[0])
 	})
+}
+
+func TestActionRestartUnmarshalJSON(t *testing.T) {
+	t.Run("RESTART maps to ActionRestart", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"RESTART","start_time":"2022-01-02T12:00:00Z","expiration":"2022-01-02T13:00:00Z"}]`)
+		a := &Actions{}
+		require.NoError(t, a.UnmarshalJSON(p))
+
+		action, ok := (*a)[0].(*ActionRestart)
+		require.True(t, ok, "unable to cast action to ActionRestart")
+		assert.Equal(t, "testid", action.ActionID)
+		assert.Equal(t, ActionTypeRestart, action.ActionType)
+		assert.Equal(t, "2022-01-02T12:00:00Z", action.ActionStartTime)
+		assert.Equal(t, "2022-01-02T13:00:00Z", action.ActionExpiration)
+
+		st, err := action.StartTime()
+		require.NoError(t, err)
+		assert.Equal(t, "2022-01-02T12:00:00Z", st.Format(time.RFC3339))
+
+		exp, err := action.Expiration()
+		require.NoError(t, err)
+		assert.Equal(t, "2022-01-02T13:00:00Z", exp.Format(time.RFC3339))
+	})
+
+	t.Run("RESTART without start time or expiration", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"RESTART"}]`)
+		a := &Actions{}
+		require.NoError(t, a.UnmarshalJSON(p))
+
+		action, ok := (*a)[0].(*ActionRestart)
+		require.True(t, ok, "unable to cast action to ActionRestart")
+
+		_, err := action.StartTime()
+		assert.ErrorIs(t, err, ErrNoStartTime)
+		_, err = action.Expiration()
+		assert.ErrorIs(t, err, ErrNoExpiration)
+	})
+}
+
+func TestNewActionRestart(t *testing.T) {
+	a := NewAction(ActionTypeRestart)
+	_, ok := a.(*ActionRestart)
+	assert.True(t, ok, "NewAction(RESTART) should return *ActionRestart")
+}
+
+func TestActionRestartMarshalMap(t *testing.T) {
+	action := ActionRestart{
+		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		ActionType: "RESTART",
+		Signed: &Signed{
+			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
+			Signature: "MEQCIGxsrI742xKL6OSI",
+		},
+	}
+
+	m, err := action.MarshalMap()
+	require.NoError(t, err)
+
+	diff := cmp.Diff(map[string]interface{}{
+		"id":   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
+		"type": "RESTART",
+		"signed": map[string]interface{}{
+			"data":      "eyJAdGltZXN0YW1wIjoiMjAy",
+			"signature": "MEQCIGxsrI742xKL6OSI",
+		},
+	}, m)
+	if diff != "" {
+		t.Fatal(diff)
+	}
 }
 
 func TestActionUnenrollMarshalMap(t *testing.T) {

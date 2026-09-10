@@ -29,6 +29,11 @@ const (
 	ActionTypeDiagnostics          = string(api.REQUESTDIAGNOSTICS)
 	ActionTypeMigrate              = string(api.MIGRATE)
 	ActionTypePrivilegeLevelChange = string(api.PRIVILEGELEVELCHANGE)
+	// ActionTypeRestart is defined locally because the Fleet Server API spec
+	// does not yet expose a RESTART action type. Switch to string(api.RESTART)
+	// once it is added upstream.
+	// TODO: Replace with the real reference once Fleet supports the action.
+	ActionTypeRestart = "RESTART"
 )
 
 // Error values that the Action interface can return
@@ -117,6 +122,8 @@ func NewAction(actionType string) Action {
 		action = &ActionMigrate{}
 	case ActionTypePrivilegeLevelChange:
 		action = &ActionPrivilegeLevelChange{}
+	case ActionTypeRestart:
+		action = &ActionRestart{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
@@ -403,6 +410,78 @@ func (a *ActionUpgrade) SetStartTime(t time.Time) {
 
 // MarshalMap marshals ActionUpgrade into a corresponding map
 func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
+}
+
+// ActionRestart is a request for the agent to restart itself.
+// It reuses the upgrade restart machinery: the agent persists the action,
+// re-execs, and acknowledges the action on the next startup.
+type ActionRestart struct {
+	ActionID         string  `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
+	ActionStartTime  string  `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
+	ActionExpiration string  `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
+	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+func (a *ActionRestart) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+// Type returns the type of the Action.
+func (a *ActionRestart) Type() string {
+	return a.ActionType
+}
+
+// ID returns the ID of the Action.
+func (a *ActionRestart) ID() string {
+	return a.ActionID
+}
+
+// StartTime returns the start_time as a UTC time.Time or ErrNoStartTime if there is no start time.
+func (a *ActionRestart) StartTime() (time.Time, error) {
+	if a.ActionStartTime == "" {
+		return time.Time{}, ErrNoStartTime
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionStartTime)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+// Expiration returns the expiration as a UTC time.Time or ErrNoExpiration if there is no expiration.
+func (a *ActionRestart) Expiration() (time.Time, error) {
+	if a.ActionExpiration == "" {
+		return time.Time{}, ErrNoExpiration
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionExpiration)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+func (a *ActionRestart) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := newGenericEvent(a.ActionID, a.ActionType, agentID, ts)
+	if a.Err != nil {
+		errStr := a.Err.Error()
+		event.Error = &errStr
+	}
+	return toGenericAckEvent(event)
+}
+
+// MarshalMap marshals ActionRestart into a corresponding map.
+func (a *ActionRestart) MarshalMap() (map[string]interface{}, error) {
 	var res map[string]interface{}
 	err := mapstructure.Decode(a, &res)
 	return res, err
