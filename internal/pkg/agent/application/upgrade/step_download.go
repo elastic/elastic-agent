@@ -163,7 +163,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				)
 			}
 
-			sourceURI, err := Resolve(ctx, target, src, defaultRemoteSourceSubdir, fileName)
+			sourceURI, err := Resolve(target, src, defaultRemoteSourceSubdir, fileName)
 			if err != nil {
 				e := fmt.Errorf("could not resolve source %s: %w", src, err)
 				a.log.Debugf("%v", e)
@@ -277,7 +277,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 }
 
 // Resolve computes the fully resolved download URI for an artifact.
-func Resolve(ctx context.Context, target artifact.Artifact, sourceURI, sourceSubdir, fileName string) (string, error) {
+func Resolve(target artifact.Artifact, sourceURI, sourceSubdir, fileName string) (string, error) {
 	if target.Version.IsSnapshot() && sourceURI == artifact.DefaultSourceURI {
 		buildID := target.Version.BuildMetadata()
 		sourceURI = fmt.Sprintf(snapshotURIFormat, target.Version.CoreVersion(), buildID)
