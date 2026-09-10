@@ -77,14 +77,31 @@ func TestConfig_Unpack(t *testing.T) {
 }
 
 func TestConfig_Unpack_LegacySourceURI(t *testing.T) {
-	cfg := DefaultConfig()
+	t.Run("sourceURI only", func(t *testing.T) {
+		cfg := DefaultConfig()
 
-	oldcfg, err := agentlibsconfig.NewConfigFrom(`sourceURI: https://example.test/downloads/`)
-	require.NoError(t, err, "could not create config from yaml")
+		oldCfg, err := agentlibsconfig.NewConfigFrom(`sourceURI: https://example.test/downloads/`)
+		require.NoError(t, err, "could not create config from yaml")
 
-	err = cfg.Unpack(oldcfg)
-	require.NoError(t, err, "Unpack failed")
-	assert.Equal(t, []string{"https://example.test/downloads/"}, cfg.Sources)
+		err = cfg.Unpack(oldCfg)
+		require.NoError(t, err, "Unpack failed")
+		assert.Equal(t, []string{"https://example.test/downloads/"}, cfg.Sources)
+	})
+
+	t.Run("sources takes precedence over sourceURI when both are set", func(t *testing.T) {
+		cfg := DefaultConfig()
+
+		oldCfg, err := agentlibsconfig.NewConfigFrom(`
+sources:
+  - https://new.example.test/downloads/
+sourceURI: https://old.example.test/downloads/
+`)
+		require.NoError(t, err, "could not create config from yaml")
+
+		err = cfg.Unpack(oldCfg)
+		require.NoError(t, err, "Unpack failed")
+		assert.Equal(t, []string{"https://new.example.test/downloads/"}, cfg.Sources)
+	})
 }
 
 // TestConfig_Unpack_RetrySleepInitDuration covers the validation of
