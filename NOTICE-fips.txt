@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20260907121332-ebfd78bcf90a
+Version: v7.0.0-alpha2.0.20260909201521-bc56f2d13826
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -7843,11 +7843,11 @@ limitations under the License.
 
 --------------------------------------------------------------------------------
 Dependency : golang.org/x/crypto
-Version: v0.55.0
+Version: v0.56.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.55.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/golang.org/x/crypto@v0.56.0/LICENSE:
 
 Copyright 2009 The Go Authors.
 
