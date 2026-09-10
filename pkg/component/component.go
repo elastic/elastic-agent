@@ -964,6 +964,19 @@ func (r *RuntimeSpecs) componentsForOutput(
 	return components
 }
 
+// agentSection returns a policy that only contains the top-level "agent" section (including any
+// flattened "agent.*" keys). Feature flags and limits live under it, so parsing the entire rendered
+// policy (with every rendered input) through go-ucfg on each component model refresh is wasted work.
+func agentSection(policy map[string]interface{}) map[string]interface{} {
+	section := make(map[string]interface{}, 1)
+	for k, v := range policy {
+		if k == "agent" || strings.HasPrefix(k, "agent.") {
+			section[k] = v
+		}
+	}
+	return section
+}
+
 // PolicyToComponents takes the policy and generates a component model.
 func (r *RuntimeSpecs) PolicyToComponents(
 	policy map[string]interface{},
@@ -973,7 +986,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	dynamicInputs map[string]bool,
 ) ([]Component, error) {
 	// get feature flags from policy
-	featureFlags, err := features.Parse(policy)
+	featureFlags, err := features.Parse(agentSection(policy))
 	if err != nil {
 		return nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
 	}
@@ -994,7 +1007,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	sort.Strings(outputKeys)
 
 	// get agent limits from the policy
-	limits, err := limits.Parse(policy)
+	limits, err := limits.Parse(agentSection(policy))
 	if err != nil {
 		return nil, fmt.Errorf("could not parse limits from policy: %w", err)
 	}

@@ -9,13 +9,13 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
 
@@ -101,38 +101,96 @@ func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, erro
 		return nil, err
 	}
 
-	if err := updateDataStreamsFromSource(result); err != nil {
+	if err := updateDataStreamsFromSource(result, cfg); err != nil {
 		return nil, fmt.Errorf("could not dedot 'data_stream': %w", err)
 	}
 
 	return result, nil
 }
 
-func deDotDataStream(ds *proto.DataStream, source *structpb.Struct) (*proto.DataStream, error) {
+// dataStreamFields holds the data_stream values found in a source map, both from a nested
+// `data_stream` dictionary and from flattened `data_stream.<field>` keys.
+type dataStreamFields struct {
+	DataStream struct {
+		Dataset   string
+		Type      string
+		Namespace string
+	}
+}
+
+// stringValue converts a scalar value into a string the way go-ucfg unpacks it into a string
+// field. nil converts into the empty string. Non-scalar values are rejected.
+func stringValue(v interface{}) (string, error) {
+	switch t := v.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return t, nil
+	case bool:
+		return strconv.FormatBool(t), nil
+	case []byte:
+		return string(t), nil
+	case json.Number:
+		return string(t), nil
+	case int, int8, int16, int32, int64:
+		return strconv.FormatInt(reflect.ValueOf(t).Int(), 10), nil
+	case uint, uint8, uint16, uint32, uint64:
+		return strconv.FormatUint(reflect.ValueOf(t).Uint(), 10), nil
+	case float32, float64:
+		return strconv.FormatFloat(reflect.ValueOf(t).Float(), 'f', -1, 64), nil
+	}
+	return "", fmt.Errorf("unconvertible type '%T'", v)
+}
+
+// dataStreamFromSource extracts the data_stream fields directly from the source map without
+// going through go-ucfg. Flattened keys (`data_stream.dataset`) take precedence over the nested
+// dictionary, mirroring how go-ucfg merges them.
+func dataStreamFromSource(source map[string]interface{}) (dataStreamFields, error) {
+	var tmp dataStreamFields
+	var err error
+	if nested, ok := source["data_stream"].(map[string]interface{}); ok {
+		if tmp.DataStream.Dataset, err = flattenedValue(nested["dataset"], "data_stream.dataset"); err != nil {
+			return tmp, err
+		}
+		if tmp.DataStream.Type, err = flattenedValue(nested["type"], "data_stream.type"); err != nil {
+			return tmp, err
+		}
+		if tmp.DataStream.Namespace, err = flattenedValue(nested["namespace"], "data_stream.namespace"); err != nil {
+			return tmp, err
+		}
+	}
+	for key, field := range map[string]*string{
+		"data_stream.dataset":   &tmp.DataStream.Dataset,
+		"data_stream.type":      &tmp.DataStream.Type,
+		"data_stream.namespace": &tmp.DataStream.Namespace,
+	} {
+		if v, ok := source[key]; ok {
+			if *field, err = flattenedValue(v, key); err != nil {
+				return tmp, err
+			}
+		}
+	}
+	return tmp, nil
+}
+
+// flattenedValue converts a data_stream value into a string, rejecting non-scalar values the way
+// unpacking them with go-ucfg did.
+func flattenedValue(v interface{}, key string) (string, error) {
+	s, err := stringValue(v)
+	if err != nil {
+		return "", fmt.Errorf("can not convert '%T' into 'string' accessing '%s'", v, key)
+	}
+	return s, nil
+}
+
+func deDotDataStream(ds *proto.DataStream, source map[string]interface{}) (*proto.DataStream, error) {
 	if ds == nil {
 		ds = &proto.DataStream{}
 	}
 
-	cfg, err := config.NewConfigFrom(source.AsMap())
+	tmp, err := dataStreamFromSource(source)
 	if err != nil {
-		return nil, fmt.Errorf("cannot generate config from source field: %w", err)
-	}
-
-	// Create a temporary struct to unpack the configuration.
-	// UnpackTo correctly handles any flattened fields like
-	// data_stream.type. So all we need to do is to call UnpackTo,
-	// ensure the DataStream does not have a different value,
-	// them merge them both.
-	tmp := struct {
-		DataStream struct {
-			Dataset   string `config:"dataset" yaml:"dataset"`
-			Type      string `config:"type" yaml:"type"`
-			Namespace string `config:"namespace" yaml:"namespace"`
-		} `config:"data_stream" yaml:"data_stream"`
-	}{}
-
-	if err := cfg.Unpack(&tmp); err != nil {
-		return nil, fmt.Errorf("cannot unpack source field into struct: %w", err)
+		return nil, err
 	}
 
 	if (ds.Dataset != tmp.DataStream.Dataset) && (ds.Dataset != "" && tmp.DataStream.Dataset != "") {
@@ -165,15 +223,21 @@ func valueOrDefault(a, b string) string {
 	return a
 }
 
-func updateDataStreamsFromSource(unitConfig *proto.UnitExpectedConfig) error {
+func updateDataStreamsFromSource(unitConfig *proto.UnitExpectedConfig, cfg map[string]interface{}) error {
 	var err error
-	unitConfig.DataStream, err = deDotDataStream(unitConfig.GetDataStream(), unitConfig.GetSource())
+	unitConfig.DataStream, err = deDotDataStream(unitConfig.GetDataStream(), cfg)
 	if err != nil {
 		return fmt.Errorf("could not parse data_stream from input: %w", err)
 	}
 
+	// streams are decoded index-aligned with the "streams" list of the source config
+	cfgStreams, _ := cfg["streams"].([]interface{})
 	for i, stream := range unitConfig.Streams {
-		stream.DataStream, err = deDotDataStream(stream.GetDataStream(), stream.GetSource())
+		var streamCfg map[string]interface{}
+		if i < len(cfgStreams) {
+			streamCfg, _ = cfgStreams[i].(map[string]interface{})
+		}
+		stream.DataStream, err = deDotDataStream(stream.GetDataStream(), streamCfg)
 		if err != nil {
 			return fmt.Errorf("could not parse data_stream from stream [%d]: %w",
 				i, err)
