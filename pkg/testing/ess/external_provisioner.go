@@ -16,17 +16,26 @@ const ProvisionerExternal = "external"
 
 type ExternalProvisioner struct {
 	logger common.Logger
+	stack  common.Stack
 }
 
 // NewExternalProvisioner creates a stack provisioner backed by environment variables.
 func NewExternalProvisioner() (common.StackProvisioner, error) {
-	if os.Getenv("ELASTICSEARCH_HOST") == "" {
+	stack := common.Stack{
+		Provisioner:   ProvisionerExternal,
+		Elasticsearch: os.Getenv("ELASTICSEARCH_HOST"),
+		Kibana:        os.Getenv("KIBANA_HOST"),
+		Username:      os.Getenv("ELASTICSEARCH_USERNAME"),
+		Password:      os.Getenv("ELASTICSEARCH_PASSWORD"),
+		Ready:         true,
+	}
+	if stack.Elasticsearch == "" {
 		return nil, fmt.Errorf("the %q stack provisioner requires ELASTICSEARCH_HOST to be set", ProvisionerExternal)
 	}
-	if os.Getenv("KIBANA_HOST") == "" {
+	if stack.Kibana == "" {
 		return nil, fmt.Errorf("the %q stack provisioner requires KIBANA_HOST to be set", ProvisionerExternal)
 	}
-	return &ExternalProvisioner{}, nil
+	return &ExternalProvisioner{stack: stack}, nil
 }
 
 func (p *ExternalProvisioner) Name() string {
@@ -41,19 +50,13 @@ func (p *ExternalProvisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
-// Create returns a Stack populated from environment variables. No remote
+// Create returns the Stack that the environment variables describe. No remote
 // provisioning is performed, the stack is considered immediately ready.
 func (p *ExternalProvisioner) Create(_ context.Context, req common.StackRequest) (common.Stack, error) {
-	return common.Stack{
-		ID:            req.ID,
-		Version:       req.Version,
-		Provisioner:   ProvisionerExternal,
-		Elasticsearch: os.Getenv("ELASTICSEARCH_HOST"),
-		Kibana:        os.Getenv("KIBANA_HOST"),
-		Username:      os.Getenv("ELASTICSEARCH_USERNAME"),
-		Password:      os.Getenv("ELASTICSEARCH_PASSWORD"),
-		Ready:         true,
-	}, nil
+	stack := p.stack
+	stack.ID = req.ID
+	stack.Version = req.Version
+	return stack, nil
 }
 
 // WaitForReady is a no-op, the external stack is assumed to be ready.
@@ -68,5 +71,5 @@ func (p *ExternalProvisioner) Delete(_ context.Context, _ common.Stack) error {
 
 // Upgrade is not supported for an external stack.
 func (p *ExternalProvisioner) Upgrade(_ context.Context, _ common.Stack, _ string) error {
-	return fmt.Errorf("upgrade is not supported for the %s stack provisioner", ProvisionerExternal)
+	return fmt.Errorf("upgrade is not supported for the %q stack provisioner", ProvisionerExternal)
 }
