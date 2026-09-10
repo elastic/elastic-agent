@@ -15,7 +15,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -194,14 +196,111 @@ func TestCleanupAgentDirectories_Orphan_TerminalMarker_AllowsRemoval(t *testing.
 	assert.True(t, dc.shouldRemove(filepath.Join("data", "elastic-agent-orphan")))
 }
 
-func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnSymlinkErr(t *testing.T) {
+func TestCleanupAgentDirectories_AbsentSymlink_NotDegraded(t *testing.T) {
+	log, obs := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// One install, no symlink — models a fresh or freshly-cleaned EFS volume.
+	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
+
+	// Unexpired TTL on the install — must be preserved.
+	validUntil := time.Now().Add(24 * time.Hour)
+	wantMarker := ttl.TTLMarker{Version: "1.0.0", Hash: "aaaaaa", ValidUntil: validUntil}
+	source := ttl.NewTTLMarkerRegistry(log, topDir)
+	require.NoError(t,
+		source.Set(map[string]ttl.TTLMarker{relHome: wantMarker}),
+		"writing unexpired TTL marker for fixture")
+
+	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	// An absent symlink is not a degraded state — the agent creates it on first
+	// start, after this cleanup pass runs.
+	require.NoError(t, err)
+
+	// Unexpired rollback must be preserved even without the symlink — the caller
+	// uses leftoverRollbacks to schedule the next cleanup.
+	require.NotNil(t, leftover)
+	got, ok := leftover[relHome]
+	require.True(t, ok, "unexpired TTL entry must be in leftoverRollbacks")
+	assert.Equal(t, wantMarker.Version, got.Version)
+	assert.Equal(t, wantMarker.Hash, got.Hash)
+	// YAML round-trip strips monotonic clock; tolerate sub-second drift.
+	assert.WithinDuration(t, wantMarker.ValidUntil, got.ValidUntil, time.Second)
+
+	// The absence must be logged at debug, not warn — a missing symlink on a
+	// fresh volume is expected and must not produce a spurious warning.
+	warnLogs := obs.FilterLevelExact(zapcore.WarnLevel).All()
+	for _, entry := range warnLogs {
+		assert.NotContains(t, entry.Message, "symlink",
+			"absent symlink must not be logged at warn level; got: %q", entry.Message)
+	}
+	debugEntries := obs.FilterLevelExact(zapcore.DebugLevel).FilterMessageSnippet("symlink is absent").All()
+	assert.NotEmpty(t, debugEntries, "absent symlink must produce a debug log entry")
+}
+
+func TestCleanupAgentDirectories_AbsentSymlink_WithMarker_IsDegraded(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
-	// One install, no symlink.
 	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
+	source := ttl.NewTTLMarkerRegistry(log, topDir)
 
-	// Unexpired TTL on the install — must be returned in leftoverRollbacks even when cleanup is degraded.
+	// Write an upgrade marker — this means an upgrade was in progress.
+	require.NoError(t, os.MkdirAll(filepath.Join(topDir, "data"), 0o750))
+	require.NoError(t,
+		SaveMarker(paths.DataFrom(topDir), &UpdateMarker{Version: "1.0.0", Hash: "aaaaaa"}, true),
+		"writing upgrade marker fixture")
+
+	// No symlink. The marker's presence means this is not a fresh-volume start,
+	// so cleanup must still treat it as degraded.
+	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	require.Error(t, err)
+	require.ErrorIs(t, err, errCleanupDegraded,
+		"absent symlink with an upgrade marker must still return errCleanupDegraded")
+
+	// The install must be kept conservatively.
+	require.NotNil(t, leftover)
+	assert.DirExists(t, filepath.Join(topDir, relHome))
+}
+
+func TestCleanupAgentDirectories_DanglingSymlink_IsDegraded(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks requires elevated privileges on Windows")
+	}
+	log, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Create a symlink pointing to a directory that does not exist. This is path
+	// 2 in liveVersionedHome: os.Readlink succeeds, os.Stat on the target fails
+	// with ErrNotExist. This represents a broken installation, not a fresh volume,
+	// and must be treated as degraded.
+	absentTarget := filepath.Join(topDir, "data", "elastic-agent-gone", AgentName)
+	require.NoError(t, os.Symlink(absentTarget, filepath.Join(topDir, AgentName)))
+
+	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
+	source := ttl.NewTTLMarkerRegistry(log, topDir)
+
+	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	require.Error(t, err)
+	require.ErrorIs(t, err, errCleanupDegraded,
+		"a dangling symlink (present but target absent) must return errCleanupDegraded")
+
+	// Install must be kept conservatively.
+	require.NotNil(t, leftover)
+	assert.DirExists(t, filepath.Join(topDir, relHome))
+}
+
+func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnSymlinkNotReadable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("placing a directory at the symlink path to cause EINVAL is not portable on Windows")
+	}
+	log, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Place a directory where the symlink should be — os.Readlink returns EINVAL
+	// (not ErrNotExist), which must still be treated as a degraded state.
+	require.NoError(t, os.MkdirAll(filepath.Join(topDir, AgentName), 0o750))
+
+	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
 	validUntil := time.Now().Add(24 * time.Hour)
 	wantMarker := ttl.TTLMarker{Version: "1.0.0", Hash: "aaaaaa", ValidUntil: validUntil}
 	source := ttl.NewTTLMarkerRegistry(log, topDir)
