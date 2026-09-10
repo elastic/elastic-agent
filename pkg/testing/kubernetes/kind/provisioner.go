@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	dockerclient "github.com/moby/moby/client"
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +31,14 @@ import (
 
 const (
 	Name = "kind"
+)
+
+// timeouts for the kind commands
+const (
+	createClusterTimeout = 15 * time.Minute
+	loadImageTimeout     = 10 * time.Minute
+	deleteClusterTimeout = 5 * time.Minute
+	getCommandTimeout    = 1 * time.Minute
 )
 
 const clusterCfg string = `
@@ -115,7 +124,9 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
 			clusterConfig := strings.NewReader(clusterCfg)
 
-			ret, err := p.kindCmd(ctx, clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			createCtx, createCancel := context.WithTimeout(ctx, createClusterTimeout)
+			ret, err := p.kindCmd(createCtx, clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			createCancel()
 			if err != nil {
 				return nil, fmt.Errorf("kind: failed to create cluster %s: %s", instanceName, ret.stderr)
 			}
@@ -169,6 +180,9 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 }
 
 func (p *provisioner) loadImage(ctx context.Context, clusterName string, image string) error {
+	ctx, cancel := context.WithTimeout(ctx, loadImageTimeout)
+	defer cancel()
+
 	ret, err := p.kindCmd(ctx, nil, "load", "docker-image", "--name", clusterName, image)
 	if err != nil {
 		return fmt.Errorf("kind: load docker-image %s failed: %w: %s", image, err, ret.stderr)
@@ -244,6 +258,9 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 }
 
 func (p *provisioner) clusterExists(ctx context.Context, name string) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, getCommandTimeout)
+	defer cancel()
+
 	ret, err := p.kindCmd(ctx, nil, "get", "clusters")
 	if err != nil {
 		return false, err
@@ -259,6 +276,9 @@ func (p *provisioner) clusterExists(ctx context.Context, name string) (bool, err
 
 func (p *provisioner) writeKubeconfig(ctx context.Context, name string) (string, error) {
 	kubecfg := fmt.Sprintf("%s-kubecfg", name)
+
+	ctx, cancel := context.WithTimeout(ctx, getCommandTimeout)
+	defer cancel()
 
 	ret, err := p.kindCmd(ctx, nil, "get", "kubeconfig", "--name", name)
 	if err != nil {
@@ -299,6 +319,9 @@ func (p *provisioner) kindCmd(ctx context.Context, stdIn io.Reader, args ...stri
 }
 
 func (p *provisioner) deleteCluster(ctx context.Context, name string) error {
+	ctx, cancel := context.WithTimeout(ctx, deleteClusterTimeout)
+	defer cancel()
+
 	_, err := p.kindCmd(ctx, nil, "delete", "cluster", "--name", name)
 	return err
 }
