@@ -178,7 +178,11 @@ func (v *Vars) lookupNode(name string) (Node, bool) {
 
 func replaceVars(value string, replacer func(variable string) (Node, Processors, bool), reqMatch bool, defaultProvider string) (Node, error) {
 	var processors Processors
-	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
+	if !strings.Contains(value, "${") {
+		// fast path: nothing to replace (the vast majority of config strings)
+		return NewStrVal(value), nil
+	}
+	matchIdxs := varsRegex.FindAllStringSubmatchIndex(value, -1)
 	if !validBrackets(value, matchIdxs) {
 		return nil, fmt.Errorf("starting ${ is missing ending }")
 	}

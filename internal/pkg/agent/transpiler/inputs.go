@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/cespare/xxhash/v2"
 )
@@ -44,11 +45,38 @@ func RenderInputs(inputs Node, varsArray []*Vars) (Node, map[string]RenderedInpu
 	inputIdToRenderInfo := make(map[string]RenderedInputInfo, len(varsArray)-1)
 	nodesMap := map[uint64]*Dict{}
 	hasher := xxhash.New()
+	// determine which providers each input references, so that an input that doesn't reference
+	// a dynamic provider is only rendered once (against the context vars) instead of once per
+	// dynamic mapping.
+	inputNodes := l.Value().([]Node)
+	inputProviders := make([]map[string]struct{}, len(inputNodes))
+	defaultProvider := ""
+	if len(varsArray) > 0 {
+		defaultProvider = varsArray[0].defaultProvider
+	}
+	for i, node := range inputNodes {
+		dict, ok := node.(*Dict)
+		if !ok {
+			continue
+		}
+		providers := map[string]struct{}{}
+		for _, name := range dict.Vars(nil, defaultProvider) {
+			providers[strings.SplitN(name, varsSeparator, 2)[0]] = struct{}{}
+		}
+		inputProviders[i] = providers
+	}
 	for _, vars := range varsArray {
-		for _, node := range l.Value().([]Node) {
+		for i, node := range inputNodes {
 			dict, ok := node.(*Dict)
 			if !ok {
 				continue
+			}
+			if vars.dynamicProvider != "" {
+				if _, referenced := inputProviders[i][vars.dynamicProvider]; !referenced {
+					// input doesn't reference this dynamic provider; rendering it against this
+					// mapping produces the same result as the context vars (already rendered)
+					continue
+				}
 			}
 			hadStreams := false
 			if streams := getStreams(dict); streams != nil {
