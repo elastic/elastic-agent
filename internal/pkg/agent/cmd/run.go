@@ -19,7 +19,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/collector/featuregate"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
@@ -451,16 +450,19 @@ func runElasticAgent(
 	}
 	defer lis.Close()
 
-	mux := cmux.New(lis)
-	grpcLis := mux.Match(cmux.TLS())
-	httpLis := mux.Match(cmux.Any())
-	go func() {
-		if serveErr := mux.Serve(); serveErr != nil && !goerrors.Is(serveErr, net.ErrClosed) {
-			l.Errorf("cmux serve error: %v", serveErr)
-		}
-	}()
+	// Create a Unix socket for the OpAMP server. This avoids sharing the gRPC TCP
+	// port via cmux: the gRPC listener stays pure TCP/TLS while OpAMP is off-network.
+	opampSockPath := filepath.Join(paths.Top(), "opamp.sock")
+	if err := os.Remove(opampSockPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("removing stale opamp socket: %w", err)
+	}
+	opampLis, err := (&net.ListenConfig{}).Listen(ctx, "unix", opampSockPath)
+	if err != nil {
+		return fmt.Errorf("failed to listen on opamp socket %s: %w", opampSockPath, err)
+	}
+	defer opampLis.Close()
 
-	opampSrv, err := otelmanager.NewOpAMPServerOnListener(l.Named("opamp_server"), httpLis)
+	opampSrv, err := otelmanager.NewOpAMPServerOnListener(l.Named("opamp_server"), opampLis)
 	if err != nil {
 		return fmt.Errorf("failed to start opamp server: %w", err)
 	}
@@ -471,7 +473,7 @@ func runElasticAgent(
 	}()
 
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, opampSrv, grpcLis, modifiers...)
+		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, opampSrv, lis, modifiers...)
 	if err != nil {
 		return err
 	}

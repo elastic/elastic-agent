@@ -1997,6 +1997,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 			mgr.opampExtComponentID,
 			mgr.opampInstanceUID,
 			mgr.opampServer.Endpoint(),
+			mgr.opampServer.SocketPath(),
 			mgr.opampServer.secret,
 		))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))

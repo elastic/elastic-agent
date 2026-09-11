@@ -86,7 +86,7 @@ func (wf *wrappedFactory) CreateMeterProvider(
 	// We call through to the baseline resource creation so we get standard
 	// fields, but we need to backconvert it to a config in order to assemble
 	// the final meter provider with our manual reader added.
-	res, err := wf.CreateResource(ctx, set.Settings, cfg)
+	res, _, err := wf.CreateResource(ctx, set.Settings, cfg)
 	if err != nil {
 		return nil, err
 	}

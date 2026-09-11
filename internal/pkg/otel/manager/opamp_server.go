@@ -16,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/soheilhy/cmux"
-
 	"github.com/open-telemetry/opamp-go/protobufs"
 	"github.com/open-telemetry/opamp-go/server"
 	"github.com/open-telemetry/opamp-go/server/types"
@@ -65,8 +63,9 @@ type OpAMPServer struct {
 	log    *logger.Logger
 	secret string
 
-	srv      server.OpAMPServer
-	endpoint string
+	srv        server.OpAMPServer
+	endpoint   string
+	socketPath string // non-empty when the server is listening on a Unix socket
 	// httpSrv is set when the server is started via serveOn (Attach path).
 	// nil when started via srv.Start.
 	httpSrv *http.Server
@@ -130,12 +129,15 @@ func (s *OpAMPServer) serveOn(lis net.Listener) error {
 		ConnContext:       connContext,
 		ReadHeaderTimeout: 60 * time.Second,
 	}
-	s.endpoint = fmt.Sprintf("http://%s%s", lis.Addr().String(), opampListenPath)
+	if lis.Addr().Network() == "unix" {
+		s.socketPath = lis.Addr().String()
+		s.endpoint = "http://localhost" + opampListenPath // cosmetic URL when using a Unix socket
+	} else {
+		s.endpoint = fmt.Sprintf("http://%s%s", lis.Addr().String(), opampListenPath)
+	}
 	go func() {
 		if serveErr := s.httpSrv.Serve(lis); serveErr != nil &&
-			!errors.Is(serveErr, http.ErrServerClosed) &&
-			!errors.Is(serveErr, cmux.ErrServerClosed) &&
-			!errors.Is(serveErr, cmux.ErrListenerClosed) {
+			!errors.Is(serveErr, http.ErrServerClosed) {
 			s.log.Errorf("opamp http server: %v", serveErr)
 		}
 	}()
@@ -202,6 +204,12 @@ func (s *OpAMPServer) Stop(ctx context.Context) error {
 // e.g. "http://127.0.0.1:1234/v1/opamp". Empty until Start succeeds.
 func (s *OpAMPServer) Endpoint() string {
 	return s.endpoint
+}
+
+// SocketPath returns the Unix socket path when the server is listening on a
+// Unix domain socket, or an empty string when using TCP.
+func (s *OpAMPServer) SocketPath() string {
+	return s.socketPath
 }
 
 // StartSession begins a new collector session. Closes any prior session and
