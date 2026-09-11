@@ -25,11 +25,16 @@ import (
 // the test if Docker is unavailable.
 func newTestProvisioner(t *testing.T) *provisioner {
 	t.Helper()
-	p := &provisioner{logger: &tLogger{t}}
+	ip, err := NewProvisioner()
+	if err != nil {
+		t.Skipf("docker not available: %s", err)
+	}
+	p := ip.(*provisioner)
+	p.logger = &tLogger{t}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := p.checkDocker(ctx); err != nil {
-		t.Skipf("docker not available: %s", err)
+	if _, err := p.client.ServerVersion(ctx, dockerclient.ServerVersionOptions{}); err != nil {
+		t.Skipf("docker daemon not reachable: %s", err)
 	}
 	return p
 }
@@ -95,11 +100,6 @@ func startAlpineLabeled(t *testing.T, p *provisioner, name string) {
 		_, _ = p.client.ContainerRemove(context.Background(), name,
 			dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 	})
-}
-
-func TestCheckDocker(t *testing.T) {
-	p := newTestProvisioner(t) // skips if docker unavailable
-	assert.NotNil(t, p.client)
 }
 
 func TestContainerSSHPort(t *testing.T) {

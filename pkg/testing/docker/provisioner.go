@@ -129,10 +129,6 @@ func (p *provisioner) Supported(os define.OS) bool {
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
-	if err := p.checkDocker(ctx); err != nil {
-		return nil, err
-	}
-
 	publicKeyPath := filepath.Join(cfg.StateDir, "id_rsa.pub")
 	publicKey, err := os.ReadFile(publicKeyPath)
 	if err != nil {
@@ -544,13 +540,6 @@ func (p *provisioner) containerSSHPort(ctx context.Context, name string) (int, e
 		}
 	}
 	return 0, fmt.Errorf("container %s has no published SSH port on 127.0.0.1", name)
-}
-
-func (p *provisioner) checkDocker(ctx context.Context) error {
-	if _, err := p.client.ServerVersion(ctx, dockerclient.ServerVersionOptions{}); err != nil {
-		return fmt.Errorf("docker does not appear to be running: %w", err)
-	}
-	return nil
 }
 
 // containerExec runs cmd inside the named container, optionally piping stdin.
