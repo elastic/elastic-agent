@@ -128,7 +128,7 @@ common:
       - v1.33.0
       - v1.34.0
       - v1.35.0
-    variants: &k8s_test_variants
+    all_variants: &k8s_test_all_variants
       - basic
       - complete
       - complete-wolfi
@@ -142,10 +142,18 @@ common:
       - complete
       - complete-wolfi
       - elastic-otel-collector
+    all_variants_without_default: &k8s_test_all_variants_without_default
+      - basic
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+      - wolfi
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
       TARGET_ARCH: "amd64"
+      K8S_PROVISIONER: "kind"
     agent: &k8s_test_agent
       provider: "gcp"
       machineType: "n2-standard-8"
@@ -164,7 +172,7 @@ common:
     artifact_paths: &k8s_test_artifact_paths
       - build/*
       - build/diagnostics/**
-      - build/*.pod_logs_dump/*
+      - build/k8s-logs-*/**
 
 steps:
   - label: "Custom ECH Testing"
@@ -987,7 +995,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants_without_default
             version:
               - *k8s_min_test_version
               - *k8s_max_test_version
@@ -1022,7 +1030,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants
             version:
               *k8s_test_versions_without_min_max
 
