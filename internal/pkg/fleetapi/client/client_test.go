@@ -323,7 +323,7 @@ func Test_CheckRemote(t *testing.T) {
 
 			require.NoError(t, err)
 
-			checkErr := CheckRemote(t.Context(), c)
+			checkErr := CheckRemote(t.Context(), testLogger, c)
 			require.Equal(t, tc.expectedError, checkErr != nil)
 			assert.Equal(t, tc.isRecoverable, errors.IsRecoverable(checkErr))
 			if tc.expectedError {
