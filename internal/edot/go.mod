@@ -119,6 +119,7 @@ require (
 	github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.74.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
+	github.com/elastic/proxy-connect-dialer-go v0.1.1 // indirect
 	github.com/elastic/tk-btf v0.2.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
@@ -145,7 +146,6 @@ require (
 	github.com/itchyny/timefmt-go v0.1.8 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
 	github.com/moby/moby/api v1.56.0 // indirect
 	github.com/moby/moby/client v0.6.0 // indirect
@@ -178,7 +178,6 @@ require (
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
-	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/sony/gobreaker/v2 v2.4.0 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
 	github.com/twpayne/go-geom v1.6.1 // indirect
@@ -820,7 +819,17 @@ require (
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
 
-replace github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
+replace (
+	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
+	// Use fork from https://github.com/open-telemetry/opamp-go/pull/642 which adds Unix socket transport support.
+	github.com/open-telemetry/opamp-go => github.com/dpaasman00/opamp-go v0.0.0-20260901163641-3ad84468cc95
+	// Use fork from https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/50667 which adds
+	// configurable socket options (Unix/named-pipe) to the opamp extension.
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension => github.com/dpaasman00/opentelemetry-collector-contrib/extension/opampextension v0.0.0-20260902163552-7280767449cd
+	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
+	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
+	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
+)
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
 replace (

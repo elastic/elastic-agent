@@ -22,7 +22,7 @@ func TestInjectOpAMPExtension(t *testing.T) {
 
 	t.Run("adds_extension_and_service_listing_into_empty_config", func(t *testing.T) {
 		conf := confmap.New()
-		require.NoError(t, injectOpAMPExtension(conf, extensionID, instanceUID, serverEndpoint, secret))
+		require.NoError(t, injectOpAMPExtension(conf, extensionID, instanceUID, serverEndpoint, "", secret))
 
 		require.True(t, conf.IsSet("extensions::"+extensionID))
 		assert.Equal(t, instanceUID, conf.Get("extensions::"+extensionID+"::instance_uid"))
@@ -48,7 +48,7 @@ func TestInjectOpAMPExtension(t *testing.T) {
 				"extensions": []any{"existing/foo"},
 			},
 		})
-		require.NoError(t, injectOpAMPExtension(conf, extensionID, instanceUID, serverEndpoint, secret))
+		require.NoError(t, injectOpAMPExtension(conf, extensionID, instanceUID, serverEndpoint, "", secret))
 
 		exts, ok := conf.Get("service::extensions").([]any)
 		require.True(t, ok)

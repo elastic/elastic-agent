@@ -35,20 +35,29 @@ const (
 // extensionID is the full OTel component ID (e.g. "opamp/<uuid>"). instanceUID
 // is a UUIDv7 string that remains stable across collector restarts of this
 // manager. serverEndpoint is the URL of the manager's OpAMP server (e.g.
-// "http://127.0.0.1:1234/v1/opamp"). secret is the bearer token that the
-// extension must send in the Authorization header.
-func injectOpAMPExtension(conf *confmap.Conf, extensionID, instanceUID, serverEndpoint, secret string) error {
+// "http://127.0.0.1:1234/v1/opamp"). socketPath, when non-empty, is the Unix
+// domain socket path the extension should dial instead of the TCP address in
+// serverEndpoint. secret is the bearer token that the extension must send in
+// the Authorization header.
+func injectOpAMPExtension(conf *confmap.Conf, extensionID, instanceUID, serverEndpoint, socketPath, secret string) error {
+	httpConfig := map[string]any{
+		"endpoint":         serverEndpoint,
+		"polling_interval": opampPollingInterval,
+		"headers": map[string]any{
+			opampAuthorizationHeader: fmt.Sprintf("Bearer %s", secret),
+		},
+	}
+	if socketPath != "" {
+		httpConfig["socket"] = map[string]any{
+			"endpoint":  socketPath,
+			"transport": "unix",
+		}
+	}
 	return mergeWithExtensions(conf, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
 			extensionID: map[string]any{
 				"server": map[string]any{
-					"http": map[string]any{
-						"endpoint":         serverEndpoint,
-						"polling_interval": opampPollingInterval,
-						"headers": map[string]any{
-							opampAuthorizationHeader: fmt.Sprintf("Bearer %s", secret),
-						},
-					},
+					"http": httpConfig,
 				},
 				"instance_uid": instanceUID,
 				"capabilities": map[string]any{
