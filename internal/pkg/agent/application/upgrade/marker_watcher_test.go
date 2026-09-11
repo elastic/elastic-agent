@@ -14,6 +14,7 @@ import (
 
 	"go.uber.org/zap/zapcore"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"gopkg.in/yaml.v2"
@@ -315,5 +316,78 @@ details:
 			require.True(t, actualMarker.Details.Equals(test.expectedDetails))
 		})
 
+	}
+}
+
+// TestProcessMarker_FallbackToWatcherMarker verifies that when the agent restarts
+// with no upgrade marker on disk, processMarker emits an UpdateMarker derived
+// from the watcher marker so the coordinator can re-report the terminal upgrade
+// state to Fleet.
+func TestProcessMarker_FallbackToWatcherMarker(t *testing.T) {
+	cases := []struct {
+		name    string
+		outcome details.State
+	}{
+		{name: "completed", outcome: details.StateCompleted},
+		{name: "rollback", outcome: details.StateRollback},
+		{name: "failed", outcome: details.StateFailed},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			markerFilePath := filepath.Join(tmpDir, markerFilename)
+			// No upgrade marker — simulates agent restart after watcher cleanup.
+
+			log, _ := loggertest.New("marker_watcher")
+			updateCh := make(chan UpdateMarker)
+			mfw := MarkerFileWatcher{
+				markerFilePath: markerFilePath,
+				logger:         log,
+				updateCh:       updateCh,
+			}
+
+			wm := &WatcherMarker{
+				Outcome:         tc.outcome,
+				TargetVersion:   "9.1.0",
+				PreviousVersion: "9.0.0",
+				ActionID:        "action-abc",
+				CompletedAt:     time.Now(),
+			}
+			require.NoError(t, WriteWatcherMarker(log, tmpDir, wm))
+
+			done := make(chan struct{})
+			defer close(done)
+
+			var emitted bool
+			var received UpdateMarker
+			var mu sync.Mutex
+			go func() {
+				select {
+				case m := <-updateCh:
+					mu.Lock()
+					emitted = true
+					received = m
+					mu.Unlock()
+				case <-done:
+				}
+			}()
+
+			mfw.processMarker(t.Context(), "9.1.0", "somehash")
+
+			require.Eventually(t, func() bool {
+				mu.Lock()
+				defer mu.Unlock()
+				return emitted
+			}, 5*time.Second, 10*time.Millisecond,
+				"processMarker did not emit an UpdateMarker from the watcher marker")
+
+			mu.Lock()
+			defer mu.Unlock()
+			assert.Equal(t, "9.1.0", received.Version)
+			assert.Equal(t, "9.0.0", received.PrevVersion)
+			assert.Equal(t, "action-abc", received.GetActionID())
+			assert.Nil(t, received.Details)
+		})
 	}
 }

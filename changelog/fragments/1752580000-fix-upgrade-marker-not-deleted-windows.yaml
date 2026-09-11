@@ -1,0 +1,14 @@
+kind: bug-fix
+
+summary: Remove upgrade marker after successful upgrade on all platforms including Windows
+
+description: |
+  The upgrade watcher previously skipped deleting the upgrade marker on Windows,
+  leaving a stale marker that interfered with subsequent upgrades. This change
+  introduces a new watcher-owned .watcher-marker file that records the terminal
+  upgrade outcome (completed, rolled back, or failed) before the upgrade marker
+  is deleted. The upgrade marker is now removed unconditionally on all platforms.
+
+component: elastic-agent
+
+issue: https://github.com/elastic/elastic-agent/issues/3027
