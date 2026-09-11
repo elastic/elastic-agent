@@ -79,18 +79,17 @@ type provisioner struct {
 	client *dockerclient.Client
 }
 
-// NewProvisioner creates the docker instance provisioner.
-func NewProvisioner() common.InstanceProvisioner {
-	p := &provisioner{}
-	// Initialize the Docker client eagerly so it is available even when Provision
-	// is skipped (e.g. the runner resumes from saved state).  New() only parses
-	// env vars and creates an HTTP transport — no network calls — so it is safe
-	// to call here without a context.  Connectivity is verified later in Provision
-	// via checkDocker.
-	if c, err := dockerclient.New(dockerclient.FromEnv); err == nil {
-		p.client = c
+// NewProvisioner creates the docker instance provisioner. The Docker client is
+// initialized eagerly so it is available even when Provision is skipped (e.g.
+// the runner resumes from saved state). New() only parses env vars and creates
+// an HTTP transport — no network calls — so connectivity is verified later in
+// Provision via checkDocker.
+func NewProvisioner() (common.InstanceProvisioner, error) {
+	c, err := dockerclient.New(dockerclient.FromEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	return p
+	return &provisioner{client: c}, nil
 }
 
 func (p *provisioner) Name() string {
@@ -239,15 +238,6 @@ func hostGoModCacheDownload(ctx context.Context) string {
 // leftovers from a run cancelled mid-provision — which never made it into state — are
 // removed too.
 func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
-	if p.client == nil {
-		// Eager init in NewProvisioner may have failed (e.g. Docker unavailable at
-		// startup); create the client now so Clean can still remove containers.
-		c, err := dockerclient.New(dockerclient.FromEnv)
-		if err != nil {
-			return fmt.Errorf("docker client unavailable; containers may need manual cleanup: %w", err)
-		}
-		p.client = c
-	}
 	for _, instance := range instances {
 		// RemoveVolumes also drops the anonymous /var/lib/docker volume backing the nested daemon.
 		if _, err := p.client.ContainerRemove(ctx, instance.Name, dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
@@ -288,9 +278,6 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 // common.InstanceNetworkAttacher). It is idempotent: re-attaching an
 // already-connected container is treated as success.
 func (p *provisioner) AttachInstanceToNetwork(ctx context.Context, instance common.Instance, networkID string) error {
-	if p.client == nil {
-		return fmt.Errorf("docker client not initialized")
-	}
 	_, err := p.client.NetworkConnect(ctx, networkID, dockerclient.NetworkConnectOptions{Container: instance.Name})
 	if err != nil {
 		if cerrdefs.IsConflict(err) {
@@ -560,14 +547,6 @@ func (p *provisioner) containerSSHPort(ctx context.Context, name string) (int, e
 }
 
 func (p *provisioner) checkDocker(ctx context.Context) error {
-	if p.client == nil {
-		// NewProvisioner's eager init failed; create the client now.
-		c, err := dockerclient.New(dockerclient.FromEnv)
-		if err != nil {
-			return fmt.Errorf("failed to create Docker client: %w", err)
-		}
-		p.client = c
-	}
 	if _, err := p.client.ServerVersion(ctx, dockerclient.ServerVersionOptions{}); err != nil {
 		return fmt.Errorf("docker does not appear to be running: %w", err)
 	}
