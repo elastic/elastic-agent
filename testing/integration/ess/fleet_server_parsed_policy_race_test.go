@@ -133,8 +133,7 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 		}
 	})
 
-	// Verify the agent is connected to Fleet. If the fleet-server panics while
-	// dispatching the policy, the agent would never reach the connected state.
+	// Verify the agent is connected to Fleet.
 	t.Log("Verifying agent is connected to Fleet (no panic)...")
 	require.True(t, check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute),
 		"agent did not connect to Fleet — fleet-server may have crashed with index-out-of-range panic")
@@ -156,9 +155,7 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 	t.Log("Checking diagnostics archive for panic strings...")
 	checkDiagArchiveNoPanic(t, diagZip)
 
-	// Verify the agent's applied policy revision in Fleet matches (or exceeds) the
-	// latest revision. If fleet-server crashed mid-dispatch, the agent would have
-	// an older revision recorded.
+	// Verify the agent's applied policy revision in Fleet matches (or exceeds) the latest revision.
 	t.Log("Verifying agent policy revision matches Fleet...")
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		currentPolicy, err := info.KibanaClient.GetPolicy(ctx, policyResp.ID)
