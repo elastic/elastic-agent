@@ -79,7 +79,7 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 	outputID := createRemoteESOutputWithSecret(t, ctx, info, esHost, serviceToken)
 	t.Logf("Created remote_elasticsearch output with ID: %s", outputID)
 
-	// Create the agent policy, pointing its data output at the remote ES output.
+	// Create the agent policy, pointing its elasticsearch output to the remote ES cluster.
 	// Any policy that references this output will have non-empty secret_references.
 	policyUUID := uuid.Must(uuid.NewV4()).String()
 	policyReq := kibana.AgentPolicy{
@@ -98,8 +98,7 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 	require.NoError(t, err, "failed to create agent policy")
 	t.Logf("Created policy %s (ID: %s, revision: %d)", policyResp.Name, policyResp.ID, policyResp.Revision)
 
-	// Add the Elastic Defend integration to the policy to make the test more
-	// realistic and cover an edge case with additional policy complexity.
+	// Add the Elastic Defend integration to the policy.
 	t.Log("Installing Elastic Defend package policy...")
 	_, err = installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoError(t, err, "failed to install Elastic Defend package policy")
