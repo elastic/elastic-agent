@@ -412,6 +412,8 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 			assert.Nil(ct, agentResp.UpgradeDetails,
 				"Fleet upgrade_details should be nil after upgrade completes")
 		}
+		assert.NoFileExists(ct, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"),
+			"upgrade marker must be removed after upgrade completes")
 	}, 5*time.Minute, 15*time.Second)
 
 	// 3. Request rollback via Fleet API
@@ -534,10 +536,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 					assert.Equal(t, cproto.State_HEALTHY, state.State)
 					assert.Equal(collect, expectedVersion, state.Info.Version)
 					assert.Equal(collect, expectedSnapshot, state.Info.Snapshot)
-					if runtime.GOOS != "windows" {
-						// on windows the update marker is not removed when cleaning up
-						assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
-					}
+					assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
 				}, 4*time.Minute, 10*time.Second)
 				t.Log("elastic agent is out of grace period.")
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)

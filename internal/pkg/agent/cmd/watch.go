@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -227,7 +226,22 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	saveMarkerFunc := func(marker *upgrade.UpdateMarker, b bool) error {
 		return upgrade.SaveMarker(dataDir, marker, b)
 	}
-	upgradeDetails := initUpgradeDetails(marker, saveMarkerFunc, log)
+
+	// Determine whether the watcher should remove the marker on success (old protocol)
+	// or leave it for the coordinator to clean up (new protocol, coordinator >= 9.5.0).
+	targetVersion, targetVersionErr := semver.ParseVersion(marker.Version)
+	removeMarker := targetVersionErr != nil || targetVersion.Less(*upgrade.Version_9_5_0_SNAPSHOT)
+	if !removeMarker && targetVersionErr == nil {
+		// When the watcher binary is newer than the upgrade target, the target
+		// coordinator may not understand StateCompleted and would get stuck.
+		// Fall back to old protocol: skip writing StateCompleted and let the
+		// watcher remove the marker so the coordinator receives nil instead.
+		// If the watcher version is unknown, fall back to old protocol as well.
+		watcherVersion := version.GetParsedAgentPackageVersion()
+		removeMarker = watcherVersion == nil || targetVersion.Less(*watcherVersion)
+	}
+
+	upgradeDetails := initUpgradeDetails(marker, saveMarkerFunc, log, removeMarker)
 
 	errorCheckInterval := cfg.ErrorCheck.Interval
 	ctx := context.Background()
@@ -275,18 +289,15 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	// watch succeeded - upgrade was successful!
 	upgradeDetails.SetState(details.StateCompleted)
 
-	// cleanup older versions,
-	// in windows it might leave self untouched, this will get cleaned up
-	// later at the start, because for windows we leave marker untouched.
-	//
-	// Why is this being skipped on Windows? The comment above is not clear.
-	// issue: https://github.com/elastic/elastic-agent/issues/3027
-	removeMarker := !isWindows()
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
 		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
 	}
+	// When removeMarker is true the watcher deletes the marker; the coordinator receives
+	// nil from the fsnotify Remove event.
+	// When false (9.5.0+ target), the coordinator handles cleanup: via upgradeMarkerCleanCh
+	// in managed mode, or on StateCompleted in standalone mode.
 	// Only newVersionedHome is explicitly kept here; rollback candidates are preserved by
 	// cleanupAgentDirectories reading the TTL registry and retaining unexpired entries.
 	err = installModifier.Cleanup(log, topDir, removeMarker, false /* keepLogs */, newVersionedHome)
@@ -349,10 +360,6 @@ func rollback(log *logp.Logger, topDir string, client client.Client, installModi
 	return nil
 }
 
-func isWindows() bool {
-	return runtime.GOOS == "windows"
-}
-
 // gracePeriod returns true if it is within grace period and time until grace period ends.
 // otherwise it returns false and 0
 func gracePeriod(marker *upgrade.UpdateMarker, gracePeriodDuration time.Duration) (bool, time.Duration) {
@@ -403,13 +410,19 @@ func getConfig(streams *cli.IOStreams) *configuration.Configuration {
 	return cfg
 }
 
-func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger) *details.Details {
+func initUpgradeDetails(marker *upgrade.UpdateMarker, saveMarker func(*upgrade.UpdateMarker, bool) error, log *logp.Logger, removeMarker bool) *details.Details {
 	upgradeDetails := details.NewDetails(version.GetAgentPackageVersion(), details.StateWatching, marker.GetActionID())
-	upgradeDetails.RegisterObserver(func(details *details.Details) {
-		marker.Details = details
+	upgradeDetails.RegisterObserver(func(d *details.Details) {
+		// When the watcher will remove the marker on success, skip writing
+		// StateCompleted. The coordinator will receive nil from the Remove
+		// fsnotify event, which works for both old and new coordinators.
+		if removeMarker && d != nil && d.State == details.StateCompleted {
+			return
+		}
+		marker.Details = d
 		if err := saveMarker(marker, true); err != nil {
-			if details != nil {
-				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", details.State, err.Error())
+			if d != nil {
+				log.Errorf("unable to save upgrade marker after setting upgrade details (state = %s): %s", d.State, err.Error())
 			} else {
 				log.Errorf("unable to save upgrade marker after clearing upgrade details: %s", err.Error())
 			}

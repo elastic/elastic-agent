@@ -34,59 +34,82 @@ import (
 )
 
 func TestInitUpgradeDetails(t *testing.T) {
-	testMarker := &upgrade.UpdateMarker{
-		Action: &fleetapi.ActionUpgrade{
-			ActionID: "foobar",
-		},
-	}
+	t.Run("removeMarker=false: StateCompleted is written to marker", func(t *testing.T) {
+		testMarker := &upgrade.UpdateMarker{
+			Action: &fleetapi.ActionUpgrade{ActionID: "foobar"},
+		}
 
-	saveCount := 0
-	mockSaveMarker := func(marker *upgrade.UpdateMarker, _ bool) error {
-		saveCount++
-		if saveCount <= 3 {
-			testMarker = marker
+		saveCount := 0
+		mockSaveMarker := func(marker *upgrade.UpdateMarker, _ bool) error {
+			saveCount++
+			if saveCount <= 3 {
+				testMarker = marker
+				return nil
+			}
+			return errors.New("some error")
+		}
+
+		log, obs := loggertest.New("initUpgradeDetails")
+		upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log, false)
+
+		require.NotNil(t, testMarker.Details)
+		require.Equal(t, details.StateWatching, testMarker.Details.State)
+		require.Equal(t, 0, obs.Len())
+
+		upgradeDetails.SetState(details.StateRollback)
+		require.Equal(t, details.StateRollback, testMarker.Details.State)
+		require.Equal(t, 0, obs.Len())
+
+		// StateCompleted must be written so the coordinator can detect and clean the marker.
+		upgradeDetails.SetState(details.StateCompleted)
+		require.NotNil(t, testMarker.Details)
+		require.Equal(t, details.StateCompleted, testMarker.Details.State)
+		require.Equal(t, 0, obs.Len())
+
+		upgradeDetails.SetState(details.StateRollback)
+		require.Equal(t, 1, obs.Len())
+		logs := obs.TakeAll()
+		require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+		require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_ROLLBACK): some error`, logs[0].Message)
+
+		upgradeDetails.SetState(details.StateCompleted)
+		require.NotNil(t, testMarker.Details)
+		require.Equal(t, details.StateCompleted, testMarker.Details.State)
+		require.Equal(t, 1, obs.Len())
+		logs = obs.TakeAll()
+		require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
+		require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_COMPLETED): some error`, logs[0].Message)
+	})
+
+	t.Run("removeMarker=true: StateCompleted is not written to marker", func(t *testing.T) {
+		testMarker := &upgrade.UpdateMarker{
+			Action: &fleetapi.ActionUpgrade{ActionID: "foobar"},
+		}
+
+		var lastSavedMarker *upgrade.UpdateMarker
+		mockSaveMarker := func(marker *upgrade.UpdateMarker, _ bool) error {
+			lastSavedMarker = marker
 			return nil
 		}
-		return errors.New("some error")
-	}
 
-	log, obs := loggertest.New("initUpgradeDetails")
+		log, _ := loggertest.New("initUpgradeDetails")
+		upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log, true)
 
-	upgradeDetails := initUpgradeDetails(testMarker, mockSaveMarker, log)
+		// Initial StateWatching must still be saved.
+		require.NotNil(t, lastSavedMarker)
+		require.Equal(t, details.StateWatching, lastSavedMarker.Details.State)
 
-	// Verify initial state
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, details.StateWatching, testMarker.Details.State)
-	require.Equal(t, 0, obs.Len())
+		// StateCompleted must be skipped: the watcher will remove the marker,
+		// so writing StateCompleted would leave old coordinators stuck at UPG_COMPLETED.
+		lastSavedMarker = nil
+		upgradeDetails.SetState(details.StateCompleted)
+		require.Nil(t, lastSavedMarker, "observer must not write StateCompleted when removeMarker=true")
 
-	// Verify state after changing details state
-	upgradeDetails.SetState(details.StateRollback)
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, details.StateRollback, testMarker.Details.State)
-	require.Equal(t, 0, obs.Len())
-
-	// Verify state after clearing details state
-	upgradeDetails.SetState(details.StateCompleted)
-	require.Nil(t, testMarker.Details)
-	require.Equal(t, 0, obs.Len())
-
-	// Verify state after changing details state and there's an
-	// error saving the marker
-	upgradeDetails.SetState(details.StateRollback)
-	require.NotNil(t, testMarker.Details)
-	require.Equal(t, 1, obs.Len())
-	logs := obs.TakeAll()
-	require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
-	require.Equal(t, `unable to save upgrade marker after setting upgrade details (state = UPG_ROLLBACK): some error`, logs[0].Message)
-
-	// Verify state after clearing details state and there's an
-	// error saving the marker
-	upgradeDetails.SetState(details.StateCompleted)
-	require.Nil(t, testMarker.Details)
-	require.Equal(t, 1, obs.Len())
-	logs = obs.TakeAll()
-	require.Equal(t, zapcore.ErrorLevel, logs[0].Level)
-	require.Equal(t, `unable to save upgrade marker after clearing upgrade details: some error`, logs[0].Message)
+		// Other state transitions must still be saved.
+		upgradeDetails.SetState(details.StateRollback)
+		require.NotNil(t, lastSavedMarker)
+		require.Equal(t, details.StateRollback, lastSavedMarker.Details.State)
+	})
 }
 
 func Test_watchCmd(t *testing.T) {
@@ -139,11 +162,118 @@ func Test_watchCmd(t *testing.T) {
 					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(nil)
 
-				// on windows the marker is not removed immediately to allow for cleanup on restart
-				expectedRemoveMarkerFlag := runtime.GOOS != "windows"
+				installModifier.EXPECT().
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "happy path: target version >= 9.5.0, coordinator owns marker cleanup",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "9.5.0",
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-9.5.0-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.4.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
 
 				installModifier.EXPECT().
-					Cleanup(mock.Anything, topDir, expectedRemoveMarkerFlag, false, filepath.Join("data", "elastic-agent-4.5.6-newver")).
+					Cleanup(mock.Anything, topDir, false, false, filepath.Join("data", "elastic-agent-9.5.0-newver")).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			// When marker.Version is unparseable, targetVersionErr != nil → removeMarker=true.
+			// The watcher falls back to old protocol regardless of versions.
+			name: "happy path: unparseable marker version falls back to old protocol (removeMarker=true)",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "", // unparseable: triggers targetVersionErr != nil branch
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.4.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+
+				// removeMarker=true: unparseable target version falls back to old protocol.
+				installModifier.EXPECT().
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-newver")).
+					Return(nil)
+			},
+			args: args{
+				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			// The watcher binary version (version.GetParsedAgentPackageVersion(), which
+			// defaults to 9.5.0 in tests) is newer than the target SNAPSHOT. The watcher
+			// falls back to old protocol: it removes the marker so the coordinator sees nil
+			// rather than StateCompleted.
+			name: "happy path: watcher newer than target SNAPSHOT, falls back to old protocol (removeMarker=true)",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				dataDirPath := paths.DataFrom(topDir)
+				err := os.MkdirAll(dataDirPath, 0755)
+				require.NoError(t, err)
+				err = upgrade.SaveMarker(
+					dataDirPath,
+					&upgrade.UpdateMarker{
+						Version:           "9.5.0-SNAPSHOT",
+						Hash:              "newver",
+						VersionedHome:     filepath.Join("data", "elastic-agent-9.5.0-SNAPSHOT-newver"),
+						UpdatedOn:         time.Now(),
+						PrevVersion:       "9.4.0",
+						PrevHash:          "prvver",
+						PrevVersionedHome: filepath.Join("data", "elastic-agent-prvver"),
+					},
+					true,
+				)
+				require.NoError(t, err)
+
+				watcher.EXPECT().
+					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil)
+
+				// removeMarker=true: watcher removes the marker (old protocol).
+				installModifier.EXPECT().
+					Cleanup(mock.Anything, topDir, true, false, filepath.Join("data", "elastic-agent-9.5.0-SNAPSHOT-newver")).
 					Return(nil)
 			},
 			args: args{
@@ -459,16 +589,9 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 		paths.BinaryPath(filepath.Join(topDir, liveHome), binName),
 		"live agent binary must survive cleanup")
 
-	// Sanity: watchCmd sets removeMarker = !isWindows() for the success
-	// branch, so the marker should be gone on non-Windows and preserved
-	// on Windows.
 	loaded, loadErr := upgrade.LoadMarker(dataDir)
 	require.NoError(t, loadErr)
-	if runtime.GOOS == "windows" {
-		assert.NotNil(t, loaded, "marker should be preserved after successful watch on windows")
-	} else {
-		assert.Nil(t, loaded, "marker should be cleaned up after successful watch on non-windows")
-	}
+	assert.Nil(t, loaded, "marker should be removed after successful watch")
 }
 
 // writeFakeInstallForWatcherTest builds the on-disk shape that step_unpack
