@@ -26,6 +26,40 @@ func makeResourceMetrics(scopes []metricdata.ScopeMetrics) *metricdata.ResourceM
 	}
 }
 
+func TestMetricdataToPdata_ResourceAttributes(t *testing.T) {
+	res, err := resource.New(t.Context(),
+		resource.WithAttributes(
+			attribute.String("service.name", "elastic-agent"),
+			attribute.Int64("some.int", 7),
+			attribute.Float64("some.float", 1.5),
+			attribute.Bool("some.bool", true),
+		),
+	)
+	require.NoError(t, err)
+
+	rm := &metricdata.ResourceMetrics{Resource: res, ScopeMetrics: nil}
+	md := metricdataToPdata(rm)
+
+	require.Equal(t, 1, md.ResourceMetrics().Len())
+	attrs := md.ResourceMetrics().At(0).Resource().Attributes()
+
+	v, ok := attrs.Get("service.name")
+	require.True(t, ok)
+	assert.Equal(t, "elastic-agent", v.Str())
+
+	v, ok = attrs.Get("some.int")
+	require.True(t, ok)
+	assert.Equal(t, int64(7), v.Int())
+
+	v, ok = attrs.Get("some.float")
+	require.True(t, ok)
+	assert.InDelta(t, 1.5, v.Double(), 1e-9)
+
+	v, ok = attrs.Get("some.bool")
+	require.True(t, ok)
+	assert.True(t, v.Bool())
+}
+
 func scopeWithAttrs(name string, attrs ...attribute.KeyValue) instrumentation.Scope {
 	return instrumentation.Scope{
 		Name:       name,
