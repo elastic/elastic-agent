@@ -96,7 +96,7 @@ function ess_down {
       $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
     }
     if (-not $ClusterName) {
-      $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+      $ClusterName = Get-EssClusterNameFromMetadata
     }
     if (-not $ClusterName) {
       Write-Output "No cluster-name found; nothing to destroy."
@@ -109,6 +109,66 @@ function ess_down {
   } catch {
     Write-Warning "Error during ess_down: $_ - ephemeral cluster will auto-expire."
   }
+}
+
+# True when oblt-cli failed because GCP Secret Manager does not have the
+# cluster env secret yet (gRPC NotFound). Other failures should not be polled.
+function Test-EssSecretsNotFoundYet {
+  param([string]$Output)
+  return $Output -match '(?i)code = NotFound|not found or has no versions'
+}
+
+# Runs a native command and returns its exit code, its stdout, and its combined
+# stdout/stderr as strings.
+#
+# Redirecting the stderr of a native command (`2>&1`, `2>$null`, ...) makes
+# PowerShell wrap every stderr line in a NativeCommandError record. The
+# Buildkite agent runs job commands through a wrapper that sets
+# `$ErrorActionPreference = "STOP"`, which turns the first such record into a
+# terminating error - even for a command that goes on to succeed. oblt-cli logs
+# everything, including `[info]` lines, to stderr, so it always tripped this.
+# Relax the preference for the duration of the call and flatten the records
+# back into strings.
+function Invoke-NativeCommand {
+  param(
+    [string]$FilePath,
+    [string[]]$ArgumentList = @()
+  )
+
+  $previousPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $captured = & $FilePath @ArgumentList 2>&1
+  } finally {
+    $ErrorActionPreference = $previousPreference
+  }
+  $exitCode = $LASTEXITCODE
+
+  # Merged stderr arrives as ErrorRecord objects, stdout as plain strings.
+  $stdOut = [System.Collections.Generic.List[string]]::new()
+  $combined = [System.Collections.Generic.List[string]]::new()
+  foreach ($item in $captured) {
+    $line = "$item"
+    if ($item -isnot [System.Management.Automation.ErrorRecord]) {
+      $stdOut.Add($line)
+    }
+    $combined.Add($line)
+  }
+
+  return [pscustomobject]@{
+    ExitCode = $exitCode
+    StdOut   = ($stdOut -join [Environment]::NewLine)
+    Output   = ($combined -join [Environment]::NewLine)
+  }
+}
+
+# Reads the shared cluster name from Buildkite meta-data, or $null when unset.
+function Get-EssClusterNameFromMetadata {
+  $metadata = Invoke-NativeCommand -FilePath 'buildkite-agent' -ArgumentList @('meta-data', 'get', 'cluster-name')
+  if ($metadata.ExitCode -ne 0) {
+    return $null
+  }
+  return $metadata.StdOut.Trim()
 }
 
 function ess_load_secrets {
@@ -125,22 +185,56 @@ function ess_load_secrets {
     $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
   }
   if (-not $ClusterName) {
-    $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+    $ClusterName = Get-EssClusterNameFromMetadata
   }
   if (-not $ClusterName) {
     Write-Error "Error: no cluster-name available (neither cluster-info.json nor meta-data); cannot load secrets."
     return 1
   }
 
+  # `oblt-cli cluster create --wait` returns as soon as the cluster config lands
+  # on the observability-test-environments default branch, but the credentials
+  # secret is published by a later step of the cluster-manager workflow and has
+  # been observed to lag by several minutes. Poll rather than reading it once.
+  $timeoutSeconds = if ($Env:ESS_SECRETS_TIMEOUT_SECONDS) { [int]$Env:ESS_SECRETS_TIMEOUT_SECONDS } else { 600 }
+  $intervalSeconds = if ($Env:ESS_SECRETS_POLL_INTERVAL_SECONDS) { [int]$Env:ESS_SECRETS_POLL_INTERVAL_SECONDS } else { 15 }
+
   # --output-file must be absolute (oblt-cli resolves relative paths against
-  # its own config dir). Pipe stdout to Out-Host so it's visible in logs but
-  # doesn't pollute the function's return value captured by `$rc =
-  # ess_load_secrets` in the caller.
+  # its own config dir). Capture output so retry attempts stay to one line
+  # and don't pollute the function's return value captured by `$rc =
+  # ess_load_secrets` in the caller. Dump the last oblt-cli output only when
+  # giving up. Retry only GCP NotFound (secret not published yet); fail fast
+  # on auth, permission, or other errors.
   $envFile = Join-Path $PWD "secrets.env"
-  & oblt-cli cluster secrets env --cluster-name $ClusterName --output-file $envFile | Out-Host
-  if ($LASTEXITCODE -ne 0) {
-    Write-Error "Error: oblt-cli cluster secrets env failed (exit=$LASTEXITCODE)"
-    return 1
+  $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+  $attempt = 0
+  while ($true) {
+    $attempt++
+    $result = Invoke-NativeCommand -FilePath 'oblt-cli' -ArgumentList @(
+      'cluster', 'secrets', 'env',
+      '--cluster-name', $ClusterName,
+      '--output-file', $envFile
+    )
+    $lastExit = $result.ExitCode
+    $lastOutput = $result.Output
+    if ($lastExit -eq 0) {
+      if ($lastOutput.Trim()) {
+        Write-Host $lastOutput
+      }
+      break
+    }
+    if (-not (Test-EssSecretsNotFoundYet $lastOutput)) {
+      Write-Host $lastOutput
+      Write-Error "Error: oblt-cli cluster secrets env failed for cluster '$ClusterName' (exit=$lastExit); not retrying"
+      return 1
+    }
+    if ((Get-Date) -ge $deadline) {
+      Write-Host $lastOutput
+      Write-Error "Error: oblt-cli cluster secrets env failed for cluster '$ClusterName' after ${timeoutSeconds}s and $attempt attempts (last exit=$lastExit)"
+      return 1
+    }
+    Write-Host "Secrets for cluster '$ClusterName' are not available yet (attempt $attempt, exit=$lastExit); retrying in ${intervalSeconds}s..."
+    Start-Sleep -Seconds $intervalSeconds
   }
 
   if (-not (Test-Path $envFile)) {

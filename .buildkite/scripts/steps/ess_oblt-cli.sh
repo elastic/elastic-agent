@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# `oblt-cli cluster create --wait` returns as soon as the cluster config lands on
+# the observability-test-environments default branch, but the credentials secret
+# is published by a later step of the cluster-manager workflow and has been
+# observed to lag by several minutes, so ess_load_secrets polls for it.
+ESS_SECRETS_TIMEOUT_SECONDS="${ESS_SECRETS_TIMEOUT_SECONDS:-600}"
+ESS_SECRETS_POLL_INTERVAL_SECONDS="${ESS_SECRETS_POLL_INTERVAL_SECONDS:-15}"
+
 function ess_up() {
   : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
 
@@ -86,6 +93,12 @@ function ess_down() {
   fi
 }
 
+# Returns 0 when oblt-cli failed because GCP Secret Manager does not have the
+# cluster env secret yet (gRPC NotFound). Other failures should not be polled.
+function ess_secrets_not_found_yet() {
+  grep -qiE 'code = NotFound|not found or has no versions' <<<"$1"
+}
+
 function ess_load_secrets() {
   echo "~~~ Loading ESS Stack secrets"
 
@@ -105,9 +118,39 @@ function ess_load_secrets() {
     CLUSTER_NAME="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name")"
   fi
 
-  # Load the ESS stack secrets
+  # Load the ESS stack secrets, polling until the cluster-manager workflow has
+  # published them (see the note at the top of this file). Capture output so
+  # retry attempts stay to one line; dump the last oblt-cli output only when
+  # giving up. Retry only GCP NotFound (secret not published yet); fail fast
+  # on auth, permission, or other errors.
   local secrets_file="secrets.env.sh"
-  oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}"
+  local deadline=$((SECONDS + ESS_SECRETS_TIMEOUT_SECONDS))
+  local attempt=0
+  local last_output=""
+  local last_rc=0
+  while true; do
+    attempt=$((attempt + 1))
+    last_rc=0
+    last_output="$(oblt-cli cluster secrets env --cluster-name="${CLUSTER_NAME}" --output-file="${secrets_file}" 2>&1)" || last_rc=$?
+    if [ "${last_rc}" -eq 0 ]; then
+      if [ -n "${last_output}" ]; then
+        echo "${last_output}"
+      fi
+      break
+    fi
+    if ! ess_secrets_not_found_yet "${last_output}"; then
+      echo "${last_output}" >&2
+      echo "Error: oblt-cli cluster secrets env failed for cluster '${CLUSTER_NAME}' (exit=${last_rc}); not retrying" >&2
+      return 1
+    fi
+    if [ "${SECONDS}" -ge "${deadline}" ]; then
+      echo "${last_output}" >&2
+      echo "Error: oblt-cli cluster secrets env failed for cluster '${CLUSTER_NAME}' after ${ESS_SECRETS_TIMEOUT_SECONDS}s and ${attempt} attempts (last exit=${last_rc})" >&2
+      return 1
+    fi
+    echo "Secrets for cluster '${CLUSTER_NAME}' are not available yet (attempt ${attempt}, exit=${last_rc}); retrying in ${ESS_SECRETS_POLL_INTERVAL_SECONDS}s..." >&2
+    sleep "${ESS_SECRETS_POLL_INTERVAL_SECONDS}"
+  done
 
   # Source the secrets file with allexport to make variables available outside the function
   local src_rc=0
