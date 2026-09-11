@@ -19,12 +19,15 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/service"
 
+	"github.com/elastic/beats/v7/libbeat/beat"
+
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/agentprovider"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -32,6 +35,11 @@ const (
 	agentBaseDirectory    = "/usr/share/elastic-agent"    // directory that holds all elastic-agent related files
 	defaultStateDirectory = agentBaseDirectory + "/state" // directory that will hold the state data
 )
+
+// initBeatHostnameFromEnv sets the process-wide Beat hostname override from ELASTIC_AGENT_HOSTNAME.
+func initBeatHostnameFromEnv() {
+	beat.SetHostnameOverride(util.HostnameOverride())
+}
 
 func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams, componentsFn func() (otelcol.Factories, error)) *cobra.Command {
 	cmd := &cobra.Command{
@@ -89,6 +97,14 @@ func hideInheritedFlags(c *cobra.Command) {
 }
 
 func RunCollector(cmdCtx context.Context, configFiles []string, supervised bool, supervisedLoggingLevel string, supervisedMonitoringURL string, componentsFn func() (otelcol.Factories, error)) error {
+	if supervised {
+		// Agent-generated configs pass the override to each Beat receiver through its native
+		// hostname setting. Set the process-wide value before OTel constructs processors so
+		// they observe the same hostname. Standalone collectors own their receiver config and
+		// should use the native hostname setting directly.
+		initBeatHostnameFromEnv()
+	}
+
 	settings, err := prepareCollectorSettings(configFiles, supervised, supervisedLoggingLevel, componentsFn)
 	if err != nil {
 		return fmt.Errorf("failed to prepare collector settings: %w", err)
