@@ -78,8 +78,8 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	if batch.Type != define.Kubernetes || batch.Arch != runtime.GOARCH {
 		return false
 	}
-	if batch.Distro != "" && batch.Distro != Name {
-		// not kind, don't run
+	if batch.Distro != "" && batch.Distro != kubernetes.KubernetesDistro {
+		// not kubernetes, don't run
 		return false
 	}
 	return true

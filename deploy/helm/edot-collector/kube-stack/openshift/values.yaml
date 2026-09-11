@@ -1,0 +1,128 @@
+# For installation and configuration options, refer to the [installation instructions](https://www.elastic.co/docs/solutions/observability/get-started/opentelemetry/quickstart/self-managed/k8s#manual-installation)
+
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/opentelemetry-kube-stack-0.16.0/charts/opentelemetry-kube-stack/values.yaml)
+# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.16.0
+
+# Apply this file on top of values.yaml when deploying on OpenShift:
+#
+#   helm install opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+#     --namespace opentelemetry-operator-system \
+#     --values 'https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v<AGENT_VERSION>/deploy/helm/edot-collector/kube-stack/values.yaml' \
+#     --values 'https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v<AGENT_VERSION>/deploy/helm/edot-collector/kube-stack/openshift/values.yaml' \
+#     --version '<CHART_VERSION>'
+
+# OpenShift CRI-O rejects unqualified (short) image names.
+cleanupJob:
+  image:
+    repository: docker.io/rancher/kubectl
+
+# RBAC for the collectors, with RBAC for the OpenShift specific APIs.
+clusterRole:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get"]
+    # Required by the k8s_events receiver
+    - apiGroups: [""]
+      resources: ["events"]
+      verbs: ["get", "list", "watch"]
+    # Required by the openshift resource detector
+    - apiGroups: ["config.openshift.io"]
+      resources: ["infrastructures/status"]
+      verbs: ["get"]
+
+# The openshift detector reads the cluster name from the OpenShift API instead of cloud metadata.
+collectors:
+  cluster:
+    config:
+      processors:
+        resourcedetection/cloud:
+          detectors: [openshift]
+          openshift:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+  daemon:
+    config:
+      processors:
+        resourcedetection/cloud:
+          detectors: [openshift]
+          openshift:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+
+extraObjects:
+  # Allow the OTel Operator to run as non-root (UID 65532) on OpenShift.
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: "{{ .Release.Name }}-otel-operator-nonroot-v2"
+      namespace: "{{ .Release.Namespace }}"
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: system:openshift:scc:nonroot-v2
+    subjects:
+      - kind: ServiceAccount
+        name: opentelemetry-operator
+        namespace: "{{ .Release.Namespace }}"
+
+  # Custom SCC for the daemon collector. It needs host network, host ports, and
+  # host filesystem access to collect node telemetry from /var/log/pods and /proc.
+  - apiVersion: security.openshift.io/v1
+    kind: SecurityContextConstraints
+    metadata:
+      name: "{{ .Release.Name }}-edot-daemon-collector"
+    allowPrivilegedContainer: false
+    allowHostNetwork: true
+    allowHostPID: false
+    allowHostIPC: false
+    allowHostPorts: true
+    allowHostDirVolumePlugin: true
+    allowPrivilegeEscalation: false
+    allowedCapabilities: []
+    requiredDropCapabilities: [ALL]
+    runAsUser:
+      type: RunAsAny
+    seLinuxContext:
+      type: MustRunAs
+      seLinuxOptions:
+        user: system_u
+        role: system_r
+        type: spc_t
+        level: s0
+    fsGroup:
+      type: RunAsAny
+    supplementalGroups:
+      type: RunAsAny
+    seccompProfiles:
+      - '*'
+    readOnlyRootFilesystem: false
+    volumes: [configMap, downwardAPI, emptyDir, hostPath, projected, secret]
+
+  # ClusterRole that grants permission to use the daemon SCC above.
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: "{{ .Release.Name }}-edot-daemon-collector-scc"
+    rules:
+      - apiGroups: [security.openshift.io]
+        resources: [securitycontextconstraints]
+        resourceNames: ["{{ .Release.Name }}-edot-daemon-collector"]
+        verbs: [use]
+
+  # Bind the daemon collector service account to the SCC ClusterRole above.
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: "{{ .Release.Name }}-edot-daemon-collector-scc"
+      namespace: "{{ .Release.Namespace }}"
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: "{{ .Release.Name }}-edot-daemon-collector-scc"
+    subjects:
+      - kind: ServiceAccount
+        name: opentelemetry-kube-stack-daemon-collector
+        namespace: "{{ .Release.Namespace }}"

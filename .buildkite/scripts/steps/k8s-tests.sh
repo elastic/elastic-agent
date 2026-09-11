@@ -2,8 +2,9 @@
 set -euo pipefail
 
 export PATH=$HOME/bin:${PATH}
-source .buildkite/scripts/install-kubectl.sh
-source .buildkite/scripts/install-kind.sh
+
+.buildkite/scripts/install-kubectl.sh
+.buildkite/scripts/install-kind.sh
 
 kind create cluster --image "kindest/node:${K8S_VERSION}" --config - <<EOF
 kind: Cluster

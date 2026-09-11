@@ -1,0 +1,137 @@
+{{- include "elasticagent.init" $ -}}
+{{- if include "elasticagent.isOpenShift" $ -}}
+{{- if (dig "openshift" "securityContextConstraints" "create" true .Values.agent) -}}
+{{- if $.Values.agent.unprivileged -}}
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: {{ include "elasticagent.scc.name" $ }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+  annotations:
+    kubernetes.io/description: >-
+      Least-privilege SCC for unprivileged Elastic Agent on OpenShift.
+      Collects container/node logs and Kubernetes metrics as a non-root user.
+      No privileged containers, no host PID/IPC.
+      Uses the spc_t SELinux type for cross-MCS container log access.
+allowHostPID: false
+allowHostIPC: false
+# Needed when a preset requires it (e.g. the per-node collector).
+allowHostNetwork: {{ include "elasticagent.hostNetwork" $ | default "false" }}
+allowHostPorts: {{ include "elasticagent.hostNetwork" $ | default "false" }}
+# Needed for /var/log and state dir.
+allowHostDirVolumePlugin: true
+allowPrivilegedContainer: false
+# Needed for the allowed capabilities to stay effective in the agent's child
+# processes, which OpenShift would otherwise strip via no_new_privs.
+allowPrivilegeEscalation: true
+allowedCapabilities:
+  - CHOWN
+  - SETPCAP
+  - DAC_READ_SEARCH
+  - SYS_PTRACE
+requiredDropCapabilities:
+  - ALL
+defaultAddCapabilities: []
+runAsUser:
+  type: MustRunAsNonRoot
+fsGroup:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+# spc_t bypasses MCS separation so the agent can read logs from all containers.
+seLinuxContext:
+  type: MustRunAs
+  seLinuxOptions:
+    user: system_u
+    role: system_r
+    type: spc_t
+    level: s0
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - hostPath
+  - projected
+  - secret
+seccompProfiles:
+  - '*'
+readOnlyRootFilesystem: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "elasticagent.scc.clusterRole" $ }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+rules:
+  - apiGroups:
+      - security.openshift.io
+    resources:
+      - securitycontextconstraints
+    resourceNames:
+      - {{ include "elasticagent.scc.name" $ }}
+    verbs:
+      - use
+---
+{{- end }}
+{{- range $presetName, $presetVal := $.Values.agent.presets -}}
+{{- if or ($presetVal).serviceAccount.create ($presetVal).serviceAccount.name -}}
+{{- $rbName := printf "agent-%s-%s-%s-scc" $presetName $.Release.Name $.Release.Namespace }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $rbName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+    {{- with ($presetVal).labels -}}
+    {{ toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with ($presetVal).annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+subjects:
+  - kind: ServiceAccount
+    {{- if eq $presetVal.serviceAccount.create true }}
+    name: {{ include "elasticagent.preset.fullname" (list $ $presetName) }}
+    {{- else }}
+    name: {{ $presetVal.serviceAccount.name }}
+    {{- end }}
+    namespace: {{ $.Release.Namespace | quote }}
+roleRef:
+  kind: ClusterRole
+  name: {{ include "elasticagent.scc.clusterRole" $ }}
+  apiGroup: rbac.authorization.k8s.io
+---
+{{- end }}
+{{- end }}
+{{- $ksmValues := index $.Values "kube-state-metrics" -}}
+{{- if $ksmValues.enabled -}}
+{{- $ksmSAName := dig "fullnameOverride" "kube-state-metrics" $ksmValues -}}
+{{- $ksmRBName := printf "kube-state-metrics-%s-%s-scc" $.Release.Name $.Release.Namespace }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $ksmRBName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels:
+    {{- include "elasticagent.labels" $ | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $ksmSAName }}
+    namespace: {{ $.Release.Namespace | quote }}
+roleRef:
+  kind: ClusterRole
+  # The agent sidecar shares the kube-state-metrics pod, so it needs the agent SCC.
+  {{- if $.Values.kubernetes.state.agentAsSidecar.enabled }}
+  name: {{ include "elasticagent.scc.clusterRole" $ }}
+  {{- else }}
+  name: system:openshift:scc:nonroot-v2
+  {{- end }}
+  apiGroup: rbac.authorization.k8s.io
+---
+{{- end }}
+{{- end }}
+{{- end }}

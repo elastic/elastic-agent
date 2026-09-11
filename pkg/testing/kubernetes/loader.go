@@ -17,6 +17,8 @@ import (
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
+	securityv1 "github.com/openshift/api/security/v1"
+
 	"github.com/elastic/cloud-on-k8s/v3/pkg/apis/agent/v1alpha1"
 )
 
@@ -29,6 +31,7 @@ func LoadFromYAML(reader *bufio.Reader) ([]k8s.Object, error) {
 		return nil, fmt.Errorf("failed to add clientsetscheme: %w", err)
 	}
 	k8sScheme.AddKnownTypes(schema.GroupVersion{Group: "agent.k8s.elastic.co", Version: "v1alpha1"}, &v1alpha1.Agent{})
+	k8sScheme.AddKnownTypes(securityv1.GroupVersion, &securityv1.SecurityContextConstraints{})
 
 	var objects []k8s.Object
 	decoder := serializer.NewCodecFactory(k8sScheme).UniversalDeserializer()
