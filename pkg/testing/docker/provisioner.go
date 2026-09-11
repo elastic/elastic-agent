@@ -83,7 +83,7 @@ type provisioner struct {
 // initialized eagerly so it is available even when Provision is skipped (e.g.
 // the runner resumes from saved state). New() only parses env vars and creates
 // an HTTP transport — no network calls — so connectivity is verified later in
-// Provision via checkDocker.
+// Provision.
 func NewProvisioner() (common.InstanceProvisioner, error) {
 	c, err := dockerclient.New(dockerclient.FromEnv)
 	if err != nil {
