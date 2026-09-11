@@ -19,6 +19,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -42,7 +43,7 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 	if _, err := exec.LookPath("docker"); err != nil {
 		t.Skip("docker not found in PATH")
 	}
-	if out, err := exec.Command("docker", "info").CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(t.Context(), "docker", "info").CombinedOutput(); err != nil {
 		t.Skipf("docker daemon not accessible: %v\n%s", err, out)
 	}
 
@@ -69,11 +70,12 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 
 	imageTag := "elastic-agent-ironbank-perms-test:latest"
 	t.Cleanup(func() {
-		//nolint:errcheck
-		exec.Command("docker", "rmi", "-f", imageTag).Run()
+		//nolint:errcheck // best-effort cleanup; failure is not actionable
+		exec.CommandContext(context.Background(), "docker", "rmi", "-f", imageTag).Run()
 	})
 
-	buildOut, err := exec.Command("docker", "build",
+	//nolint:gosec // args are constructed from test constants and a value parsed from a repo-local template file
+	buildOut, err := exec.CommandContext(t.Context(), "docker", "build",
 		"--build-arg", "BASE_REGISTRY="+publicUBIRegistry,
 		"--build-arg", "BASE_IMAGE="+publicUBIImage,
 		"--build-arg", "BASE_TAG="+baseTag,
@@ -84,7 +86,7 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 	).CombinedOutput()
 	require.NoError(t, err, "docker build failed:\n%s", buildOut)
 
-	runOut, err := exec.Command("docker", "run", "--rm", "--entrypoint", "/bin/sh", imageTag,
+	runOut, err := exec.CommandContext(t.Context(), "docker", "run", "--rm", "--entrypoint", "/bin/sh", imageTag,
 		"-c", `find /usr/share/elastic-agent/data/elastic-agent-*/components -name "*.yml" -type f -exec stat -c '%n %a' {} \;`,
 	).Output()
 	require.NoError(t, err, "docker run failed: %v", err)
@@ -135,6 +137,7 @@ func renderIronbankDockerfile(t *testing.T, tmplPath, buildCtx, version string) 
 	rendered := strings.ReplaceAll(string(content), "{{ agent_package_version }}", version)
 
 	dest := filepath.Join(buildCtx, "Dockerfile")
+	//nolint:gosec // dest is filepath.Join of a t.TempDir() path — no traversal possible
 	require.NoError(t, os.WriteFile(dest, []byte(rendered), 0o644))
 }
 
