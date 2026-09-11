@@ -21,7 +21,7 @@ var versions = []define.OS{
 	// Kubernetes 1.36
 	{
 		Type:    define.Kubernetes,
-		Version: "1.36.0",
+		Version: "1.36.4",
 	},
 	// Kubernetes 1.35
 	{
