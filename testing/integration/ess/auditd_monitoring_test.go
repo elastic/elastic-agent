@@ -41,9 +41,7 @@ func TestAuditdCorrectBinaries(t *testing.T) {
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		OS: []define.OS{
-			// Skipped on Debian, see https://github.com/elastic/elastic-agent/issues/7813
-			{Type: define.Linux, Distro: "ubuntu"},
-			{Type: define.Linux, Distro: "rhel"},
+			{Type: define.Linux},
 		},
 	})
 
