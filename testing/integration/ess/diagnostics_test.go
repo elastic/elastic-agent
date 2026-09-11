@@ -605,6 +605,15 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
+  - id: system-metrics
+    type: system/metrics
+    use_output: default
+    streams:
+      - id: system/metrics-system.cpu
+        metricsets:
+          - cpu
+        period: 1s
+        data_stream.dataset: system.cpu
 agent.grpc:
     port: 6790
 outputs:
@@ -614,6 +623,7 @@ outputs:
     api_key: placeholder
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.metricbeat.system/metrics: otel
 `
 
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
@@ -665,7 +675,10 @@ agent.internal.runtime.filebeat.filestream: otel
 
 	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
 	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
-	// at the component level and land under the component directory, same as for process-runtime beats.
+	// at the component level and written under a stream subdirectory so two streams of the
+	// same component do not overwrite beat_metrics.json. Slash characters in component and
+	// stream IDs are replaced with "-" in archive paths, e.g. system/metrics-default →
+	// system-metrics-default and system/metrics-system.cpu → system-metrics-system.cpu.
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
 		"edot/environment.yaml",
@@ -675,9 +688,11 @@ agent.internal.runtime.filebeat.filestream: otel
 		"edot/heap.profile.gz",
 		"edot/mutex.profile.gz",
 		"edot/threadcreate.profile.gz",
-		"components/filestream-default/registry.tar.gz",
-		"components/filestream-default/beat_metrics.json",
-		"components/filestream-default/input_metrics.json",
+		"components/filestream-default/*/registry.tar.gz",
+		"components/filestream-default/*/beat_metrics.json",
+		"components/filestream-default/*/input_metrics.json",
+		"components/system-metrics-default/*/beat_metrics.json",
+		"components/system-metrics-default/*/input_metrics.json",
 		"logs/elastic-agent-*/elastic-agent-*.ndjson",
 		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
@@ -690,7 +705,10 @@ agent.internal.runtime.filebeat.filestream: otel
 		require.NoErrorf(t, err, "stat file %q failed", matches[0])
 		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
-	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
+	registryMatches, err := filepath.Glob(filepath.Join(extractionDir, "components/filestream-default/*/registry.tar.gz"))
+	require.NoError(t, err)
+	require.NotEmpty(t, registryMatches)
+	verifyFilebeatRegistry(t, registryMatches[0])
 }
 
 // TestContainerDiagnostics verifies that `elastic-agent diagnostics` collects
