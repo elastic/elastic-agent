@@ -115,6 +115,9 @@ annotations:
   elastictraceprocessor:
     comment: |
       Deprecated in 9.2.0. Replaced by the `elasticapm` processor. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
+  googlecloudmonitoringreceiver:
+    comment: |
+      Authentication is only supported via ambient Google Cloud Application Default Credentials (ADC). Explicit credentials configuration (for example, a service account key file referenced directly in the receiver config) is **NOT** supported.
   kafkareceiver:
     comment: |
       The following features and configuration options are **NOT** officially supported in {{agent}} with the Kafka receiver:

@@ -9,28 +9,28 @@ package docker
 import (
 	"context"
 	"net"
-	"os/exec"
 	"testing"
 	"time"
 
+	"github.com/moby/moby/api/types/container"
+	dockerclient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
 
-// skipIfDockerUnavailable skips the test if docker is not in PATH or the
-// daemon is not reachable.
-func skipIfDockerUnavailable(t *testing.T) {
+// newTestProvisioner creates a provisioner with a live Docker client, skipping
+// the test if Docker is unavailable.
+func newTestProvisioner(t *testing.T) *provisioner {
 	t.Helper()
-	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker not found in PATH")
-	}
+	p := &provisioner{logger: &tLogger{t}}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := exec.CommandContext(ctx, "docker", "version").Run(); err != nil {
-		t.Skipf("docker daemon not available: %s", err)
+	if err := p.checkDocker(ctx); err != nil {
+		t.Skipf("docker not available: %s", err)
 	}
+	return p
 }
 
 // tLogger adapts *testing.T to common.Logger.
@@ -38,34 +38,71 @@ type tLogger struct{ t *testing.T }
 
 func (l *tLogger) Logf(format string, args ...any) { l.t.Logf(format, args...) }
 
+// pullImage pulls the named image, tolerating the case where it is already present.
+func pullImage(t *testing.T, p *provisioner, image string) {
+	t.Helper()
+	ctx := context.Background()
+	resp, err := p.client.ImagePull(ctx, image, dockerclient.ImagePullOptions{})
+	require.NoError(t, err)
+	require.NoError(t, resp.Wait(ctx))
+}
+
 // startAlpine starts a detached alpine container that sleeps for 60 s and
 // registers a cleanup to force-remove it when the test ends.
 func startAlpine(t *testing.T, p *provisioner, name string) {
 	t.Helper()
-	_, err := p.docker(context.Background(), nil, "run", "-d", "--name", name, "alpine", "sleep", "60")
+	pullImage(t, p, "alpine")
+	ctx := context.Background()
+	resp, err := p.client.ContainerCreate(ctx, dockerclient.ContainerCreateOptions{
+		Config:     &container.Config{Image: "alpine", Cmd: []string{"sleep", "60"}},
+		HostConfig: &container.HostConfig{},
+		Name:       name,
+	})
+	require.NoError(t, err)
+	_, err = p.client.ContainerStart(ctx, resp.ID, dockerclient.ContainerStartOptions{})
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		_, _ = p.docker(context.Background(), nil, "rm", "-fv", name)
+		_, _ = p.client.ContainerRemove(context.Background(), name,
+			dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 	})
 }
 
-// containerExists returns true if `docker inspect <name>` succeeds.
+// containerExists returns true if ContainerInspect succeeds for the given name.
 func containerExists(p *provisioner, name string) bool {
-	_, err := p.docker(context.Background(), nil, "inspect", name)
+	_, err := p.client.ContainerInspect(context.Background(), name, dockerclient.ContainerInspectOptions{})
 	return err == nil
 }
 
+// startAlpineLabeled starts a detached alpine container with the provisioner label.
+func startAlpineLabeled(t *testing.T, p *provisioner, name string) {
+	t.Helper()
+	pullImage(t, p, "alpine")
+	ctx := context.Background()
+	resp, err := p.client.ContainerCreate(ctx, dockerclient.ContainerCreateOptions{
+		Config: &container.Config{
+			Image:  "alpine",
+			Cmd:    []string{"sleep", "60"},
+			Labels: map[string]string{containerLabel: ""},
+		},
+		HostConfig: &container.HostConfig{},
+		Name:       name,
+	})
+	require.NoError(t, err)
+	_, err = p.client.ContainerStart(ctx, resp.ID, dockerclient.ContainerStartOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = p.client.ContainerRemove(context.Background(), name,
+			dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	})
+}
+
 func TestCheckDocker(t *testing.T) {
-	skipIfDockerUnavailable(t)
-	p := &provisioner{logger: &tLogger{t}}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	assert.NoError(t, p.checkDocker(ctx))
+	p := newTestProvisioner(t) // skips if docker unavailable
+	assert.NotNil(t, p.client)
 }
 
 func TestContainerIP(t *testing.T) {
-	skipIfDockerUnavailable(t)
-	p := &provisioner{logger: &tLogger{t}}
+	p := newTestProvisioner(t)
 	name := containerName(t.Name())
 	startAlpine(t, p, name)
 
@@ -76,10 +113,8 @@ func TestContainerIP(t *testing.T) {
 }
 
 func TestClean(t *testing.T) {
-	skipIfDockerUnavailable(t)
-
 	t.Run("removes containers listed as instances", func(t *testing.T) {
-		p := &provisioner{logger: &tLogger{t}}
+		p := newTestProvisioner(t)
 		name := containerName(t.Name())
 		startAlpine(t, p, name)
 
@@ -92,46 +127,32 @@ func TestClean(t *testing.T) {
 	})
 
 	t.Run("sweeps leftover containers by label", func(t *testing.T) {
-		p := &provisioner{logger: &tLogger{t}}
+		p := newTestProvisioner(t)
 		name := containerName(t.Name())
 
 		// Create a container with the provisioner label but do NOT include it in the
 		// instances list — simulating a container from a run cancelled mid-provision.
-		_, err := p.docker(context.Background(), nil,
-			"run", "-d",
-			"--name", name,
-			"--label", containerLabel,
-			"alpine", "sleep", "60",
-		)
-		require.NoError(t, err)
-		t.Cleanup(func() { _, _ = p.docker(context.Background(), nil, "rm", "-fv", name) })
+		startAlpineLabeled(t, p, name)
 
 		require.True(t, containerExists(p, name), "container should exist before Clean")
 
 		// Clean with no instances: the label sweep must pick it up.
-		err = p.Clean(context.Background(), common.Config{}, nil)
+		err := p.Clean(context.Background(), common.Config{}, nil)
 		require.NoError(t, err)
 
 		assert.False(t, containerExists(p, name), "leftover container should be swept by Clean")
 	})
 
 	t.Run("sweeps leftover containers by name prefix", func(t *testing.T) {
-		p := &provisioner{logger: &tLogger{t}}
+		p := newTestProvisioner(t)
 		// Build a name that carries the provisioner prefix but no containerLabel,
 		// to exercise the name-prefix branch of the sweep independently.
 		name := containerName(t.Name())
-
-		_, err := p.docker(context.Background(), nil,
-			"run", "-d",
-			"--name", name,
-			"alpine", "sleep", "60",
-		)
-		require.NoError(t, err)
-		t.Cleanup(func() { _, _ = p.docker(context.Background(), nil, "rm", "-fv", name) })
+		startAlpine(t, p, name)
 
 		require.True(t, containerExists(p, name), "container should exist before Clean")
 
-		err = p.Clean(context.Background(), common.Config{}, nil)
+		err := p.Clean(context.Background(), common.Config{}, nil)
 		require.NoError(t, err)
 
 		assert.False(t, containerExists(p, name), "prefix-matched leftover should be swept by Clean")
