@@ -389,7 +389,7 @@ func getReceiversConfigForComponent(
 	// we run a single receiver for each component to mirror what beats processes do
 	var inputs []map[string]any
 	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeInput {
+		if unit.Type == client.UnitTypeInput && unit.Config != nil {
 			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
 			if err != nil {
 				return nil, err
@@ -503,7 +503,8 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	exporterCfg map[string]any,
 	queueCfg map[string]any,
 	extensionCfg map[string]any,
-	processors map[string]any, err error) {
+	processors map[string]any, err error,
+) {
 	outputUnit, ok := comp.OutputUnit()
 	if !ok {
 		return nil, nil, nil, nil, nil
@@ -561,7 +562,8 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	exportersCfg map[string]any,
 	queueSettings map[string]any,
 	extensionCfg map[string]any,
-	processorCfg map[string]any, err error) {
+	processorCfg map[string]any, err error,
+) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
