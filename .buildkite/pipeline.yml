@@ -21,21 +21,22 @@ common:
 env:
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1788224497"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1788224497"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1788224497"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1788224497"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1789137875"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1789108817"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1789108817"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1789108817"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_10_VERSION: "1.0.1788224497"
-  IMAGE_WIN_11_VERSION: "1.0.1788224497"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1788224497"
+  IMAGE_WIN_10_VERSION: "1.0.1789108817"
+  IMAGE_WIN_11_VERSION: "1.0.1789108817"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1789108817"
 
 steps:
 
   - label: "check-ci"
     key: "check-ci"
+    skip: 'fast'
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
@@ -46,6 +47,7 @@ steps:
 
   - group: "Unit tests"
     key: "unit-tests"
+    skip: 'fast'
     steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
@@ -205,6 +207,7 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
+    skip: "fast ci"
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
@@ -247,6 +250,7 @@ steps:
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
+    skip: "fast feedback loop"
     steps:
       - label: "Unit tests - Windows 10"
         key: "unit-tests-win10"
@@ -344,6 +348,7 @@ steps:
           - *google_oidc_plugin
 
   - label: ":junit: Junit annotate"
+    skip: 'fast'
     agents:
       # requires at least "bash", "curl" and "git"
       image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
@@ -381,6 +386,7 @@ steps:
 
   - group: "K8s tests"
     key: "k8s-tests"
+    skip: "fast feedback loop"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
         env:
@@ -409,6 +415,7 @@ steps:
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
+    skip: "fast feedback loop"
     branches: main
     command: ".buildkite/scripts/steps/sync-k8s.sh"
     agents:
@@ -459,6 +466,7 @@ steps:
 
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
+    skip: 'fast'
     if: build.pull_request.id == null && build.source != "schedule"
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
     plugins:
@@ -467,6 +475,7 @@ steps:
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
+    skip: "fast feedback loop"
     if: build.pull_request.id != null
     trigger: "beats-agent-serverless-tests"
     build:
@@ -483,6 +492,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
+    skip: "fast feedback loop"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
@@ -508,6 +518,7 @@ steps:
   # staging manifest, to catch regressions before they reach the release pipeline.
   # See https://buildkite.com/elastic/independent-agent-release-staging
   - label: "Trigger Elastic Agent Package (IAR staging)"
+    skip: "fast feedback loop"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh
@@ -533,6 +544,7 @@ steps:
   # staging manifest, to catch regressions before they reach the release pipeline.
   # See https://buildkite.com/elastic/unified-release-staging
   - label: "Trigger Elastic Agent Package (unified-release staging)"
+    skip: "fast feedback loop"
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh
@@ -557,6 +569,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
+    skip: 'fast'
     if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
     if_changed:
       include:
@@ -577,6 +590,7 @@ steps:
   - wait: ~
 
   - label: "Publish to serverless"
+    skip: "fast feedback loop"
     branches: main
     trigger: "agentless-serverless-release"
     build:

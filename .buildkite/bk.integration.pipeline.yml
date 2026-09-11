@@ -7,21 +7,23 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1788224497"
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1788224497"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1788224497"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1788224497"
-  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1788224497"
-  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1788224497"
-  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1788224497"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1788224497"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1788224497"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1788224497"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1789108817"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1789108817"
+  IMAGE_UBUNTU_2604_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1789137875"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1789108817"
+  IMAGE_UBUNTU_2604_ARM_64: "platform-ingest-elastic-agent-ubuntu-2604-aarch64-1789108817"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1789108817"
+  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1789108817"
+  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1789108817"
+  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1789108817"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1789108817"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1789108817"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1789108817"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
   # Same version for all the azure images
-  IMAGE_WIN_VERSION: "1.0.1788224497"
+  IMAGE_WIN_VERSION: "1.0.1789108817"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -149,7 +151,7 @@ common:
     agent: &k8s_test_agent
       provider: "gcp"
       machineType: "n2-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      image: "${IMAGE_UBUNTU_2604_X86_64}"
       diskSizeGb: 80
     command: &k8s_test_command |
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
@@ -190,7 +192,7 @@ steps:
     agents:
       provider: "gcp"
       machineType: "n2-standard-8"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      image: "${IMAGE_UBUNTU_2604_X86_64}"
     plugins:
       - *google_oidc_observability_plugin
       - *oblt_cli_plugin
@@ -214,6 +216,7 @@ steps:
       - *vault_github_token
 
   - group: "Extended runtime leak tests"
+    skip: "no need to run the tests here"
     key: extended-integration-tests
     notify:
       - github_commit_status:
@@ -267,7 +270,7 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
 
-      - label: "Ubuntu:2404:amd64:sudo"
+      - label: "Ubuntu:2604:amd64:sudo"
         depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
@@ -283,13 +286,14 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          image: "${IMAGE_UBUNTU_2604_X86_64}"
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
 
   - group: "Stateful: Windows (tier 1)"
+    skip: "no need to run the tests here"
     if: build.pull_request.id != null
     key: integration-tests-win-tier-1
     notify:
@@ -352,6 +356,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
+    skip: "no need to run the tests here"
     if_changed:
       include:
         - .buildkite/**
@@ -430,6 +435,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
+    skip: "no need to run the tests here"
     key: integration-tests-win-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
@@ -617,7 +623,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          image: "${IMAGE_UBUNTU_2604_X86_64}"
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
@@ -646,7 +652,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          image: "${IMAGE_UBUNTU_2604_X86_64}"
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
@@ -879,7 +885,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "${IMAGE_UBUNTU_2604_ARM_64}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -909,7 +915,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "${IMAGE_UBUNTU_2604_ARM_64}"
           instanceType: "m6g.xlarge"
         plugins:
           - *google_oidc_observability_plugin
@@ -921,6 +927,7 @@ steps:
               - default
 
   - group: ":kubernetes: Kubernetes (tier 1)"
+    skip: "no need to run the tests here"
     key: integration-tests-kubernetes-tier-1
     if: build.pull_request.id != null
     notify:
@@ -953,6 +960,7 @@ steps:
               *k8s_test_versions
 
   - group: ":kubernetes: Kubernetes (tier 2)"
+    skip: "no need to run the tests here"
     key: integration-tests-kubernetes-tier-2
     if_changed:
       include:
@@ -993,6 +1001,7 @@ steps:
               - *k8s_max_test_version
 
   - group: ":kubernetes: Kubernetes (tier 3)"
+    skip: "no need to run the tests here"
     key: integration-tests-kubernetes-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
@@ -1027,6 +1036,7 @@ steps:
               *k8s_test_versions_without_min_max
 
   - group: "Serverless integration test"
+    skip: "no need to run the tests here"
     key: integration-tests-serverless
     notify:
       - github_commit_status:
@@ -1077,7 +1087,7 @@ steps:
           - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
-      - label: "Ubuntu:2404:amd64:sudo"
+      - label: "Ubuntu:2604:amd64:sudo"
         depends_on: packaging-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
@@ -1093,7 +1103,7 @@ steps:
         agents:
           provider: "gcp"
           machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2404_X86_64}"
+          image: "${IMAGE_UBUNTU_2604_X86_64}"
         plugins:
           - *google_oidc_observability_plugin
           - *google_oidc_plugin
