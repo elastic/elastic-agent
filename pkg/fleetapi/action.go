@@ -34,6 +34,11 @@ const (
 	// once it is added upstream.
 	// TODO: Replace with the real reference once Fleet supports the action.
 	ActionTypeRestart = "RESTART"
+	// ActionTypeUninstall is defined locally because the Fleet Server API spec
+	// does not yet expose an UNINSTALL action type. Switch to
+	// string(api.UNINSTALL) once it is added upstream.
+	// TODO: Replace with the real reference once Fleet supports the action.
+	ActionTypeUninstall = "UNINSTALL"
 )
 
 // Error values that the Action interface can return
@@ -124,6 +129,8 @@ func NewAction(actionType string) Action {
 		action = &ActionPrivilegeLevelChange{}
 	case ActionTypeRestart:
 		action = &ActionRestart{}
+	case ActionTypeUninstall:
+		action = &ActionUninstall{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
@@ -482,6 +489,82 @@ func (a *ActionRestart) AckEvent(agentID string, ts time.Time) api.AckRequest_Ev
 
 // MarshalMap marshals ActionRestart into a corresponding map.
 func (a *ActionRestart) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
+}
+
+// ActionUninstall is a request for the agent to uninstall itself.
+// Unlike an upgrade or restart, the agent cannot acknowledge the action on the
+// next startup because there is none: the uninstall is terminal. Instead the
+// action is acknowledged by the detached uninstaller process at the point of no
+// return (after the agent is effectively uninstalled but before its credentials
+// are removed), and failures before that point are acknowledged with the error
+// set so Fleet learns the uninstall did not complete.
+type ActionUninstall struct {
+	ActionID         string  `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
+	ActionStartTime  string  `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
+	ActionExpiration string  `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
+	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+func (a *ActionUninstall) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+// Type returns the type of the Action.
+func (a *ActionUninstall) Type() string {
+	return a.ActionType
+}
+
+// ID returns the ID of the Action.
+func (a *ActionUninstall) ID() string {
+	return a.ActionID
+}
+
+// StartTime returns the start_time as a UTC time.Time or ErrNoStartTime if there is no start time.
+func (a *ActionUninstall) StartTime() (time.Time, error) {
+	if a.ActionStartTime == "" {
+		return time.Time{}, ErrNoStartTime
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionStartTime)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+// Expiration returns the expiration as a UTC time.Time or ErrNoExpiration if there is no expiration.
+func (a *ActionUninstall) Expiration() (time.Time, error) {
+	if a.ActionExpiration == "" {
+		return time.Time{}, ErrNoExpiration
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionExpiration)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+func (a *ActionUninstall) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := newGenericEvent(a.ActionID, a.ActionType, agentID, ts)
+	if a.Err != nil {
+		errStr := a.Err.Error()
+		event.Error = &errStr
+	}
+	return toGenericAckEvent(event)
+}
+
+// MarshalMap marshals ActionUninstall into a corresponding map.
+func (a *ActionUninstall) MarshalMap() (map[string]interface{}, error) {
 	var res map[string]interface{}
 	err := mapstructure.Decode(a, &res)
 	return res, err

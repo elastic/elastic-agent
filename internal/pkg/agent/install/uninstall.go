@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	fleetacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -55,7 +56,15 @@ func (a *agentInfo) AgentID() string {
 }
 
 // Uninstall uninstalls persistently Elastic Agent on the system.
-func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt ProgressDescriber, skipFleetAudit bool) error {
+//
+// fleetAckActionID, when non-empty, is the ID of a Fleet UNINSTALL action that
+// triggered this uninstall. It is acknowledged to Fleet at the point of no
+// return (after the agent is effectively uninstalled but before its credentials
+// are removed, and before the audit/unenroll notification which can invalidate
+// the API key). If the uninstall fails before that point the action is
+// acknowledged with the error set, so Fleet learns the uninstall did not
+// complete and the agent remains installed.
+func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt ProgressDescriber, skipFleetAudit bool, fleetAckActionID string) (err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("unable to get current working directory")
@@ -97,6 +106,23 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 			}
 		}
 	}()
+
+	// ackSuccessSent guards against the deferred failure-ack double-acking after
+	// the success ack sent at the point of no return.
+	ackSuccessSent := false
+	if fleetAckActionID != "" {
+		defer func() {
+			if err == nil || ackSuccessSent || !notifyFleet || cfg == nil {
+				return
+			}
+			// The uninstall failed before the point of no return; the agent is
+			// still installed and enrolled. Acknowledge the failure so Fleet does
+			// not consider the action completed.
+			if ackErr := ackFleetUninstallAction(ctx, log, pt, cfg, &agentID, fleetAckActionID, err); ackErr != nil {
+				pt.Describe(fmt.Sprintf("failed to ack uninstall action failure to Fleet: %v", ackErr))
+			}
+		}()
+	}
 
 	// Notify fleet-server while it is still running if it's running locally
 	if notifyFleet && localFleet {
@@ -162,6 +188,20 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}
 	}
 
+	// Point of no return: the service and components have been removed, so the
+	// agent is effectively uninstalled. Acknowledge the Fleet UNINSTALL action
+	// (if any) now, before the audit/unenroll notification below (which can
+	// invalidate the API key) and before the install directory (holding the
+	// credentials) is removed. The uninstall proceeds regardless of the ack
+	// outcome; a failed ack here is best-effort and complemented by the
+	// audit/unenroll notification.
+	if fleetAckActionID != "" && notifyFleet && cfg != nil {
+		if ackErr := ackFleetUninstallAction(ctx, log, pt, cfg, &agentID, fleetAckActionID, nil); ackErr != nil {
+			pt.Describe(fmt.Sprintf("failed to ack uninstall action to Fleet: %v", ackErr))
+		}
+		ackSuccessSent = true
+	}
+
 	// Notify Fleet of the uninstall before removing the top path, at this point the service is stopped and won't run anymore.
 	// Doing this after RemovePath has been linked to some difficult to diagnose runtime panics on Windows, where the implementation
 	// of RemovePath is more complex. See https://github.com/elastic/elastic-agent/issues/14142 and https://github.com/elastic/elastic-agent/issues/8428.
@@ -187,6 +227,48 @@ func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt ProgressDescr
 	if notifyFleet && !localFleet && !skipFleetAudit {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it)
 	}
+}
+
+// ackFleetUninstallAction acknowledges a Fleet UNINSTALL action to Fleet Server.
+// When ackErr is non-nil the action is acknowledged as failed. It is
+// best-effort with a few retries; callers proceed regardless of the outcome.
+func ackFleetUninstallAction(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo, actionID string, ackErr error) error {
+	if cfg == nil || cfg.Fleet == nil {
+		return fmt.Errorf("no fleet configuration available to ack uninstall action")
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	pt.Describe("Acknowledging uninstall action to Fleet")
+
+	client, err := fleetclient.NewAuthWithConfig(log, cfg.Fleet.AccessAPIKey, cfg.Fleet.Client)
+	if err != nil {
+		return fmt.Errorf("unable to create fleetapi client: %w", err)
+	}
+	fleetAcker, err := fleetacker.NewAcker(log, ai, client)
+	if err != nil {
+		return fmt.Errorf("unable to create fleet acker: %w", err)
+	}
+
+	action := &pkgfleetapi.ActionUninstall{
+		ActionID:   actionID,
+		ActionType: pkgfleetapi.ActionTypeUninstall,
+		Err:        ackErr,
+	}
+
+	jitterBackoff := backoffWithContext(ctx)
+	var lastErr error
+	for i := 0; i < fleetAuditAttempts; i++ {
+		lastErr = fleetAcker.Ack(ctx, action)
+		if lastErr == nil {
+			pt.Describe("Acknowledged uninstall action to Fleet")
+			return nil
+		}
+		pt.Describe(fmt.Sprintf("ack uninstall action: %v (retry in %v)", lastErr, jitterBackoff.NextWait()))
+		if !jitterBackoff.Wait() {
+			break
+		}
+	}
+	return lastErr
 }
 
 type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error
