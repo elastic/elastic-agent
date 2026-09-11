@@ -176,18 +176,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 }
 
 // Injecting notifyFleetAuditUninstall for easier unit testing
-func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, agentID agentInfo, notifyFleet, localFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
+func notifyFleetIfNeeded(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, agentID agentInfo, notifyFleet, localFleet, skipFleetAudit bool, notifyFleetAuditUninstall NotifyFleetAuditUninstall) {
 	if notifyFleet && !localFleet && !skipFleetAudit {
 		notifyFleetAuditUninstall(ctx, log, pt, cfg, &agentID) //nolint:errcheck // ignore the error as we can't act on it)
 	}
 }
 
-type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error
+type NotifyFleetAuditUninstall func(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error
 
 // notifyFleetAuditUninstall will attempt to notify fleet-server of the agent's uninstall.
 //
 // There are retries for the attempt after a 10s wait, but it is a best-effort approach.
-func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error {
+func notifyFleetAuditUninstall(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	pt.Describe("Attempting to notify Fleet of uninstall")
