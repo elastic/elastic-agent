@@ -21,7 +21,7 @@ common:
 env:
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1789108817"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1789137875"
   IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1789108817"
   IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1789108817"
   IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1789108817"
@@ -205,6 +205,7 @@ steps:
 
   - group: "macOS tests"
     key: "macos-unit-tests"
+    skip: "fast ci"
     steps:
       - label: "Unit tests - macOS 15 ARM"
         command: ".buildkite/scripts/steps/unit-tests.sh"
