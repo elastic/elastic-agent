@@ -1,0 +1,44 @@
+version: 9.4.7
+entries:
+    - kind: bug-fix
+      summary: Fix Kafka lz4/snappy compression failing in the OTel runtime after 9.5
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16537
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16239
+      impact: ""
+      action: ""
+      timestamp: 1787733895
+      file:
+        name: 1787733895-fix-kafka-lz4-compression-failing-in-the-otel-runtime.yaml
+        checksum: e6dd7fb2253c6a3dcaf40201f7b450389061a431
+    - kind: bug-fix
+      summary: prevent panic when translating otel config and unit has nil configuration
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16537
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16470
+      impact: ""
+      action: ""
+      timestamp: 1788375679
+      file:
+        name: 1788375679-handle-units-with-nil-config.yaml
+        checksum: df1d5fd5efbca47ed405b0d8bc5f668f29beaca6
+    - kind: security
+      summary: validate component working directory path to prevent path traversal
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16537
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16226
+      impact: ""
+      action: ""
+      timestamp: 1788440317
+      file:
+        name: 1788440317-validate-component-working-directory-path-to-prevent-path-traversal.yaml
+        checksum: 5e14a7b888af0bdcc02148e1488ea4968ca8082a
