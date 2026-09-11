@@ -195,6 +195,114 @@ func TestBeatMetrics(t *testing.T) {
 	})
 }
 
+func TestBeatMetricsComponentIDContainingSlash(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip test on Windows.",
+			"It's technically cumbersome to set up an npipe http server.",
+			"And it doesn't have anything to do with the code paths being tested.",
+		)
+	}
+	setTemporaryAgentPath(t)
+	logger, _ := loggertest.New("test")
+
+	systemComp := testComponent("system/metrics-default")
+	systemComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
+	httpComp := testComponent("http/metrics-monitoring")
+	httpComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
+
+	receiverType := otelcomponent.MustNewType("metricbeatreceiver")
+	systemReceiver := translate.GetReceiverID(receiverType, systemComp.ID+"/system/metrics-system.cpu-policy-id").String()
+	httpReceiver := translate.GetReceiverID(receiverType, httpComp.ID+"/metrics-monitoring-agent").String()
+	metricData := []byte(`{"test":"test"}`)
+
+	expectedResponse := elasticdiagnostics.Response{
+		ComponentDiagnostics: []*proto.ActionDiagnosticUnitResult{
+			{Name: systemReceiver, Filename: "beat_metrics.json", ContentType: "application/json", Content: metricData},
+			{Name: httpReceiver, Filename: "beat_metrics.json", ContentType: "application/json", Content: metricData},
+		},
+	}
+
+	m := &OTelManager{
+		managerLogger: logger,
+		components:    []component.Component{systemComp, httpComp},
+	}
+
+	called := false
+	server := handlers.NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, &expectedResponse)
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
+	})
+
+	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Len(t, diags, 2)
+
+	resultsByComp := make(map[string][]string)
+	for _, d := range diags {
+		for _, result := range d.Results {
+			resultsByComp[d.Component.ID] = append(resultsByComp[d.Component.ID], result.Name)
+		}
+	}
+
+	assert.Equal(t, []string{systemReceiver}, resultsByComp[systemComp.ID])
+	assert.Equal(t, []string{httpReceiver}, resultsByComp[httpComp.ID])
+}
+
+func TestBeatMetricsAmbiguousComponentIDsPreserveResults(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skip test on Windows.",
+			"It's technically cumbersome to set up an npipe http server.",
+			"And it doesn't have anything to do with the code paths being tested.",
+		)
+	}
+	setTemporaryAgentPath(t)
+	logger, obs := loggertest.New("test")
+
+	parentComp := testComponent("foo")
+	parentComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
+	nestedComp := testComponent("foo/bar")
+	nestedComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
+
+	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("metricbeatreceiver"), "foo/bar/baz").String()
+	expectedResponse := elasticdiagnostics.Response{
+		ComponentDiagnostics: []*proto.ActionDiagnosticUnitResult{
+			{Name: receiverName, Filename: "beat_metrics.json", ContentType: "application/json", Content: []byte(`{}`)},
+		},
+	}
+	m := &OTelManager{
+		managerLogger: logger,
+		components:    []component.Component{parentComp, nestedComp},
+	}
+
+	called := false
+	server := handlers.NewMockServer(t, paths.DiagnosticsExtensionSocket(), &called, &expectedResponse)
+	t.Cleanup(func() {
+		assert.NoError(t, server.Close())
+	})
+
+	diags, err := m.PerformComponentDiagnostics(t.Context(), nil)
+	require.NoError(t, err)
+	require.True(t, called)
+	require.Len(t, diags, 2)
+	for _, diag := range diags {
+		require.Len(t, diag.Results, 1)
+		assert.Equal(t, receiverName, diag.Results[0].Name)
+	}
+	assert.NotEmpty(t, obs.FilterLevelExact(zapcore.WarnLevel).FilterMessageSnippet("associated with multiple components").All())
+}
+
+func TestDiagnosticComponentIDsFromNameMatchesReceiverType(t *testing.T) {
+	shortFilebeatComp := testComponent("foo")
+	nestedMetricbeatComp := testComponent("foo/bar")
+	nestedMetricbeatComp.InputSpec.Spec.Command.Args = []string{"metricbeat"}
+
+	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("metricbeatreceiver"), "foo/bar/baz").String()
+	componentIDs := diagnosticComponentIDsFromName(receiverName, []component.Component{shortFilebeatComp, nestedMetricbeatComp})
+
+	assert.Equal(t, []string{nestedMetricbeatComp.ID}, componentIDs)
+}
+
 // TestBeatMetricsPrefixOverlap guards that each EDOT result is assigned to exactly one component.
 // When one component ID is a prefix of another (e.g. "filebeat" and "filebeat-2"), the prefix
 // component must not receive the result of the longer one.
