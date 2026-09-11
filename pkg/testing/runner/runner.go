@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -442,8 +443,12 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return common.OSRunnerResult{}, fmt.Errorf("failed to determine SSH private key path: %w", err)
 	}
 
-	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, instance.Username, instance.IP)
-	client := tssh.NewClient(instance.IP, instance.Username, sshAuth, logger)
+	sshPort := ""
+	if instance.SSHPort != 0 {
+		sshPort = strconv.Itoa(instance.SSHPort)
+	}
+	logger.Logf("Starting SSH; connect with `ssh -i %s -p %s %s@%s`", sshPrivateKeyPath, sshPort, instance.Username, instance.IP)
+	client := tssh.NewClient(instance.IP, sshPort, instance.Username, sshAuth, logger)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	err = client.Connect(connectCtx)

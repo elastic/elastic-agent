@@ -24,6 +24,7 @@ type logger interface {
 
 type sshClient struct {
 	ip       string
+	port     string
 	username string
 	auth     ssh.AuthMethod
 	logger   logger
@@ -31,9 +32,14 @@ type sshClient struct {
 }
 
 // NewClient creates a new SSH client connection to the host.
-func NewClient(ip string, username string, sshAuth ssh.AuthMethod, logger logger) SSHClient {
+// port is the TCP port to connect to; pass "22" or "" for the default SSH port.
+func NewClient(ip string, port string, username string, sshAuth ssh.AuthMethod, logger logger) SSHClient {
+	if port == "" {
+		port = "22"
+	}
 	return &sshClient{
 		ip:       ip,
+		port:     port,
 		username: username,
 		auth:     sshAuth,
 		logger:   logger,
@@ -49,7 +55,7 @@ func (s *sshClient) Connect(ctx context.Context) error {
 		Auth:            []ssh.AuthMethod{s.auth},
 		Timeout:         30 * time.Second,
 	}
-	addr := net.JoinHostPort(s.ip, "22")
+	addr := net.JoinHostPort(s.ip, s.port)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
