@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -80,7 +81,16 @@ type provisioner struct {
 
 // NewProvisioner creates the docker instance provisioner.
 func NewProvisioner() common.InstanceProvisioner {
-	return &provisioner{}
+	p := &provisioner{}
+	// Initialize the Docker client eagerly so it is available even when Provision
+	// is skipped (e.g. the runner resumes from saved state).  New() only parses
+	// env vars and creates an HTTP transport — no network calls — so it is safe
+	// to call here without a context.  Connectivity is verified later in Provision
+	// via checkDocker.
+	if c, err := dockerclient.New(dockerclient.FromEnv); err == nil {
+		p.client = c
+	}
+	return p
 }
 
 func (p *provisioner) Name() string {
@@ -313,7 +323,7 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 		// On native Linux the loopback binding is directly reachable; on Lima/Docker
 		// Desktop the host automatically port-forwards loopback bindings from the VM.
 		PortBindings: network.PortMap{
-			network.MustParsePort("22/tcp"): []network.PortBinding{{HostPort: ""}},
+			network.MustParsePort("22/tcp"): []network.PortBinding{{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: ""}},
 		},
 	}
 	if modCache != "" {
@@ -524,8 +534,10 @@ func (p *provisioner) containerSSHPort(ctx context.Context, name string) (int, e
 		return 0, fmt.Errorf("failed to inspect container %s: %w", name, err)
 	}
 	bindings := result.Container.NetworkSettings.Ports[network.MustParsePort("22/tcp")]
+	loopback := netip.MustParseAddr("127.0.0.1")
+	unspecified4 := netip.MustParseAddr("0.0.0.0")
 	for _, b := range bindings {
-		if b.HostIP.String() == "127.0.0.1" || !b.HostIP.IsValid() {
+		if b.HostIP == loopback || b.HostIP == unspecified4 || !b.HostIP.IsValid() {
 			port, err := strconv.Atoi(b.HostPort)
 			if err == nil && port > 0 {
 				return port, nil

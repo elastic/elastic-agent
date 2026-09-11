@@ -8,6 +8,7 @@ package docker
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -110,7 +111,7 @@ func TestContainerSSHPort(t *testing.T) {
 		Config: &container.Config{Image: "alpine", Cmd: []string{"sleep", "60"}},
 		HostConfig: &container.HostConfig{
 			PortBindings: network.PortMap{
-				network.MustParsePort("22/tcp"): []network.PortBinding{{HostPort: ""}},
+				network.MustParsePort("22/tcp"): []network.PortBinding{{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: ""}},
 			},
 		},
 		Name: name,
