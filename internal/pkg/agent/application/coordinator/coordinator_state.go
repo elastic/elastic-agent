@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -292,20 +293,96 @@ func (c *Coordinator) setLogLevel(logLevel logp.Level) {
 	c.stateNeedsRefresh = true
 }
 
-// Returns true if any component in the given list, or any unit in one of
-// those components, matches the given state.
+// hasState reports whether any component in the list, or any of its units, is in
+// the given state -- excluding units that opt out via their status_reporting
+// config (see statusReporting). This lets operators run broad policies whose
+// inputs are not healthy on every host without those units dragging the whole
+// agent into a degraded state. Suppressed units are still reported individually
+// in the per-component state; they are only excluded from this aggregate-health
+// rollup.
 func hasState(components []runtime.ComponentComponentState, state client.UnitState) bool {
 	for _, comp := range components {
-		if comp.State.State == state {
+		if componentHasState(comp, state) {
 			return true
-		}
-		for _, unit := range comp.State.Units {
-			if unit.State == state {
-				return true
-			}
 		}
 	}
 	return false
+}
+
+// componentHasState reports whether a single component or any of its
+// non-suppressed units is in the given state.
+func componentHasState(comp runtime.ComponentComponentState, state client.UnitState) bool {
+	matchedUnit := false
+	for key, unit := range comp.State.Units {
+		if unit.State != state {
+			continue
+		}
+		matchedUnit = true
+		if !unitStatusReporting(comp, key).suppresses(state) {
+			return true
+		}
+	}
+	// A component-level state without a contributing unit cannot be attributed to
+	// a suppressing unit, so it still counts.
+	return comp.State.State == state && !matchedUnit
+}
+
+// statusReporting is the optional per-unit "status_reporting" config block that
+// lets an input opt out of contributing its Degraded/Failed state to the agent's
+// aggregate health:
+//
+//	status_reporting:
+//	  report_degraded: false   # a Degraded unit does not degrade the agent
+//	  report_failed: false     # a Failed unit does not degrade the agent
+//
+// An absent key (nil) or true keeps the default behavior: the state counts.
+type statusReporting struct {
+	ReportDegraded *bool
+	ReportFailed   *bool
+}
+
+// suppresses reports whether this config opts the unit out of contributing the
+// given state to the aggregate health.
+func (s statusReporting) suppresses(state client.UnitState) bool {
+	switch state {
+	case client.UnitStateFailed:
+		return s.ReportFailed != nil && !*s.ReportFailed
+	case client.UnitStateDegraded:
+		return s.ReportDegraded != nil && !*s.ReportDegraded
+	}
+	return false
+}
+
+// unitStatusReporting returns the status_reporting config for the unit
+// identified by key within the component, or the zero value (no suppression) if
+// the unit or its config is absent.
+func unitStatusReporting(comp runtime.ComponentComponentState, key runtime.ComponentUnitKey) statusReporting {
+	for _, u := range comp.Component.Units {
+		if u.Type == key.UnitType && u.ID == key.UnitID {
+			return parseStatusReporting(u.Config)
+		}
+	}
+	return statusReporting{}
+}
+
+// parseStatusReporting extracts the status_reporting block from a unit's
+// expected config. A malformed or absent block yields the zero value.
+func parseStatusReporting(cfg *proto.UnitExpectedConfig) statusReporting {
+	var sr statusReporting
+	if cfg == nil || cfg.Source == nil {
+		return sr
+	}
+	raw, ok := cfg.Source.AsMap()["status_reporting"].(map[string]any)
+	if !ok {
+		return sr
+	}
+	if v, ok := raw["report_degraded"].(bool); ok {
+		sr.ReportDegraded = &v
+	}
+	if v, ok := raw["report_failed"].(bool); ok {
+		sr.ReportFailed = &v
+	}
+	return sr
 }
 
 func copyOTelStatus(copy *status.AggregateStatus) *status.AggregateStatus {
