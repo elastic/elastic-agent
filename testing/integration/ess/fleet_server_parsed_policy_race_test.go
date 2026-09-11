@@ -126,6 +126,7 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 	t.Logf("Enrolled agent with ID: %s", agentID)
 
 	t.Cleanup(func() {
+		//nolint:forbidigo // t.Context() is cancelled by cleanup time
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
 		if err := fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID); err != nil {
@@ -222,6 +223,7 @@ func createRemoteESOutputWithSecret(t *testing.T, ctx context.Context, info *def
 	t.Logf("Created Fleet output: %s (ID: %s)", outputName, outputResp.Item.ID)
 
 	t.Cleanup(func() {
+		//nolint:forbidigo // t.Context() is cancelled by cleanup time
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cleanupCancel()
 		deleteStatus, deleteResult, deleteErr := info.KibanaClient.Request(
