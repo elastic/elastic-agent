@@ -21,9 +21,9 @@ summary: Reduce Elastic Agent resource usage when collecting Kubernetes containe
 description: >
   Kubernetes container logs are now collected by a single log input watching all
   container log files, instead of one input per running container. Agent uses
-  noticeably less CPU and memory on busy nodes, and no longer reconfigures itself
-  every time a pod starts or stops. Existing read positions are preserved, so no
-  logs are re-read or missed.
+  noticeably less CPU on busy nodes and no longer reconfigures itself every time a
+  pod starts or stops. Existing read positions are preserved, so no logs are
+  re-read or missed.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
