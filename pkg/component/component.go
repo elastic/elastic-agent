@@ -853,6 +853,15 @@ func (r *RuntimeSpecs) componentsForInputType(
 				if input.runtimeManager == "" {
 					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
+				// In the security-only variant, only beats compiled into the
+				// security-only elastic-otel-collector are supported.
+				if len(variantAllowedInputTypes) > 0 && inputSpec.BeatName() != "" {
+					if _, ok := variantAllowedInputTypes[inputType]; !ok {
+						componentErr = fmt.Errorf("input type %q is not supported in this variant", inputType)
+					} else {
+						input.runtimeManager = OtelRuntimeManager
+					}
+				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
 					unitForInput(input, unitID),
@@ -911,6 +920,13 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 			if input.runtimeManager == "" {
 				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
+			}
+			if len(variantAllowedInputTypes) > 0 && inputSpec.BeatName() != "" {
+				if _, ok := variantAllowedInputTypes[inputType]; !ok {
+					componentErr = fmt.Errorf("input type %q is not supported in this variant", inputType)
+				} else {
+					input.runtimeManager = OtelRuntimeManager
+				}
 			}
 
 			var units []Unit
@@ -1168,6 +1184,11 @@ func toIntermediate(
 			case OtelRuntimeManager, ProcessRuntimeManager:
 			default:
 				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
+			}
+			// When a variant restricts input types, it also cannot run beats in
+			// process mode — the beat subcommands are not compiled in.
+			if len(variantAllowedInputTypes) > 0 && runtimeManagerVal == ProcessRuntimeManager {
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', process runtime is not supported in this variant", idx)
 			}
 			runtimeManager = runtimeManagerVal
 			delete(input, runtimeManagerKey)

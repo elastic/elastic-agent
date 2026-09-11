@@ -245,7 +245,7 @@ func TestDownloadWithRetries(t *testing.T) {
 		},
 	}
 	parsedVersion := agtversion.NewParsedSemVer(8, 9, 0, "", "")
-	target, err := artifact.New("elastic-agent", false, parsedVersion, "linux", "amd64")
+	target, err := artifact.New("elastic-agent", "", false, parsedVersion, "linux", "amd64")
 	require.NoError(t, err)
 
 	t.Run("initial success", func(t *testing.T) {

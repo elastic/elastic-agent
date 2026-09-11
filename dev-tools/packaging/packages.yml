@@ -87,6 +87,14 @@ components:
       - *windows-amd64
       - *windows-arm64
     packageTypes: *all-package-types
+  - &comp-elastic-agent-security-core
+    projectName: elastic-agent-security-core
+    packageName: elastic-agent-security-core-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: elastic-agent-core-{{.Version}}-{{.Platform}}
+    binaryName: elastic-agent
+    fips: false
+    platforms: *all-platforms
+    packageTypes: *all-package-types
   - &comp-apm_server
     projectName: apm-server
     packageName: apm-server-{{.Version}}-{{.Platform}}.{{.Ext}}
@@ -134,7 +142,7 @@ components:
       - *linux-arm64
     pythonWheel: true
     packageTypes: *all-package-types
-  - &comp-endpoint
+  - &comp-security
     projectName: endpoint-dev
     packageName: endpoint-security-{{.Version}}-{{.Platform}}.{{.Ext}}
     rootDir: endpoint-security-{{.Version}}-{{.Platform}}
@@ -226,6 +234,17 @@ shared:
     url: '{{.BeatURL}}'
     description: '{{.BeatDescription}}'
 
+  - &common_security
+    name: '{{.BeatName}}-security'
+    service_name: '{{.BeatServiceName}}'
+    os: '{{.GOOS}}'
+    arch: '{{.PackageArch}}'
+    vendor: '{{.BeatVendor}}'
+    version: '{{ agent_package_version }}'
+    license: '{{.BeatLicense}}'
+    url: '{{.BeatURL}}'
+    description: '{{.BeatDescription}}'
+
   # agent specific
 
   # components included in elastic-agent package specs defined before components support in this YAML
@@ -235,7 +254,7 @@ shared:
       - *comp-cloudbeat
       - *comp-cloud-defend
       - *comp-connectors
-      - *comp-endpoint
+      - *comp-security
       - *comp-fleet-server
       - *comp-pf-elastic-collector
       - *comp-pf-elastic-symbolizer
@@ -247,7 +266,7 @@ shared:
       - *comp-apm_server
       - *comp-cloudbeat
       - *comp-connectors
-      - *comp-endpoint
+      - *comp-security
       - *comp-fleet-server
       - *comp-pf-elastic-collector
       - *comp-pf-elastic-symbolizer
@@ -258,6 +277,11 @@ shared:
     components:
       - *comp-apm_server-fips
       - *comp-fleet-server-fips
+
+  # components included in security distribution elastic-agent package specs
+  - &elastic_agent_security_components
+    components:
+      - *comp-security
 
   # Deb/RPM spec.
   - &deb_rpm_agent_spec
@@ -336,6 +360,89 @@ shared:
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
         source: '{{ repo.RootDir }}/build/core/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
+        mode: 0644
+        content: >
+          {{ manifest .fips }}
+
+  # Deb/RPM spec for the security distribution variant.
+  - &deb_rpm_agent_security_spec
+    <<: *common_security
+    pre_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/preinstall.sh.tmpl'
+    post_install_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postinstall.sh.tmpl'
+    post_rm_script: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/postrm.sh.tmpl'
+    files:
+      /usr/share/{{.BeatName}}/LICENSE.txt:
+        source: '{{ repo.RootDir }}/LICENSE.txt'
+        mode: 0644
+      /usr/share/{{.BeatName}}/NOTICE.txt:
+        source: '{{ repo.RootDir }}/NOTICE.txt'
+        mode: 0644
+      /usr/share/{{.BeatName}}/README.md:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/common/README.md.tmpl'
+        mode: 0644
+      /usr/share/{{.BeatName}}/.build_hash.txt:
+        content: >
+          {{ core_commit }}
+        mode: 0644
+      /etc/{{.BeatName}}/elastic-agent.reference.yml:
+        source: 'elastic-agent.reference.yml'
+        mode: 0644
+      /etc/{{.BeatName}}/elastic-agent.yml:
+        source: 'elastic-agent.yml'
+        mode: 0600
+        config: true
+      /etc/{{.BeatName}}/otel.yml:
+        source: 'otel.yml'
+        mode: 0600
+        config: true
+      /etc/{{.BeatName}}/.elastic-agent.active.commit:
+        content: >
+          {{ core_commit }}
+        mode: 0644
+      /usr/bin/{{.BeatName}}:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.sh.tmpl'
+        mode: 0755
+      /lib/systemd/system/{{.BeatServiceName}}.service:
+        template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/linux/elastic-agent.unit.tmpl'
+        mode: 0644
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/package.version:
+        content: >
+          {{ agent_package_version }}
+        mode: 0644
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components:
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/'
+        mode: 0755
+        config_mode: 0644
+        skip_on_missing: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
+        mode: 0644
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/endpoint-security-resources.zip:
+        source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
+        mode: 0644
+        skip_on_missing: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/module:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
+        preserve_mode: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/certs/certs.pem:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
+        mode: 0640
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/lenses:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
+        preserve_mode: true
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osqueryd:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd'
+        mode: 0755
+      /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/components/osquery-extension.ext:
+        source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
         mode: 0755
       /var/lib/{{.BeatName}}/data/{{.BeatName}}-{{ agent_package_version }}{{snapshot_suffix}}-{{ core_commit_short }}/manifest.yaml:
         mode: 0644
@@ -453,6 +560,34 @@ shared:
       mode: 0644
       skip_on_missing: true
 
+  # Endpoint variant: explicit endpoint-security binary + spec + resources, without the full
+  # components glob that would also pull fleet-server and other non-security binaries.
+  - &agent_security_binary_files
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security{{.BinaryExt}}':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security{{.BinaryExt}}'
+      mode: 0755
+      skip_on_missing: true
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security.spec.yml':
+      source: '{{ repo.RootDir }}/specs/endpoint-security.spec.yml'
+      mode: 0644
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.tar.gz/endpoint-security-resources.zip'
+      mode: 0644
+      skip_on_missing: true
+
+  - &agent_security_binary_windows_files
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security{{.BinaryExt}}':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security{{.BinaryExt}}'
+      mode: 0755
+      skip_on_missing: true
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security.spec.yml':
+      source: '{{ repo.RootDir }}/specs/endpoint-security.spec.yml'
+      mode: 0644
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/endpoint-security-resources.zip':
+      source: '{{.AgentDropPath}}/{{.GOOS}}-{{.AgentArchName}}.zip/endpoint-security-resources.zip'
+      mode: 0644
+      skip_on_missing: true
+
   - &agent_windows_otel_scripts_samples
     'otelcol.ps1':
       source: '{{ repo.RootDir }}/dev-tools/packaging/files/windows/otelcol.ps1'
@@ -475,6 +610,14 @@ shared:
   - &agent_otel_collector_binary_spec_core
     'components/elastic-otel-collector{{.BinaryExt}}':
       source: '{{ repo.RootDir }}/build/golang-crossbuild/elastic-otel-collector-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
+      mode: 0755
+    'components/elastic-otel-collector.spec.yml':
+      source: '{{ repo.RootDir }}/internal/edot/spec.yml'
+      mode: 0644
+
+  - &agent_otel_collector_binary_spec_security_core
+    'components/elastic-otel-collector{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/golang-crossbuild/elastic-otel-collector-security-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
       mode: 0755
     'components/elastic-otel-collector.spec.yml':
       source: '{{ repo.RootDir }}/internal/edot/spec.yml'
@@ -548,6 +691,96 @@ shared:
   - &osquerybeat_extension_windows_core
     'components/osquery-extension{{.BinaryExt}}':
       source: '{{ repo.RootDir }}/beats/x-pack/osquerybeat/ext/osquery-extension/build/golang-crossbuild/osquery-extension-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}'
+      mode: 0755
+
+  # Endpoint distribution variant: final packaging file anchors.
+  # These mirror the standard *_core anchors but source from build/core-security/extracted/.
+
+  - &agent_binary_files_security
+    '{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/package.version':
+      content: >
+        {{ agent_package_version }}
+      mode: 0644
+    <<: *agent_binary_common_files
+
+  - &agent_darwin_binary_common_files_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/package.version':
+      content: >
+        {{ agent_package_version }}
+      mode: 0644
+    'otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/otelcol':
+      source: '{{ repo.RootDir }}/dev-tools/packaging/files/darwin/otelcol.sh'
+      mode: 0755
+    'otel_samples':
+      source: '{{ repo.RootDir }}/internal/edot/samples/darwin/'
+      mode: 0644
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/Info.plist':
+      template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/Info.plist.tmpl'
+      mode: 0644
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/PkgInfo':
+      template: '{{ elastic_beats_dir }}/dev-tools/packaging/files/darwin/PkgInfo'
+      mode: 0644
+    <<: *agent_binary_common_files
+
+  - &agent_darwin_binary_files_security
+    '{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/{{.BeatName}}{{.BinaryExt}}'
+      mode: 0755
+    <<: *agent_darwin_binary_common_files_security
+
+  - &agent_otel_collector_binary_spec_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector{{.BinaryExt}}'
+      mode: 0755
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/elastic-otel-collector.spec.yml':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/elastic-otel-collector.spec.yml'
+      mode: 0644
+
+  - &metricbeat_lightweight_module_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/module':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/module'
+      preserve_mode: true
+
+  - &osquerybeat_osquery_certs_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/certs/certs.pem':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/certs/certs.pem'
+      mode: 0640
+
+  - &osquerybeat_osquery_lenses_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/lenses':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/lenses'
+      preserve_mode: true
+
+  - &osquerybeat_osqueryd_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osqueryd{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osqueryd{{.BinaryExt}}'
+      mode: 0755
+
+  - &osquerybeat_osqueryapp_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery.app':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery.app'
+      preserve_mode: true
+
+  - &osquerybeat_extension_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery-extension.ext':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension.ext'
+      mode: 0755
+
+  - &osquerybeat_extension_windows_security
+    'data/{{.BeatName}}-{{ core_commit_short }}/components/osquery-extension{{.BinaryExt}}':
+      source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/components/osquery-extension{{.BinaryExt}}'
       mode: 0755
 
   # Binary package spec (tar.gz for linux) for community beats.
@@ -634,6 +867,49 @@ shared:
     NOTICE.txt:
       source: '{{ repo.RootDir }}/NOTICE-fips.txt'
       mode: 0644
+
+  # Binary package spec (tar.gz for linux) for the security distribution variant.
+  - &agent_binary_spec_security
+    <<: *common_security
+    <<: *elastic_agent_security_components
+    files:
+      <<: *agent_binary_files_security
+      <<: *linux_otel_files
+      <<: *agent_security_binary_files
+      <<: *agent_otel_collector_binary_spec_security
+      <<: *metricbeat_lightweight_module_security
+      <<: *osquerybeat_osquery_certs_security
+      <<: *osquerybeat_osquery_lenses_security
+      <<: *osquerybeat_osqueryd_security
+      <<: *osquerybeat_extension_security
+
+  # Binary package spec (tar.gz for darwin) for the security distribution variant.
+  - &agent_darwin_binary_spec_security
+    <<: *common_security
+    <<: *elastic_agent_security_components
+    files:
+      <<: *agent_darwin_binary_files_security
+      <<: *agent_security_binary_files
+      <<: *agent_otel_collector_binary_spec_security
+      <<: *metricbeat_lightweight_module_security
+      <<: *osquerybeat_osquery_certs_security
+      <<: *osquerybeat_osquery_lenses_security
+      <<: *osquerybeat_osqueryapp_security
+      <<: *osquerybeat_extension_security
+
+  # Binary package spec (zip for windows) for the security distribution variant.
+  - &agent_windows_binary_spec_security
+    <<: *common_security
+    <<: *elastic_agent_security_components
+    files:
+      <<: *agent_binary_files_security
+      <<: *agent_security_binary_windows_files
+      <<: *agent_otel_collector_binary_spec_security
+      <<: *metricbeat_lightweight_module_security
+      <<: *osquerybeat_osquery_certs_security
+      <<: *osquerybeat_osqueryd_security
+      <<: *osquerybeat_extension_windows_security
+      <<: *agent_windows_otel_scripts_samples
 
 # This image is used only for preparing the file tree before actually building the image
   - &docker_builder_spec
@@ -1389,3 +1665,113 @@ specs:
           <<: *agent_otel_collector_binary_spec_core
           <<: *metricbeat_lightweight_module_core
     ######## End FIPS Specs ########
+
+  elastic_agent_security_core:
+    ###
+    # Elastic Agent Endpoint Core Packages
+    #
+    # Builds the elastic-agent-security-core packages used as the first step of security final packaging.
+    # Identical in structure to elastic_agent_core but uses the security variant elastic-otel-collector binary.
+    ###
+    - os: windows
+      types: [zip]
+      spec:
+        <<: *common_security
+        <<: *elastic_license_for_binaries
+        version: '{{ agent_core_version }}'
+        qualifier: core
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-security-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          'elastic-agent-archive-root.exe':
+            source: ./build/windows-{{.Platform.Arch}}-archive-root-binary/elastic-agent-archive-root.exe
+          <<: *agent_otel_collector_binary_spec_security_core
+          <<: *metricbeat_lightweight_module_core
+          <<: *osquerybeat_osquery_certs_core
+          <<: *osquerybeat_osqueryd_core
+          <<: *osquerybeat_extension_windows_core
+
+    - os: darwin
+      types: [tgz]
+      spec:
+        <<: *common_security
+        <<: *elastic_license_for_binaries
+        version: '{{ agent_core_version }}'
+        qualifier: core
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-security-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_collector_binary_spec_security_core
+          <<: *metricbeat_lightweight_module_core
+          <<: *osquerybeat_osquery_certs_core
+          <<: *osquerybeat_osquery_lenses_core
+          <<: *osquerybeat_osqueryapp_core
+          <<: *osquerybeat_extension_core
+
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *common_security
+        <<: *elastic_license_for_binaries
+        version: '{{ agent_core_version }}'
+        qualifier: core
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: ./build/golang-crossbuild/{{.BeatName}}-security-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
+          <<: *agent_otel_collector_binary_spec_security_core
+          <<: *metricbeat_lightweight_module_core
+          <<: *osquerybeat_osquery_certs_core
+          <<: *osquerybeat_osquery_lenses_core
+          <<: *osquerybeat_osqueryd_core
+          <<: *osquerybeat_extension_core
+
+  elastic_agent_security_packaging:
+    ###
+    # Elastic Agent Endpoint Final Packages
+    #
+    # Assembles elastic-agent-security packages from the extracted endpoint core plus the endpoint-security component.
+    # No Docker images; no aix. Package name: elastic-agent-security-<version>-<os>-<arch>.
+    ###
+    - os: windows
+      types: [zip]
+      spec:
+        <<: *agent_windows_binary_spec_security
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: '{{ repo.RootDir }}/build/core-security/extracted/{{.GOOS}}-{{.Platform.Arch}}/elastic-agent-archive-root.exe'
+          'package.version':
+            content: >
+              {{ agent_package_version }}
+            mode: 0644
+
+    - os: darwin
+      types: [tgz]
+      spec:
+        <<: *agent_darwin_binary_spec_security
+        <<: *elastic_license_for_binaries
+        files:
+          'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent':
+            template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
+            mode: 0755
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
+            symlink: true
+            mode: 0755
+
+    - os: linux
+      types: [tgz]
+      spec:
+        <<: *agent_binary_spec_security
+        <<: *elastic_license_for_binaries
+        files:
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            symlink: true
+            mode: 0755
+
+    - os: linux
+      types: [deb, rpm]
+      spec:
+        <<: *deb_rpm_agent_security_spec
+        <<: *elastic_license_for_deb_rpm

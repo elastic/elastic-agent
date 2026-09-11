@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !requirefips
+//go:build !requirefips && !securityonly
 
 package components
 
@@ -21,19 +21,16 @@ import (
 )
 
 func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
-	receivers = append(receivers,
+	return append(receivers,
 		kafkareceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
 		osqreceiver.NewFactoryWithSettings(osqreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 		pbreceiver.NewFactoryWithSettings(pbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 	)
-
-	return receivers
 }
 
 func addNonFipsExporters(exporters []exporter.Factory) []exporter.Factory {
-	exporters = append(exporters,
+	return append(exporters,
 		kafkaexporter.NewFactory(),
 	)
-	return exporters
 }
