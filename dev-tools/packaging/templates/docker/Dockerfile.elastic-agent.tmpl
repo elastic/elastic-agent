@@ -201,6 +201,10 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
     mv {{ $beatHome }}/data/service/connectors /usr/share/connectors && \
     PYTHON=python3.11 make -C /usr/share/connectors clean install install-agent && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
+{{- if .fips }}
+# The connectors use the OpenSSL of the image, which is FIPS ready in the FIPS base image
+ENV ELASTICSEARCH_CONNECTORS_FIPS_MODE=true
+{{- end }}
 {{- end }}
 
 {{- if (and (eq .Variant "complete") (and (contains .from "redhat/ubi") (contains .from "-minimal") ))  }}
