@@ -7,24 +7,18 @@
 package ess
 
 // TestFleetServerParsedPolicyRaceConditionFix is a regression test for
-// sdh-beats#7585 / elastic/fleet-server#7794.
+// elastic/fleet-server#7794.
 //
-// The bug: multiple processPolicy goroutines in fleet-server shared a single
-// *ParsedPolicy and concurrently called slices.DeleteFunc + append on its
-// SecretKeys slice, producing a corrupted slice and an "index out of range [-1]"
-// panic. The fix (PR #7794) clones the *ParsedPolicy in dispatchPending before
-// handing it to each subscriber.
+// It verifies that fleet-server correctly serves a policy with a
+// remote_elasticsearch output whose service_token is stored as a Fleet secret
+// (non-empty secret_references) without crashing.
 //
-// Trigger: the policy's secret_references must be non-empty. That only happens
-// when the remote_elasticsearch output is created with
+// The service_token must be wrapped in {"secrets": {"service_token": "..."}} when
+// creating the Fleet output — NOT passed as a top-level field — so that Fleet
+// stores it as a secret and populates secret_references in the generated policy.
 //
-//	{"secrets": {"service_token": "..."}}
-//
-// (the secrets wrapper), NOT with a top-level "service_token" field.
-//
-// This test also installs the Elastic Defend integration, mirroring the real
-// downgrade scenario from the ticket where additional policy complexity increases
-// the likelihood of hitting the race.
+// Elastic Defend is also installed to make the test more realistic and cover
+// an edge case with additional policy complexity.
 
 import (
 	"archive/zip"
@@ -91,7 +85,7 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 	policyReq := kibana.AgentPolicy{
 		Name:        "test-fleet-server-race-fix-" + policyUUID,
 		Namespace:   info.Namespace,
-		Description: "Regression test: sdh-beats#7585 / fleet-server PR #7794",
+		Description: "Regression test: fleet-server PR #7794",
 		MonitoringEnabled: []kibana.MonitoringEnabledOption{
 			kibana.MonitoringEnabledLogs,
 			kibana.MonitoringEnabledMetrics,
@@ -104,9 +98,8 @@ func TestFleetServerParsedPolicyRaceConditionFix(t *testing.T) {
 	require.NoError(t, err, "failed to create agent policy")
 	t.Logf("Created policy %s (ID: %s, revision: %d)", policyResp.Name, policyResp.ID, policyResp.Revision)
 
-	// Add the Elastic Defend integration to the policy. This mirrors the downgrade
-	// scenario from sdh-beats#7585 and adds additional policy complexity / subscribers
-	// that increase the probability of hitting the concurrent slice-mutation race.
+	// Add the Elastic Defend integration to the policy to make the test more
+	// realistic and cover an edge case with additional policy complexity.
 	t.Log("Installing Elastic Defend package policy...")
 	_, err = installElasticDefendPackage(t, info, policyResp.ID)
 	require.NoError(t, err, "failed to install Elastic Defend package policy")
@@ -300,7 +293,7 @@ func checkDiagArchiveNoPanic(t *testing.T, diagZip string) {
 			assert.NotContains(t, content, sig,
 				"diagnostics archive entry %q contains panic signature %q — "+
 					"fleet-server or elastic-agent may have panicked with the "+
-					"concurrent slice-mutation bug (sdh-beats#7585)", f.Name, sig)
+					"concurrent slice-mutation bug (fleet-server#7794)", f.Name, sig)
 		}
 	}
 }
