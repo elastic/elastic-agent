@@ -222,19 +222,13 @@ share similar leavers as the packaging process.
    the host-local runner are supported. Multipass and Kind are rejected before
    provisioning until their local-stack networking support is implemented.
 
-   **macOS limitation:** the `local` stack provisioner does not currently work
-   on macOS. On macOS, Docker runs inside the Docker Desktop VM, so containers
-   (including the test instances spun up by the `docker` provisioner) are not
-   reachable from the host by their container IP. The provisioner relies on
-   containers being attachable to the elastic-package compose network and
-   reachable over that network — a model that assumes Docker is running on the
-   host itself, not inside a VM. Use the cloud (`stateful` / `serverless`)
-   provisioners on macOS instead.
+   On **macOS** you need to build a Linux package on the same arch as your host. 
 
    Example (no cloud account required):
    ```
+   PLATFORMS=linux/$(go env GOARCH) mage package
    STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
-     TEST_PLATFORMS="linux/amd64/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
+     TEST_PLATFORMS="linux/$(go env GOARCH)/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
      TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
    ```
 
