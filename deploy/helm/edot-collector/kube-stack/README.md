@@ -1,6 +1,6 @@
 ## Kube-stack Helm Chart
 
-**More detailed documentation can be found [here](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md).**
+**More detailed documentation can be found [here](https://github.com/open-telemetry/opentelemetry-operator/blob/main/README.md).**
 
 The [kube-stack Helm Chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-kube-stack#readme) is used to manage the installation of the OpenTelemetry operator (including its CRDs) and to configure a suite of EDOT collectors, which instrument various Kubernetes components to enable comprehensive observability and monitoring.
 
@@ -66,11 +66,48 @@ $ kubectl create namespace opentelemetry-operator-system
 
 3. Execute the following commands to deploy the Helm Chart.
 
-```
+```shell
 $ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
 $ helm repo update
-$ helm upgrade --install --namespace opentelemetry-operator-system opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack --values ./values.yaml --version 0.3.3
+$ helm upgrade --install --namespace opentelemetry-operator-system \
+  opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+    --values ./values.yaml \
+    --version 0.16.0
+```
+
+#### OpenShift
+
+The [`./openshift/values.yaml`](./openshift/values.yaml) file contains all the configuration that is needed to run the chart on OpenShift. It is applied on top of the default [`values.yaml`](./values.yaml) file.
+
+1. Follow the steps 1 and 2 from the [Installation](#installation) section to create the namespace and the secret.
+
+2. Execute the following commands to deploy the Helm Chart with both values files:
+
+```shell
+$ helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+$ helm repo update
+$ helm upgrade --install --namespace opentelemetry-operator-system \
+  opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+    --values ./values.yaml \
+    --values ./openshift/values.yaml \
+    --version 0.16.0
+```
+
+If the OpenTelemetry Operator is already installed through the Operator Lifecycle Manager (OLM), the chart must not install a second operator. Disable the operator and its CRDs with the following command:
+
+```shell
+$ helm upgrade --install --namespace opentelemetry-operator-system \
+  opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+    --values ./values.yaml \
+    --values ./openshift/values.yaml \
+    --set crds.installOtel=false \
+    --set opentelemetry-operator.enabled=false \
+    --version 0.16.0
+```
+
+### Compatibility
+
+Each OpenTelemetry Operator version supports a specific range of Kubernetes versions and each Helm Chart version installs a specific Operator version. Use a chart version that matches the Kubernetes version of your cluster:
 
 > [!NOTE]
-> Refer to the [compatibility matrix](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md#compatibility-matrix) for a complete list of available manifests and associated helm chart versions.
-```
+> Refer to the [compatibility matrix](https://github.com/open-telemetry/opentelemetry-operator/blob/main/docs/getting-started/compatibility.md#compatibility-matrix) for a complete list of available manifests and associated helm chart versions.
