@@ -20,19 +20,25 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/moby/moby/api/types/container"
+	dockerclient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // publicUBIRegistry is the registry used when building the Ironbank Dockerfile
-// in CI environments that cannot reach the restricted Ironbank registry.
+// in environments that cannot reach the restricted Ironbank registry.
 const publicUBIRegistry = "registry.access.redhat.com"
 
 // publicUBIImage is the public Red Hat UBI image path that is functionally
@@ -40,11 +46,12 @@ const publicUBIRegistry = "registry.access.redhat.com"
 const publicUBIImage = "ubi10/ubi"
 
 func TestIronbankDockerfilePermissions(t *testing.T) {
-	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skip("docker not found in PATH")
-	}
-	if out, err := exec.CommandContext(t.Context(), "docker", "info").CombinedOutput(); err != nil {
-		t.Skipf("docker daemon not accessible: %v\n%s", err, out)
+	cli, err := dockerclient.New(dockerclient.FromEnv)
+	require.NoError(t, err)
+	t.Cleanup(func() { cli.Close() })
+
+	if _, err := cli.Ping(t.Context(), dockerclient.PingOptions{}); err != nil {
+		t.Skipf("docker daemon not accessible: %v", err)
 	}
 
 	const (
@@ -70,29 +77,36 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 
 	imageTag := "elastic-agent-ironbank-perms-test:latest"
 	t.Cleanup(func() {
-		//nolint:errcheck // best-effort cleanup; failure is not actionable
-		exec.CommandContext(context.Background(), "docker", "rmi", "-f", imageTag).Run()
+		_, _ = cli.ImageRemove(context.Background(), imageTag, dockerclient.ImageRemoveOptions{Force: true, PruneChildren: true})
 	})
 
-	//nolint:gosec // args are constructed from test constants and a value parsed from a repo-local template file
-	buildOut, err := exec.CommandContext(t.Context(), "docker", "build",
-		"--build-arg", "BASE_REGISTRY="+publicUBIRegistry,
-		"--build-arg", "BASE_IMAGE="+publicUBIImage,
-		"--build-arg", "BASE_TAG="+baseTag,
-		"--build-arg", "ELASTIC_STACK="+testVersion,
-		"--build-arg", "OS_AND_ARCH="+testOSArch,
-		"-t", imageTag,
-		buildCtx,
-	).CombinedOutput()
-	require.NoError(t, err, "docker build failed:\n%s", buildOut)
+	buildCtxTar, err := dirTar(buildCtx)
+	require.NoError(t, err)
 
-	runOut, err := exec.CommandContext(t.Context(), "docker", "run", "--rm", "--entrypoint", "/bin/sh", imageTag,
-		"-c", `find /usr/share/elastic-agent/data/elastic-agent-*/components -name "*.yml" -type f -exec stat -c '%n %a' {} \;`,
-	).Output()
-	require.NoError(t, err, "docker run failed: %v", err)
+	buildResp, err := cli.ImageBuild(t.Context(), buildCtxTar, dockerclient.ImageBuildOptions{
+		Tags:   []string{imageTag},
+		Remove: true,
+		BuildArgs: map[string]*string{
+			"BASE_REGISTRY": strPtr(publicUBIRegistry),
+			"BASE_IMAGE":    strPtr(publicUBIImage),
+			"BASE_TAG":      strPtr(baseTag),
+			"ELASTIC_STACK": strPtr(testVersion),
+			"OS_AND_ARCH":   strPtr(testOSArch),
+		},
+	})
+	require.NoError(t, err)
+	defer buildResp.Body.Close()
+	require.NoError(t, consumeBuildOutput(buildResp.Body), "docker build failed")
+
+	out, err := runContainerOneShot(t.Context(), cli, imageTag,
+		"/bin/sh", []string{"-c",
+			`find /usr/share/elastic-agent/data/elastic-agent-*/components -name "*.yml" -type f -exec stat -c '%n %a' {} \;`,
+		},
+	)
+	require.NoError(t, err)
 
 	var ymlFiles []string
-	scanner := bufio.NewScanner(bytes.NewReader(runOut))
+	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := scanner.Text()
 		parts := strings.Fields(line)
@@ -106,7 +120,6 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 
 // parseDockerfileArg reads the default value of a Docker ARG from a Dockerfile
 // (or Dockerfile template), returning the value after the "=" sign.
-// It looks for lines of the form "ARG <name>=<value>".
 func parseDockerfileArg(t *testing.T, dockerfilePath, argName string) string {
 	t.Helper()
 	data, err := os.ReadFile(dockerfilePath)
@@ -126,9 +139,6 @@ func parseDockerfileArg(t *testing.T, dockerfilePath, argName string) string {
 // renderIronbankDockerfile reads the Ironbank Dockerfile.tmpl, substitutes the
 // single Go template variable {{ agent_package_version }} with version, and
 // writes the result as "Dockerfile" into buildCtx.
-//
-// All other "${ ... }" references in the file are Docker build ARGs and are
-// left untouched; they are supplied via --build-arg at docker-build time.
 func renderIronbankDockerfile(t *testing.T, tmplPath, buildCtx, version string) {
 	t.Helper()
 	content, err := os.ReadFile(tmplPath)
@@ -147,10 +157,10 @@ func renderIronbankDockerfile(t *testing.T, tmplPath, buildCtx, version string) 
 // The tarball has one top-level directory (stripped by --strip-components=1)
 // and the following paths underneath it:
 //
-//	elastic-agent                                     (stub binary)
-//	data/<versionedHome>/elastic-agent                (stub binary)
-//	data/<versionedHome>/components/filebeat          (stub binary, satisfies *beat glob)
-//	data/<versionedHome>/components/module/kafka/module.yml  (config, must be 0644 after build)
+//	elastic-agent                                                  (stub binary)
+//	data/<versionedHome>/elastic-agent                             (stub binary)
+//	data/<versionedHome>/components/filebeat                       (stub, satisfies *beat glob)
+//	data/<versionedHome>/components/module/kafka/module.yml        (must be 0644 after build)
 func createFakeAgentTarball(t *testing.T, buildCtx, product, version, osArch, versionedHome string) {
 	t.Helper()
 
@@ -160,7 +170,7 @@ func createFakeAgentTarball(t *testing.T, buildCtx, product, version, osArch, ve
 	topLevel := product + "-" + version + "-" + osArch
 
 	type entry struct {
-		name  string // path relative to topLevel/
+		name  string
 		isDir bool
 		mode  int64
 		body  []byte
@@ -214,7 +224,169 @@ func createFakeAgentTarball(t *testing.T, buildCtx, product, version, osArch, ve
 	require.NoError(t, f.Close())
 }
 
+// dirTar creates an uncompressed tar archive of all files under dir, with
+// paths relative to dir (no leading path component). The result is suitable
+// for use as a Docker image build context.
+func dirTar(dir string) (io.Reader, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+
+		hdr := &tar.Header{
+			Name: filepath.ToSlash(rel),
+			Mode: int64(info.Mode()),
+		}
+		if d.IsDir() {
+			hdr.Typeflag = tar.TypeDir
+			hdr.Name += "/"
+			return tw.WriteHeader(hdr)
+		}
+
+		hdr.Typeflag = tar.TypeReg
+		hdr.Size = info.Size()
+		if err := tw.WriteHeader(hdr); err != nil {
+			return err
+		}
+
+		//nolint:gosec // path comes from WalkDir over a temp directory we own; no TOCTOU risk
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		_, err = io.Copy(tw, f)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	return &buf, nil
+}
+
+// buildOutputMsg is the subset of Docker's streaming build JSON we care about.
+type buildOutputMsg struct {
+	Stream string `json:"stream"`
+	Error  string `json:"error"`
+}
+
+// consumeBuildOutput drains the streaming JSON from an image build response
+// body, returning a non-nil error if Docker reported a build failure.
+func consumeBuildOutput(r io.Reader) error {
+	dec := json.NewDecoder(r)
+	for {
+		var msg buildOutputMsg
+		if err := dec.Decode(&msg); errors.Is(err, io.EOF) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if msg.Error != "" {
+			return fmt.Errorf("%s", strings.TrimRight(msg.Error, "\n"))
+		}
+	}
+}
+
+// runContainerOneShot creates a container from image, runs entrypoint with cmd,
+// waits for it to exit, returns its stdout, then removes the container.
+func runContainerOneShot(ctx context.Context, cli *dockerclient.Client, image, entrypoint string, cmd []string) ([]byte, error) {
+	created, err := cli.ContainerCreate(ctx, dockerclient.ContainerCreateOptions{
+		Config: &container.Config{
+			Image:      image,
+			Entrypoint: []string{entrypoint},
+			Cmd:        cmd,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ContainerCreate: %w", err)
+	}
+
+	waitResult := cli.ContainerWait(ctx, created.ID, dockerclient.ContainerWaitOptions{
+		Condition: container.WaitConditionNotRunning,
+	})
+
+	if _, err := cli.ContainerStart(ctx, created.ID, dockerclient.ContainerStartOptions{}); err != nil {
+		return nil, fmt.Errorf("ContainerStart: %w", err)
+	}
+
+	select {
+	case res := <-waitResult.Result:
+		if res.Error != nil {
+			return nil, fmt.Errorf("container exited with error: %s", res.Error.Message)
+		}
+		if res.StatusCode != 0 {
+			return nil, fmt.Errorf("container exited with status %d", res.StatusCode)
+		}
+	case err := <-waitResult.Error:
+		return nil, fmt.Errorf("ContainerWait: %w", err)
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	defer func() {
+		_, _ = cli.ContainerRemove(context.Background(), created.ID,
+			dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	}()
+
+	logs, err := cli.ContainerLogs(ctx, created.ID, dockerclient.ContainerLogsOptions{
+		ShowStdout: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ContainerLogs: %w", err)
+	}
+	defer logs.Close()
+
+	return readDockerStdout(logs)
+}
+
+// readDockerStdout demultiplexes a Docker log stream (8-byte frame header
+// followed by payload) and returns only the stdout frames.
+// Frame header: [stream_type(1), padding(3), payload_size(4 big-endian)].
+// stream_type 1 = stdout, 2 = stderr.
+func readDockerStdout(r io.Reader) ([]byte, error) {
+	var out bytes.Buffer
+	hdr := make([]byte, 8)
+	for {
+		if _, err := io.ReadFull(r, hdr); errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			break
+		} else if err != nil {
+			return nil, err
+		}
+		size := int64(binary.BigEndian.Uint32(hdr[4:]))
+		if hdr[0] == 1 { // stdout
+			if _, err := io.CopyN(&out, r, size); err != nil {
+				return nil, err
+			}
+		} else {
+			if _, err := io.CopyN(io.Discard, r, size); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return out.Bytes(), nil
+}
+
 func writeFile(t *testing.T, path string, content []byte, mode os.FileMode) {
 	t.Helper()
 	require.NoError(t, os.WriteFile(path, content, mode))
 }
+
+func strPtr(s string) *string { return &s }
