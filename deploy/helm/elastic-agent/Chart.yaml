@@ -7,6 +7,6 @@ appVersion: 9.6.0
 version: 9.6.0-SNAPSHOT
 dependencies:
   - name: kube-state-metrics
-    version: "6.1.0"
+    version: "8.4.1"
     repository: https://prometheus-community.github.io/helm-charts
     condition: kube-state-metrics.enabled

@@ -5,13 +5,13 @@ kind: ServiceAccount
 automountServiceAccountToken: true
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-6.1.0
+    helm.sh/chart: kube-state-metrics-8.4.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.16.0"
+    app.kubernetes.io/version: "2.20.0"
   name: kube-state-metrics
   namespace: default
 ---
@@ -464,13 +464,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-6.1.0
+    helm.sh/chart: kube-state-metrics-8.4.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.16.0"
+    app.kubernetes.io/version: "2.20.0"
   name: kube-state-metrics
 rules:
 
@@ -499,9 +499,9 @@ rules:
   - deployments
   verbs: ["list", "watch"]
 
-- apiGroups: [""]
+- apiGroups: ["discovery.k8s.io"]
   resources:
-  - endpoints
+  - endpointslices
   verbs: ["list", "watch"]
 
 - apiGroups: ["autoscaling"]
@@ -783,13 +783,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   labels:    
-    helm.sh/chart: kube-state-metrics-6.1.0
+    helm.sh/chart: kube-state-metrics-8.4.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.16.0"
+    app.kubernetes.io/version: "2.20.0"
   name: kube-state-metrics
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -849,23 +849,22 @@ metadata:
   name: kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-6.1.0
+    helm.sh/chart: kube-state-metrics-8.4.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.16.0"
+    app.kubernetes.io/version: "2.20.0"
   annotations:
     prometheus.io/scrape: 'true'
 spec:
   type: "ClusterIP"
   ports:
-  - name: "http"
+  - name: http
     protocol: TCP
     port: 8080
-    targetPort: 8080
-  
+    targetPort: http
   selector:    
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
@@ -877,13 +876,13 @@ metadata:
   name: kube-state-metrics
   namespace: default
   labels:    
-    helm.sh/chart: kube-state-metrics-6.1.0
+    helm.sh/chart: kube-state-metrics-8.4.1
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: metrics
     app.kubernetes.io/part-of: kube-state-metrics
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: "2.16.0"
+    app.kubernetes.io/version: "2.20.0"
 spec:
   selector:
     matchLabels:      
@@ -896,13 +895,13 @@ spec:
   template:
     metadata:
       labels:        
-        helm.sh/chart: kube-state-metrics-6.1.0
+        helm.sh/chart: kube-state-metrics-8.4.1
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: metrics
         app.kubernetes.io/part-of: kube-state-metrics
         app.kubernetes.io/name: kube-state-metrics
         app.kubernetes.io/instance: example
-        app.kubernetes.io/version: "2.16.0"
+        app.kubernetes.io/version: "2.20.0"
     spec:
       automountServiceAccountToken: true
       hostNetwork: false
@@ -919,18 +918,19 @@ spec:
       - name: kube-state-metrics
         args:
         - --port=8080
-        - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpoints,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
+        - --resources=certificatesigningrequests,configmaps,cronjobs,daemonsets,deployments,endpointslices,horizontalpodautoscalers,ingresses,jobs,leases,limitranges,mutatingwebhookconfigurations,namespaces,networkpolicies,nodes,persistentvolumeclaims,persistentvolumes,poddisruptionbudgets,pods,replicasets,replicationcontrollers,resourcequotas,secrets,services,statefulsets,storageclasses,validatingwebhookconfigurations,volumeattachments
         imagePullPolicy: IfNotPresent
-        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.16.0
+        image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0
         ports:
         - containerPort: 8080
-          name: "http"
+          name: http
+        - containerPort: 8081
+          name: metrics
         livenessProbe:
           failureThreshold: 3
           httpGet:
-            httpHeaders:
             path: /livez
-            port: 8080
+            port: http
             scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
@@ -939,9 +939,8 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            httpHeaders:
             path: /readyz
-            port: 8081
+            port: metrics
             scheme: HTTP
           initialDelaySeconds: 5
           periodSeconds: 10
