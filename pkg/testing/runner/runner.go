@@ -443,7 +443,7 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return common.OSRunnerResult{}, fmt.Errorf("failed to determine SSH private key path: %w", err)
 	}
 
-	sshPort := "22"
+	sshPort := ""
 	if instance.SSHPort != 0 {
 		sshPort = strconv.Itoa(instance.SSHPort)
 	}
