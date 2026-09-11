@@ -36,6 +36,7 @@ steps:
 
   - label: "check-ci"
     key: "check-ci"
+    skip: 'fast'
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
       provider: "gcp"
@@ -46,6 +47,7 @@ steps:
 
   - group: "Unit tests"
     key: "unit-tests"
+    skip: 'fast'
     steps:
       - label: "Unit tests - Ubuntu 22.04"
         key: "unit-tests-2204"
@@ -346,6 +348,7 @@ steps:
           - *google_oidc_plugin
 
   - label: ":junit: Junit annotate"
+    skip: 'fast'
     agents:
       # requires at least "bash", "curl" and "git"
       image: "docker.elastic.co/ci-agent-images/buildkite-junit-annotate:1.0"
@@ -463,6 +466,7 @@ steps:
 
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
+    skip: 'fast'
     if: build.pull_request.id == null && build.source != "schedule"
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
     plugins:
@@ -565,6 +569,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/pull/11725
   - label: "DRY RUN publish to serverless"
+    skip: 'fast'
     if: build.pull_request.id != null && build.env("BUILDKITE_PULL_REQUEST_BASE_BRANCH") == "main"
     if_changed:
       include:
