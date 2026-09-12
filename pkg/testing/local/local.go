@@ -35,6 +35,12 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeLocal
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
+}
+
+func (p *provisioner) SupportsLocalStack() bool { return true }
+
 func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
