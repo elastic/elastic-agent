@@ -119,7 +119,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
-	err = os.MkdirAll(testLogsBasePath, 0o755)
+	err = os.MkdirAll(testLogsBasePath, 0o755) //nolint:gosec // path comes from a trusted test env var (K8S_TESTS_POD_LOGS_BASE)
 	require.NoError(t, err, "failed to create test logs directory")
 
 	esHost, err := integration.GetESHost()
@@ -585,7 +585,7 @@ type GetAgentResponse struct {
 // kibanaGetAgent essentially re-implements kibana.GetAgent to extract also GetAgentResponse.EnrolledAt
 func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgentResponse, error) {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s", id)
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
+	r, err := kc.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error calling get agent API: %w", err)
 	}
