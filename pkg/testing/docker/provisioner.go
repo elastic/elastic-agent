@@ -93,6 +93,12 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeVM
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
+}
+
+func (p *provisioner) SupportsLocalStack() bool { return true }
+
 // Supported returns true if the docker provisioner supports this OS.
 //
 // Only Ubuntu on the same architecture as the host is supported: the container
