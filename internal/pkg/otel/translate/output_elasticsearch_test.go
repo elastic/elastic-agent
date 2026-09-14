@@ -378,8 +378,6 @@ compression_params:
 include_source_on_error: true
 logs_dynamic_id:
   enabled: true
-logs_dynamic_pipeline:
-  enabled: true
 `
 
 		tests := []struct {
@@ -476,8 +474,6 @@ compression_params:
   level: 1
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
  `,
 			},
@@ -746,8 +742,6 @@ compression: none
 {{ end }}
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
 `
 
