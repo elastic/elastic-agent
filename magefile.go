@@ -3189,7 +3189,11 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = multipass.NewProvisioner()
 		identifier = localIdentifier()
 	case kind.Name:
-		instanceProvisioner = kind.NewProvisioner()
+		var err error
+		instanceProvisioner, err = kind.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()
@@ -3201,6 +3205,7 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
+<<<<<<< HEAD
 	provisionCfg := ess.ProvisionerConfig{
 		Identifier: identifier,
 		APIKey:     essToken,
@@ -3213,6 +3218,15 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	case "", ess.ProvisionerStateful:
 		stackProvisionerMode = ess.ProvisionerStateful
 		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
+=======
+	// The local stack provisioner runs elastic-package locally and the external one
+	// reads an already running stack from the environment, so neither needs ESS
+	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
+	var provisionCfg ess.ProvisionerConfig
+	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
+	if stackProvisionerMode != ess.ProvisionerLocal && stackProvisionerMode != ess.ProvisionerExternal {
+		provisionCfg, err = essProvisionerConfig(cfg, identifier)
+>>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
 		if err != nil {
 			return nil, err
 		}
@@ -3300,6 +3314,64 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	return r, nil
 }
 
+<<<<<<< HEAD
+=======
+// essProvisionerConfig builds the ESS provisioner configuration (API key + region)
+// used by both the stateful and serverless stack provisioners.
+func essProvisionerConfig(cfg *devtools.Settings, identifier string) (ess.ProvisionerConfig, error) {
+	essToken, ok, err := ess.GetESSAPIKey()
+	if err != nil {
+		return ess.ProvisionerConfig{}, err
+	}
+	if !ok {
+		return ess.ProvisionerConfig{}, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+	}
+
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
+	essRegion := cfg.IntegrationTest.ESSRegion
+	if essRegion == "" {
+		essRegion = "gcp-us-west2"
+	}
+
+	return ess.ProvisionerConfig{
+		Identifier: identifier,
+		APIKey:     essToken,
+		Region:     essRegion,
+	}, nil
+}
+
+// newStackProvisioner creates the stack provisioner selected by STACK_PROVISIONER
+// (defaulting to stateful), returning the provisioner and its resolved mode.
+func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerConfig) (tcommon.StackProvisioner, string, error) {
+	mode := cfg.IntegrationTest.StackProvisioner
+	switch mode {
+	case "", ess.ProvisionerStateful:
+		mode = ess.ProvisionerStateful
+		sp, err := ess.NewProvisioner(provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerServerless:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerExternal:
+		sp, err := ess.NewExternalProvisioner()
+		return sp, mode, err
+	case ess.ProvisionerLocal:
+		sp, err := ess.NewLocalProvisioner()
+		return sp, mode, err
+	default:
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q, %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			ess.ProvisionerExternal,
+			ess.ProvisionerLocal,
+			mode)
+	}
+}
+
+>>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
 func shouldBuildAgent(cfg *devtools.Settings) bool {
 	return cfg.IntegrationTest.BuildAgent
 }
