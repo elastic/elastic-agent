@@ -109,6 +109,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 				LogLevel:     i.GetLogLevelRuntime(),
 				Unprivileged: i.unprivileged,
 				FIPS:         release.FIPSDistribution(),
+				Variant:      release.Variant(),
 			},
 		},
 		Host: &ecsmeta.HostECSMeta{

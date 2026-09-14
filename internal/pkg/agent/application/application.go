@@ -32,7 +32,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
-	"github.com/elastic/elastic-agent/internal/pkg/composable/providers/kubernetes"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
@@ -174,7 +173,7 @@ func New(
 				return nil, nil, nil, fmt.Errorf("failed to transform agent configuration into a map: %w", err)
 			}
 			discover := config.Discoverer(pathConfigFile, cfg.Settings.Path, paths.ExternalInputs(),
-				kubernetes.GetHintsInputConfigPath(log, rawCfgMap))
+				hintsInputConfigPath(log, rawCfgMap))
 			if !cfg.Settings.Reload.Enabled {
 				log.Debug("Reloading of configuration is off")
 				configMgr = newOnce(log, discover, loader)
