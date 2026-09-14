@@ -18,6 +18,15 @@ const (
 	ProvisionerTypeLocal
 )
 
+// ProvisionerLocation describes whether a provisioner's resources run in the
+// local development environment or in remote infrastructure.
+type ProvisionerLocation uint32
+
+const (
+	ProvisionerLocationRemote ProvisionerLocation = iota
+	ProvisionerLocationLocal
+)
+
 // Instance represents a provisioned instance.
 type Instance struct {
 	// Provider is the instance provider for the instance.
@@ -57,6 +66,9 @@ type InstanceProvisioner interface {
 	// Type returns the type of the provisioner.
 	Type() ProvisionerType
 
+	// Location returns whether the provisioned instances run locally or remotely.
+	Location() ProvisionerLocation
+
 	// SetLogger sets the logger for it to use.
 	SetLogger(l Logger)
 
@@ -70,4 +82,27 @@ type InstanceProvisioner interface {
 
 	// Clean cleans up all provisioned resources.
 	Clean(ctx context.Context, cfg Config, instances []Instance) error
+}
+
+// InstanceNetworkAttacher is an optional interface an InstanceProvisioner may
+// implement to attach a provisioned instance to an additional, externally-managed
+// network so it can reach a stack that lives on that network.
+//
+// It is used by the local stack provisioner together with the docker instance
+// provisioner: the local stack runs as a set of containers on its own compose
+// network, and the test container must join that network to resolve the stack's
+// services by name (so TLS hostnames match). The runner calls this when the stack
+// advertises a network and the instance provisioner implements this interface;
+// otherwise it is a no-op.
+type InstanceNetworkAttacher interface {
+	// AttachInstanceToNetwork attaches the given instance to the named network.
+	// It must be idempotent (attaching an already-attached instance is not an error).
+	AttachInstanceToNetwork(ctx context.Context, instance Instance, network string) error
+}
+
+// LocalStackCompatible is implemented by local instance provisioners that can
+// reach a local stack. Locality alone is not sufficient: for example, a VM or a
+// Kubernetes cluster running locally still needs an explicit networking bridge.
+type LocalStackCompatible interface {
+	SupportsLocalStack() bool
 }
