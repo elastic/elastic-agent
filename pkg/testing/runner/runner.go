@@ -24,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	tssh "github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"github.com/elastic/elastic-agent/pkg/testing/supported"
@@ -901,6 +902,11 @@ func (r *Runner) findStack(id string) *common.Stack {
 }
 
 func (r *Runner) addOrUpdateStack(stack common.Stack) error {
+	// do not update state for an external stack
+	if stack.Provisioner == ess.ProvisionerExternal {
+		return nil
+	}
+
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 
