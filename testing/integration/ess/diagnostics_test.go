@@ -363,6 +363,49 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsAgentTags(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+	})
+
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent)
+	require.NoError(t, err)
+
+	err = f.Run(ctx, integrationtest.State{
+		Configure:  simpleConfigWithTags,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: componentSetup,
+		After: func(ctx context.Context) error {
+			diagZip, err := f.ExecDiagnostics(ctx, "diagnostics", "collect")
+			require.NoError(t, err)
+
+			extractionDir := t.TempDir()
+			extractZipArchive(t, diagZip, extractionDir)
+
+			agentInfoPath := filepath.Join(extractionDir, "agent-info.yaml")
+			agentInfoFile, err := os.Open(agentInfoPath)
+			require.NoErrorf(t, err, "open file %q failed", agentInfoPath)
+			defer agentInfoFile.Close()
+
+			var agentInfo map[string]any
+			err = yaml.NewDecoder(agentInfoFile).Decode(&agentInfo)
+			require.NoErrorf(t, err, "decode file %q failed", agentInfoPath)
+
+			assert.Equal(t, []any{"tag1", "tag2"}, agentInfo["tags"],
+				"agent-info.yaml should report the tags set with agent.tags")
+
+			return nil
+		},
+	})
+	assert.NoError(t, err)
+}
+
 func TestBeatDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,

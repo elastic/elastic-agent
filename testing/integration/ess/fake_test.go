@@ -41,6 +41,21 @@ inputs:
     message: Healthy
 `
 
+var simpleConfigWithTags = `
+agent:
+  tags: ["tag1", "tag2"]
+  monitoring.enabled: false
+  grpc.port: 0
+outputs:
+  default:
+    type: fake-output
+inputs:
+  - id: fake
+    type: fake
+    state: 2
+    message: Healthy
+`
+
 var simpleIsolatedUnitsConfig = `
 outputs:
   default:

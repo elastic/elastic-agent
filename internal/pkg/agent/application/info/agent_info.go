@@ -7,6 +7,9 @@ package info
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
+	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -36,6 +39,12 @@ type Agent interface {
 	// SetLogLevelOverride updates the per-agent log level override and
 	// persists it to the on-disk agent config.
 	SetLogLevelOverride(ctx context.Context, level string) error
+
+	// GetTags returns the tags that identify this agent.
+	GetTags() []string
+
+	// SetTags updates the agent tags.
+	SetTags(tags []string)
 
 	// ReloadID reloads agent info ID from configuration file.
 	ReloadID(ctx context.Context) error
@@ -67,6 +76,9 @@ type AgentInfo struct {
 	// esHeaders will be injected into the headers field of any elasticsearch
 	// output created by this agent (see component.toIntermediate).
 	esHeaders map[string]string
+
+	tagsMu sync.RWMutex
+	tags   []string
 }
 
 // for unit testing
@@ -102,6 +114,7 @@ func NewAgentInfoWithLog(ctx context.Context, level string, createAgentID bool) 
 		logLevelOverride: agentInfo.LogLevelOverride,
 		unprivileged:     !isRoot,
 		esHeaders:        agentInfo.Headers,
+		tags:             agentInfo.Tags,
 		isStandalone:     isStandalone,
 	}, nil
 }
@@ -151,6 +164,22 @@ func (i *AgentInfo) SetLogLevelOverride(ctx context.Context, level string) error
 	return nil
 }
 
+// GetTags returns the tags that identify this agent.
+func (i *AgentInfo) GetTags() []string {
+	i.tagsMu.RLock()
+	defer i.tagsMu.RUnlock()
+
+	return slices.Clone(i.tags)
+}
+
+// SetTags updates the agent tags, trimming spaces and removing duplicates.
+func (i *AgentInfo) SetTags(tags []string) {
+	normalized := NormalizeTags(tags)
+	i.tagsMu.Lock()
+	defer i.tagsMu.Unlock()
+	i.tags = normalized
+}
+
 // ReloadID reloads agent info ID from configuration file.
 func (i *AgentInfo) ReloadID(ctx context.Context) error {
 	newInfo, err := NewAgentInfoWithLog(ctx, i.logLevelPolicy, false)
@@ -189,4 +218,26 @@ func (i *AgentInfo) Unprivileged() bool {
 // IsStandalone returns true when the agent is running in standalone mode.
 func (i *AgentInfo) IsStandalone() bool {
 	return i.isStandalone
+}
+
+// NormalizeTags trims each tag, drops empty ones and removes duplicates.
+func NormalizeTags(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(tags))
+	result := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		result = append(result, tag)
+	}
+	return result
 }

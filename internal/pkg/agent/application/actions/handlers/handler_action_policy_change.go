@@ -10,6 +10,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 
 	"gopkg.in/yaml.v2"
@@ -266,7 +267,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("failed to parse policy configuration: %w", err)
 	}
 
-	// Step 3: Set the policy log level, the runtime step below reads it back.
+	// Step 3: Read policy values and apply them to the agent info.
 	policyLogLevel := logger.DefaultLogLevel.String()
 	if loggingConfig != nil {
 		policyLogLevel = loggingConfig.Level.String()
@@ -351,6 +352,7 @@ type configPatch struct {
 	fleetClient     remote.Config
 	monitoringHTTP  *monitoringCfg.MonitoringHTTPConfig
 	monitoringPprof *monitoringCfg.PprofConfig
+	tags            []string
 }
 
 // buildConfigPatch computes the pending config values from the incoming policy.
@@ -367,6 +369,7 @@ func (h *PolicyChangeHandler) buildConfigPatch(
 		fleetClient:     h.config.Fleet.Client,
 		monitoringHTTP:  h.config.Settings.MonitoringConfig.HTTP,
 		monitoringPprof: h.config.Settings.MonitoringConfig.Pprof,
+		tags:            h.config.Settings.Tags,
 	}
 	needsReExec := false
 
@@ -404,6 +407,11 @@ func (h *PolicyChangeHandler) buildConfigPatch(
 		patch.logging.Level = loggingConfig.Level
 	}
 
+	// Tags changes.
+	if cfg != nil && cfg.Settings != nil {
+		patch.tags = info.NormalizeTags(cfg.Settings.Tags)
+	}
+
 	// Fleet client.
 	if validatedFleetConfig != nil {
 		patch.fleetClient = *validatedFleetConfig
@@ -438,6 +446,8 @@ func (h *PolicyChangeHandler) configWithPatch(patch configPatch) *configuration.
 	loggingCopy := patch.logging
 	settingsCopy.LoggingConfig = &loggingCopy
 
+	settingsCopy.Tags = slices.Clone(patch.tags)
+
 	// Fleet is a shared pointer after the shallow copy; isolate before modifying Client.
 	fleetCopy := *h.config.Fleet
 	cfgCopy.Fleet = &fleetCopy
@@ -459,6 +469,7 @@ func (h *PolicyChangeHandler) commitConfig(patch configPatch) {
 	h.config.Fleet.Client = patch.fleetClient
 	h.config.Settings.MonitoringConfig.HTTP = patch.monitoringHTTP
 	h.config.Settings.MonitoringConfig.Pprof = patch.monitoringPprof
+	h.config.Settings.Tags = patch.tags
 }
 
 func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
@@ -566,6 +577,7 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 	agentConfig := map[string]interface{}{
 		"id":                           agentID,
 		"headers":                      headers,
+		"tags":                         cfg.Settings.Tags,
 		"logging.level":                cfg.Settings.LoggingConfig.Level,
 		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
 		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
