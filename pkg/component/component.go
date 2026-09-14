@@ -540,8 +540,6 @@ func (r *RuntimeSpecs) componentsForInputType(
 	// Treat as non isolated units component on error of reading the input spec
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
 		componentID := fmt.Sprintf("%s-%s", inputType, output.Name)
-<<<<<<< HEAD
-=======
 		if inputSpec.Spec.Service != nil {
 			componentID = inputType
 		}
@@ -549,7 +547,6 @@ func (r *RuntimeSpecs) componentsForInputType(
 		if componentErr == nil {
 			componentErr = validateComponentID(paths.Run(), componentID)
 		}
->>>>>>> 3457c42 (validate component working directory path to prevent path traversal (#16489))
 		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 			// This output is unsupported.
 			componentErr = ErrOutputNotSupported
@@ -596,8 +593,6 @@ func (r *RuntimeSpecs) componentsForInputType(
 		for _, input := range output.Inputs[inputType] {
 			// Units are being mapped to components, so we need a unique ID for each.
 			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.Name, input.id)
-<<<<<<< HEAD
-=======
 			if inputSpec.Spec.Service != nil {
 				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
 			}
@@ -606,7 +601,6 @@ func (r *RuntimeSpecs) componentsForInputType(
 			if err := validateComponentID(paths.Run(), componentID); err != nil {
 				componentErr = err
 			}
->>>>>>> 3457c42 (validate component working directory path to prevent path traversal (#16489))
 			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
