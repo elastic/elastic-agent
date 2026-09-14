@@ -3751,12 +3751,20 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	return nil
 }
 
+const windowsNpcapCrossBuildImageVersion = "1.88"
+
+func npcapCrossBuildImageTag() string {
+	version := xpacketbeat.NpcapVersion
+	if version != windowsNpcapCrossBuildImageVersion {
+		version = windowsNpcapCrossBuildImageVersion
+	}
+	return "npcap-" + version + "-debian11"
+}
+
 // npcapImageSelector is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
 // xpacketbeat.ImageSelector cannot be used directly because it will use its own devtools that comes from the beats
 // repository and will duplicate global state that is not correct for the elastic-agent.
 func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
-	const windowsNpcapCrossBuildVersion = "1.88"
-
 	return func(cfg *devtools.Settings, platform string) (string, error) {
 		image, err := devtools.CrossBuildImage(cfg, platform)
 		if err != nil {
@@ -3767,7 +3775,7 @@ func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
 		}
 		if platform == "windows/amd64" {
 			image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
-			image = strings.ReplaceAll(image, "main", "npcap-"+windowsNpcapCrossBuildVersion+"-debian11")
+			image = strings.ReplaceAll(image, "main", npcapCrossBuildImageTag())
 		}
 		return image, nil
 	}
