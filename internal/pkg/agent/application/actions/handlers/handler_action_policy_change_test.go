@@ -42,6 +42,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -1207,6 +1208,55 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 	}
 }
 
+func TestPolicyChangeHandler_handlePolicyChange_TagsAreAppliedAndPersisted(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	mockLogSetter := newMockLogLevelSetter(t)
+	mockLogSetter.EXPECT().SetLogLevel(mock.Anything, mock.Anything).Return(nil).Once()
+
+	mockAgent := info.NewMockAgent(t)
+	mockAgent.EXPECT().SetLogLevelPolicy(mock.Anything).Return().Once()
+	mockAgent.EXPECT().GetLogLevelRuntime().Return("info").Once()
+	mockAgent.EXPECT().AgentID().Return("agent-id").Once()
+	mockAgent.EXPECT().Headers().Return(nil).Once()
+	mockAgent.EXPECT().GetLogLevelOverride().Return("").Once()
+
+	capture := &captureStore{}
+	h := &PolicyChangeHandler{
+		log:                   log,
+		agentInfo:             mockAgent,
+		config:                configuration.DefaultConfiguration(),
+		store:                 capture,
+		runtimeLogLevelSetter: mockLogSetter,
+	}
+
+	cfg := config.MustNewConfigFrom(map[string]interface{}{
+		// tag1 should be deduplicated since it appears twice and has leading/trailing spaces.
+		"agent.tags": []string{"tag1", "tag2", " tag1 "},
+		"agent.features.include_tags_in_events.enabled": true,
+	})
+	err := h.handlePolicyChange(context.Background(), cfg, nil)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(capture.saved, &got))
+	agentSection, ok := got["agent"].(map[any]any)
+	require.True(t, ok, "saved yaml must contain agent section")
+
+	tags, ok := agentSection["tags"].([]interface{})
+	require.True(t, ok, "agent.tags should be persisted to fleet.enc")
+	require.Len(t, tags, 2)
+	assert.Equal(t, "tag1", tags[0])
+	assert.Equal(t, "tag2", tags[1])
+
+	c, err := cfg.ToMapStr()
+	require.NoError(t, err)
+	flags, err := features.Parse(c)
+	require.NoError(t, err)
+	assert.True(t, flags.IncludeTagsInEvents(), "feature flag include_tags_in_events should be enabled")
+}
+
 func TestPolicyChangeHandler_handlePolicyChange_MonitoringHTTPHostPreserved(t *testing.T) {
 	// Regression test for https://github.com/elastic/elastic-agent/issues/4582-style breakage:
 	// a locally-configured agent.monitoring.http.host (e.g. 0.0.0.0 for Kubernetes probes) must
@@ -1618,6 +1668,7 @@ func configPatchFrom(cfg *configuration.Configuration) configPatch {
 		fleetClient:     cfg.Fleet.Client,
 		monitoringHTTP:  cfg.Settings.MonitoringConfig.HTTP,
 		monitoringPprof: cfg.Settings.MonitoringConfig.Pprof,
+		tags:            cfg.Settings.Tags,
 	}
 }
 
@@ -1746,7 +1797,7 @@ func TestPolicyChangeSaveConfigFail(t *testing.T) {
 func TestConfigPatchCompleteness(t *testing.T) {
 	// Field count guard: update this number when adding fields to configPatch,
 	// and update configPatchFrom, configWithPatch, and commitConfig to match.
-	assert.Equal(t, 5, reflect.TypeOf(configPatch{}).NumField(),
+	assert.Equal(t, 6, reflect.TypeOf(configPatch{}).NumField(),
 		"configPatch has new fields — update configPatchFrom, configWithPatch, and commitConfig")
 
 	cfg := configuration.DefaultConfiguration()
@@ -1762,6 +1813,7 @@ func TestConfigPatchCompleteness(t *testing.T) {
 		fleetClient:     remote.Config{Host: "https://fleet.example.com"},
 		monitoringHTTP:  altHTTP,
 		monitoringPprof: altPprof,
+		tags:            []string{"tag1", "tag2"},
 	}
 	// configWithPatch: every patch field must appear in the returned config.
 	// Non-mutation of h.config is verified by TestConfigWithPatchDoesNotMutateConfig.
