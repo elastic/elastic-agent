@@ -4,13 +4,16 @@
 
 package testing
 
-// TestIronbankDockerfilePermissions builds the Ironbank Dockerfile template
-// using a publicly accessible UBI base image in place of the Ironbank registry
-// (which requires privileged repository access) and verifies that .yml files
-// inside components/ are restored to 0644 permissions after the broad 0666
-// chmod applied earlier in the RUN layer.
+// TestIronbankDockerfilePermissions builds the Ironbank Dockerfile using a
+// publicly accessible UBI base image in place of the restricted Ironbank
+// registry and verifies that .yml files inside components/ are restored to
+// 0644 permissions after the broad 0666 chmod applied earlier in the RUN layer.
 //
-// Run with:
+// The test uses pre-built artifacts from build/distributions/:
+//   - the ironbank docker build context tarball (*-ironbank-*-docker-build-context.tar.gz)
+//   - the linux x86_64 agent tarball (elastic-agent-*-linux-x86_64.tar.gz)
+//
+// Run after 'mage Package Ironbank':
 //
 //	go test -v -run TestIronbankDockerfilePermissions ./dev-tools/packaging/testing/
 
@@ -28,6 +31,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -54,26 +58,38 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 		t.Skipf("docker daemon not accessible: %v", err)
 	}
 
-	const (
-		testVersion = "0.0.1-test"
-		testOSArch  = "linux-x86_64"
-		testProduct = "elastic-agent"
-	)
+	distDir := filepath.Join(*sourceRoot, "../build/distributions")
 
-	versionedHome := testProduct + "-" + testVersion
+	ironbankCtxFile := findFile(t, distDir, regexp.MustCompile(`-ironbank-.*-docker-build-context\.tar\.gz$`))
+	if ironbankCtxFile == "" {
+		t.Skip("no ironbank docker build context found in build/distributions; run 'mage Ironbank' first")
+	}
 
-	tmplPath := filepath.Join(*sourceRoot, "templates/ironbank/Dockerfile.tmpl")
-	baseTag := parseDockerfileArg(t, tmplPath, "BASE_TAG")
+	agentTarball := findFile(t, distDir, regexp.MustCompile(`^elastic-agent-[\d.].*-linux-x86_64\.tar\.gz$`))
+	if agentTarball == "" {
+		t.Skip("no elastic-agent linux-x86_64 tarball found in build/distributions; run 'mage Package' first")
+	}
+
+	// Parse version and OS/arch from the agent tarball filename.
+	// e.g. "elastic-agent-8.18.0-SNAPSHOT-linux-x86_64.tar.gz" → version="8.18.0-SNAPSHOT", osArch="linux-x86_64"
+	const osArch = "linux-x86_64"
+	base := strings.TrimSuffix(filepath.Base(agentTarball), ".tar.gz")
+	version := strings.TrimSuffix(strings.TrimPrefix(base, "elastic-agent-"), "-"+osArch)
 
 	buildCtx := t.TempDir()
 
-	renderIronbankDockerfile(t, tmplPath, buildCtx, testVersion)
-	createFakeAgentTarball(t, buildCtx, testProduct, testVersion, testOSArch, versionedHome)
+	// Extract the ironbank docker build context (Dockerfile, config/, LICENSE).
+	require.NoError(t, extractTarGz(ironbankCtxFile, buildCtx))
+
+	// The Dockerfile COPYs the agent tarball; it must be present in the build context.
+	dst := filepath.Join(buildCtx, "elastic-agent-"+version+"-"+osArch+".tar.gz")
+	require.NoError(t, copyFile(agentTarball, dst))
+
+	// tinit and jq are provided by the IronBank pipeline; add minimal stubs here.
 	writeFile(t, filepath.Join(buildCtx, "tinit"), []byte("#!/bin/sh\n"), 0o755)
 	writeFile(t, filepath.Join(buildCtx, "jq"), []byte("#!/bin/sh\n"), 0o755)
-	require.NoError(t, os.MkdirAll(filepath.Join(buildCtx, "config"), 0o755))
-	writeFile(t, filepath.Join(buildCtx, "config", "docker-entrypoint"), []byte("#!/bin/sh\nexec \"$@\"\n"), 0o755)
-	writeFile(t, filepath.Join(buildCtx, "LICENSE"), []byte("LICENSE\n"), 0o644)
+
+	baseTag := parseDockerfileArg(t, filepath.Join(buildCtx, "Dockerfile"), "BASE_TAG")
 
 	imageTag := "elastic-agent-ironbank-perms-test:latest"
 	t.Cleanup(func() {
@@ -90,8 +106,8 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 			"BASE_REGISTRY": strPtr(publicUBIRegistry),
 			"BASE_IMAGE":    strPtr(publicUBIImage),
 			"BASE_TAG":      strPtr(baseTag),
-			"ELASTIC_STACK": strPtr(testVersion),
-			"OS_AND_ARCH":   strPtr(testOSArch),
+			"ELASTIC_STACK": strPtr(version),
+			"OS_AND_ARCH":   strPtr(osArch),
 		},
 	})
 	require.NoError(t, err)
@@ -118,6 +134,105 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 	assert.NotEmptyf(t, ymlFiles, "no .yml files found under components in %s image", imageTag)
 }
 
+// findFile returns the path of the first file in dir matching pattern,
+// or empty string if none is found.
+func findFile(t *testing.T, dir string, pattern *regexp.Regexp) string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return ""
+	}
+	require.NoError(t, err)
+	for _, e := range entries {
+		if !e.IsDir() && pattern.MatchString(e.Name()) {
+			return filepath.Join(dir, e.Name())
+		}
+	}
+	return ""
+}
+
+// extractTarGz extracts a .tar.gz file into destDir.
+func extractTarGz(src, destDir string) error {
+	f, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gr.Close()
+
+	tr := tar.NewReader(gr)
+	for {
+		hdr, err := tr.Next()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		rel := filepath.Clean(strings.TrimPrefix(hdr.Name, "./"))
+		if rel == "." {
+			continue
+		}
+		dest := filepath.Join(destDir, rel)
+
+		//nolint:gosec // G115: hdr.Mode is a POSIX mode stored as int64; upper bits are always 0 in valid archives
+		mode := fs.FileMode(uint32(hdr.Mode))
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(dest, mode); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+				return err
+			}
+			out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+			if err != nil {
+				return err
+			}
+			//nolint:gosec // G110: src is our own build artifact, not user-supplied input
+			_, copyErr := io.Copy(out, tr)
+			closeErr := out.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+			if closeErr != nil {
+				return closeErr
+			}
+		}
+	}
+	return nil
+}
+
+// copyFile copies a file from src to dst, preserving mode bits.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+
 // parseDockerfileArg reads the default value of a Docker ARG from a Dockerfile
 // (or Dockerfile template), returning the value after the "=" sign.
 func parseDockerfileArg(t *testing.T, dockerfilePath, argName string) string {
@@ -134,97 +249,6 @@ func parseDockerfileArg(t *testing.T, dockerfilePath, argName string) string {
 	}
 	t.Fatalf("ARG %s not found in %s", argName, dockerfilePath)
 	return ""
-}
-
-// renderIronbankDockerfile reads the Ironbank Dockerfile.tmpl, substitutes the
-// single Go template variable {{ agent_package_version }} with version, and
-// writes the result as "Dockerfile" into buildCtx.
-func renderIronbankDockerfile(t *testing.T, tmplPath, buildCtx, version string) {
-	t.Helper()
-	content, err := os.ReadFile(tmplPath)
-	require.NoError(t, err, "reading Ironbank Dockerfile template")
-
-	rendered := strings.ReplaceAll(string(content), "{{ agent_package_version }}", version)
-
-	dest := filepath.Join(buildCtx, "Dockerfile")
-	//nolint:gosec // dest is filepath.Join of a t.TempDir() path — no traversal possible
-	require.NoError(t, os.WriteFile(dest, []byte(rendered), 0o644))
-}
-
-// createFakeAgentTarball creates a minimal elastic-agent tar.gz in buildCtx
-// that satisfies the COPY and chmod commands in the Ironbank Dockerfile.
-//
-// The tarball has one top-level directory (stripped by --strip-components=1)
-// and the following paths underneath it:
-//
-//	elastic-agent                                                  (stub binary)
-//	data/<versionedHome>/elastic-agent                             (stub binary)
-//	data/<versionedHome>/components/filebeat                       (stub, satisfies *beat glob)
-//	data/<versionedHome>/components/module/kafka/module.yml        (must be 0644 after build)
-func createFakeAgentTarball(t *testing.T, buildCtx, product, version, osArch, versionedHome string) {
-	t.Helper()
-
-	tarName := product + "-" + version + "-" + osArch + ".tar.gz"
-	tarPath := filepath.Join(buildCtx, tarName)
-
-	topLevel := product + "-" + version + "-" + osArch
-
-	type entry struct {
-		name  string
-		isDir bool
-		mode  int64
-		body  []byte
-	}
-
-	stubBin := []byte("#!/bin/sh\n")
-	entries := []entry{
-		{name: "", isDir: true, mode: 0o755},
-		{name: "data", isDir: true, mode: 0o755},
-		{name: "data/" + versionedHome, isDir: true, mode: 0o755},
-		{name: "data/" + versionedHome + "/components", isDir: true, mode: 0o755},
-		{name: "data/" + versionedHome + "/components/module", isDir: true, mode: 0o755},
-		{name: "data/" + versionedHome + "/components/module/kafka", isDir: true, mode: 0o755},
-		{name: product, mode: 0o755, body: stubBin},
-		// elastic-agent.yml must exist: the Dockerfile runs
-		// "chown root:root .../elastic-agent.yml && chmod go-w .../elastic-agent.yml"
-		{name: product + ".yml", mode: 0o644, body: []byte("# elastic-agent config\n")},
-		{name: "data/" + versionedHome + "/" + product, mode: 0o755, body: stubBin},
-		{name: "data/" + versionedHome + "/components/filebeat", mode: 0o755, body: stubBin},
-		{name: "data/" + versionedHome + "/components/module/kafka/module.yml", mode: 0o644, body: []byte("module: kafka\n")},
-	}
-
-	f, err := os.Create(tarPath)
-	require.NoError(t, err)
-
-	gz := gzip.NewWriter(f)
-	tw := tar.NewWriter(gz)
-
-	for _, e := range entries {
-		fullName := topLevel
-		if e.name != "" {
-			fullName += "/" + e.name
-		}
-		if e.isDir {
-			require.NoError(t, tw.WriteHeader(&tar.Header{
-				Typeflag: tar.TypeDir,
-				Name:     fullName + "/",
-				Mode:     e.mode,
-			}))
-		} else {
-			require.NoError(t, tw.WriteHeader(&tar.Header{
-				Typeflag: tar.TypeReg,
-				Name:     fullName,
-				Mode:     e.mode,
-				Size:     int64(len(e.body)),
-			}))
-			_, err = tw.Write(e.body)
-			require.NoError(t, err)
-		}
-	}
-
-	require.NoError(t, tw.Close())
-	require.NoError(t, gz.Close())
-	require.NoError(t, f.Close())
 }
 
 // dirTar creates an uncompressed tar archive of all files under dir, with
