@@ -2984,6 +2984,33 @@ func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
 	assert.Equal(t, "browser", monitors[0]["type"], "the emitted monitor must be the browser stream")
 }
 
+func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
+	unit := component.Unit{
+		ID:   "heartbeat-api-test-unit",
+		Type: client.UnitTypeInput,
+		Config: component.MustExpectedConfig(map[string]any{
+			"id":         "test",
+			"use_output": "default",
+			"type":       "synthetics/api",
+			"streams": []any{
+				map[string]any{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"schedule": "@every 5s",
+				},
+			},
+		}),
+	}
+	comp := &component.Component{InputType: "synthetics/api"}
+
+	inputs, err := getInputsForUnit(unit, &info.AgentInfo{}, "logs", comp)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+	assert.Equal(t, "api", inputs[0].config["type"])
+}
+
 // TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
 // auxiliary Synthetics browser sub-streams, including the malformed-config fallback.
 func TestKeepScheduledMonitors(t *testing.T) {
