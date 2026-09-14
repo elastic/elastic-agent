@@ -400,16 +400,7 @@ require (
 	k8s.io/klog/v2 v2.140.0 // indirect
 )
 
-<<<<<<< HEAD
-replace (
-	github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
-	// openshift removed all tags from their repo, use the pseudoversion from the release-3.9 branch HEAD
-	// See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/12d41f40b0d408b0167633d8095160d3343d46ac/go.mod#L38
-	github.com/openshift/api v3.9.0+incompatible => github.com/openshift/api v0.0.0-20180801171038-322a19404e37
-)
-=======
-replace github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
->>>>>>> adc13bd (feat(edot-collector): support the EDOT kube-stack Helm chart on OpenShift (#16524))
+replace github.com/dop251/goja_nodejs => github.com/dop251/goja_nodejs v0.0.0-20171011081505-adff31b136e6
 
 // Replace statements carried forward from Beats https://github.com/elastic/beats/blob/0678f4d96212ac968fc90596e60475ed2f3979e1/go.mod#L503
 replace (
