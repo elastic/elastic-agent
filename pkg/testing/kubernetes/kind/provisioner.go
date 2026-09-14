@@ -29,7 +29,8 @@ import (
 )
 
 const (
-	Name = "kind"
+	Name               = "kind"
+	kindCommandTimeout = 5 * time.Minute
 )
 
 const clusterCfg string = `
@@ -281,7 +282,7 @@ type cmdResult struct {
 func (p *provisioner) kindCmd(stdIn io.Reader, args ...string) (cmdResult, error) {
 
 	var stdout, stderr bytes.Buffer
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), kindCommandTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "kind", args...)
 	cmd.Stdout = &stdout
