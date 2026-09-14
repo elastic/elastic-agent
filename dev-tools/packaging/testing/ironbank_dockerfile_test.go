@@ -185,6 +185,9 @@ func createFakeAgentTarball(t *testing.T, buildCtx, product, version, osArch, ve
 		{name: "data/" + versionedHome + "/components/module", isDir: true, mode: 0o755},
 		{name: "data/" + versionedHome + "/components/module/kafka", isDir: true, mode: 0o755},
 		{name: product, mode: 0o755, body: stubBin},
+		// elastic-agent.yml must exist: the Dockerfile runs
+		// "chown root:root .../elastic-agent.yml && chmod go-w .../elastic-agent.yml"
+		{name: product + ".yml", mode: 0o644, body: []byte("# elastic-agent config\n")},
 		{name: "data/" + versionedHome + "/" + product, mode: 0o755, body: stubBin},
 		{name: "data/" + versionedHome + "/components/filebeat", mode: 0o755, body: stubBin},
 		{name: "data/" + versionedHome + "/components/module/kafka/module.yml", mode: 0o644, body: []byte("module: kafka\n")},
