@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	Name               = "kind"
+	Name = "kind"
 )
 
 // timeouts for the kind commands
