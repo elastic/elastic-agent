@@ -279,7 +279,7 @@ require (
 	github.com/prometheus/otlptranslator v1.0.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
-	github.com/rednafi/link-patrol v0.0.0-20260824155319-d15a9ccb03c5 // indirect
+	github.com/rednafi/link-patrol v0.0.0-20260907155300-f0a8d661d033 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/cors v1.11.1 // indirect
 	github.com/rubenv/sql-migrate v1.8.1 // indirect
@@ -294,7 +294,7 @@ require (
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/urfave/cli/v2 v2.27.7 // indirect
-	github.com/vektra/mockery/v3 v3.7.4 // indirect
+	github.com/vektra/mockery/v3 v3.8.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
@@ -305,7 +305,7 @@ require (
 	github.com/xlab/treeprint v1.2.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	github.com/yuin/goldmark v1.8.5 // indirect
+	github.com/yuin/goldmark v1.8.6 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.12 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
