@@ -121,16 +121,16 @@ type Upgrader struct {
 	availableRollbacksSource ttl.Source
 
 	// The following are abstractions for testability
-	artifactDownloader   artifactDownloadHandler
-	unpacker             unpackHandler
-	isDiskSpaceErrorFunc func(err error) bool
-	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
-	copyActionStore      copyActionStoreFunc
-	copyRunDirectory     copyRunDirectoryFunc
-	writeUpgradeMarker   writeUpgradeMarkerFunc
-	markUpgrade          markUpgradeFunc
-	changeSymlink        changeSymlinkFunc
-	rollbackInstall      rollbackInstallFunc
+	artifactDownloader       artifactDownloadHandler
+	unpacker                 unpackHandler
+	isDiskSpaceFullErrorFunc func(err error) bool
+	extractAgentVersion      func(metadata packageMetadata, upgradeVersion string) agentVersion
+	copyActionStore          copyActionStoreFunc
+	copyRunDirectory         copyRunDirectoryFunc
+	writeUpgradeMarker       writeUpgradeMarkerFunc
+	markUpgrade              markUpgradeFunc
+	changeSymlink            changeSymlinkFunc
+	rollbackInstall          rollbackInstallFunc
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -153,7 +153,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		availableRollbacksSource: ars,
 		artifactDownloader:       newArtifactDownloader(settings, log),
 		unpacker:                 newUnpacker(log),
-		isDiskSpaceErrorFunc:     upgradeErrors.IsDiskSpaceError,
+		isDiskSpaceFullErrorFunc: upgradeErrors.IsDiskSpaceFullError,
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
@@ -309,9 +309,10 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		if err != nil {
 			// Add the disk space error to the error chain if it is a disk space error
 			// so that we can use errors.Is to check for it
-			if u.isDiskSpaceErrorFunc(err) {
-				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			if u.isDiskSpaceFullErrorFunc(err) {
+				err = goerrors.Join(err, upgradeErrors.ErrDiskSpaceFull)
 			}
+
 			// If there is an error, we need to clean up downloads and any
 			// extracted agent files.
 			for _, path := range cleanupPaths {

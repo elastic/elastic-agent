@@ -1077,19 +1077,19 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	type upgraderMocker func(upgrader *Upgrader, archivePath string, versionedHome string)
 
 	type testCase struct {
-		isDiskSpaceErrorResult    bool
-		expectedError             error
-		upgraderMocker            upgraderMocker
-		upgradeOpts               []Option
-		checkArchiveCleanup       bool
-		checkVersionedHomeCleanup bool
-		setupMocks                func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper)
+		isDiskSpaceFullErrorResult bool
+		expectedError              error
+		upgraderMocker             upgraderMocker
+		upgradeOpts                []Option
+		checkArchiveCleanup        bool
+		checkVersionedHomeCleanup  bool
+		setupMocks                 func(t *testing.T, mockAgentInfo *info.MockAgent, mockRollbackSrc *ttl.MockSource, mockWatcherHelper *MockWatcherHelper)
 	}
 
 	testCases := map[string]testCase{
 		"should return error and cleanup downloaded archive if downloadArtifact fails after download is complete": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError:       testError,
@@ -1103,8 +1103,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error if getPackageMetadata fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1120,8 +1120,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1149,8 +1149,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1182,8 +1182,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1217,8 +1217,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
 				upgrader.artifactDownloader = &mockArtifactDownloader{
@@ -1256,8 +1256,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1300,8 +1300,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact if writeUpgradeMarker fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceFullErrorResult: false,
+			expectedError:              testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1331,8 +1331,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
-			isDiskSpaceErrorResult: true,
-			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
+			isDiskSpaceFullErrorResult: true,
+			expectedError:              upgradeErrors.ErrDiskSpaceFull,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError: testError,
@@ -1463,8 +1463,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			err = os.WriteFile(filepath.Join(baseDir, "versionedHome"), []byte("test"), 0o600)
 			require.NoError(t, err)
 
-			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
-				return tc.isDiskSpaceErrorResult
+			upgrader.isDiskSpaceFullErrorFunc = func(err error) bool {
+				return tc.isDiskSpaceFullErrorResult
 			}
 
 			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
