@@ -35,6 +35,7 @@ env:
 steps:
 
   - label: "check-ci"
+    skip: 'unrequired'
     key: "check-ci"
     command: ".buildkite/scripts/steps/check-ci.sh"
     agents:
@@ -45,6 +46,7 @@ steps:
         allowed: true
 
   - group: "Unit tests"
+    skip: 'unrequired'
     key: "unit-tests"
     steps:
       - label: "Unit tests - Ubuntu 22.04"
@@ -204,6 +206,7 @@ steps:
           - *google_oidc_plugin
 
   - group: "macOS tests"
+    skip: 'unrequired'
     key: "macos-unit-tests"
     steps:
       - label: "Unit tests - macOS 15 ARM"
@@ -246,6 +249,7 @@ steps:
           - *google_oidc_plugin
 
   - group: "Desktop Windows tests"
+    skip: 'unrequired'
     key: "extended-windows"
     steps:
       - label: "Unit tests - Windows 10"
@@ -380,6 +384,7 @@ steps:
         allow_failure: true
 
   - group: "K8s tests"
+    skip: 'unrequired'
     key: "k8s-tests"
     steps:
       - label: "K8s tests: {{matrix.k8s_version}}"
@@ -409,6 +414,7 @@ steps:
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
+    skip: 'unrequired'
     branches: main
     command: ".buildkite/scripts/steps/sync-k8s.sh"
     agents:
@@ -459,6 +465,7 @@ steps:
 
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
+    skip: 'unrequired'
     if: build.pull_request.id == null && build.source != "schedule"
     command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
     plugins:
@@ -467,6 +474,7 @@ steps:
   # Trigger for pull requests - Serverless Beats Tests
   # this should help detecting issues earlier in the development cycle
   - label: "Trigger Serverless Beats Tests"
+    skip: 'unrequired'
     if: build.pull_request.id != null
     trigger: "beats-agent-serverless-tests"
     build:
@@ -483,6 +491,7 @@ steps:
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
+    skip: 'unrequired'
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh

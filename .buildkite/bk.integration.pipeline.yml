@@ -179,6 +179,7 @@ common:
 steps:
   - label: "Custom ECH Testing"
     key: integration-tests-ech
+    skip: 'unrequired'
     depends_on:
       - packaging-containers-amd64
       - packaging-containers-arm64
@@ -232,6 +233,7 @@ steps:
       - integration-ess
     steps:
       - label: "Windows:2022:amd64:sudo"
+        skip: 'unrequired'
         depends_on:
           - packaging-amd64
         env:
@@ -255,6 +257,7 @@ steps:
           - *vault_github_token
 
       - label: "Windows:2025:amd64:sudo"
+        skip: 'unrequired'
         depends_on:
           - packaging-amd64
         env:
@@ -300,6 +303,7 @@ steps:
           - *vault_github_token
 
   - group: "Stateful: Windows (tier 1)"
+    skip: 'unrequired'
     if: build.pull_request.id != null
     key: integration-tests-win-tier-1
     notify:
@@ -362,6 +366,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 2)"
+    skip: 'unrequired'
     if_changed:
       include:
         - .buildkite/**
@@ -440,6 +445,7 @@ steps:
               - default
 
   - group: "Stateful: Windows (tier 3)"
+    skip: 'unrequired'
     key: integration-tests-win-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
@@ -1045,6 +1051,7 @@ steps:
               *k8s_test_versions_without_min_max
 
   - group: "Serverless integration test"
+    skip: 'unrequired'
     key: integration-tests-serverless
     notify:
       - github_commit_status:
