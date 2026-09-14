@@ -611,6 +611,7 @@ func TestLiveVersionedHome(t *testing.T) {
 	})
 }
 
+<<<<<<< HEAD
 // TestCleanup_AbortsWhenLiveHomeUnresolvable encodes the
 // refusal-to-proceed contract: when the symlink cannot be resolved, cleanup
 // must return an error and leave the on-disk state untouched rather than risk
@@ -629,6 +630,52 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 	})
 
 	t.Run("removeMarker=true: marker survives because resolve precedes CleanMarker", func(t *testing.T) {
+=======
+// TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable encodes the
+// graceful-degradation contract: when the symlink cannot be resolved but an
+// upgrade marker is present, cleanup must still proceed (sweeping directories
+// that the parsed TTL marks as removable) but flag the run as degraded via
+// errCleanupDegraded. The upgrade marker is preserved so that the next run can
+// revisit cleanup with full verification.
+//
+// When the symlink is absent AND there is no upgrade marker (a fresh volume),
+// no degraded error is returned — that is the expected state at first start.
+func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
+	t.Run("no marker: not degraded, expired TTL swept, orphan swept", func(t *testing.T) {
+		testLogger, _ := loggertest.New(t.Name())
+		topDir := t.TempDir()
+
+		// Two installs, no symlink, no upgrade marker — models a fresh EFS volume
+		// that has prior versioned directories but the symlink was cleaned:
+		// - expired: has an expired TTL -> should be swept
+		// - orphan : has no TTL and is not caller-protected -> also swept
+		expiredHome := createFakeAgentInstall(t, topDir, "1.2.3", "expire", true)
+		orphanHome := createFakeAgentInstall(t, topDir, "4.5.6", "orphan", true)
+		now := time.Now()
+		require.NoError(t,
+			ttl.NewTTLMarkerRegistry(testLogger, topDir).Set(map[string]ttl.TTLMarker{
+				expiredHome: {Version: "1.2.3", Hash: "expire", ValidUntil: now.Add(-1 * time.Hour)},
+			}),
+			"writing TTL registry with expired entry")
+
+		// No symlink, no upgrade marker.
+
+		err := cleanup(testLogger, topDir, false, false, 0)
+		// No marker means this is a fresh-volume start, not a degraded state.
+		require.NoError(t, err)
+
+		// Expired TTL is swept even without a symlink.
+		assert.NoDirExists(t, filepath.Join(topDir, expiredHome),
+			"expired TTL entry should be swept even without a symlink")
+		// Orphan is swept: absent symlink is no longer a guard; callerProtected
+		// (derived from paths.Home() in real usage) is the safety net, and no
+		// homes were passed to this cleanup call.
+		assert.NoDirExists(t, filepath.Join(topDir, orphanHome),
+			"orphan must be swept when symlink is absent and no caller-protected homes are set")
+	})
+
+	t.Run("removeMarker=true: absent symlink is not degraded; marker is removed", func(t *testing.T) {
+>>>>>>> 3b1faaa (fix: don't degrade rollback cleaner when live-install symlink is absent (#16561))
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
@@ -637,6 +684,7 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 		require.NoError(t, os.WriteFile(markerPath, []byte("placeholder upgrade marker"), 0o600),
 			"writing placeholder marker file")
 
+<<<<<<< HEAD
 		phantomHome := filepath.Join("data", "elastic-agent-1.2.3-SNAPSHOT-deadbeef")
 		err := cleanup(testLogger, topDir, phantomHome, "", true, false, 0)
 		require.Error(t, err)
@@ -646,3 +694,172 @@ func TestCleanup_AbortsWhenLiveHomeUnresolvable(t *testing.T) {
 			"upgrade marker must survive an aborted cleanup (CleanMarker must not run before resolve)")
 	})
 }
+=======
+		// No symlink. Absent symlink is no longer treated as degraded, so
+		// removeMarker=true must proceed and remove the marker.
+		err := cleanup(testLogger, topDir, true, false, 0)
+		require.NoError(t, err)
+
+		assert.NoFileExists(t, markerPath,
+			"upgrade marker must be removed when cleanup is not degraded and removeMarker=true")
+	})
+}
+
+// TestCleanAvailableRollbacks_AbsentSymlink_NoMarker verifies that
+// CleanAvailableRollbacks succeeds (not degraded) when the agent symlink is
+// absent and no upgrade marker is present — the expected state on a fresh
+// volume. Expired TTL entries are swept, orphans are kept conservatively, and
+// unexpired TTL entries are returned.
+func TestCleanAvailableRollbacks_AbsentSymlink_NoMarker(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	versionA := testAgentVersion{version: "1.0.0", hash: "aaaaaa"} // unexpired TTL -> keep
+	versionB := testAgentVersion{version: "2.0.0", hash: "bbbbbb"} // caller-protected
+	versionC := testAgentVersion{version: "3.0.0", hash: "cccccc"} // expired TTL -> sweep
+	versionD := testAgentVersion{version: "4.0.0", hash: "dddddd"} // orphan -> keep
+
+	relA := createFakeAgentInstall(t, topDir, versionA.version, versionA.hash, true)
+	relB := createFakeAgentInstall(t, topDir, versionB.version, versionB.hash, true)
+	relC := createFakeAgentInstall(t, topDir, versionC.version, versionC.hash, true)
+	relD := createFakeAgentInstall(t, topDir, versionD.version, versionD.hash, true)
+
+	// No symlink, no upgrade marker.
+
+	now := time.Now()
+	validUntil := now.Add(24 * time.Hour)
+	availableRollbacks := map[string]ttl.TTLMarker{
+		relA: {Version: versionA.version, Hash: versionA.hash, ValidUntil: validUntil},
+		relC: {Version: versionC.version, Hash: versionC.hash, ValidUntil: now.Add(-1 * time.Hour)},
+	}
+	registry := ttl.NewTTLMarkerRegistry(testLogger, topDir)
+	require.NoError(t, registry.Set(availableRollbacks), "writing TTL registry")
+
+	leftover, err := CleanAvailableRollbacks(testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
+
+	// No marker means this is a fresh-volume start, not a degraded state.
+	require.NoError(t, err)
+	if assert.Len(t, leftover, 1, "unexpired rollback must be returned for future cleanup") {
+		m := leftover[relA]
+		assert.Equal(t, versionA.version, m.Version)
+		assert.Equal(t, versionA.hash, m.Hash)
+		assert.WithinDuration(t, validUntil, m.ValidUntil, time.Second,
+			"ValidUntil should round-trip cleanly (monotonic clock stripped by YAML)")
+	}
+
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+	// Unexpired TTL — keep.
+	assertAgentInstallExists(t, filepath.Join(topDir, relA), agentExecutableName)
+	// Caller-protected — keep.
+	assertAgentInstallExists(t, filepath.Join(topDir, relB), agentExecutableName)
+	// Expired TTL — swept even though symlink is unresolvable.
+	assert.NoDirExists(t, filepath.Join(topDir, relC),
+		"expired TTL entry should be swept even when symlink is unresolvable")
+	// Orphan — swept because callerProtected (relB) already identifies the live
+	// install; absent symlink no longer conservatively blocks cleanup.
+	assert.NoDirExists(t, filepath.Join(topDir, relD),
+		"orphan must be swept when symlink is absent and callerProtected identifies the live install")
+}
+
+// TestCleanAvailableRollbacks_NilDetailsMarker_LenientMode verifies that
+// CleanAvailableRollbacks (requireMarkerDetails=false, lenient) preserves both
+// installs referenced by a nil-Details upgrade marker.
+//
+// This is the counterpart to TestCleanup_NilDetailsMarker_StrictMode: legacy agents
+// that did not populate marker Details must still have their installs protected during
+// the periodic cleanup window, so a rollback remains possible.
+func TestCleanAvailableRollbacks_NilDetailsMarker_LenientMode(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	currentVersionedHome := createFakeAgentInstall(t, topDir, "9.0.0", "newver0000", true)
+	prevVersionedHome := createFakeAgentInstall(t, topDir, "8.0.0", "oldver0000", true)
+	createLink(t, topDir, currentVersionedHome)
+
+	require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
+	require.NoError(t, SaveMarker(paths.DataFrom(topDir), &UpdateMarker{
+		Version:           "9.0.0",
+		Hash:              "newver",
+		VersionedHome:     currentVersionedHome,
+		PrevVersion:       "8.0.0",
+		PrevHash:          "oldver",
+		PrevVersionedHome: prevVersionedHome,
+		Details:           nil, // legacy marker without upgrade details
+	}, true), "writing nil-Details upgrade marker fixture")
+
+	source := ttl.NewTTLMarkerRegistry(testLogger, topDir)
+
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	_, err := CleanAvailableRollbacks(testLogger, source, topDir, currentVersionedHome, time.Now(), CleanupExpiredRollbacks)
+	require.NoError(t, err)
+
+	// currentVersionedHome is caller-protected.
+	assertAgentInstallExists(t, filepath.Join(topDir, currentVersionedHome), agentExecutableName)
+
+	// prevVersionedHome: referenced by a nil-Details marker; in lenient mode this must protect it.
+	assertAgentInstallExists(t, filepath.Join(topDir, prevVersionedHome), agentExecutableName)
+}
+
+// TestCleanup_NilDetailsMarker_StrictMode verifies the interaction between
+// requireMarkerDetails=true (used by Cleanup after rollback) and callerProtected.
+//
+// A nil-Details upgrade marker (written by a legacy agent that did not populate
+// details) must NOT protect directories from removal in strict mode, BUT
+// callerProtected entries must still survive regardless.
+//
+// Scenario (post-rollback):
+//   - prevVersionedHome: the rollback target, explicitly protected by Cleanup's keep list
+//   - newVersionedHome:  the failed upgrade directory, NOT protected
+//   - marker: nil Details, references both
+//
+// Expected:
+//   - prevVersionedHome kept   (callerProtected wins over everything)
+//   - newVersionedHome removed (nil-Details + not callerProtected + not TTL)
+func TestCleanup_NilDetailsMarker_StrictMode(t *testing.T) {
+	testLogger, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	newVersionedHome := createFakeAgentInstall(t, topDir, "9.0.0", "newver0000", true)
+	prevVersionedHome := createFakeAgentInstall(t, topDir, "8.0.0", "oldver0000", true)
+	// After rollback the symlink points at the previous (restored) install.
+	createLink(t, topDir, prevVersionedHome)
+
+	// Write a nil-Details upgrade marker referencing both installs.
+	// Passing nil for details simulates a marker written by a pre-Details agent version.
+	require.NoError(t, os.MkdirAll(paths.DataFrom(topDir), 0o750))
+	require.NoError(t, SaveMarker(paths.DataFrom(topDir), &UpdateMarker{
+		Version:           "9.0.0",
+		Hash:              "newver",
+		VersionedHome:     newVersionedHome,
+		PrevVersion:       "8.0.0",
+		PrevHash:          "oldver",
+		PrevVersionedHome: prevVersionedHome,
+		Details:           nil, // nil Details = legacy marker without upgrade details
+	}, true), "writing nil-Details upgrade marker fixture")
+
+	agentExecutableName := AgentName
+	if runtime.GOOS == "windows" {
+		agentExecutableName += ".exe"
+	}
+
+	// Cleanup is called after rollback with prevVersionedHome as the keep target.
+	// requireMarkerDetails=true (strict) is used internally by cleanup().
+	err := cleanup(testLogger, topDir, false, false, 0, prevVersionedHome)
+	require.NoError(t, err)
+
+	// prevVersionedHome is in callerProtected — must survive even though the nil-Details
+	// marker cannot protect it in strict mode.
+	assertAgentInstallExists(t, filepath.Join(topDir, prevVersionedHome), agentExecutableName)
+
+	// newVersionedHome: not callerProtected, no TTL, nil-Details in strict mode → fully removed.
+	assert.NoDirExists(t, filepath.Join(topDir, newVersionedHome),
+		"failed upgrade directory must be removed when marker has nil Details in strict mode")
+}
+>>>>>>> 3b1faaa (fix: don't degrade rollback cleaner when live-install symlink is absent (#16561))
