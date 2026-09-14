@@ -102,6 +102,19 @@ require (
 )
 
 require (
+	github.com/apache/thrift v0.24.0 // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/elastic/go-concert v0.3.1 // indirect
+	github.com/elastic/go-lumber v0.2.0 // indirect
+	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
+	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57 // indirect
+	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.2.0 // indirect
+	github.com/xdg-go/stringprep v1.0.4 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
+)
+
+require (
 	github.com/distribution/reference v0.6.0 // indirect
 	go.opentelemetry.io/collector/component v1.65.1-0.20260824174011-67fef8cb7049
 	go.opentelemetry.io/collector/confmap v1.65.1-0.20260824174011-67fef8cb7049
