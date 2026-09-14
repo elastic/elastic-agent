@@ -404,6 +404,7 @@ func CreateAgentConfig(agentID string, pc map[string]interface{}, headers map[st
 	if staging != "" {
 		staging := fmt.Sprintf("https://staging.elastic.co/%s-%s/downloads/", release.Version(), staging[:8])
 		agentConfig["download"] = map[string]interface{}{
+			"sources":   []string{staging},
 			"sourceURI": staging,
 		}
 	}

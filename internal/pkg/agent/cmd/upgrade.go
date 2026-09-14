@@ -287,7 +287,14 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 	cmd := input.cmd
 	c := input.c
 	version := input.args[0]
-	sourceURI, _ := cmd.Flags().GetString(flagSourceURI)
+	var sources []string
+	sourceURI, err := cmd.Flags().GetString(flagSourceURI)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve command flag information %q while trying to upgrade the agent: %w", flagSourceURI, err)
+	}
+	if sourceURI != "" {
+		sources = append(sources, sourceURI)
+	}
 
 	force, err := cmd.Flags().GetBool(flagForce)
 	if err != nil {
@@ -356,7 +363,7 @@ func upgradeCmdWithClient(input *upgradeInput) error {
 		}
 	}
 	skipDefaultPgp, _ := cmd.Flags().GetBool(flagSkipDefaultPgp)
-	version, err = c.Upgrade(context.Background(), version, rollbackFlag, sourceURI, skipVerification, skipDefaultPgp, pgpChecks...)
+	version, err = c.Upgrade(context.Background(), version, rollbackFlag, sources, skipVerification, skipDefaultPgp, pgpChecks...)
 	if err != nil {
 		s, ok := status.FromError(err)
 		// Sometimes the gRPC server shuts down before replying to the command which is expected
