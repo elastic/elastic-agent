@@ -15,7 +15,8 @@ const (
 
 // Config holds the configuration for the elasticmonitoringconnector.
 // The polling interval lives in the upstream elasticmonitoringreceiver; this
-// connector is stateless and only handles the metric-to-log conversion.
+// connector is stateless and converts pre-processed pmetric.Metrics (from the
+// elasticmonitoringprocessor) into Beats-format plog.Logs.
 type Config struct {
 	// EventTemplate provides the static fields included in every generated
 	// exporter/pipeline metrics event. If data_stream.* is present those fields
@@ -29,10 +30,6 @@ type Config struct {
 	InputEventTemplate struct {
 		Fields map[string]any `mapstructure:",remain"`
 	} `mapstructure:"input_event_template"`
-
-	// ExporterNames maps OTel exporter component IDs to the agent component name
-	// that should appear in the generated log record.
-	ExporterNames map[string]string `mapstructure:"exporter_names"`
 }
 
 func NewFactory() connector.Factory {
