@@ -600,6 +600,35 @@ out weight the benefits of creating another group.
 
   This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
 
+### CI tiers for extended/stateful testing
+
+`.buildkite/bk.integration.pipeline.yml` runs the "Stateful" (ESS-backed) Linux and Windows
+integration tests. To keep PR feedback fast while still getting broad OS coverage, the pipeline
+splits these tests into three tiers:
+
+- **Tier 1** — Runs on every pull request (`if: build.pull_request.id != null`). It exercises only
+  the default variant on the newest supported OS per platform (currently Ubuntu 24.04 for Linux,
+  Windows Server 2022 for Windows). This tier must stay small and fast, since it gates every PR.
+- **Tier 2** — Runs when relevant files change (`if_changed`, e.g. `.buildkite/**`, `magefile.go`,
+  `dev-tools/**`, `go.mod`/`go.sum`). It adds one additional OS per package family (for example
+  Debian 13 for `.deb` and RHEL 10 for `.rpm`) to catch packaging/tooling regressions without
+  running on every PR.
+- **Tier 3** — Runs only on a schedule or when triggered from the scheduler pipeline
+  (`build.source == "schedule"` or `BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG ==
+  "elastic-agent-pipeline-scheduler"`). This is the broadest matrix: it exercises the full set of
+  supported OS versions and package variants (including `stress`), and covers arm64 in addition to
+  amd64. Because it's the most expensive tier, it does not block PRs.
+
+When a new OS image is added to the support matrix (see the `IMAGE_*` environment variables at the
+top of `bk.integration.pipeline.yml`), it should generally be added to the tier 3 `matrix.setup.os`
+list first. Promote it to tier 2 or tier 1 only when it needs to run more frequently (e.g. it's
+becoming the new default, or it validates something that changes often).
+
+Image versions are timestamped VM image names (for example
+`platform-ingest-elastic-agent-ubuntu-2604-1789378451`) that are bumped automatically across all
+`.buildkite/*.yml` files by the `updatecli-bump-vm-images.yml` Updatecli pipeline
+(`.ci/updatecli/updatecli-bump-vm-images.yml`).
+
 ### Test namespaces
 
 Every test has access to its own unique namespace (a string value). This namespace can
