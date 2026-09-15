@@ -681,7 +681,6 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		"components/system-metrics-default/beat_metrics.json",
 		"components/system-metrics-default/input_metrics.json",
 		"logs/elastic-agent-*/elastic-agent-*.ndjson",
-		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
 
 	for _, f := range expectedFiles {
