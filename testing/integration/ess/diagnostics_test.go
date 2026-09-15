@@ -683,10 +683,12 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 	}
 
 	for _, f := range expectedFiles {
-		path := filepath.Join(extractionDir, f)
-		stat, err := os.Stat(path)
-		require.NoErrorf(t, err, "stat file %q failed", path)
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		matches, err := filepath.Glob(filepath.Join(extractionDir, f))
+		require.NoErrorf(t, err, "glob %q failed", f)
+		require.NotEmptyf(t, matches, "no file matching %q", f)
+		stat, err := os.Stat(matches[0])
+		require.NoErrorf(t, err, "stat file %q failed", matches[0])
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
