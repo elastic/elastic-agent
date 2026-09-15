@@ -101,6 +101,17 @@ def since_to_minor(since):
     return f"{parsed[0]}.{parsed[1]}" if parsed else ''
 
 
+def is_new_component(since, latest_version):
+    """True when a component's 'since' version shares the latest release's minor.
+
+    Used to flag components introduced in the current release line so the
+    components table can render a 'New' marker next to them. Returns False when
+    either version is empty or unparseable (e.g. 'main')."""
+    comp_minor = since_to_minor(since)
+    latest_minor = since_to_minor(latest_version)
+    return bool(comp_minor and latest_minor and comp_minor == latest_minor)
+
+
 def resolve_path_for_tag(tag, path_type, fallback_to_file_check=True):
     """Resolve the correct file path for a given tag using semantic versioning.
     
@@ -498,6 +509,8 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
 
         # Major.Minor used to render the 'Added in' column as an applies_to badge.
         comp['since_minor'] = since_to_minor(comp['since'])
+        # Flag components introduced in the latest release line for the 'New' marker.
+        comp['is_new'] = is_new_component(comp['since'], latest_version)
 
     components_grouped = defaultdict(list)
 

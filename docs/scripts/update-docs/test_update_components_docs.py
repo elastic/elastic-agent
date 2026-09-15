@@ -259,6 +259,22 @@ class TestSinceToMinor(unittest.TestCase):
         self.assertEqual(script.since_to_minor('main'), '')
 
 
+class TestIsNewComponent(unittest.TestCase):
+    """Tests for is_new_component (New-marker gating)."""
+
+    def test_matches_latest_minor(self):
+        self.assertTrue(script.is_new_component('v9.5.0', '9.5.3'))
+        self.assertTrue(script.is_new_component('v9.5.3', 'v9.5.3'))
+
+    def test_older_minor_is_not_new(self):
+        self.assertFalse(script.is_new_component('v9.4.0', '9.5.3'))
+        self.assertFalse(script.is_new_component('v9.0.0', '9.5.0'))
+
+    def test_empty_or_main_is_not_new(self):
+        self.assertFalse(script.is_new_component('', '9.5.3'))
+        self.assertFalse(script.is_new_component('v9.5.0', 'main'))
+
+
 build_pr_body = SourceFileLoader('build_pr_body', 'build_pr_body.py').load_module()
 
 
