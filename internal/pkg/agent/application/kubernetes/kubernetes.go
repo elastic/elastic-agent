@@ -20,6 +20,7 @@ package kubernetes
 import (
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 )
 
@@ -43,10 +44,17 @@ var k8sAnnotationVarPattern = regexp.MustCompile(`\$\{kubernetes\.annotations\.(
 // that may still contain non-kubernetes provider references.
 var anyVarPattern = regexp.MustCompile(`\$\{[^}]+\}`)
 
-// consecutiveStarsPattern matches two or more consecutive * characters produced
-// when a path contains a literal wildcard adjacent to a variable reference
-// (e.g. *${kubernetes.container.id}).
-var consecutiveStarsPattern = regexp.MustCompile(`\*{2,}`)
+// starAdjacentVarPattern matches one or more consecutive ${...} variable
+// references together with any immediately adjacent * wildcards. The whole
+// group is replaced by a single * so that *${var} and ${var1}${var2} become *
+// rather than **. Pre-existing ** patterns not adjacent to a variable reference
+// (e.g. /var/log/pods/**/*.log) are left untouched.
+var starAdjacentVarPattern = regexp.MustCompile(`\**(\$\{[^}]+\})+\**`)
+
+// k8sStarAdjacentVarPattern is like starAdjacentVarPattern but only matches
+// ${kubernetes.*} references. Used in path translation so that context-provider
+// references (${env.*}, ${host.*}, …) are preserved and resolved by the AST.
+var k8sStarAdjacentVarPattern = regexp.MustCompile(`\**(\$\{kubernetes\.[^}]+\})+\**`)
 
 // separatorRunPattern matches a run of the separators used to join variable
 // references into ids, left behind once the references are removed.
@@ -57,12 +65,14 @@ var separatorRunPattern = regexp.MustCompile(`[-_.]{2,}`)
 // collapsed into a single glob input.
 const hintsVarPrefix = "${kubernetes.hints."
 
-// translateVarPathToGlob replaces all ${...} variable references with *
+// translateVarPathToGlob replaces ${kubernetes.*} variable references with *
 // wildcards, converting a policy path template into a stable file-glob pattern.
-// Adjacent wildcards are collapsed to a single * to avoid double-star globs.
+// Stars immediately adjacent to a kubernetes variable reference are absorbed into
+// the replacement so that *${kubernetes.var} becomes * rather than **. Pre-existing
+// ** patterns and non-kubernetes provider references (${env.*}, ${host.*}, …) are
+// preserved unchanged so the AST can resolve them to their actual values.
 func translateVarPathToGlob(path string) string {
-	withWildcards := anyVarPattern.ReplaceAllString(path, "*")
-	return consecutiveStarsPattern.ReplaceAllString(withWildcards, "*")
+	return k8sStarAdjacentVarPattern.ReplaceAllString(path, "*")
 }
 
 // RewriteContainerLogInputs rewrites every eligible kubernetes.container_logs
@@ -272,6 +282,21 @@ func filterVarProcessors(raw interface{}) (kept []interface{}, annotations []str
 			continue
 		}
 		if referencesVar {
+			if transformed, ok := transformAddFieldsToFieldCopies(processor); ok {
+				kept = append(kept, transformed...)
+			} else if processorHasNonAnnotationKubernetesVarRef(processor) {
+				// Has non-annotation ${kubernetes.*} refs that we cannot transform.
+				// Keep the processor: context provider variable references
+				// (${host.*}, ${env.*}, …) are resolved by the AST to a single
+				// value. Kubernetes dynamic provider references are left for the
+				// AST to handle on a best-effort basis — better than silently
+				// dropping the processor or reverting the entire input to
+				// per-container mode.
+				kept = append(kept, processor)
+			}
+			// Processors whose only kubernetes references are annotation refs are
+			// dropped here; add_kubernetes_metadata publishes those annotations via
+			// include_annotations so dropping the original processor is correct.
 			continue
 		}
 		kept = append(kept, processor)
@@ -379,6 +404,111 @@ func enableTakeOverFromAnyID(stream map[string]interface{}) {
 	takeOver := ensureTakeOver(stream)
 	takeOver[takeOverFromAnyID] = true
 	delete(takeOver, takeOverFromIDs)
+}
+
+// processorHasNonAnnotationKubernetesVarRef reports whether any string value in
+// the processor contains a ${kubernetes.*} reference that is NOT an annotation
+// reference. Annotation references are handled separately via include_annotations
+// and do not need to survive in the processor itself.
+func processorHasNonAnnotationKubernetesVarRef(processor interface{}) bool {
+	found := false
+	walkStrings(processor, func(s string) {
+		stripped := k8sAnnotationVarPattern.ReplaceAllString(s, "")
+		if k8sVarPattern.MatchString(stripped) {
+			found = true
+		}
+	})
+	return found
+}
+
+// isExactNonAnnotationKubernetesVarRef reports whether s is entirely a single
+// ${kubernetes.*} variable reference that is NOT an annotation reference.
+// Mixed or templated strings (surrounding text, multiple refs) return false.
+func isExactNonAnnotationKubernetesVarRef(s string) bool {
+	return k8sVarPattern.FindString(s) == s && !k8sAnnotationVarPattern.MatchString(s)
+}
+
+// transformAddFieldsToFieldCopies converts an add_fields processor whose field
+// values are exact non-annotation ${kubernetes.*} variable references into
+// copy_fields processors that copy from the event fields added by
+// add_kubernetes_metadata. Fields with annotation or mixed variable references
+// are omitted (the annotation-extraction pass in filterVarProcessors already
+// handles annotation refs via include_annotations). Static fields are preserved
+// in a residual add_fields.
+//
+// Returns the replacement processors and true when at least one field was
+// transformed. Returns nil, false for any other processor type or when no field
+// could be transformed.
+func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool) {
+	processorMap, ok := processor.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	addFieldsCfg, ok := processorMap["add_fields"].(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+	fields, ok := addFieldsCfg["fields"].(map[string]interface{})
+	if !ok || len(fields) == 0 {
+		return nil, false
+	}
+	target, _ := addFieldsCfg["target"].(string)
+
+	// Iterate in sorted key order for a stable config hash.
+	keys := make([]string, 0, len(fields))
+	for k := range fields {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var copySpecs []interface{}
+	staticFields := make(map[string]interface{})
+
+	for _, key := range keys {
+		val := fields[key]
+		strVal, isStr := val.(string)
+		if !isStr || !isExactNonAnnotationKubernetesVarRef(strVal) {
+			if isStr && k8sVarPattern.MatchString(strVal) {
+				// Annotation ref or complex template — drop; annotation key was
+				// already extracted by filterVarProcessors above.
+				continue
+			}
+			staticFields[key] = val
+			continue
+		}
+		// Strip ${ and } to get the event-field path, e.g. "kubernetes.pod.name".
+		kubernetesField := strVal[2 : len(strVal)-1]
+		destField := key
+		if target != "" {
+			destField = target + "." + key
+		}
+		copySpecs = append(copySpecs, map[string]interface{}{
+			"from": kubernetesField,
+			"to":   destField,
+		})
+	}
+
+	if len(copySpecs) == 0 {
+		return nil, false
+	}
+
+	var result []interface{}
+	if len(staticFields) > 0 {
+		result = append(result, map[string]interface{}{
+			"add_fields": map[string]interface{}{
+				"target": target,
+				"fields": staticFields,
+			},
+		})
+	}
+	result = append(result, map[string]interface{}{
+		"copy_fields": map[string]interface{}{
+			"fields":         copySpecs,
+			"fail_on_error":  false,
+			"ignore_missing": true,
+		},
+	})
+	return result, true
 }
 
 // walkStrings calls fn for every string found in the value tree, descending into

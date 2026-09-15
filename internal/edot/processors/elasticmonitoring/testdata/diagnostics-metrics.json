@@ -1,0 +1,625 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {},
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "go.opentelemetry.io/collector/exporter/exporterhelper",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {
+                  "stringValue": "elasticsearch/_agent-component/monitoring"
+                }
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {
+                  "stringValue": "exporter"
+                }
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {
+                  "stringValue": "logs"
+                }
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "otelcol_exporter_queue_capacity",
+              "description": "Fixed capacity of the retry queue (in batches). [Alpha]",
+              "unit": "{batch}",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "data_type",
+                        "value": {
+                          "stringValue": "logs"
+                        }
+                      },
+                      {
+                        "key": "exporter",
+                        "value": {
+                          "stringValue": "elasticsearch/_agent-component/monitoring"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633053776734998",
+                    "timeUnixNano": "1784633053940296387",
+                    "asInt": "3200"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "otelcol_exporter_queue_size",
+              "description": "Current size of the retry queue (in batches). [Alpha]",
+              "unit": "{batch}",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "data_type",
+                        "value": {
+                          "stringValue": "logs"
+                        }
+                      },
+                      {
+                        "key": "exporter",
+                        "value": {
+                          "stringValue": "elasticsearch/_agent-component/monitoring"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633053776753770",
+                    "timeUnixNano": "1784633053940297967",
+                    "asInt": "0"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "github.com/elastic/beats/v7/x-pack/otel/telemetry",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {
+                  "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-edot-collector"
+                }
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {
+                  "stringValue": "receiver"
+                }
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {
+                  "stringValue": "logs"
+                }
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "libbeat.output.write.latency_delta.histogram.min",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-edot-collector"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633053877057947",
+                    "timeUnixNano": "1784633053940310233",
+                    "asInt": "0"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "libbeat.output.events.batches",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-edot-collector"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633053877088907",
+                    "timeUnixNano": "1784633053940311496",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "libbeat.output.events.dropped",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-edot-collector"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633053877100948",
+                    "timeUnixNano": "1784633053940312769",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "github.com/elastic/beats/v7/x-pack/otel/telemetry",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {
+                  "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-kube-apiserver-partial-reload-control-plane-fd67f8330a6b00bb999c7fca5fea7b54edd65a65f0fbbc6be679ebd75c78f5bb"
+                }
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {
+                  "stringValue": "receiver"
+                }
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {
+                  "stringValue": "logs"
+                }
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "libbeat.pipeline.events.total",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-kube-apiserver-partial-reload-control-plane-fd67f8330a6b00bb999c7fca5fea7b54edd65a65f0fbbc6be679ebd75c78f5bb"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062650579804",
+                    "timeUnixNano": "1784633062725747762",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "libbeat.pipeline.events.published",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-kube-apiserver-partial-reload-control-plane-fd67f8330a6b00bb999c7fca5fea7b54edd65a65f0fbbc6be679ebd75c78f5bb"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062650606032",
+                    "timeUnixNano": "1784633062725754908",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "libbeat.output.events.active",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-kube-apiserver-partial-reload-control-plane-fd67f8330a6b00bb999c7fca5fea7b54edd65a65f0fbbc6be679ebd75c78f5bb"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062650621542",
+                    "timeUnixNano": "1784633062725756240",
+                    "asInt": "0"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "github.com/elastic/beats/v7/x-pack/otel/telemetry",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {
+                  "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-metrics-server-5dff76cbd9-nrrcm-42d70a9a9dba12ba6846e0e191211589ac7d8ef5b63ca49891cb907179d2c9ec"
+                }
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {
+                  "stringValue": "receiver"
+                }
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {
+                  "stringValue": "logs"
+                }
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "libbeat.pipeline.events.filtered",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-metrics-server-5dff76cbd9-nrrcm-42d70a9a9dba12ba6846e0e191211589ac7d8ef5b63ca49891cb907179d2c9ec"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062524563282",
+                    "timeUnixNano": "1784633062725812075",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "libbeat.pipeline.clients",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-metrics-server-5dff76cbd9-nrrcm-42d70a9a9dba12ba6846e0e191211589ac7d8ef5b63ca49891cb907179d2c9ec"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062524590321",
+                    "timeUnixNano": "1784633062725813861",
+                    "asInt": "0"
+                  }
+                ]
+              }
+            },
+            {
+              "name": "libbeat.output.write.latency_delta.histogram.count",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "filebeatreceiver/_agent-component/filestream-default/kubernetes-container-logs-metrics-server-5dff76cbd9-nrrcm-42d70a9a9dba12ba6846e0e191211589ac7d8ef5b63ca49891cb907179d2c9ec"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062524603808",
+                    "timeUnixNano": "1784633062725815287",
+                    "asInt": "0"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {
+                  "stringValue": "elasticsearch/_agent-component/default"
+                }
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {
+                  "stringValue": "exporter"
+                }
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {
+                  "stringValue": "logs"
+                }
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "otelcol.elasticsearch.bulk_requests.count",
+              "description": "Count of the completed bulk requests. [Alpha]",
+              "unit": "1",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "http.response.status_code",
+                        "value": {
+                          "intValue": "200"
+                        }
+                      },
+                      {
+                        "key": "outcome",
+                        "value": {
+                          "stringValue": "success"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062494873270",
+                    "timeUnixNano": "1784633135987134245",
+                    "asInt": "4"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "otelcol.elasticsearch.docs.processed",
+              "description": "Count of documents flushed to Elasticsearch. [Alpha]",
+              "unit": "1",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "http.response.status_code",
+                        "value": {
+                          "intValue": "200"
+                        }
+                      },
+                      {
+                        "key": "outcome",
+                        "value": {
+                          "stringValue": "success"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062494914119",
+                    "timeUnixNano": "1784633135987143370",
+                    "asInt": "447"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "otelcol.elasticsearch.flushed.bytes",
+              "description": "Number of bytes flushed by the indexer. [Alpha]",
+              "unit": "By",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "startTimeUnixNano": "1784633062494971899",
+                    "timeUnixNano": "1784633135987146234",
+                    "asInt": "126978"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            }
+          ]
+        },
+        {
+          "scope": {
+            "name": "github.com/elastic/beats/v7/x-pack/otel/telemetry",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {
+                  "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                }
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {
+                  "stringValue": "receiver"
+                }
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {
+                  "stringValue": "logs"
+                }
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "metricbeat.http.json.failures",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062714728473",
+                    "timeUnixNano": "1784633135987407281",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "metricbeat.http.json.events",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062729365558",
+                    "timeUnixNano": "1784633135987408378",
+                    "asInt": "4"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "metricbeat.http.json.consecutive_failures",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062729375622",
+                    "timeUnixNano": "1784633135987409023",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "metricbeat.http.json.success",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062729385451",
+                    "timeUnixNano": "1784633135987409598",
+                    "asInt": "4"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "libbeat.pipeline.events.retry",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062576842805",
+                    "timeUnixNano": "1784633135987381609",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "libbeat.output.events.toomany",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {
+                          "stringValue": "metricbeatreceiver/_agent-component/http/metrics-monitoring/metrics-monitoring-agent"
+                        }
+                      }
+                    ],
+                    "startTimeUnixNano": "1784633062576879087",
+                    "timeUnixNano": "1784633135987382998",
+                    "asInt": "0"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

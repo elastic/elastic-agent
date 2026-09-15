@@ -140,6 +140,140 @@ func TestRewriteContainerLogInputs_ChartPolicy(t *testing.T) {
 	})
 }
 
+// TestRewriteContainerLogInputs_UserProcessors covers the case reported by
+// belimawr: user-defined processors that reference ${kubernetes.*} variables
+// were silently dropped after the glob-input rewrite. Exact non-annotation
+// ${kubernetes.*} field values in add_fields processors are now converted to
+// copy_fields that read from the event fields added by add_kubernetes_metadata.
+func TestRewriteContainerLogInputs_UserProcessors(t *testing.T) {
+	m := mustConfig(t, `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: 'audit-${kubernetes.container.id}'
+        data_stream:
+          type: logs
+          dataset: kubernetes.container_logs
+        paths:
+          - '/var/log/containers/*${kubernetes.container.id}.log'
+        processors:
+          - add_fields:
+              target: foo
+              fields:
+                pod: '${kubernetes.pod.name}'
+                namespace: '${kubernetes.namespace}'
+                static_label: production
+          - add_fields:
+              target: ''
+              fields:
+                myfield: '${kubernetes.container.name}'
+`)
+	RewriteContainerLogInputs(m, true)
+
+	stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
+	processors := stream["processors"].([]interface{})
+
+	// Expected order:
+	//   [0] add_kubernetes_metadata (prepended)
+	//   [1] add_fields{target:foo, fields:{static_label:production}} (residual static fields)
+	//   [2] copy_fields{foo.namespace, foo.pod} (transformed var refs, sorted by dest)
+	//   [3] copy_fields{myfield} (second add_fields, single var ref, root target)
+	require.Len(t, processors, 4)
+
+	t.Run("add_kubernetes_metadata is first", func(t *testing.T) {
+		_, isMetadata := processors[0].(map[string]interface{})["add_kubernetes_metadata"]
+		assert.True(t, isMetadata)
+	})
+
+	t.Run("static fields in add_fields are preserved in a residual add_fields", func(t *testing.T) {
+		afm := processors[1].(map[string]interface{})["add_fields"].(map[string]interface{})
+		fields := afm["fields"].(map[string]interface{})
+		assert.Equal(t, "production", fields["static_label"])
+		assert.Equal(t, "foo", afm["target"])
+		assert.NotContains(t, fields, "pod")
+		assert.NotContains(t, fields, "namespace")
+	})
+
+	t.Run("kubernetes var refs in add_fields become copy_fields sorted by destination", func(t *testing.T) {
+		cfm := processors[2].(map[string]interface{})["copy_fields"].(map[string]interface{})
+		assert.Equal(t, false, cfm["fail_on_error"])
+		assert.Equal(t, true, cfm["ignore_missing"])
+		specs := cfm["fields"].([]interface{})
+		require.Len(t, specs, 2)
+		s0 := specs[0].(map[string]interface{})
+		s1 := specs[1].(map[string]interface{})
+		// sorted by destination: foo.namespace < foo.pod
+		assert.Equal(t, "kubernetes.namespace", s0["from"])
+		assert.Equal(t, "foo.namespace", s0["to"])
+		assert.Equal(t, "kubernetes.pod.name", s1["from"])
+		assert.Equal(t, "foo.pod", s1["to"])
+	})
+
+	t.Run("empty target add_fields with var ref becomes root-level copy_fields", func(t *testing.T) {
+		cfm := processors[3].(map[string]interface{})["copy_fields"].(map[string]interface{})
+		specs := cfm["fields"].([]interface{})
+		require.Len(t, specs, 1)
+		s := specs[0].(map[string]interface{})
+		assert.Equal(t, "kubernetes.container.name", s["from"])
+		assert.Equal(t, "myfield", s["to"])
+	})
+}
+
+// TestRewriteContainerLogInputs_UntransformableProcessorsKept covers the
+// requirement that processors which cannot be automatically translated for the
+// glob-input context are kept as-is rather than silently dropped or reverting
+// the whole input to per-container mode. Context provider variable references
+// (${host.*}, ${env.*}, …) will be resolved by the AST to a single value.
+// Dynamic provider references that cannot be converted are left for the AST to
+// handle on a best-effort basis.
+func TestRewriteContainerLogInputs_UntransformableProcessorsKept(t *testing.T) {
+	m := mustConfig(t, `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+        processors:
+          - add_tags:
+              tags: ['${kubernetes.labels.app}']
+          - add_fields:
+              target: host
+              fields:
+                name: '${host.name}'
+`)
+	RewriteContainerLogInputs(m, true)
+
+	stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
+	processors := stream["processors"].([]interface{})
+
+	// [0] add_kubernetes_metadata, [1] add_tags (kept as-is), [2] add_fields (kept as-is)
+	require.Len(t, processors, 3)
+
+	t.Run("glob input is still applied (paths and id rewritten)", func(t *testing.T) {
+		assert.Equal(t, []interface{}{"/var/log/containers/*.log"}, stream["paths"])
+		assert.Equal(t, "kubernetes-container-logs", stream["id"])
+	})
+
+	t.Run("untransformable add_tags kept as-is", func(t *testing.T) {
+		addTags, ok := processors[1].(map[string]interface{})["add_tags"].(map[string]interface{})
+		require.True(t, ok)
+		assert.Equal(t, []interface{}{"${kubernetes.labels.app}"}, addTags["tags"])
+	})
+
+	t.Run("context provider var in add_fields kept as-is", func(t *testing.T) {
+		addFields, ok := processors[2].(map[string]interface{})["add_fields"].(map[string]interface{})
+		require.True(t, ok)
+		fields := addFields["fields"].(map[string]interface{})
+		assert.Equal(t, "${host.name}", fields["name"])
+	})
+}
+
 func TestRewriteContainerLogInputs_RotatedLogsPolicy(t *testing.T) {
 	m := mustConfig(t, `
 inputs:
@@ -291,7 +425,11 @@ func TestTranslateVarPathToGlob(t *testing.T) {
 		"/var/log/containers/*${kubernetes.container.id}.log":                                                                    "/var/log/containers/*.log",
 		"/var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/${kubernetes.container.name}/*.log*": "/var/log/pods/*_*_*/*/*.log*",
 		"/var/log/containers/${kubernetes.container.id}.log":                                                                     "/var/log/containers/*.log",
-		"/var/log/plain.log": "/var/log/plain.log",
+		"/var/log/plain.log":                                                                    "/var/log/plain.log",
+		"/var/log/pods/**/*.log":                                                                "/var/log/pods/**/*.log",
+		"/var/log/pods/**/containers/*.log":                                                     "/var/log/pods/**/containers/*.log",
+		"${env.CONTAINER_LOG_DIR}/${kubernetes.namespace}_${kubernetes.pod.name}/*.log":         "${env.CONTAINER_LOG_DIR}/*_*/*.log",
+		"${env.CONTAINER_LOG_DIR}/${kubernetes.namespace}/${kubernetes.container.name}/*.log":   "${env.CONTAINER_LOG_DIR}/*/*/*.log",
 	}
 	for input, expected := range testcases {
 		assert.Equal(t, expected, translateVarPathToGlob(input), "input: %s", input)

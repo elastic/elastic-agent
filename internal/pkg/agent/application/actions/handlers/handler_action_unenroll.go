@@ -26,6 +26,7 @@ type stateStore interface {
 	SetAckToken(ackToken string)
 	Save() error
 	Action() fleetapi.Action
+	SaveAction(fleetapi.Action) error
 }
 
 // Unenroll results in  running agent entering idle state, non managed non standalone.
