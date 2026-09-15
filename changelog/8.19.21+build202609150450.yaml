@@ -1,17 +1,56 @@
 version: 8.19.21+build202609150450
 entries:
-    - kind: bug-fix
-      summary: Adds workaround to macOS Elastic Defend for a macOS 27 (Golden Gate) bug where the system's Guard Proxy could drop network flow verdicts, potentially blocking all network traffic from apps using Network.framework
-      description: ""
+    - kind: security
+      summary: "{elastic-defend} on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing)"
+      description: "The gRPC-bundled c-ares snapshot (~1.19) is unchanged and is tracked separately pending a gRPC version upgrade."
       component: elastic-defend
       pr:
-        - https://github.com/elastic/endpoint-dev/pull/21932
+        - https://github.com/elastic/endpoint-dev/pull/21384
       issue: []
       impact: ""
       action: ""
       timestamp: 1789490905
       file:
-        name: macos-golden-gate-network-filter-workaround.yaml
+        name: cares-upgrade-cve-2024-25629.yaml
+        checksum: ""
+    - kind: enhancement
+      summary: Add experimental macOS 27 support to Elastic Defend
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/20653
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: experimental-macos-27-support.yaml
+        checksum: ""
+    - kind: bug-fix
+      summary: Reduces Elastic Defend CPU usage and lock contention during network cache cleanup on Linux, preventing event enrichment stalls at high connection counts
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21599
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: network-cache-cleanup-perf.yaml
+        checksum: ""
+    - kind: bug-fix
+      summary: Increased Elastic Defend event buffer size
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21758
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: increased-event-buffer-size.yaml
         checksum: ""
     - kind: bug-fix
       summary: Hardens how Elastic Defend restores file ownership and permissions during malware quarantine on Linux and macOS
@@ -25,4 +64,43 @@ entries:
       timestamp: 1789490905
       file:
         name: posix-quarantine-chown-chmod-symlink-race.yaml
+        checksum: ""
+    - kind: bug-fix
+      summary: Fixed a crash in Elastic Defend on Windows when processing files or processes whose paths contain CJK characters
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21845
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: windows-cjk-path-crash.yaml
+        checksum: ""
+    - kind: bug-fix
+      summary: "Elastic Defend exception list and trusted app rules matching on host.name now correctly handle mixed-case values"
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21597
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: hostname-case-insensitive-matching.yaml
+        checksum: ""
+    - kind: bug-fix
+      summary: Adds workaround to macOS Elastic Defend for Golden Gate bug breaking network connections from apps using Network.framework
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21932
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: macos-golden-gate-network-filter-workaround.yaml
         checksum: ""

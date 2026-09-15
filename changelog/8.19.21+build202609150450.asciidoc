@@ -6,10 +6,26 @@
 Review important information about the 8.19.21+build202609150450 independent agent release (IAR).
 
 [discrete]
+[[security-updates-8.19.21-build202609150450]]
+=== Security updates
+
+* {elastic-defend} on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing). The gRPC-bundled c-ares snapshot (~1.19) is unchanged and is tracked separately pending a gRPC version upgrade. https://github.com/elastic/endpoint-dev/pull/21384[#21384]
+
+[discrete]
+[[enhancements-8.19.21-build202609150450]]
+=== Enhancements
+
+* Add experimental macOS 27 support to {elastic-defend}. https://github.com/elastic/endpoint-dev/pull/20653[#20653]
+
+[discrete]
 [[bug-fixes-8.19.21-build202609150450]]
 === Bug fixes
 
-* Adds workaround to macOS {elastic-defend} for a macOS 27 (Golden Gate) bug where the system's Guard Proxy could drop network flow verdicts, potentially blocking all network traffic from apps using Network.framework. https://developer.apple.com/forums/thread/837709[Apple Developer Forums] https://github.com/elastic/endpoint-dev/pull/21932[#21932]
+* Reduces {elastic-defend} CPU usage and lock contention during network cache cleanup on Linux, preventing event enrichment stalls at high connection counts. https://github.com/elastic/endpoint-dev/pull/21599[#21599]
+* Increased {elastic-defend} event buffer size. https://github.com/elastic/endpoint-dev/pull/21758[#21758]
 * Hardens how {elastic-defend} restores file ownership and permissions during malware quarantine on Linux and macOS. https://github.com/elastic/endpoint-dev/pull/21843[#21843]
+* Fixed a crash in {elastic-defend} on Windows when processing files or processes whose paths contain CJK (Chinese, Japanese, Korean) characters. https://github.com/elastic/endpoint-dev/pull/21845[#21845]
+* {elastic-defend} exception list and trusted app rules matching on `host.name` now correctly handle mixed-case values. Previously, an exception with `host.name: "MyServer"` would silently fail to match because {elastic-defend} normalizes `host.name` to lowercase per ECS, while Kibana's default comparison is case-sensitive. https://github.com/elastic/endpoint-dev/pull/21597[#21597]
+* Adds workaround to macOS {elastic-defend} for Golden Gate bug breaking network connections from apps using Network.framework. https://developer.apple.com/forums/thread/837709[Apple Developer Forums] https://github.com/elastic/endpoint-dev/pull/21932[#21932]
 
 // end 8.19.21+build202609150450 relnotes
