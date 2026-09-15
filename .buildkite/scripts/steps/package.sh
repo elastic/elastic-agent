@@ -27,6 +27,11 @@ MAGE_TARGETS+=("fixDRADockerArtifacts")
 
 mage "${MAGE_TARGETS[@]}"
 
+if [ "$FIPS" != "true" ]; then
+  echo "--- Test Ironbank Dockerfile permissions"
+  go test -v -run TestIronbankDockerfilePermissions ./dev-tools/packaging/testing/
+fi
+
 echo "+++ Generate dependencies report"
 # When the pipeline set MANIFEST_URL we already have it; otherwise read it from
 # .package-version (the package target read the same file internally).
