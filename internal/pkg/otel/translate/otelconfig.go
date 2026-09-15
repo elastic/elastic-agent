@@ -194,10 +194,15 @@ func getPipelineID(comp *component.Component) (pipeline.ID, error) {
 	return pipeline.NewIDWithName(signal, pipelineName), nil
 }
 
-// getReceiverID returns the receiver id for the given unit and exporter type.
-func getReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
+// GetReceiverID returns the receiver id for the given receiver type and unit ID.
+func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
 	receiverName := fmt.Sprintf("%s%s", OtelNamePrefix, unitID)
 	return otelcomponent.NewIDWithName(receiverType, receiverName)
+}
+
+// getReceiverID is an unexported alias kept for internal callers.
+func getReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
+	return GetReceiverID(receiverType, unitID)
 }
 
 // getExporterID returns the exporter id for the given exporter type and output name.
