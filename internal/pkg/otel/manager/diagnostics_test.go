@@ -223,8 +223,8 @@ func TestBeatMetricsComponentIDContainingSlash(t *testing.T) {
 	}
 
 	m := &OTelManager{
-		managerLogger: logger,
-		components:    []component.Component{systemComp, httpComp},
+		logger:     logger,
+		components: []component.Component{systemComp, httpComp},
 	}
 
 	called := false
@@ -271,8 +271,8 @@ func TestBeatMetricsAmbiguousComponentIDsPreserveResults(t *testing.T) {
 		},
 	}
 	m := &OTelManager{
-		managerLogger: logger,
-		components:    []component.Component{parentComp, nestedComp},
+		logger:     logger,
+		components: []component.Component{parentComp, nestedComp},
 	}
 
 	called := false
