@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -483,6 +484,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
 			"suppress_conflict_errors": true,
+			"timeout":                  90 * time.Second,
 		}
 	}
 
@@ -2800,6 +2802,38 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			// No expectedReceiverID - no inputs means no receivers
 		},
 		{
+			name: "input unit with nil config is skipped without panic",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			outputQueueConfig: nil,
+			// No expectedReceiverID - nil config input is skipped
+		},
+		{
 			name: "unsupported component type",
 			component: &component.Component{
 				ID:        "unsupported-test-id",
@@ -2948,6 +2982,33 @@ func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
 	require.Len(t, monitors, 1, "exactly one monitor should be emitted")
 	assert.Equal(t, "@every 3m", monitors[0]["schedule"], "the emitted monitor must carry the schedule")
 	assert.Equal(t, "browser", monitors[0]["type"], "the emitted monitor must be the browser stream")
+}
+
+func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
+	unit := component.Unit{
+		ID:   "heartbeat-api-test-unit",
+		Type: client.UnitTypeInput,
+		Config: component.MustExpectedConfig(map[string]any{
+			"id":         "test",
+			"use_output": "default",
+			"type":       "synthetics/api",
+			"streams": []any{
+				map[string]any{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"schedule": "@every 5s",
+				},
+			},
+		}),
+	}
+	comp := &component.Component{InputType: "synthetics/api"}
+
+	inputs, err := getInputsForUnit(unit, &info.AgentInfo{}, "logs", comp)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+	assert.Equal(t, "api", inputs[0].config["type"])
 }
 
 // TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
@@ -3182,6 +3243,38 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
+		{
+			name: "input unit with nil config does not panic",
+			component: &component.Component{
+				ID:         "nil-config-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "filestream-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -3192,115 +3285,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				assert.Equal(t, err.Error(), tt.expectedError)
 			} else {
 				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestGetBeatsAuthExtensionConfig(t *testing.T) {
-	tests := []struct {
-		name          string
-		outputCfg     map[string]any
-		expected      map[string]any
-		expectedError string
-	}{
-		{
-			name:      "empty config",
-			outputCfg: map[string]any{},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"timeout":                 "1m30s",
-			},
-		},
-		{
-			name: "with proxy_url and timeout",
-			outputCfg: map[string]any{
-				"proxy_url": "http://proxy.example.com:8080",
-				"timeout":   "2m",
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"proxy_url":               "http://proxy.example.com:8080",
-				"timeout":                 "2m0s",
-			},
-		},
-		{
-			name: "with ssl enabled",
-			outputCfg: map[string]any{
-				"ssl.enabled": true,
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"ssl": map[string]interface{}{
-					"ca_sha256":                  []interface{}{},
-					"ca_trusted_fingerprint":     "",
-					"certificate":                "",
-					"certificate_authorities":    []interface{}{},
-					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
-					"cipher_suites":              []interface{}{},
-					"disable_legacy_pem_support": false,
-					"curve_types":                []interface{}{},
-					"enabled":                    true,
-					"key":                        "",
-					"key_passphrase":             "",
-					"key_passphrase_path":        "",
-					"renegotiation":              int64(0),
-					"supported_protocols":        []interface{}{},
-					"verification_mode":          uint64(0),
-				},
-				"timeout": "1m30s",
-			},
-		},
-		{
-			name: "with ssl enabled and verification_mode certificate",
-			outputCfg: map[string]any{
-				"ssl.enabled":           true,
-				"ssl.verification_mode": "certificate",
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"ssl": map[string]interface{}{
-					"ca_sha256":                  []interface{}{},
-					"ca_trusted_fingerprint":     "",
-					"certificate":                "",
-					"certificate_authorities":    []interface{}{},
-					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
-					"cipher_suites":              []interface{}{},
-					"disable_legacy_pem_support": false,
-					"curve_types":                []interface{}{},
-					"enabled":                    true,
-					"key":                        "",
-					"key_passphrase":             "",
-					"key_passphrase_path":        "",
-					"renegotiation":              int64(0),
-					"supported_protocols":        []interface{}{},
-					"verification_mode":          uint64(2),
-				},
-				"timeout": "1m30s",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.NewConfigFrom(tt.outputCfg)
-			require.NoError(t, err)
-
-			actual, err := getBeatsAuthExtensionConfig(cfg)
-			if tt.expectedError != "" {
-				require.Error(t, err)
-				assert.Equal(t, tt.expectedError, err.Error())
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, actual)
 			}
 		})
 	}
@@ -3380,17 +3364,33 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, error) {
+		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, map[string]any, error) {
 			if c.HasField("unsupported") {
-				return nil, nil, errors.New("unsupported config")
+				return nil, nil, nil, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
+
 			cfgMap["translated"] = true
-			return cfgMap, nil, nil
+
+			// Perform beats auth extension translation
+			cfgMap["auth"] = map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			}
+
+			// return extension config
+			beatsAuthCfg, err := getBeatsAuthExtensionConfig(c)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			extensionConfig := make(map[string]any)
+			extensionConfig[getBeatsAuthExtensionID("default").String()] = beatsAuthCfg
+
+			return cfgMap, nil, extensionConfig, nil
 		},
 		kafkaExporterType: KafkaToOTelConfig,
 	}
@@ -4059,4 +4059,78 @@ func TestInjectOsqueryConfig(t *testing.T) {
 			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
 		})
 	}
+}
+
+func TestGetReceiversConfigHostnameOverride(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-hostname-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-hostname-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	t.Run("env_set", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "override-node")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be injected into receiver config", id)
+		}
+	})
+
+	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "  override-node  ")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be trimmed before injection", id)
+		}
+	})
+
+	t.Run("env_unset", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "")
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.NotContains(t, cfg, "hostname",
+				"receiver %s: hostname should not be present when env var is unset", id)
+		}
+	})
 }

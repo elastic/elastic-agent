@@ -50,6 +50,10 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeVM
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
+}
+
 // Supported returns true if multipass supports this OS.
 //
 // multipass only supports Ubuntu on the same architecture as the running host.
