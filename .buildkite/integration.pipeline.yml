@@ -58,11 +58,11 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-      - label: ":package: amd64: FIPS tar.gz,zip (linux,windows)"
+      - label: ":package: amd64: FIPS tar.gz,zip (linux,windows,macos)"
         key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz,zip"
-          PLATFORMS: "linux/amd64,windows/amd64"
+          PLATFORMS: "linux/amd64,windows/amd64,darwin/amd64"
           FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
@@ -96,11 +96,11 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-      - label: ":package: arm64: FIPS tar.gz,zip (linux,windows)"
+      - label: ":package: arm64: FIPS tar.gz,zip (linux,windows,macos)"
         key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz,zip"
-          PLATFORMS: "linux/arm64,windows/arm64"
+          PLATFORMS: "linux/arm64,windows/arm64,darwin/arm64"
           FIPS: "true"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
