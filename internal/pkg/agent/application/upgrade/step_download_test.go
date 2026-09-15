@@ -880,7 +880,8 @@ func TestLatestSnapshotBuildID(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-		buildID, err := latestSnapshotBuildID(t.Context(), config, version)
+		upgradeDetails := details.NewDetails(version.String(), details.StateRequested, "")
+		buildID, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
 		require.NoError(t, err)
 		assert.Equal(t, "6d69ee76", buildID)
 	})
@@ -890,7 +891,8 @@ func TestLatestSnapshotBuildID(t *testing.T) {
 			rw.WriteHeader(http.StatusNotFound)
 		})
 
-		_, err := latestSnapshotBuildID(t.Context(), config, version)
+		upgradeDetails := details.NewDetails(version.String(), details.StateRequested, "")
+		_, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
 		require.ErrorContains(t, err, "not found")
 	})
 }
