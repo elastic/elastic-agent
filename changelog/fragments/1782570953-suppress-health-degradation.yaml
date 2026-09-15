@@ -1,0 +1,17 @@
+kind: enhancement
+
+summary: Let inputs opt out of degrading agent health via status_reporting
+
+description: |
+  The Coordinator health rollup now honors a per-stream/input `status_reporting`
+  config. Setting `report_degraded: false` and/or `report_failed: false` excludes
+  that unit from the agent's aggregate health, so broad policies with inputs that
+  are not running on every enrolled host (or that fail) no longer drag the whole
+  agent into a degraded state. The unit's own state is still reported per
+  component; only the aggregate rollup ignores it. Works for both process (Beat)
+  and OpenTelemetry-translated components, since both flow through the
+  Coordinator. Ports the Beats-side approach from
+  https://github.com/elastic/beats/pull/49511 into elastic-agent per maintainer
+  guidance, so it also covers non-Beats components and the OTel collector runtime.
+
+component: elastic-agent
