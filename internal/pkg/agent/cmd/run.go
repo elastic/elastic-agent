@@ -450,15 +450,12 @@ func runElasticAgent(
 	}
 	defer lis.Close()
 
-	// Create a Unix socket for the OpAMP server. This avoids sharing the gRPC TCP
+	// Create the platform IPC listener for the OpAMP server (Unix domain socket
+	// on non-Windows, named pipe on Windows). This avoids sharing the gRPC TCP
 	// port via cmux: the gRPC listener stays pure TCP/TLS while OpAMP is off-network.
-	opampSockPath := filepath.Join(paths.Top(), "opamp.sock")
-	if err := os.Remove(opampSockPath); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("removing stale opamp socket: %w", err)
-	}
-	opampLis, err := (&net.ListenConfig{}).Listen(ctx, "unix", opampSockPath)
+	opampLis, err := listenOpAMPSocket(ctx, l)
 	if err != nil {
-		return fmt.Errorf("failed to listen on opamp socket %s: %w", opampSockPath, err)
+		return fmt.Errorf("failed to create opamp ipc listener: %w", err)
 	}
 	defer opampLis.Close()
 

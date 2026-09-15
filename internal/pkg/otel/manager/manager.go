@@ -571,6 +571,7 @@ func (m *OTelManager) buildMergedConfig(
 		m.opampInstanceUID,
 		m.opampServer.Endpoint(),
 		m.opampServer.SocketPath(),
+		m.opampServer.SocketTransport(),
 		m.opampServer.secret,
 	); err != nil {
 		return nil, fmt.Errorf("failed to inject opamp extension: %w", err)
