@@ -3202,11 +3202,7 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = multipass.NewProvisioner()
 		identifier = localIdentifier()
 	case kind.Name:
-		var err error
-		instanceProvisioner, err = kind.NewProvisioner()
-		if err != nil {
-			return nil, err
-		}
+		instanceProvisioner = kind.NewProvisioner()
 		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()
@@ -3218,12 +3214,10 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
-	// The local stack provisioner runs elastic-package locally and the external one
-	// reads an already running stack from the environment, so neither needs ESS
+	// The local stack provisioner runs elastic-package locally and needs no ESS
 	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
 	var provisionCfg ess.ProvisionerConfig
-	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	if stackProvisionerMode != ess.ProvisionerLocal && stackProvisionerMode != ess.ProvisionerExternal {
+	if cfg.IntegrationTest.StackProvisioner != ess.ProvisionerLocal {
 		provisionCfg, err = essProvisionerConfig(cfg, identifier)
 		if err != nil {
 			return nil, err
@@ -3343,17 +3337,13 @@ func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerCon
 		defer cancel()
 		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
 		return sp, mode, err
-	case ess.ProvisionerExternal:
-		sp, err := ess.NewExternalProvisioner()
-		return sp, mode, err
 	case ess.ProvisionerLocal:
 		sp, err := ess.NewLocalProvisioner()
 		return sp, mode, err
 	default:
-		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q, %q or %q, not %s",
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
-			ess.ProvisionerExternal,
 			ess.ProvisionerLocal,
 			mode)
 	}
@@ -3761,16 +3751,6 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	return nil
 }
 
-const windowsNpcapCrossBuildImageVersion = "1.88"
-
-func npcapCrossBuildImageTag() string {
-	version := xpacketbeat.NpcapVersion
-	if version != windowsNpcapCrossBuildImageVersion {
-		version = windowsNpcapCrossBuildImageVersion
-	}
-	return "npcap-" + version + "-debian11"
-}
-
 // npcapImageSelector is similar to xpacketbeat.ImageSelector, using a single variable to enable it. Sadly
 // xpacketbeat.ImageSelector cannot be used directly because it will use its own devtools that comes from the beats
 // repository and will duplicate global state that is not correct for the elastic-agent.
@@ -3785,7 +3765,7 @@ func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
 		}
 		if platform == "windows/amd64" {
 			image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
-			image = strings.ReplaceAll(image, "main", npcapCrossBuildImageTag())
+			image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian11")
 		}
 		return image, nil
 	}
