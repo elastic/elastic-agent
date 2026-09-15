@@ -3220,7 +3220,10 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		}
 		identifier = localIdentifier()
 	case dockerprov.Name:
-		instanceProvisioner = dockerprov.NewProvisioner()
+		instanceProvisioner, err = dockerprov.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case local.Name:
 		instanceProvisioner = local.NewProvisioner()
