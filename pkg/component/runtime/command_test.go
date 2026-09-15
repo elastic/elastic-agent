@@ -24,6 +24,51 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func TestHostnameOverrideArgs(t *testing.T) {
+	cases := []struct {
+		name     string
+		beatName string
+		hostname string
+		wantArgs []string
+	}{
+		{
+			name:     "filebeat_with_hostname_appends_flag",
+			beatName: "filebeat",
+			hostname: "my-node",
+			wantArgs: []string{"--hostname", "my-node"},
+		},
+		{
+			name:     "metricbeat_with_hostname_appends_flag",
+			beatName: "metricbeat",
+			hostname: "my-node",
+			wantArgs: []string{"--hostname", "my-node"},
+		},
+		{
+			name:     "cloudbeat_does_not_support_hostname_override_flag",
+			beatName: "cloudbeat",
+			hostname: "my-node",
+			wantArgs: nil,
+		},
+		{
+			name:     "non_beat_component_no_flag",
+			beatName: "",
+			hostname: "my-node",
+			wantArgs: nil,
+		},
+		{
+			name:     "empty_hostname_no_flag",
+			beatName: "metricbeat",
+			hostname: "",
+			wantArgs: nil,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.wantArgs, hostnameOverrideArgs(tc.beatName, tc.hostname))
+		})
+	}
+}
+
 func TestAddToBucket(t *testing.T) {
 	testCases := map[string]struct {
 		bucketSize int

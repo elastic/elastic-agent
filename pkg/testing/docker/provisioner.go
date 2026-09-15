@@ -11,11 +11,15 @@
 package docker
 
 import (
+	"archive/tar"
 	"bytes"
 	"context"
 	"crypto/sha256"
 	_ "embed"
+	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,6 +29,9 @@ import (
 	"strings"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/container"
+	dockerclient "github.com/moby/moby/client"
 	"golang.org/x/mod/modfile"
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
@@ -66,6 +73,7 @@ var dockerfile []byte
 
 type provisioner struct {
 	logger common.Logger
+	client *dockerclient.Client
 }
 
 // NewProvisioner creates the docker instance provisioner.
@@ -222,8 +230,8 @@ func hostGoModCacheDownload(ctx context.Context) string {
 // removed too.
 func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
 	for _, instance := range instances {
-		// -v also drops the anonymous /var/lib/docker volume backing the nested daemon
-		if _, err := p.docker(ctx, nil, "rm", "-fv", instance.Name); err != nil {
+		// RemoveVolumes also drops the anonymous /var/lib/docker volume backing the nested daemon.
+		if _, err := p.client.ContainerRemove(ctx, instance.Name, dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
 			// don't let one failure stop the others
 			p.logger.Logf("Delete container %s failed: %s", instance.Name, err)
 		}
@@ -235,62 +243,91 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 	// also catches containers created before the label was introduced. The ones
 	// removed above are already gone, so this won't double-remove them.
 	leftovers := map[string]struct{}{}
-	for _, filter := range []string{"label=" + containerLabel, "name=" + containerNamePrefix} {
-		out, err := p.docker(ctx, nil, "ps", "-aq", "--filter", filter)
+	for _, f := range []dockerclient.Filters{
+		make(dockerclient.Filters).Add("label", containerLabel),
+		make(dockerclient.Filters).Add("name", containerNamePrefix),
+	} {
+		result, err := p.client.ContainerList(ctx, dockerclient.ContainerListOptions{All: true, Filters: f})
 		if err != nil {
-			p.logger.Logf("Listing leftover %s containers (%s) failed: %s", Name, filter, err)
+			p.logger.Logf("Listing leftover %s containers failed: %s", Name, err)
 			continue
 		}
-		for _, id := range strings.Fields(out) {
-			leftovers[id] = struct{}{}
+		for _, c := range result.Items {
+			leftovers[c.ID] = struct{}{}
 		}
 	}
 	for id := range leftovers {
-		if _, err := p.docker(ctx, nil, "rm", "-fv", id); err != nil {
+		if _, err := p.client.ContainerRemove(ctx, id, dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
 			p.logger.Logf("Delete leftover container %s failed: %s", id, err)
 		}
 	}
 	return nil
 }
 
+// AttachInstanceToNetwork connects the instance's container to an additional docker
+// network so it can reach a stack running on that network (see
+// common.InstanceNetworkAttacher). It is idempotent: re-attaching an
+// already-connected container is treated as success.
+func (p *provisioner) AttachInstanceToNetwork(ctx context.Context, instance common.Instance, networkID string) error {
+	_, err := p.client.NetworkConnect(ctx, networkID, dockerclient.NetworkConnectOptions{Container: instance.Name})
+	if err != nil {
+		if cerrdefs.IsConflict(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to connect container %s to network %s: %w", instance.Name, networkID, err)
+	}
+	return nil
+}
+
 // launch creates (or recreates) the container for a batch and returns its instance.
 // modCache, when non-empty, is the host Go module download cache to share read-only.
-func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, build imageBuild, publicKey []byte, modCache string) (common.Instance, error) {
+func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imageBuild, publicKey []byte, modCache string) (common.Instance, error) {
 	name := containerName(batch.ID)
 	version := batch.OS.Version
 	if version == "" {
 		version = "24.04"
 	}
 
-	image, err := p.ensureImage(ctx, version, build)
+	image, err := p.ensureImage(ctx, version, bld)
 	if err != nil {
 		return common.Instance{}, err
 	}
 
 	// remove any pre-existing container with the same name so the run is fresh
-	// (-v also clears its old /var/lib/docker volume)
-	_, _ = p.docker(ctx, nil, "rm", "-fv", name)
+	// (RemoveVolumes also clears its old /var/lib/docker volume)
+	_, _ = p.client.ContainerRemove(ctx, name, dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
 
 	p.logger.Logf("Starting container %s (%s)", name, image)
-	runArgs := []string{
-		"run", "-d",
-		"--name", name,
-		"--hostname", name,
-		// tag so cleanup can find leftovers not recorded in state
-		"--label", containerLabel,
+
+	hostCfg := &container.HostConfig{
 		// systemd as PID 1 requires these inside the container
-		"--privileged",
-		"--cgroupns=host",
-		"-v", "/sys/fs/cgroup:/sys/fs/cgroup:rw",
-		"--tmpfs", "/run",
-		"--tmpfs", "/run/lock",
+		Privileged:   true,
+		CgroupnsMode: "host",
+		Tmpfs: map[string]string{
+			"/run":      "",
+			"/run/lock": "",
+		},
+		Binds: []string{"/sys/fs/cgroup:/sys/fs/cgroup:rw"},
 	}
 	if modCache != "" {
 		// Share the host module cache read-only; configureGoProxy points Go at it.
-		runArgs = append(runArgs, "-v", modCache+":"+containerModCacheDownload+":ro")
+		hostCfg.Binds = append(hostCfg.Binds, modCache+":"+containerModCacheDownload+":ro")
 	}
-	runArgs = append(runArgs, image)
-	if _, err := p.docker(ctx, nil, runArgs...); err != nil {
+
+	created, err := p.client.ContainerCreate(ctx, dockerclient.ContainerCreateOptions{
+		Config: &container.Config{
+			Image:    image,
+			Hostname: name,
+			// tag so cleanup can find leftovers not recorded in state
+			Labels: map[string]string{containerLabel: ""},
+		},
+		HostConfig: hostCfg,
+		Name:       name,
+	})
+	if err != nil {
+		return common.Instance{}, fmt.Errorf("failed to create container: %w", err)
+	}
+	if _, err := p.client.ContainerStart(ctx, created.ID, dockerclient.ContainerStartOptions{}); err != nil {
 		return common.Instance{}, fmt.Errorf("failed to start container: %w", err)
 	}
 
@@ -335,7 +372,7 @@ func (p *provisioner) installSSHKey(ctx context.Context, name string, publicKey 
 		"set -e; umask 077; mkdir -p /home/%[1]s/.ssh; cat >> /home/%[1]s/.ssh/authorized_keys; "+
 			"chown -R %[1]s:%[1]s /home/%[1]s/.ssh", sshUser)
 	stdin := bytes.NewReader(append(bytes.TrimSpace(publicKey), '\n'))
-	if _, err := p.docker(ctx, stdin, "exec", "-i", name, "bash", "-c", script); err != nil {
+	if err := p.containerExec(ctx, name, stdin, "bash", "-c", script); err != nil {
 		return fmt.Errorf("failed to install SSH key in container %s: %w", name, err)
 	}
 	return nil
@@ -350,7 +387,7 @@ func (p *provisioner) installSSHKey(ctx context.Context, name string, publicKey 
 func (p *provisioner) configureGoProxy(ctx context.Context, name string) {
 	proxy := "file://" + containerModCacheDownload + ",https://proxy.golang.org,direct"
 	script := "export HOME=/home/" + sshUser + "; go env -w GOPROXY=" + proxy
-	if _, err := p.docker(ctx, nil, "exec", name, "su", sshUser, "-c", script); err != nil {
+	if err := p.containerExec(ctx, name, nil, "su", sshUser, "-c", script); err != nil {
 		p.logger.Logf("Configuring GOPROXY in container %s failed (continuing without the module cache): %s", name, err)
 	}
 }
@@ -360,33 +397,90 @@ func (p *provisioner) configureGoProxy(ctx context.Context, name string) {
 // The Go/mage/gotestsum versions and a hash of the Dockerfile are part of the tag, so
 // bumping any of them (e.g. via .go-version or go.mod) or editing the Dockerfile itself
 // triggers a rebuild rather than reusing an image with stale baked contents.
-func (p *provisioner) ensureImage(ctx context.Context, version string, build imageBuild) (string, error) {
+func (p *provisioner) ensureImage(ctx context.Context, version string, bld imageBuild) (string, error) {
 	dfHash := sha256.Sum256(dockerfile)
 	image := fmt.Sprintf("%s:%s-go%s-mage%s-gts%s-df%s",
 		imageRepo, version,
-		strings.TrimPrefix(build.goVersion, "v"),
-		strings.TrimPrefix(build.mageVersion, "v"),
-		strings.TrimPrefix(build.gotestsumVersion, "v"),
+		strings.TrimPrefix(bld.goVersion, "v"),
+		strings.TrimPrefix(bld.mageVersion, "v"),
+		strings.TrimPrefix(bld.gotestsumVersion, "v"),
 		hex.EncodeToString(dfHash[:])[:8])
-	if _, err := p.docker(ctx, nil, "image", "inspect", image); err == nil {
+	if _, err := p.client.ImageInspect(ctx, image); err == nil {
 		return image, nil // already built
 	}
 
 	p.logger.Logf("Building docker image %s (first use; this can take a few minutes)", image)
 	buildCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	// Feed the Dockerfile on stdin; it has no COPY/ADD so it needs no build context.
-	if _, err := p.docker(buildCtx, bytes.NewReader(dockerfile),
-		"build", "-t", image,
-		"--build-arg", "UBUNTU_VERSION="+version,
-		"--build-arg", "GO_VERSION="+build.goVersion,
-		"--build-arg", "GO_ARCH="+runtime.GOARCH,
-		"--build-arg", "MAGE_VERSION="+build.mageVersion,
-		"--build-arg", "GOTESTSUM_VERSION="+build.gotestsumVersion,
-		"-"); err != nil {
+
+	// The Dockerfile has no COPY/ADD so the build context is just the Dockerfile itself.
+	buildContextTar, err := dockerfileTar(dockerfile)
+	if err != nil {
+		return "", fmt.Errorf("failed to create build context: %w", err)
+	}
+
+	goArch := runtime.GOARCH
+	resp, err := p.client.ImageBuild(buildCtx, buildContextTar, dockerclient.ImageBuildOptions{
+		Tags: []string{image},
+		BuildArgs: map[string]*string{
+			"UBUNTU_VERSION":    &version,
+			"GO_VERSION":        &bld.goVersion,
+			"GO_ARCH":           &goArch,
+			"MAGE_VERSION":      &bld.mageVersion,
+			"GOTESTSUM_VERSION": &bld.gotestsumVersion,
+		},
+		Remove: true,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to build image %s: %w", image, err)
+	}
+	defer resp.Body.Close()
+
+	// Drain and decode the streaming build output; surface any build error.
+	if err := decodeBuildOutput(resp.Body); err != nil {
 		return "", fmt.Errorf("failed to build image %s: %w", image, err)
 	}
 	return image, nil
+}
+
+// dockerfileTar wraps a raw Dockerfile in a tar archive suitable for use as a
+// Docker build context.
+func dockerfileTar(df []byte) (io.Reader, error) {
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	if err := tw.WriteHeader(&tar.Header{Name: "Dockerfile", Mode: 0o644, Size: int64(len(df))}); err != nil {
+		return nil, err
+	}
+	if _, err := tw.Write(df); err != nil {
+		return nil, err
+	}
+	if err := tw.Close(); err != nil {
+		return nil, err
+	}
+	return &buf, nil
+}
+
+// buildMessage is the subset of Docker's streaming build JSON we care about.
+type buildMessage struct {
+	Stream string `json:"stream"`
+	Error  string `json:"error"`
+}
+
+// decodeBuildOutput reads the streaming JSON from an image build response body,
+// returning a non-nil error if Docker reported a build failure.
+func decodeBuildOutput(r io.Reader) error {
+	dec := json.NewDecoder(r)
+	for {
+		var msg buildMessage
+		if err := dec.Decode(&msg); errors.Is(err, io.EOF) {
+			return nil
+		} else if err != nil {
+			return err
+		}
+		if msg.Error != "" {
+			return fmt.Errorf("%s", strings.TrimRight(msg.Error, "\n"))
+		}
+	}
 }
 
 // waitForDockerd blocks until the nested Docker daemon inside the container responds
@@ -399,7 +493,7 @@ func (p *provisioner) waitForDockerd(ctx context.Context, name string) error {
 	defer cancel()
 	var lastErr error
 	for {
-		if _, err := p.docker(ctx, nil, "exec", name, "docker", "info"); err == nil {
+		if err := p.containerExec(ctx, name, nil, "docker", "info"); err == nil {
 			return nil
 		} else {
 			lastErr = err
@@ -414,41 +508,94 @@ func (p *provisioner) waitForDockerd(ctx context.Context, name string) error {
 }
 
 func (p *provisioner) containerIP(ctx context.Context, name string) (string, error) {
-	out, err := p.docker(ctx, nil, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", name)
+	result, err := p.client.ContainerInspect(ctx, name, dockerclient.ContainerInspectOptions{})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to inspect container %s: %w", name, err)
 	}
-	ip := strings.TrimSpace(out)
-	if ip == "" {
-		return "", fmt.Errorf("container %s has no IP address", name)
+	for _, ep := range result.Container.NetworkSettings.Networks {
+		if ep.IPAddress.IsValid() {
+			return ep.IPAddress.String(), nil
+		}
 	}
-	return ip, nil
+	return "", fmt.Errorf("container %s has no IP address", name)
 }
 
 func (p *provisioner) checkDocker(ctx context.Context) error {
-	if _, err := exec.LookPath("docker"); err != nil {
-		return fmt.Errorf("docker not found in PATH: %w", err)
+	c, err := dockerclient.New(dockerclient.FromEnv)
+	if err != nil {
+		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	if _, err := p.docker(ctx, nil, "version", "--format", "{{.Server.Version}}"); err != nil {
+	if _, err := c.ServerVersion(ctx, dockerclient.ServerVersionOptions{}); err != nil {
 		return fmt.Errorf("docker does not appear to be running: %w", err)
+	}
+	p.client = c
+	return nil
+}
+
+// containerExec runs cmd inside the named container, optionally piping stdin.
+// It captures combined output and returns a non-nil error if the command exits
+// non-zero, including the output in the error for diagnostics.
+func (p *provisioner) containerExec(ctx context.Context, name string, stdin io.Reader, cmd ...string) error {
+	opts := dockerclient.ExecCreateOptions{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          cmd,
+	}
+	if stdin != nil {
+		opts.AttachStdin = true
+	}
+
+	execResp, err := p.client.ExecCreate(ctx, name, opts)
+	if err != nil {
+		return fmt.Errorf("exec create %v: %w", cmd, err)
+	}
+
+	attach, err := p.client.ExecAttach(ctx, execResp.ID, dockerclient.ExecAttachOptions{})
+	if err != nil {
+		return fmt.Errorf("exec attach %v: %w", cmd, err)
+	}
+	defer attach.Close()
+
+	if stdin != nil {
+		go func() {
+			_, _ = io.Copy(attach.Conn, stdin)
+			_ = attach.CloseWrite()
+		}()
+	}
+
+	var out bytes.Buffer
+	if err := demuxStream(&out, attach.Reader); err != nil {
+		return fmt.Errorf("exec read %v: %w", cmd, err)
+	}
+
+	inspect, err := p.client.ExecInspect(ctx, execResp.ID, dockerclient.ExecInspectOptions{})
+	if err != nil {
+		return fmt.Errorf("exec inspect %v: %w", cmd, err)
+	}
+	if inspect.ExitCode != 0 {
+		return fmt.Errorf("exec %v exited with code %d (output: %s)",
+			cmd, inspect.ExitCode, strings.TrimSpace(out.String()))
 	}
 	return nil
 }
 
-// docker runs the docker CLI, returning its combined output.
-func (p *provisioner) docker(ctx context.Context, stdin io.Reader, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	if stdin != nil {
-		cmd.Stdin = stdin
+// demuxStream reads Docker's multiplexed exec output (8-byte frame header followed
+// by payload) and writes the combined stdout+stderr to dst. The frame format is:
+// [stream-type (1 byte)][padding (3 bytes)][payload-size (4 bytes big-endian)].
+func demuxStream(dst io.Writer, src io.Reader) error {
+	hdr := make([]byte, 8)
+	for {
+		if _, err := io.ReadFull(src, hdr); err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return nil
+			}
+			return err
+		}
+		n := int64(binary.BigEndian.Uint32(hdr[4:]))
+		if _, err := io.CopyN(dst, src, n); err != nil {
+			return err
+		}
 	}
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	if err := cmd.Run(); err != nil {
-		return out.String(), fmt.Errorf("docker %s failed: %w (output: %s)",
-			strings.Join(args, " "), err, strings.TrimSpace(out.String()))
-	}
-	return out.String(), nil
 }
 
 // containerName derives a docker-safe container name from a batch ID.

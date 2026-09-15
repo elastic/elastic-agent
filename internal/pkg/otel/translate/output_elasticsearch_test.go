@@ -104,6 +104,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
@@ -171,6 +172,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -237,6 +239,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -305,6 +308,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
@@ -396,6 +400,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -414,6 +419,7 @@ sending_queue:
   queue_size: 12800
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -459,6 +465,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 compression: gzip
 compression_params:
@@ -486,6 +493,7 @@ sending_queue:
   queue_size: 4100
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -504,6 +512,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 		}
@@ -579,6 +588,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
@@ -642,6 +652,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
@@ -718,6 +729,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
 {{ if gt . 0 }}
 compression: gzip

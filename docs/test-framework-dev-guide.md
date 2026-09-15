@@ -175,6 +175,17 @@ share similar leavers as the packaging process.
        container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
        runner drives the container over SSH exactly like a VM. Requires Docker.
 
+ - `STACK_PROVISIONER`: Sets the provisioner used to create the Elastic Stack
+   (Elasticsearch, Kibana, Fleet Server) the tests talk to. Possible values are:
+     - `stateful`: Provisions a cloud ESS deployment (the default). Requires an
+       ESS API key (`mage integration:auth`).
+     - `serverless`: Provisions a cloud serverless project. Also requires an ESS
+       API key.
+     - `external`: Uses an existing stack supplied via environment variables
+       (`ELASTICSEARCH_HOST`, `KIBANA_HOST`, `ELASTICSEARCH_USERNAME`,
+       `ELASTICSEARCH_PASSWORD`). It creates and deletes nothing, and needs no
+       cloud account or local stack. Useful in CI, where a stack is provisioned
+       separately before the tests run.
 An example for running a single test, including packaging the artifacts for it is:
 ```
 DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
