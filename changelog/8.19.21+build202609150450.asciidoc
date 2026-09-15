@@ -10,5 +10,6 @@ Review important information about the 8.19.21+build202609150450 independent age
 === Bug fixes
 
 * Adds workaround to macOS {elastic-defend} for a macOS 27 (Golden Gate) bug where the system's Guard Proxy could drop network flow verdicts, potentially blocking all network traffic from apps using Network.framework. https://developer.apple.com/forums/thread/837709[Apple Developer Forums] https://github.com/elastic/endpoint-dev/pull/21932[#21932]
+* Hardens how {elastic-defend} restores file ownership and permissions during malware quarantine on Linux and macOS. https://github.com/elastic/endpoint-dev/pull/21843[#21843]
 
 // end 8.19.21+build202609150450 relnotes

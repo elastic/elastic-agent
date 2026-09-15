@@ -13,3 +13,16 @@ entries:
       file:
         name: macos-golden-gate-network-filter-workaround.yaml
         checksum: ""
+    - kind: bug-fix
+      summary: Hardens how Elastic Defend restores file ownership and permissions during malware quarantine on Linux and macOS
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21843
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: posix-quarantine-chown-chmod-symlink-race.yaml
+        checksum: ""
