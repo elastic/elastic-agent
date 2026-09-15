@@ -1,4 +1,4 @@
-version: 8.19.21+build202609150450
+version: 8.19.21+build202609151720
 entries:
     - kind: security
       summary: "{elastic-defend} on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing)"

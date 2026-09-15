@@ -1,24 +1,24 @@
-// begin 8.19.21+build202609150450 relnotes
+// begin 8.19.21+build202609151720 relnotes
 
-[[release-notes-8.19.21-build202609150450]]
-==  8.19.21+build202609150450
+[[release-notes-8.19.21-build202609151720]]
+==  8.19.21+build202609151720
 
-Review important information about the 8.19.21+build202609150450 independent agent release (IAR).
+Review important information about the 8.19.21+build202609151720 independent agent release (IAR).
 
 [discrete]
-[[security-updates-8.19.21-build202609150450]]
+[[security-updates-8.19.21-build202609151720]]
 === Security updates
 
 * {elastic-defend} on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing). The gRPC-bundled c-ares snapshot (~1.19) is unchanged and is tracked separately pending a gRPC version upgrade. https://github.com/elastic/endpoint-dev/pull/21384[#21384]
 
 [discrete]
-[[enhancements-8.19.21-build202609150450]]
+[[enhancements-8.19.21-build202609151720]]
 === Enhancements
 
 * Add experimental macOS 27 support to {elastic-defend}. https://github.com/elastic/endpoint-dev/pull/20653[#20653]
 
 [discrete]
-[[bug-fixes-8.19.21-build202609150450]]
+[[bug-fixes-8.19.21-build202609151720]]
 === Bug fixes
 
 * Reduces {elastic-defend} CPU usage and lock contention during network cache cleanup on Linux, preventing event enrichment stalls at high connection counts. https://github.com/elastic/endpoint-dev/pull/21599[#21599]
@@ -28,4 +28,4 @@ Review important information about the 8.19.21+build202609150450 independent age
 * {elastic-defend} exception list and trusted app rules matching on `host.name` now correctly handle mixed-case values. Previously, an exception with `host.name: "MyServer"` would silently fail to match because {elastic-defend} normalizes `host.name` to lowercase per ECS, while Kibana's default comparison is case-sensitive. https://github.com/elastic/endpoint-dev/pull/21597[#21597]
 * Adds workaround to macOS {elastic-defend} for Golden Gate bug breaking network connections from apps using Network.framework. https://developer.apple.com/forums/thread/837709[Apple Developer Forums] https://github.com/elastic/endpoint-dev/pull/21932[#21932]
 
-// end 8.19.21+build202609150450 relnotes
+// end 8.19.21+build202609151720 relnotes
