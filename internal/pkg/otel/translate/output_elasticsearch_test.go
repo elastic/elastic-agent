@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -70,8 +70,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -142,8 +140,6 @@ auth:
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -211,8 +207,6 @@ auth:
 endpoints:
   - http://localhost:9200?somekey=somevalue
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -282,8 +276,6 @@ auth:
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -386,8 +378,6 @@ compression_params:
 include_source_on_error: true
 logs_dynamic_id:
   enabled: true
-logs_dynamic_pipeline:
-  enabled: true
 `
 
 		tests := []struct {
@@ -485,8 +475,6 @@ compression_params:
 include_source_on_error: true
 logs_dynamic_id:
   enabled: true
-logs_dynamic_pipeline:
-  enabled: true
  `,
 			},
 			{
@@ -566,8 +554,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -650,8 +636,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -758,8 +742,6 @@ compression: none
 {{ end }}
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
 `
 
