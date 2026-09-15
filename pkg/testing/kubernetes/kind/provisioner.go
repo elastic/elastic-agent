@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -41,7 +42,9 @@ const (
 	getCommandTimeout    = 1 * time.Minute
 )
 
-const clusterCfg string = `
+// clusterCfgLegacy is used for Kubernetes <= 1.31 where the scheduler and
+// controller-manager still accept --bind-address and --secure-port flags.
+const clusterCfgLegacy string = `
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
@@ -58,6 +61,27 @@ nodes:
         bind-address: "0.0.0.0"
         secure-port: "10257"
 `
+
+const clusterCfgModern string = `
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+`
+
+// clusterConfig returns the kind cluster config appropriate for the given
+// Kubernetes version. The --bind-address and --secure-port extraArgs were
+// removed from kube-scheduler and kube-controller-manager in 1.32.
+func clusterConfig(k8sVersion string) string {
+	// k8sVersion is "v1.36.4" — strip leading "v", split on "."
+	parts := strings.Split(strings.TrimPrefix(k8sVersion, "v"), ".")
+	if len(parts) >= 2 {
+		if minor, err := strconv.Atoi(parts[1]); err == nil && minor <= 31 {
+			return clusterCfgLegacy
+		}
+	}
+	return clusterCfgModern
+}
 
 func NewProvisioner() (common.InstanceProvisioner, error) {
 	client, err := kubernetes.NewDockerClient()
@@ -122,10 +146,9 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 		if !exists {
 			p.logger.Logf("Provisioning kind cluster %s", instanceName)
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
-			clusterConfig := strings.NewReader(clusterCfg)
 
 			createCtx, createCancel := context.WithTimeout(ctx, createClusterTimeout)
-			ret, err := p.kindCmd(createCtx, clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			ret, err := p.kindCmd(createCtx, strings.NewReader(clusterConfig(k8sVersion)), "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
 			createCancel()
 			if err != nil {
 				return nil, fmt.Errorf("kind: failed to create cluster %s: %s", instanceName, ret.stderr)
