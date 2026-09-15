@@ -1,0 +1,14 @@
+// begin 8.19.21+build202609150450 relnotes
+
+[[release-notes-8.19.21-build202609150450]]
+==  8.19.21+build202609150450
+
+Review important information about the 8.19.21+build202609150450 independent agent release (IAR).
+
+[discrete]
+[[bug-fixes-8.19.21-build202609150450]]
+=== Bug fixes
+
+* Adds workaround to macOS {elastic-defend} for a macOS 27 (Golden Gate) bug where the system's Guard Proxy could drop network flow verdicts, potentially blocking all network traffic from apps using Network.framework. https://developer.apple.com/forums/thread/837709[Apple Developer Forums] https://github.com/elastic/endpoint-dev/pull/21932[#21932]
+
+// end 8.19.21+build202609150450 relnotes

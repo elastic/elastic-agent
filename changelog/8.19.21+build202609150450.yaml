@@ -1,0 +1,15 @@
+version: 8.19.21+build202609150450
+entries:
+    - kind: bug-fix
+      summary: Adds workaround to macOS Elastic Defend for a macOS 27 (Golden Gate) bug where the system's Guard Proxy could drop network flow verdicts, potentially blocking all network traffic from apps using Network.framework
+      description: ""
+      component: elastic-defend
+      pr:
+        - https://github.com/elastic/endpoint-dev/pull/21932
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789490905
+      file:
+        name: macos-golden-gate-network-filter-workaround.yaml
+        checksum: ""
