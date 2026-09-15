@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	dockerclient "github.com/moby/moby/client"
 	v1 "k8s.io/api/core/v1"
@@ -300,11 +301,7 @@ type cmdResult struct {
 
 func (p *provisioner) kindCmd(ctx context.Context, stdIn io.Reader, args ...string) (cmdResult, error) {
 	var stdout, stderr bytes.Buffer
-<<<<<<< HEAD
-	cmd := exec.Command("kind", args...)
-=======
 	cmd := exec.CommandContext(ctx, "kind", args...)
->>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if stdIn != nil {

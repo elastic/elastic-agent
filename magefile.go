@@ -3139,21 +3139,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
 	}
-	essToken, ok, err := ess.GetESSAPIKey()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
-	}
-
-	// Possible to change the region for deployment, default is gcp-us-west2 which is
-	// the CFT region.
-	essRegion := cfg.IntegrationTest.ESSRegion
-	if essRegion == "" {
-		essRegion = "gcp-us-west2"
-	}
-
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
 	var identifier string
@@ -3205,43 +3190,19 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
-<<<<<<< HEAD
-	provisionCfg := ess.ProvisionerConfig{
-		Identifier: identifier,
-		APIKey:     essToken,
-		Region:     essRegion,
-	}
-
-	var stackProvisioner tcommon.StackProvisioner
-	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	switch stackProvisionerMode {
-	case "", ess.ProvisionerStateful:
-		stackProvisionerMode = ess.ProvisionerStateful
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
-=======
-	// The local stack provisioner runs elastic-package locally and the external one
-	// reads an already running stack from the environment, so neither needs ESS
-	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
+	// The external stack provisioner reads an already running stack from the
+	// environment and needs no ESS credentials.
 	var provisionCfg ess.ProvisionerConfig
 	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	if stackProvisionerMode != ess.ProvisionerLocal && stackProvisionerMode != ess.ProvisionerExternal {
+	if stackProvisionerMode != ess.ProvisionerExternal {
 		provisionCfg, err = essProvisionerConfig(cfg, identifier)
->>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
 		if err != nil {
 			return nil, err
 		}
-	case ess.ProvisionerServerless:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
-			ess.ProvisionerStateful,
-			ess.ProvisionerServerless,
-			stackProvisionerMode)
+	}
+	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := cfg.IntegrationTest.TimestampEnabled
@@ -3314,8 +3275,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	return r, nil
 }
 
-<<<<<<< HEAD
-=======
 // essProvisionerConfig builds the ESS provisioner configuration (API key + region)
 // used by both the stateful and serverless stack provisioners.
 func essProvisionerConfig(cfg *devtools.Settings, identifier string) (ess.ProvisionerConfig, error) {
@@ -3358,20 +3317,14 @@ func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerCon
 	case ess.ProvisionerExternal:
 		sp, err := ess.NewExternalProvisioner()
 		return sp, mode, err
-	case ess.ProvisionerLocal:
-		sp, err := ess.NewLocalProvisioner()
-		return sp, mode, err
 	default:
-		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q, %q or %q, not %s",
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
 			ess.ProvisionerExternal,
-			ess.ProvisionerLocal,
 			mode)
 	}
 }
-
->>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
 func shouldBuildAgent(cfg *devtools.Settings) bool {
 	return cfg.IntegrationTest.BuildAgent
 }

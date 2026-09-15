@@ -42,10 +42,6 @@ func (p *ExternalProvisioner) Name() string {
 	return ProvisionerExternal
 }
 
-func (p *ExternalProvisioner) Location() common.ProvisionerLocation {
-	return common.ProvisionerLocationRemote
-}
-
 func (p *ExternalProvisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
