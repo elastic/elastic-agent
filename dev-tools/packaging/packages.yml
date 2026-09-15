@@ -510,7 +510,10 @@ shared:
     docker_variant: 'ubi'
     extra_vars:
       from: '--platform=linux/arm64 redhat/ubi9-minimal'
+<<<<<<< HEAD
 
+=======
+>>>>>>> 173d6ed (Revert non-IronBank container images to using UBI9 (#16396))
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:
