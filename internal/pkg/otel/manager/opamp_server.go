@@ -63,9 +63,10 @@ type OpAMPServer struct {
 	log    *logger.Logger
 	secret string
 
-	srv        server.OpAMPServer
-	endpoint   string
-	socketPath string // non-empty when the server is listening on a Unix socket
+	srv          server.OpAMPServer
+	endpoint     string
+	socketPath   string // non-empty when listening on a Unix socket or Windows named pipe
+	ipcTransport string // "unix" or "windows_named_pipe"; valid when socketPath != ""
 	// httpSrv is set when the server is started via serveOn (Attach path).
 	// nil when started via srv.Start.
 	httpSrv *http.Server
@@ -129,10 +130,18 @@ func (s *OpAMPServer) serveOn(lis net.Listener) error {
 		ConnContext:       connContext,
 		ReadHeaderTimeout: 60 * time.Second,
 	}
-	if lis.Addr().Network() == "unix" {
+	switch lis.Addr().Network() {
+	case "unix":
 		s.socketPath = lis.Addr().String()
-		s.endpoint = "http://localhost" + opampListenPath // cosmetic URL when using a Unix socket
-	} else {
+		s.ipcTransport = "unix"
+		s.endpoint = "http://localhost" + opampListenPath
+	case "pipe":
+		// Windows named pipe: winio returns network "pipe".
+		// confignet uses "npipe" (TransportTypeNpipe) as the transport name for named pipes.
+		s.socketPath = lis.Addr().String()
+		s.ipcTransport = "npipe"
+		s.endpoint = "http://localhost" + opampListenPath
+	default:
 		s.endpoint = fmt.Sprintf("http://%s%s", lis.Addr().String(), opampListenPath)
 	}
 	go func() {
@@ -206,10 +215,16 @@ func (s *OpAMPServer) Endpoint() string {
 	return s.endpoint
 }
 
-// SocketPath returns the Unix socket path when the server is listening on a
-// Unix domain socket, or an empty string when using TCP.
+// SocketPath returns the IPC path (Unix socket path or Windows named pipe path)
+// when the server is listening on a local IPC channel, or empty when using TCP.
 func (s *OpAMPServer) SocketPath() string {
 	return s.socketPath
+}
+
+// SocketTransport returns the confignet transport name for the IPC channel
+// ("unix" on Unix, "npipe" on Windows), or empty when using TCP.
+func (s *OpAMPServer) SocketTransport() string {
+	return s.ipcTransport
 }
 
 // StartSession begins a new collector session. Closes any prior session and
