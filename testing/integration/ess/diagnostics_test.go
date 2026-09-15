@@ -676,13 +676,10 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		"components/filestream-default/registry.tar.gz",
 		"components/filestream-default/beat_metrics.json",
 		"components/filestream-default/input_metrics.json",
-<<<<<<< HEAD
-=======
 		"components/system-metrics-default/beat_metrics.json",
 		"components/system-metrics-default/input_metrics.json",
 		"logs/elastic-agent-*/elastic-agent-*.ndjson",
 		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
->>>>>>> 9c9fbc3 (fix: fix diagnostics for otel components containing `/` (#16453))
 	}
 
 	for _, f := range expectedFiles {
