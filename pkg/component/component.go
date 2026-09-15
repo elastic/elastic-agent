@@ -540,10 +540,6 @@ func (r *RuntimeSpecs) componentsForInputType(
 	// Treat as non isolated units component on error of reading the input spec
 	if componentErr != nil || !inputSpec.Spec.IsolateUnits {
 		componentID := fmt.Sprintf("%s-%s", inputType, output.Name)
-		if inputSpec.Spec.Service != nil {
-			componentID = inputType
-		}
-
 		if componentErr == nil {
 			componentErr = validateComponentID(paths.Run(), componentID)
 		}
@@ -593,10 +589,6 @@ func (r *RuntimeSpecs) componentsForInputType(
 		for _, input := range output.Inputs[inputType] {
 			// Units are being mapped to components, so we need a unique ID for each.
 			componentID := fmt.Sprintf("%s-%s-%s", inputType, output.Name, input.id)
-			if inputSpec.Spec.Service != nil {
-				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
-			}
-
 			var componentErr error
 			if err := validateComponentID(paths.Run(), componentID); err != nil {
 				componentErr = err
