@@ -24,11 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
-<<<<<<< HEAD
-=======
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
-	"github.com/elastic/elastic-agent/pkg/testing/local"
->>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
 	tssh "github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"github.com/elastic/elastic-agent/pkg/testing/supported"
 )

@@ -140,17 +140,11 @@ common:
     default_variants: &k8s_test_default_variants
       - complete
       - complete-wolfi
-<<<<<<< HEAD
-=======
-      - elastic-otel-collector
     all_variants_without_default: &k8s_test_all_variants_without_default
       - basic
-      - elastic-otel-collector-wolfi
+      - cloud
       - service
-      - slim
-      - slim-wolfi
       - wolfi
->>>>>>> 0fd77b1 (chore(ci): run Kubernetes integration tests through the Go provisioner (#16526))
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
@@ -1078,4 +1072,3 @@ steps:
           tags:
             - "fips=false"
       - *google_oidc_observability_plugin
-
