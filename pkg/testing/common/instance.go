@@ -43,6 +43,8 @@ type Instance struct {
 	Provisioner string `yaml:"provisioner"`
 	// IP is the IP address of the instance.
 	IP string `yaml:"ip"`
+	// SSHPort is the TCP port used for SSH connections. Zero means the default (22).
+	SSHPort int `yaml:"ssh_port,omitempty"`
 	// Username is the username used to SSH to the instance.
 	Username string `yaml:"username"`
 	// RemotePath is the based path used for performing work on the instance.
