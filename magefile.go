@@ -3139,21 +3139,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
 	}
-	essToken, ok, err := ess.GetESSAPIKey()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
-	}
-
-	// Possible to change the region for deployment, default is gcp-us-west2 which is
-	// the CFT region.
-	essRegion := cfg.IntegrationTest.ESSRegion
-	if essRegion == "" {
-		essRegion = "gcp-us-west2"
-	}
-
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
 	var identifier string
@@ -3189,7 +3174,11 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = multipass.NewProvisioner()
 		identifier = localIdentifier()
 	case kind.Name:
-		instanceProvisioner = kind.NewProvisioner()
+		var err error
+		instanceProvisioner, err = kind.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner = dockerprov.NewProvisioner()
@@ -3201,33 +3190,19 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
-	provisionCfg := ess.ProvisionerConfig{
-		Identifier: identifier,
-		APIKey:     essToken,
-		Region:     essRegion,
-	}
-
-	var stackProvisioner tcommon.StackProvisioner
+	// The external stack provisioner reads an already running stack from the
+	// environment and needs no ESS credentials.
+	var provisionCfg ess.ProvisionerConfig
 	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	switch stackProvisionerMode {
-	case "", ess.ProvisionerStateful:
-		stackProvisionerMode = ess.ProvisionerStateful
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
+	if stackProvisionerMode != ess.ProvisionerExternal {
+		provisionCfg, err = essProvisionerConfig(cfg, identifier)
 		if err != nil {
 			return nil, err
 		}
-	case ess.ProvisionerServerless:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
-			ess.ProvisionerStateful,
-			ess.ProvisionerServerless,
-			stackProvisionerMode)
+	}
+	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
+	if err != nil {
+		return nil, err
 	}
 
 	timestamp := cfg.IntegrationTest.TimestampEnabled
@@ -3300,6 +3275,56 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	return r, nil
 }
 
+// essProvisionerConfig builds the ESS provisioner configuration (API key + region)
+// used by both the stateful and serverless stack provisioners.
+func essProvisionerConfig(cfg *devtools.Settings, identifier string) (ess.ProvisionerConfig, error) {
+	essToken, ok, err := ess.GetESSAPIKey()
+	if err != nil {
+		return ess.ProvisionerConfig{}, err
+	}
+	if !ok {
+		return ess.ProvisionerConfig{}, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+	}
+
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
+	essRegion := cfg.IntegrationTest.ESSRegion
+	if essRegion == "" {
+		essRegion = "gcp-us-west2"
+	}
+
+	return ess.ProvisionerConfig{
+		Identifier: identifier,
+		APIKey:     essToken,
+		Region:     essRegion,
+	}, nil
+}
+
+// newStackProvisioner creates the stack provisioner selected by STACK_PROVISIONER
+// (defaulting to stateful), returning the provisioner and its resolved mode.
+func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerConfig) (tcommon.StackProvisioner, string, error) {
+	mode := cfg.IntegrationTest.StackProvisioner
+	switch mode {
+	case "", ess.ProvisionerStateful:
+		mode = ess.ProvisionerStateful
+		sp, err := ess.NewProvisioner(provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerServerless:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerExternal:
+		sp, err := ess.NewExternalProvisioner()
+		return sp, mode, err
+	default:
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			ess.ProvisionerExternal,
+			mode)
+	}
+}
 func shouldBuildAgent(cfg *devtools.Settings) bool {
 	return cfg.IntegrationTest.BuildAgent
 }
