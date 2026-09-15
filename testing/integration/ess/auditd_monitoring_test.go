@@ -179,9 +179,8 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 				if strings.HasPrefix(comp.ID, "audit/auditd") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
 					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
-					t.Logf("audit/auditd component state=%s message=%q", compStateProto, comp.Message)
 					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
-						"expected audit/auditd component to be healthy, got %s (message: %s)", compStateProto, comp.Message)
+						"expected audit/auditd component to be healthy, got %s", compStateProto)
 					foundReceiver = true
 					break
 				}

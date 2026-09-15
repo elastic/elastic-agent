@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -150,30 +149,6 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 	return doc
 }
 
-// esServerName returns the Elasticsearch hostname used as the TLS SNI.
-func esServerName(t *testing.T) string {
-	raw := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
-	u, err := url.Parse(raw)
-	require.NoError(t, err, "parsing ELASTICSEARCH_HOST")
-	require.NotEmpty(t, u.Hostname(), "ELASTICSEARCH_HOST has no hostname")
-	return u.Hostname()
-}
-
-// esPort returns the TCP port for the Elasticsearch host. It reads the port
-// from ELASTICSEARCH_HOST (e.g. "9200" for a local stack) and falls back to
-// "443" when no explicit port is present (ESS cloud).
-func esPort(t *testing.T) string {
-	raw := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
-	u, err := url.Parse(raw)
-	require.NoError(t, err, "parsing ELASTICSEARCH_HOST")
-	if p := u.Port(); p != "" {
-		return p
-	}
-	return "443"
-}
-
 // dialTLS triggers a TLS handshake to host:port for the packet component to
 // capture. A dial error is fine: the SNI is sent before cert verification.
 func dialTLS(t *testing.T, host, port string) {
@@ -202,8 +177,15 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	// Use one fixed destination for both runtimes so the captured handshakes are
 	// directly comparable. Use the actual port from ELASTICSEARCH_HOST so that
 	// the TLS dial succeeds on local stacks (port 9200) as well as ESS (port 443).
-	serverName := esServerName(t)
-	port := esPort(t)
+	rawESHost, err := integration.GetESHost()
+	require.NoError(t, err, "could not get ES host")
+	esURL, err := url.Parse(rawESHost)
+	require.NoError(t, err, "could not parse ES host URL")
+	serverName := esURL.Hostname()
+	port := esURL.Port()
+	if port == "" {
+		port = "443"
+	}
 
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
