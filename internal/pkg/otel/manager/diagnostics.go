@@ -8,11 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-<<<<<<< HEAD
 	"io/fs"
-=======
 	"slices"
->>>>>>> 9c9fbc3 (fix: fix diagnostics for otel components containing `/` (#16453))
 	"strings"
 	"syscall"
 
@@ -127,32 +124,11 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		return diagnostics, nil
 	}
 
-<<<<<<< HEAD
-	// Receiver names have the form "<receiverType>/_agent-component/<comp.ID>/<streamID>".
-	// All "/" characters are literal string delimiters, not filesystem path separators,
-	// so this is consistent across platforms including Windows.
-	// We extract comp.ID as the segment between OtelNamePrefix and the next "/". This is
-	// exact and unambiguous for normal IDs. Both comp.ID and streamID are user-supplied
-	// (from the policy input "id" field), so either could contain "/" — making the format
-	// ambiguous in that case. The warning below flags such IDs. A proper fix requires
-	// escaping "/" in IDs at the source in the beat receiver.
-=======
->>>>>>> 9c9fbc3 (fix: fix diagnostics for otel components containing `/` (#16453))
 	diagIdxByCompID := make(map[string]int)
 	for idx, diag := range diagnostics {
 		diagIdxByCompID[diag.Component.ID] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-<<<<<<< HEAD
-		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
-		if len(parts) != 2 {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
-			continue
-		}
-		compID, _, _ := strings.Cut(parts[1], "/")
-		if idx, ok := diagIdxByCompID[compID]; ok {
-			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
-=======
 		componentIDs := diagnosticComponentIDsFromName(extDiag.Name, currentComponents)
 		if len(componentIDs) == 0 {
 			m.managerLogger.Debugf("skipping EDOT diagnostic for %q: it cannot be associated with an active component", extDiag.Name)
@@ -165,7 +141,6 @@ func (m *OTelManager) PerformComponentDiagnostics(
 			if idx, ok := diagIdxByCompID[compID]; ok {
 				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
 			}
->>>>>>> 9c9fbc3 (fix: fix diagnostics for otel components containing `/` (#16453))
 		}
 	}
 
