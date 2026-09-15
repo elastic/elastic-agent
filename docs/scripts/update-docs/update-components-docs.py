@@ -91,6 +91,16 @@ def parse_version_tag(tag):
     return None
 
 
+def since_to_minor(since):
+    """Convert a 'since' tag like 'v9.5.0' to its Major.Minor string ('9.5').
+
+    Returns '' when the value is empty or cannot be parsed. Used to render the
+    'Added in' column as an `applies_to` version badge (badges resolve to
+    Major.Minor, so patch precision is intentionally dropped)."""
+    parsed = parse_version_tag(since) if since else None
+    return f"{parsed[0]}.{parsed[1]}" if parsed else ''
+
+
 def resolve_path_for_tag(tag, path_type, fallback_to_file_check=True):
     """Resolve the correct file path for a given tag using semantic versioning.
     
@@ -485,6 +495,9 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
             print(f"  Stamped new component '{since_key}' with since={stamped}")
         else:
             comp['since'] = ''
+
+        # Major.Minor used to render the 'Added in' column as an applies_to badge.
+        comp['since_minor'] = since_to_minor(comp['since'])
 
     components_grouped = defaultdict(list)
 

@@ -245,6 +245,20 @@ class TestDocCoverageIssues(unittest.TestCase):
             self.assertEqual(issues['orphaned_pages'], [])
 
 
+class TestSinceToMinor(unittest.TestCase):
+    """Tests for since_to_minor (Added-in badge version formatting)."""
+
+    def test_converts_to_major_minor(self):
+        self.assertEqual(script.since_to_minor('v9.5.0'), '9.5')
+        self.assertEqual(script.since_to_minor('9.5.3'), '9.5')
+        self.assertEqual(script.since_to_minor('v10.0.0'), '10.0')
+
+    def test_empty_or_unparseable_returns_empty(self):
+        self.assertEqual(script.since_to_minor(''), '')
+        self.assertEqual(script.since_to_minor(None), '')
+        self.assertEqual(script.since_to_minor('main'), '')
+
+
 build_pr_body = SourceFileLoader('build_pr_body', 'build_pr_body.py').load_module()
 
 
