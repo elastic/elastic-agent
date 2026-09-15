@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -39,6 +40,16 @@ const (
 
 	stateUnknownMessage = "Unknown"
 )
+
+// hostnameOverrideArgs returns ["--hostname", h] when beatName is a standard
+// libbeat binary that supports the flag and h is non-empty, otherwise nil.
+// Cloudbeat is intentionally excluded from ELASTIC_AGENT_HOSTNAME propagation.
+func hostnameOverrideArgs(beatName, h string) []string {
+	if beatName == "" || beatName == "cloudbeat" || h == "" {
+		return nil
+	}
+	return []string{"--hostname", h}
+}
 
 func (m actionMode) String() string {
 	switch m {
@@ -417,6 +428,8 @@ func (c *commandRuntime) start(comm Communicator) error {
 
 	// differentiate data paths
 	args = append(args, "-E", "path.data="+workDir)
+
+	args = append(args, hostnameOverrideArgs(c.current.BeatName(), util.HostnameOverride())...)
 
 	// reset checkin state before starting the process.
 	c.lastCheckin = time.Time{}

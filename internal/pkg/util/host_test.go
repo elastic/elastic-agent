@@ -16,7 +16,46 @@ import (
 	"github.com/elastic/go-sysinfo/types"
 )
 
+func TestHostnameOverride(t *testing.T) {
+	cases := []struct {
+		name     string
+		envValue string
+		expected string
+	}{
+		{name: "plain", envValue: "my-node", expected: "my-node"},
+		{name: "leading_trailing_whitespace", envValue: "  my-node  ", expected: "my-node"},
+		{name: "whitespace_only", envValue: "   ", expected: ""},
+		{name: "unset", envValue: "", expected: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(EnvHostName, tc.envValue)
+			require.Equal(t, tc.expected, HostnameOverride())
+		})
+	}
+}
+
+func TestGetHostNameEnvOverride(t *testing.T) {
+	cases := []struct {
+		name     string
+		envValue string
+		expected string
+	}{
+		{name: "plain", envValue: "my-node", expected: "my-node"},
+		{name: "trimmed", envValue: "  my-node  ", expected: "my-node"},
+		{name: "whitespace_only", envValue: "   ", expected: "pod-xyz"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(EnvHostName, tc.envValue)
+			hostname := GetHostName(false, types.HostInfo{Hostname: "pod-xyz"}, nil, nil)
+			require.Equal(t, tc.expected, hostname)
+		})
+	}
+}
+
 func TestGetHostName(t *testing.T) {
+	t.Setenv(EnvHostName, "")
 	cases := map[string]struct {
 		fqdnFeatureEnabled bool
 		hostInfo           types.HostInfo
