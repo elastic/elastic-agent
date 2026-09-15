@@ -5,7 +5,9 @@ Run with: python test_update_components_docs.py
 Or:       python -m pytest test_update_components_docs.py -v (if pytest installed)
 """
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 from importlib.machinery import SourceFileLoader
 
@@ -164,6 +166,125 @@ class TestVersionComparison(unittest.TestCase):
         self.assertGreater((9, 2, 1), (9, 2, 0))
         self.assertGreater((10, 0, 0), (9, 99, 99))
         self.assertLess((9, 2, 0), (9, 2, 1))
+
+
+class TestDocCoverageIssues(unittest.TestCase):
+    """Tests for get_doc_coverage_issues (documentation coverage detection)."""
+
+    @staticmethod
+    def _resolver(components_dir):
+        # Map any site doc path to a file of the same name in the temp dir.
+        return lambda doc_path: components_dir / Path(doc_path).name
+
+    def test_missing_target_and_orphaned_pages(self):
+        with tempfile.TemporaryDirectory() as d:
+            components_dir = Path(d) / 'components'
+            components_dir.mkdir()
+            # A mapped page that exists on disk.
+            (components_dir / 'filelogreceiver.md').write_text('x', encoding='utf-8')
+            # A page that exists but is not referenced by any mapping.
+            (components_dir / 'attributesprocessor.md').write_text('x', encoding='utf-8')
+            # A non-component page that must be ignored.
+            (components_dir / 'migrate-components.md').write_text('x', encoding='utf-8')
+
+            mapping = {
+                'filelogreceiver': {
+                    'doc_path': '/reference/edot-collector/components/filelogreceiver.md'
+                },
+                # Mapping whose target file does not exist -> broken link.
+                'ghostreceiver': {
+                    'doc_path': '/reference/edot-collector/components/ghostreceiver.md'
+                },
+            }
+
+            issues = script.get_doc_coverage_issues(
+                mapping,
+                components_dir=components_dir,
+                resolver=self._resolver(components_dir),
+            )
+
+            missing = {m['component'] for m in issues['missing_targets']}
+            self.assertEqual(missing, {'ghostreceiver'})
+            self.assertEqual(
+                issues['missing_targets'][0]['doc_path'],
+                '/reference/edot-collector/components/ghostreceiver.md',
+            )
+
+            self.assertIn('attributesprocessor.md', issues['orphaned_pages'])
+            self.assertNotIn('filelogreceiver.md', issues['orphaned_pages'])
+            self.assertNotIn('migrate-components.md', issues['orphaned_pages'])
+
+    def test_no_issues_when_all_mapped_and_present(self):
+        with tempfile.TemporaryDirectory() as d:
+            components_dir = Path(d) / 'components'
+            components_dir.mkdir()
+            (components_dir / 'filelogreceiver.md').write_text('x', encoding='utf-8')
+
+            mapping = {
+                'filelogreceiver': {
+                    'doc_path': '/reference/edot-collector/components/filelogreceiver.md'
+                },
+            }
+
+            issues = script.get_doc_coverage_issues(
+                mapping,
+                components_dir=components_dir,
+                resolver=self._resolver(components_dir),
+            )
+            self.assertEqual(issues['missing_targets'], [])
+            self.assertEqual(issues['orphaned_pages'], [])
+
+    def test_empty_mapping_returns_no_issues(self):
+        with tempfile.TemporaryDirectory() as d:
+            components_dir = Path(d) / 'components'
+            components_dir.mkdir()
+            issues = script.get_doc_coverage_issues(
+                {}, components_dir=components_dir, resolver=self._resolver(components_dir)
+            )
+            self.assertEqual(issues['missing_targets'], [])
+            self.assertEqual(issues['orphaned_pages'], [])
+
+
+build_pr_body = SourceFileLoader('build_pr_body', 'build_pr_body.py').load_module()
+
+
+class TestBuildPrBody(unittest.TestCase):
+    """Tests for build_pr_body.build_body (automated PR description rendering)."""
+
+    def test_base_body_has_corrected_source_links(self):
+        body = build_pr_body.build_body({}, 'v9.5.3')
+        # Links must point at the real generation sources (regression guard for
+        # the previous components.yaml / root go.mod links).
+        self.assertIn('/blob/v9.5.3/internal/edot/go.mod', body)
+        self.assertIn('/blob/v9.5.3/internal/edot/components.yml', body)
+        self.assertNotIn('components.yaml', body)
+        self.assertNotIn('/blob/v9.5.3/go.mod', body)
+
+    def test_no_review_sections_when_empty(self):
+        body = build_pr_body.build_body({}, 'v9.5.3')
+        self.assertNotIn('New components detected', body)
+        self.assertNotIn('Documentation coverage gaps', body)
+
+    def test_new_components_section_rendered(self):
+        body = build_pr_body.build_body({'newly_stamped': ['fooreceiver', 'barexporter']}, 'v9.5.3')
+        self.assertIn('## ⚠️ New components detected', body)
+        self.assertIn('- `fooreceiver`', body)
+        self.assertIn('- `barexporter`', body)
+
+    def test_doc_coverage_section_rendered(self):
+        data = {
+            'doc_coverage': {
+                'missing_targets': [
+                    {'component': 'ghostreceiver',
+                     'doc_path': '/reference/edot-collector/components/ghostreceiver.md'}
+                ],
+                'orphaned_pages': ['attributesprocessor.md'],
+            }
+        }
+        body = build_pr_body.build_body(data, 'v9.5.3')
+        self.assertIn('## 📄 Documentation coverage gaps', body)
+        self.assertIn('`ghostreceiver`', body)
+        self.assertIn('`attributesprocessor.md`', body)
 
 
 if __name__ == '__main__':

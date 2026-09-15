@@ -36,6 +36,15 @@ COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 COMPONENTS_YAML = '../../../internal/edot/components.yml'
 COMPONENTS_YAML_LOCAL = Path(__file__).parent / '../../../internal/edot/components.yml'
+
+# Directory anchors resolved relative to this script so that path-dependent
+# helpers work regardless of the current working directory.
+SCRIPT_DIR = Path(__file__).parent
+DOCS_ROOT = SCRIPT_DIR / '../../../docs'
+COMPONENT_PAGES_DIR = SCRIPT_DIR / EDOT_COLLECTOR_DIR / 'components'
+# Doc pages under components/ that are not tied to a single component and should
+# be excluded from orphaned-page detection.
+NON_COMPONENT_PAGES = {'migrate-components.md'}
 # Path migration configuration
 # Each entry defines: new_path, old_path, and the version where the change occurred
 PATH_MIGRATIONS = {
@@ -710,6 +719,53 @@ def check_markdown():
     
     return tables and ocb
 
+def _doc_path_to_disk(doc_path):
+    """Map a site doc path (e.g. '/reference/edot-collector/components/x.md')
+    to its location on disk under the repository's docs/ directory."""
+    return DOCS_ROOT / doc_path.lstrip('/')
+
+
+def get_doc_coverage_issues(component_docs_mapping, components_dir=None, resolver=None):
+    """Detect documentation coverage gaps for the components table.
+
+    Returns a dict with:
+      - 'missing_targets': entries in component-docs.yml whose target file does
+        not exist on disk (the components table would link to a missing page).
+      - 'orphaned_pages': component doc pages that exist on disk but are not
+        referenced by any mapping, so the components table cannot link to them.
+
+    ``components_dir`` and ``resolver`` are injectable to keep the function
+    testable without touching the real docs tree.
+    """
+    component_docs_mapping = component_docs_mapping or {}
+    resolver = resolver or _doc_path_to_disk
+    components_dir = Path(components_dir) if components_dir else COMPONENT_PAGES_DIR
+
+    missing_targets = []
+    mapped_files = set()
+    for name, info in component_docs_mapping.items():
+        doc_path = (info or {}).get('doc_path')
+        if not doc_path:
+            continue
+        disk_path = resolver(doc_path)
+        mapped_files.add(str(disk_path.resolve()))
+        if not disk_path.is_file():
+            missing_targets.append({'component': name, 'doc_path': doc_path})
+
+    orphaned_pages = []
+    if components_dir.is_dir():
+        for page in sorted(components_dir.glob('*.md')):
+            if page.name in NON_COMPONENT_PAGES:
+                continue
+            if str(page.resolve()) not in mapped_files:
+                orphaned_pages.append(page.name)
+
+    return {
+        'missing_targets': sorted(missing_targets, key=lambda m: m['component']),
+        'orphaned_pages': orphaned_pages,
+    }
+
+
 def generate_markdown():
     col_version = get_collector_version()
     print(f"Collector version: {col_version}")
@@ -728,15 +784,24 @@ def generate_markdown():
     # Persist any newly stamped 'since' entries back to components.yml
     write_component_since(components_result['component_since'])
 
-    # If running in CI, write the list of newly stamped components to a file
-    # so the workflow can include a review prompt in the PR description.
+    # If running in CI, write detected review items (newly stamped components and
+    # documentation coverage gaps) to a file so the workflow can prompt reviewers
+    # in the generated PR description.
     new_components_file = os.environ.get('NEW_COMPONENTS_FILE')
-    if new_components_file and components_result['newly_stamped']:
-        Path(new_components_file).write_text(
-            json.dumps({'newly_stamped': sorted(components_result['newly_stamped'])}),
-            encoding='utf-8',
-        )
-        print(f"\nNew components written to {new_components_file}: {components_result['newly_stamped']}")
+    if new_components_file:
+        coverage = get_doc_coverage_issues(component_docs_mapping)
+        review_items = {
+            'newly_stamped': sorted(components_result['newly_stamped']),
+            'doc_coverage': coverage,
+        }
+        if (review_items['newly_stamped']
+                or coverage['missing_targets']
+                or coverage['orphaned_pages']):
+            Path(new_components_file).write_text(
+                json.dumps(review_items, indent=2),
+                encoding='utf-8',
+            )
+            print(f"\nReview items written to {new_components_file}: {review_items}")
 
     otel_col_version = get_otel_col_upstream_version()
     data = {
@@ -799,6 +864,7 @@ def generate_markdown():
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "check":
-        check_markdown()
+        # Exit non-zero when generated docs are out of date so CI can catch drift.
+        sys.exit(0 if check_markdown() else 1)
     else:
         generate_markdown()
