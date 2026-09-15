@@ -129,24 +129,21 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	retryDeadline := time.Now().Add(retryTimeout)
 	upgradeDetails.SetRetryUntil(&retryDeadline)
 
-	retrier := backoff.NewExponentialBackOff(
-		backoff.WithInitialInterval(settings.RetrySleepInitDuration),
-		backoff.WithMaxElapsedTime(retryTimeout),
-	)
-	retryCtx := backoff.WithContext(retrier, ctx)
+	retrier := backoff.NewExponentialBackOff()
+	retrier.InitialInterval = settings.RetrySleepInitDuration
 
 	attempt := 0
 	skip := make([]bool, len(sources))
 	errs := make([]error, len(sources))
 
-	fetchSources := func() error {
+	fetchSources := func() (struct{}, error) {
 		for i, src := range sources {
 			if skip[i] {
 				continue
 			}
 
 			if target.Version.IsSnapshot() && src == artifact.DefaultSourceURI && target.Version.BuildMetadata() == "" {
-				buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version)
+				buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version, upgradeDetails)
 				if err != nil {
 					e := fmt.Errorf("couldn't retrieve latest snapshot build ID: %w", err)
 					a.log.Debugf("%v", e)
@@ -179,13 +176,13 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath, a.fileOps); err != nil {
 				if downloaderrors.IsDiskSpaceError(err) {
-					return backoff.Permanent(err)
+					return struct{}{}, backoff.Permanent(err)
 				}
 				var agentErr errors.Error
 				if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
 					if agentErr.Meta()[errors.MetaKeyPath] == targetPath {
 						// can't write to target
-						return backoff.Permanent(err)
+						return struct{}{}, backoff.Permanent(err)
 					}
 				}
 
@@ -206,13 +203,13 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			if !skipVerifyOverride {
 				if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath), a.fileOps); err != nil {
 					if downloaderrors.IsDiskSpaceError(err) {
-						return backoff.Permanent(err)
+						return struct{}{}, backoff.Permanent(err)
 					}
 					var agentErr errors.Error
 					if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
 						if agentErr.Meta()[errors.MetaKeyPath] == download.AddHashExtension(targetPath) {
 							// can't write to target
-							return backoff.Permanent(err)
+							return struct{}{}, backoff.Permanent(err)
 						}
 					}
 
@@ -241,7 +238,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				}
 			}
 
-			return nil
+			return struct{}{}, nil
 		}
 
 		attempt++
@@ -255,9 +252,9 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 		if !slices.Contains(skip, false) {
 			// all sources exhausted
-			return backoff.Permanent(err)
+			return struct{}{}, backoff.Permanent(err)
 		}
-		return err
+		return struct{}{}, err
 	}
 
 	retryFailure := func(err error, retryAfter time.Duration) {
@@ -266,7 +263,10 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 		upgradeDetails.SetRetryableError(err)
 	}
 
-	if err := backoff.RetryNotify(fetchSources, retryCtx, retryFailure); err != nil {
+	if _, err := backoff.Retry(ctx, fetchSources, backoff.WithBackOff(retrier), backoff.WithMaxElapsedTime(retryTimeout), backoff.WithNotify(retryFailure)); err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return targetPath, fmt.Errorf("failed to get upgrade artifact: %w", re.LastErr)
+		}
 		return targetPath, fmt.Errorf("failed to get upgrade artifact: %w", err)
 	}
 
