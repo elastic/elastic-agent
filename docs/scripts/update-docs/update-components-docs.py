@@ -17,6 +17,7 @@ import yaml
 import re
 from pathlib import Path
 import subprocess
+import json
 import os
 import tempfile
 
@@ -35,6 +36,15 @@ COMPONENT_DOCS_YAML = '../../../docs/reference/edot-collector/component-docs.yml
 DEFAULT_CONFIG_FILE = '../../../docs/reference/edot-collector/config/default-config-standalone.md'
 COMPONENTS_YAML = '../../../internal/edot/components.yml'
 COMPONENTS_YAML_LOCAL = Path(__file__).parent / '../../../internal/edot/components.yml'
+
+# Directory anchors resolved relative to this script so that path-dependent
+# helpers work regardless of the current working directory.
+SCRIPT_DIR = Path(__file__).parent
+DOCS_ROOT = SCRIPT_DIR / '../../../docs'
+COMPONENT_PAGES_DIR = SCRIPT_DIR / EDOT_COLLECTOR_DIR / 'components'
+# Doc pages under components/ that are not tied to a single component and should
+# be excluded from orphaned-page detection.
+NON_COMPONENT_PAGES = {'migrate-components.md'}
 # Path migration configuration
 # Each entry defines: new_path, old_path, and the version where the change occurred
 PATH_MIGRATIONS = {
@@ -79,6 +89,27 @@ def parse_version_tag(tag):
     if match:
         return (int(match.group(1)), int(match.group(2)), int(match.group(3)))
     return None
+
+
+def since_to_minor(since):
+    """Convert a 'since' tag like 'v9.5.0' to its Major.Minor string ('9.5').
+
+    Returns '' when the value is empty or cannot be parsed. Used to render the
+    'Added in' column as an `applies_to` version badge (badges resolve to
+    Major.Minor, so patch precision is intentionally dropped)."""
+    parsed = parse_version_tag(since) if since else None
+    return f"{parsed[0]}.{parsed[1]}" if parsed else ''
+
+
+def is_new_component(since, latest_version):
+    """True when a component's 'since' version shares the latest release's minor.
+
+    Used to flag components introduced in the current release line so the
+    components table can render a 'New' marker next to them. Returns False when
+    either version is empty or unparseable (e.g. 'main')."""
+    comp_minor = since_to_minor(since)
+    latest_minor = since_to_minor(latest_version)
+    return bool(comp_minor and latest_minor and comp_minor == latest_minor)
 
 
 def resolve_path_for_tag(tag, path_type, fallback_to_file_check=True):
@@ -404,6 +435,7 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
     # Get since data from local components.yml (disk, not git tag)
     component_since = get_component_since()
     print(f"Found {len(component_since)} component since entries")
+    newly_stamped = []
 
     lines = elastic_agent_go_mod.splitlines()
     components_type = ['receiver', 'connector', 'processor', 'exporter', 'extension', 'provider']
@@ -470,9 +502,15 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
             stamped = f'v{latest_version}'
             comp['since'] = stamped
             component_since[since_key] = stamped
+            newly_stamped.append(since_key)
             print(f"  Stamped new component '{since_key}' with since={stamped}")
         else:
             comp['since'] = ''
+
+        # Major.Minor used to render the 'Added in' column as an applies_to badge.
+        comp['since_minor'] = since_to_minor(comp['since'])
+        # Flag components introduced in the latest release line for the 'New' marker.
+        comp['is_new'] = is_new_component(comp['since'], latest_version)
 
     components_grouped = defaultdict(list)
 
@@ -501,6 +539,7 @@ def get_otel_components(version='main', component_docs_mapping=None, auto_stamp=
         'grouped_components': components_grouped,
         'annotations': annotation_list,
         'component_since': component_since,
+        'newly_stamped': newly_stamped,
     }
 
 def find_files_with_substring(directory, substring):
@@ -706,6 +745,53 @@ def check_markdown():
     
     return tables and ocb
 
+def _doc_path_to_disk(doc_path):
+    """Map a site doc path (e.g. '/reference/edot-collector/components/x.md')
+    to its location on disk under the repository's docs/ directory."""
+    return DOCS_ROOT / doc_path.lstrip('/')
+
+
+def get_doc_coverage_issues(component_docs_mapping, components_dir=None, resolver=None):
+    """Detect documentation coverage gaps for the components table.
+
+    Returns a dict with:
+      - 'missing_targets': entries in component-docs.yml whose target file does
+        not exist on disk (the components table would link to a missing page).
+      - 'orphaned_pages': component doc pages that exist on disk but are not
+        referenced by any mapping, so the components table cannot link to them.
+
+    ``components_dir`` and ``resolver`` are injectable to keep the function
+    testable without touching the real docs tree.
+    """
+    component_docs_mapping = component_docs_mapping or {}
+    resolver = resolver or _doc_path_to_disk
+    components_dir = Path(components_dir) if components_dir else COMPONENT_PAGES_DIR
+
+    missing_targets = []
+    mapped_files = set()
+    for name, info in component_docs_mapping.items():
+        doc_path = (info or {}).get('doc_path')
+        if not doc_path:
+            continue
+        disk_path = resolver(doc_path)
+        mapped_files.add(str(disk_path.resolve()))
+        if not disk_path.is_file():
+            missing_targets.append({'component': name, 'doc_path': doc_path})
+
+    orphaned_pages = []
+    if components_dir.is_dir():
+        for page in sorted(components_dir.glob('*.md')):
+            if page.name in NON_COMPONENT_PAGES:
+                continue
+            if str(page.resolve()) not in mapped_files:
+                orphaned_pages.append(page.name)
+
+    return {
+        'missing_targets': sorted(missing_targets, key=lambda m: m['component']),
+        'orphaned_pages': orphaned_pages,
+    }
+
+
 def generate_markdown():
     col_version = get_collector_version()
     print(f"Collector version: {col_version}")
@@ -723,6 +809,25 @@ def generate_markdown():
 
     # Persist any newly stamped 'since' entries back to components.yml
     write_component_since(components_result['component_since'])
+
+    # If running in CI, write detected review items (newly stamped components and
+    # documentation coverage gaps) to a file so the workflow can prompt reviewers
+    # in the generated PR description.
+    new_components_file = os.environ.get('NEW_COMPONENTS_FILE')
+    if new_components_file:
+        coverage = get_doc_coverage_issues(component_docs_mapping)
+        review_items = {
+            'newly_stamped': sorted(components_result['newly_stamped']),
+            'doc_coverage': coverage,
+        }
+        if (review_items['newly_stamped']
+                or coverage['missing_targets']
+                or coverage['orphaned_pages']):
+            Path(new_components_file).write_text(
+                json.dumps(review_items, indent=2),
+                encoding='utf-8',
+            )
+            print(f"\nReview items written to {new_components_file}: {review_items}")
 
     otel_col_version = get_otel_col_upstream_version()
     data = {
@@ -785,6 +890,7 @@ def generate_markdown():
 if __name__ == "__main__":
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "check":
-        check_markdown()
+        # Exit non-zero when generated docs are out of date so CI can catch drift.
+        sys.exit(0 if check_markdown() else 1)
     else:
         generate_markdown()

@@ -76,6 +76,7 @@ jobs:
       - name: Pass version to script
         run: |
           echo "LATEST_VERSION=${{ needs.check-latest.outputs.version }}" >> $GITHUB_ENV
+          echo "NEW_COMPONENTS_FILE=${RUNNER_TEMP}/new-components.json" >> $GITHUB_ENV
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -92,6 +93,11 @@ jobs:
         run: |
           cd docs/scripts/update-docs
           python update-components-docs.py
+
+      - name: Build PR body
+        env:
+          VERSION: ${{ needs.check-latest.outputs.version }}
+        run: python3 docs/scripts/update-docs/build_pr_body.py
 
       - name: Check if branch already exists
         id: check_branch
@@ -112,22 +118,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "docs: update generated documentation for ${{ needs.check-latest.outputs.version }}"
           title: "Update generated documentation for ${{ needs.check-latest.outputs.version }}"
-          body: |
-            This PR updates the generated documentation based on the latest released version **${{ needs.check-latest.outputs.version }}**.
-
-            ## Changes
-            - Updates Elastic Agent component tables
-            - Updates OpenTelemetry Collector Builder (OCB) configuration
-            - Uses data from the latest released version tag: `${{ needs.check-latest.outputs.version }}`
-
-            ## References
-            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/go.mod
-            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/internal/edot/components.yaml
-            - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ needs.check-latest.outputs.version }}
-
-            cc @elastic/ski-docs
-
-            This is an automated PR created by the documentation update workflow.
+          body-path: ${{ runner.temp }}/pr-body.md
           branch: update-docs-${{ needs.check-latest.outputs.version }}
           base: main
           delete-branch: true
