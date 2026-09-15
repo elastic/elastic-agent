@@ -2150,7 +2150,6 @@ extensions:
       key: /nonexistent.key
       key_passphrase: null
       key_passphrase_path: null
-      verification_mode: none
 receivers:
   metricbeatreceiver:
     metricbeat:
