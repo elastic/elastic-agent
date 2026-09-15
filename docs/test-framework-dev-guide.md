@@ -176,6 +176,67 @@ share similar leavers as the packaging process.
        container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
        runner drives the container over SSH exactly like a VM. Requires Docker.
 
+ - `STACK_PROVISIONER`: Sets the provisioner used to create the Elastic Stack
+   (Elasticsearch, Kibana, Fleet Server) the tests talk to. Possible values are:
+     - `stateful`: Provisions a cloud ESS deployment (the default). Requires an
+       ESS API key (`mage integration:auth`).
+     - `serverless`: Provisions a cloud serverless project. Also requires an ESS
+       API key.
+     - `external`: Uses an existing stack supplied via environment variables
+       (`ELASTICSEARCH_HOST`, `KIBANA_HOST`, `ELASTICSEARCH_USERNAME`,
+       `ELASTICSEARCH_PASSWORD`). It creates and deletes nothing, and needs no
+       cloud account or local stack. Useful in CI, where a stack is provisioned
+       separately before the tests run.
+     - `local`: Brings up a fully local stack with
+       [`elastic-package stack up`](https://github.com/elastic/elastic-package) —
+       no cloud account needed. Requires the `elastic-package` binary on `PATH`
+       (`go install github.com/elastic/elastic-package@latest`, or point
+       `ELASTIC_PACKAGE_BIN` at it). It uses a dedicated elastic-package profile
+       (`elastic-agent-integration`, override with `ELASTIC_PACKAGE_PROFILE`) so it
+       does not disturb a stack you may run yourself in the `default` profile.
+
+       The stack pulls Elastic images from `docker.elastic.co`, including the
+       package-registry image, which requires authentication. Run a one-time
+       `docker login docker.elastic.co` before first use. (elastic-package has no
+       supported way to skip the package-registry — Kibana depends on it — and its
+       image has no override, so authenticating is currently the simplest path.)
+
+   The `local` stack is designed to pair with the `docker` instance provisioner.
+   The local stack serves Elasticsearch/Kibana/Fleet over HTTPS with a self-signed
+   CA, so the runner:
+     - installs that CA into the test container's system trust store, so both the
+       test clients and the agent under test trust the stack with no `--insecure`
+       or per-test certificate configuration (both fall back to the system trust
+       store when no CA is configured); and
+     - attaches the test container to elastic-package's compose network, so the
+       container reaches the stack by service name (`https://elasticsearch:9200`,
+       `https://kibana:5601`, `https://fleet-server:8220`) — the names covered by
+       each service certificate's SANs, so TLS hostname verification passes; and
+     - relaxes a couple of Elasticsearch cluster settings on the single-node local
+       stack (disables disk-watermark-based allocation and raises the per-node shard
+       cap), since the suites create many data streams and would otherwise hit
+     `503 no_shard_available_action_exception`.
+
+   It also works with `mage integration:local`: host-mode tests use the stack's
+   published loopback endpoints and trust its CA via `SSL_CERT_FILE`, without
+   modifying the host's system trust store.
+
+   Remote stack provisioners work with both local and remote instance
+   provisioners. The local stack provisioner requires a local instance
+   provisioner with an implemented connectivity bridge; currently `docker` and
+   the host-local runner are supported. Multipass and Kind are rejected before
+   provisioning until their local-stack networking support is implemented.
+
+   On **macOS** you need to build a Linux package on the same arch as your host. 
+
+   Example (no cloud account required):
+   ```
+   PLATFORMS=linux/$(go env GOARCH) mage package
+   STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
+     TEST_PLATFORMS="linux/$(go env GOARCH)/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
+     TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
+   ```
+
 When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
 
 An example for running a single test, including packaging the artifacts for it is:
@@ -575,6 +636,35 @@ out weight the benefits of creating another group.
   ```
 
   This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
+
+### CI tiers for extended/stateful testing
+
+`.buildkite/bk.integration.pipeline.yml` runs the "Stateful" (ESS-backed) Linux and Windows
+integration tests. To keep PR feedback fast while still getting broad OS coverage, the pipeline
+splits these tests into three tiers:
+
+- **Tier 1** — Runs on every pull request (`if: build.pull_request.id != null`). It exercises only
+  the default variant on the newest supported OS per platform (currently Ubuntu 24.04 for Linux,
+  Windows Server 2022 for Windows). This tier must stay small and fast, since it gates every PR.
+- **Tier 2** — Runs when relevant files change (`if_changed`, e.g. `.buildkite/**`, `magefile.go`,
+  `dev-tools/**`, `go.mod`/`go.sum`). It adds one additional OS per package family (for example
+  Debian 13 for `.deb` and RHEL 10 for `.rpm`) to catch packaging/tooling regressions without
+  running on every PR.
+- **Tier 3** — Runs only on a schedule or when triggered from the scheduler pipeline
+  (`build.source == "schedule"` or `BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG ==
+  "elastic-agent-pipeline-scheduler"`). This is the broadest matrix: it exercises the full set of
+  supported OS versions and package variants (including `stress`), and covers arm64 in addition to
+  amd64. Because it's the most expensive tier, it does not block PRs.
+
+When a new OS image is added to the support matrix (see the `IMAGE_*` environment variables at the
+top of `bk.integration.pipeline.yml`), it should generally be added to the tier 3 `matrix.setup.os`
+list first. Promote it to tier 2 or tier 1 only when it needs to run more frequently (e.g. it's
+becoming the new default, or it validates something that changes often).
+
+Image versions are timestamped VM image names (for example
+`platform-ingest-elastic-agent-ubuntu-2604-1789378451`) that are bumped automatically across all
+`.buildkite/*.yml` files by the `updatecli-bump-vm-images.yml` Updatecli pipeline
+(`.ci/updatecli/updatecli-bump-vm-images.yml`).
 
 ### Test namespaces
 

@@ -24,16 +24,21 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/require"
 	helmKube "helm.sh/helm/v3/pkg/kube"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	cliResource "k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
@@ -71,6 +76,8 @@ type k8sContext struct {
 	esEncodedAPIKey string
 	// enrollParams contains the information needed to enroll an agent with Fleet in the test
 	enrollParams *fleettools.EnrollParams
+	// openshift is true when the Kubernetes cluster is OpenShift
+	openshift bool
 	// createdAt is the time when the k8sContext was created
 	createdAt time.Time
 }
@@ -112,7 +119,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	testLogsBasePath := os.Getenv("K8S_TESTS_POD_LOGS_BASE")
 	require.NotEmpty(t, testLogsBasePath, "K8S_TESTS_POD_LOGS_BASE must be set")
 
-	err = os.MkdirAll(testLogsBasePath, 0o755)
+	err = os.MkdirAll(testLogsBasePath, 0o755) //nolint:gosec // path comes from a trusted test env var (K8S_TESTS_POD_LOGS_BASE)
 	require.NoError(t, err, "failed to create test logs directory")
 
 	esHost, err := integration.GetESHost()
@@ -128,6 +135,14 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
 	require.NoError(t, err, "failed to create fleet enroll params")
 
+	// TODO(samuelvl): compare against microshift.Name once the MicroShift instance provisioner is implemented.
+	openshift := os.Getenv("INSTANCE_PROVISIONER") == "microshift"
+	if openshift {
+		scheme := client.Resources().GetScheme()
+		require.NoError(t, configv1.Install(scheme))
+		require.NoError(t, apiextensionsv1.AddToScheme(scheme))
+	}
+
 	return k8sContext{
 		client:          client,
 		clientSet:       clientSet,
@@ -139,6 +154,7 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 		esAPIKey:        string(beatsStyleAPIKey),
 		esEncodedAPIKey: esAPIKey.Encoded,
 		enrollParams:    enrollParams,
+		openshift:       openshift,
 		createdAt:       time.Now(),
 	}
 }
@@ -226,46 +242,38 @@ func k8sCheckAgentStatus(ctx context.Context, client klient.Client, stdout *byte
 	}
 }
 
-// k8sGetAgentID returns the agent ID for the given agent pod, polling until the ID
-// is non-empty or the context deadline is reached. The agent status is populated
-// asynchronously after enrollment so a single-shot read can race the startup path.
+// k8sGetAgentStatus returns the status for the agent in the given pod.
+func k8sGetAgentStatus(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
+	namespace string, agentPodName string, containerName string,
+) (atesting.AgentStatusOutput, error) {
+	command := []string{"elastic-agent", "status", "--output=json"}
+
+	status := atesting.AgentStatusOutput{}
+	stdout.Reset()
+	stderr.Reset()
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr)
+	cancel()
+	if err != nil {
+		return atesting.AgentStatusOutput{}, err
+	}
+
+	if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
+		return atesting.AgentStatusOutput{}, err
+	}
+
+	return status, nil
+}
+
+// k8sGetAgentID returns the agent ID for the given agent pod.
 func k8sGetAgentID(ctx context.Context, client klient.Client, stdout *bytes.Buffer, stderr *bytes.Buffer,
 	namespace string, agentPodName string, containerName string,
 ) (string, error) {
-	command := []string{"elastic-agent", "status", "--output=json"}
-
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-	defer cancel()
-
-	for {
-		status := atesting.AgentStatusOutput{}
-		stdout.Reset()
-		stderr.Reset()
-		if err := client.Resources().ExecInPod(ctx, namespace, agentPodName, containerName, command, stdout, stderr); err != nil {
-			if ctx.Err() != nil {
-				return "", fmt.Errorf("timeout waiting for agent ID: %w", err)
-			}
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-
-		if err := json.Unmarshal(stdout.Bytes(), &status); err != nil {
-			if ctx.Err() != nil {
-				return "", fmt.Errorf("timeout waiting for agent ID: %w", err)
-			}
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-
-		if status.Info.ID != "" {
-			return status.Info.ID, nil
-		}
-
-		if ctx.Err() != nil {
-			return "", errors.New("timeout waiting for agent ID to be non-empty")
-		}
-		time.Sleep(100 * time.Millisecond)
+	status, err := k8sGetAgentStatus(ctx, client, stdout, stderr, namespace, agentPodName, containerName)
+	if err != nil {
+		return "", err
 	}
+	return status.Info.ID, nil
 }
 
 // getAgentComponentState returns the component state for the given component name and a bool indicating if it exists.
@@ -426,6 +434,42 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 	}
 	readyChecker := helmKube.NewReadyChecker(clientSet, func(s string, i ...interface{}) {})
 
+	httpClient, err := rest.HTTPClientFor(client.RESTConfig())
+	if err != nil {
+		return fmt.Errorf("create http client: %w", err)
+	}
+
+	mapper, err := apiutil.NewDynamicRESTMapper(client.RESTConfig(), httpClient)
+	if err != nil {
+		return fmt.Errorf("create rest mapper: %w", err)
+	}
+
+	scheme := client.Resources().GetScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	// newInfo builds the resource.Info that the ready checker needs to read an object.
+	newInfo := func(obj runtime.Object, name, namespace string) (*cliResource.Info, error) {
+		gvk, err := apiutil.GVKForObject(obj, scheme)
+		if err != nil {
+			return nil, fmt.Errorf("get group version kind of %s: %w", name, err)
+		}
+		mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+		if err != nil {
+			return nil, fmt.Errorf("get rest mapping of %s: %w", name, err)
+		}
+		restClient, err := apiutil.RESTClientForGVK(gvk, false, false, client.RESTConfig(), codecs, httpClient)
+		if err != nil {
+			return nil, fmt.Errorf("create rest client for %s: %w", name, err)
+		}
+		return &cliResource.Info{
+			Client:    restClient,
+			Mapping:   mapping,
+			Object:    obj,
+			Name:      name,
+			Namespace: namespace,
+		}, nil
+	}
+
 	ctxTimeout, cancel := context.WithTimeout(ctx, waitDuration)
 	defer cancel()
 
@@ -455,11 +499,12 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 			return fmt.Errorf("unable to convert k8s.Object %s to runtime.Object", o.GetName())
 		}
 
-		if err := waitFn(&cliResource.Info{
-			Object:    runtimeObj,
-			Name:      o.GetName(),
-			Namespace: o.GetNamespace(),
-		}); err != nil {
+		info, err := newInfo(runtimeObj, o.GetName(), o.GetNamespace())
+		if err != nil {
+			return err
+		}
+
+		if err := waitFn(info); err != nil {
 			return err
 		}
 		// extract pod label selector for all k8s objects that have underlying pods
@@ -478,11 +523,11 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 
 		// here we wait for the all pods to be ready
 		for _, pod := range podList.Items {
-			if err := waitFn(&cliResource.Info{
-				Object:    &pod,
-				Name:      pod.Name,
-				Namespace: pod.Namespace,
-			}); err != nil {
+			podInfo, err := newInfo(&pod, pod.Name, pod.Namespace)
+			if err != nil {
+				return err
+			}
+			if err := waitFn(podInfo); err != nil {
 				return err
 			}
 		}
@@ -532,7 +577,7 @@ type GetAgentResponse struct {
 // kibanaGetAgent essentially re-implements kibana.GetAgent to extract also GetAgentResponse.EnrolledAt
 func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgentResponse, error) {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s", id)
-	r, err := kc.Connection.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
+	r, err := kc.SendWithContext(ctx, http.MethodGet, apiURL, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error calling get agent API: %w", err)
 	}
@@ -554,7 +599,7 @@ func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgen
 	return &agentResp.Item, nil
 }
 
-func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamespace string) map[string]any {
+func queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value string) map[string]any {
 	return map[string]any{
 		"_source": []string{"message"},
 		"query": map[string]any{
@@ -577,7 +622,7 @@ func queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, k8snamesp
 					},
 					map[string]any{
 						"term": map[string]any{
-							"resource.attributes.k8s.namespace.name": k8snamespace,
+							"resource.attributes." + attribute: value,
 						},
 					},
 				},

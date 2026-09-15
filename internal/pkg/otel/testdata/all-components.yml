@@ -152,6 +152,13 @@ receivers:
       - 00000000-0000-0000-0000-000000000000
     cloud: AzureCloud
     credentials: default_credentials
+  # googlecloudmonitoring is intentionally omitted from this fixture (see
+  # internal/edot/otelcol/components/default.go for its registration): its
+  # Start() eagerly calls google.FindDefaultCredentials, which errors out
+  # without real GCP Application Default Credentials. This fixture is used to
+  # exercise starting every configured receiver, so a trivial config isn't
+  # practical here (no ADC available in unit-test/CI environments). This
+  # mirrors the iis/sqlserver exclusions from elastic/elastic-agent#9344.
   kafkametrics:
     brokers: [localhost:9092]
     protocol_version: 2.0.0
