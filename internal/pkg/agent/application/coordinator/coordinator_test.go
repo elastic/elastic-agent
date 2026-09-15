@@ -1531,6 +1531,41 @@ exporters:
 	}
 }
 
+func TestProcessConfig_TagsAreApplied(t *testing.T) {
+	tests := []struct {
+		name       string
+		standalone bool
+	}{
+		{name: "standalone mode", standalone: true},
+		{name: "managed mode", standalone: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAgent := info.NewMockAgent(t)
+			mockAgent.EXPECT().IsStandalone().Return(tt.standalone).Once()
+			mockAgent.EXPECT().SetTags([]string{"tag1", "tag2"}).Return().Once()
+			mockAgent.EXPECT().GetTags().Return([]string{"tag1", "tag2"}).Once()
+
+			coord := &Coordinator{
+				logger:           logp.NewLogger("testing"),
+				agentInfo:        mockAgent,
+				secretMarkerFunc: testSecretMarkerFunc,
+			}
+
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				// tag1 should be deduplicated since it appears twice and has leading/trailing spaces.
+				"agent.tags": []string{"tag1", "tag2", " tag1 "},
+			})
+			err := coord.processConfig(t.Context(), cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{"tag1", "tag2"}, coord.state.Tags)
+			assert.Equal(t, []string{"tag1", "tag2"}, coord.agentInfo.GetTags())
+		})
+	}
+}
+
 // fakeCapabilities implements the capabilities.Capabilities interface for testing
 type fakeCapabilities struct {
 	mock.Mock
