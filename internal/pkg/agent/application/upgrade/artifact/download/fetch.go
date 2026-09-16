@@ -41,7 +41,6 @@ func defaultFileOps() FileOps {
 	}
 }
 
-
 func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops FileOps) (err error) {
 	defer func() {
 		if err != nil {
