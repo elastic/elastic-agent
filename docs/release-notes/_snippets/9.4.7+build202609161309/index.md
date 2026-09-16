@@ -7,11 +7,12 @@ This is an independent Elastic Agent release. Independent Elastic Agent releases
 
 ### Fixes [elastic-agent-9.4.7+build202609161309-fixes]
 
-* Adds experimental macOS 27 (Golden Gate) support in {elastic-defend}.
-* Fixes a macOS 27 (Golden Gate) network filter kernel bug in {elastic-defend}.
-* Fixes an issue that prevented macOS OS updates when a Device Control policy was active.
-* Upgrades c-ares to 1.34.8 to fix CVE-2024-25629 in {elastic-defend}.
-* Fixes `host.name` exception matching to be case-insensitive in {elastic-defend}.
-* Fixes a POSIX quarantine `chown`/`chmod` symlink race condition in {elastic-defend}.
-* Fixes uncaught file system exceptions on Windows that could cause process terminations in {elastic-defend}.
-* Fixes a network cache scan inefficiency that caused CPU and lock contention on Linux in {elastic-defend}.
+* Adds experimental macOS 27 (Golden Gate) support to {elastic-defend}.
+* Adds a workaround to {elastic-defend} on macOS for a Golden Gate bug that broke network connections from apps using Network.framework.
+* Fixes unsuccessful macOS updates when {elastic-defend} Device Control is enabled.
+* {elastic-defend} on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing).
+* Fixes `host.name` exception list and trusted app rule matching to be case-insensitive in {elastic-defend}.
+* Hardens how {elastic-defend} restores file ownership and permissions during malware quarantine on Linux and macOS.
+* Fixes a crash in {elastic-defend} on Windows when processing files or processes whose paths contain CJK (Chinese, Japanese, Korean) characters.
+* Makes {elastic-defend} upgrade more robust on slow machines.
+* {elastic-defend} diagnostics bundles are no longer readable by unprivileged local users.
