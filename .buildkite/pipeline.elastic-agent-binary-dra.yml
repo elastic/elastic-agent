@@ -25,11 +25,6 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
-  - dra_prep_plugin: &dra_prep_plugin
-      elastic/dra-prep#v0.1.6:
-        product_id: "elastic-agent-core"
-        stack_version: "${BEAT_VERSION}"
-        workflow: "${DRA_WORKFLOW}"
 
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
@@ -116,7 +111,10 @@ steps:
         DRA_WORKFLOW: "snapshot"
       plugins:
         - *google_oidc_plugin
-        - *dra_prep_plugin
+        - elastic/dra-prep#v0.1.6:
+            product_id: "elastic-agent-core"
+            stack_version: "${BEAT_VERSION}"
+            workflow: "snapshot"
 
     - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION} / snapshot"
       trigger: "unified-release-dra-processing"
@@ -229,7 +227,10 @@ steps:
         DRA_WORKFLOW: "staging"
       plugins:
         - *google_oidc_plugin
-        - *dra_prep_plugin
+        - elastic/dra-prep#v0.1.6:
+            product_id: "elastic-agent-core"
+            stack_version: "${BEAT_VERSION}"
+            workflow: "staging"
 
     - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION} / staging"
       trigger: "unified-release-dra-processing"
