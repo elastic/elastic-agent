@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -483,6 +484,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
 			"suppress_conflict_errors": true,
+			"timeout":                  90 * time.Second,
 		}
 	}
 
@@ -641,7 +643,8 @@ func TestGetOtelConfig(t *testing.T) {
 				{
 					"id": "results",
 					"data_stream": map[string]any{
-						"dataset": "osquery_manager.result",
+						"dataset":   "osquery_manager.result",
+						"namespace": "default",
 					},
 					"query":      "SELECT * FROM processes",
 					"interval":   "3600",
@@ -652,7 +655,8 @@ func TestGetOtelConfig(t *testing.T) {
 				{
 					"id": "action-responses",
 					"data_stream": map[string]any{
-						"dataset": "osquery_manager.action.responses",
+						"dataset":   "osquery_manager.action.responses",
+						"namespace": "default",
 					},
 					"query":      nil,
 					"index":      "logs-osquery_manager.action.responses-default",
@@ -2658,6 +2662,61 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		},
 	}
 
+	// osquerybeat with single_receiver and a custom namespace set at the unit level.
+	osquerybeatCustomNamespaceComponent := &component.Component{
+		ID:        "osquerybeat-test-id",
+		InputType: "osquery",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "osquery",
+				Command: &component.CommandSpec{
+					Args: []string{"osquerybeat"},
+				},
+				SingleReceiver: true,
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "osquerybeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "osquery",
+					"data_stream": map[string]any{
+						"namespace": "custom-ns",
+					},
+					"streams": []any{
+						map[string]any{
+							"id": "action-responses",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.action.responses",
+							},
+							"query": nil,
+						},
+						map[string]any{
+							"id": "results",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.result",
+							},
+							"query":    "SELECT * FROM processes",
+							"interval": "3600",
+						},
+					},
+					"osquery": map[string]any{
+						"schedule": map[string]any{
+							"process_list": map[string]any{
+								"query":    "SELECT * FROM processes",
+								"interval": 60,
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
 	packetbeatComponent := &component.Component{
 		ID:        "packetbeat-test-id",
 		InputType: "packet",
@@ -2801,6 +2860,33 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			},
 		},
 		{
+			name:               "osquerybeat single_receiver propagates custom namespace to all streams",
+			component:          osquerybeatCustomNamespaceComponent,
+			outputQueueConfig:  nil,
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/single",
+			expectedBeatName:   "osquerybeat",
+			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+				inputs, ok := beatConfig["inputs"].([]map[string]any)
+				require.True(t, ok, "osquerybeat inputs should be a slice of maps")
+				require.Len(t, inputs, 2, "both streams must be merged into the single receiver")
+
+				assert.Equal(t, "results", inputs[0]["id"], "osquery_manager.result stream must be first")
+
+				// osquery section must be injected into the result stream (not action-responses).
+				_, hasOsquery := inputs[0]["osquery"]
+				assert.True(t, hasOsquery, "inputs[0] (result stream) must have osquery section injected")
+				_, hasOsquery = inputs[1]["osquery"]
+				assert.False(t, hasOsquery, "inputs[1] (action-responses) must not have osquery section")
+
+				for i, inp := range inputs {
+					ds, ok := inp["data_stream"].(map[string]any)
+					require.True(t, ok, "inputs[%d] must have a data_stream map", i)
+					assert.Equal(t, "custom-ns", ds["namespace"],
+						"inputs[%d] data_stream.namespace must be the unit-level custom namespace, not the default", i)
+				}
+			},
+		},
+		{
 			name:               "packetbeat component",
 			component:          packetbeatComponent,
 			outputQueueConfig:  nil,
@@ -2833,6 +2919,38 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			},
 			outputQueueConfig: nil,
 			// No expectedReceiverID - no inputs means no receivers
+		},
+		{
+			name: "input unit with nil config is skipped without panic",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			outputQueueConfig: nil,
+			// No expectedReceiverID - nil config input is skipped
 		},
 		{
 			name: "unsupported component type",
@@ -3163,6 +3281,38 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				},
 			},
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
+		},
+		{
+			name: "input unit with nil config does not panic",
+			component: &component.Component{
+				ID:         "nil-config-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "filestream-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
 		},
 	}
 
@@ -3975,6 +4125,22 @@ func TestInjectOsqueryConfig(t *testing.T) {
 		}
 	}
 
+	makeStreamWithNamespace := func(id string, isResult bool, ns string) receiverInput {
+		dataset := "osquery_manager.action.responses"
+		if isResult {
+			dataset = "osquery_manager.result"
+		}
+		return receiverInput{
+			streamID: id,
+			config: map[string]any{
+				"data_stream": map[string]any{
+					"dataset":   dataset,
+					"namespace": ns,
+				},
+			},
+		}
+	}
+
 	// unit carries the input-level osquery config, mirroring what osquerybeatCfgFromStreams
 	// receives as rawIn.Source when the integration has scheduled queries.
 	unit := component.Unit{
@@ -3985,24 +4151,40 @@ func TestInjectOsqueryConfig(t *testing.T) {
 		}),
 	}
 
+	unitWithCustomNS := component.Unit{
+		Config: component.MustExpectedConfig(map[string]interface{}{
+			"data_stream": map[string]interface{}{
+				"namespace": "custom-ns",
+			},
+			"osquery": map[string]interface{}{
+				"queries": map[string]interface{}{},
+			},
+		}),
+	}
+
 	tests := []struct {
-		name          string
-		inputs        []receiverInput
-		wantStreamIDs []string
+		name              string
+		inputs            []receiverInput
+		unit              component.Unit
+		wantStreamIDs     []string
+		wantNamespaceByID map[string]string // non-nil: verify data_stream.namespace per stream id
 	}{
 		{
 			name:          "1 stream: result only",
 			inputs:        []receiverInput{makeStream("result", true)},
+			unit:          unit,
 			wantStreamIDs: []string{"result"},
 		},
 		{
 			name:          "2 streams: result first",
 			inputs:        []receiverInput{makeStream("result", true), makeStream("action", false)},
+			unit:          unit,
 			wantStreamIDs: []string{"result", "action"},
 		},
 		{
 			name:          "2 streams: result second",
 			inputs:        []receiverInput{makeStream("action", false), makeStream("result", true)},
+			unit:          unit,
 			wantStreamIDs: []string{"result", "action"},
 		},
 		{
@@ -4013,6 +4195,7 @@ func TestInjectOsqueryConfig(t *testing.T) {
 				makeStream("other", false),
 				makeStream("result", true),
 			},
+			unit:          unit,
 			wantStreamIDs: []string{"result", "action", "other"},
 		},
 		{
@@ -4024,13 +4207,53 @@ func TestInjectOsqueryConfig(t *testing.T) {
 				makeStream("other2", false),
 				makeStream("result", true),
 			},
+			unit:          unit,
 			wantStreamIDs: []string{"result", "action", "other1", "other2"},
+		},
+		{
+			name: "default namespace propagates when unit has no data_stream namespace",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("result", true),
+			},
+			unit:          unit,
+			wantStreamIDs: []string{"result", "action"},
+			wantNamespaceByID: map[string]string{
+				"result": "default",
+				"action": "default",
+			},
+		},
+		{
+			name: "custom namespace from unit propagates to all streams",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("result", true),
+			},
+			unit:          unitWithCustomNS,
+			wantStreamIDs: []string{"result", "action"},
+			wantNamespaceByID: map[string]string{
+				"result": "custom-ns",
+				"action": "custom-ns",
+			},
+		},
+		{
+			name: "explicit stream namespace is preserved",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStreamWithNamespace("result", true, "stream-ns"),
+			},
+			unit:          unitWithCustomNS,
+			wantStreamIDs: []string{"result", "action"},
+			wantNamespaceByID: map[string]string{
+				"result": "stream-ns",
+				"action": "custom-ns",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := injectOsqueryConfig(tt.inputs, unit)
+			got := injectOsqueryConfig(tt.inputs, tt.unit)
 			require.Len(t, got, len(tt.wantStreamIDs))
 			gotIDs := make([]string, len(got))
 			for i, ri := range got {
@@ -4039,6 +4262,91 @@ func TestInjectOsqueryConfig(t *testing.T) {
 			assert.Equal(t, tt.wantStreamIDs, gotIDs,
 				"stream ordering must match osquerybeatCfgFromStreams: result stream first, others in original relative order")
 			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
+
+			for _, ri := range got {
+				wantNS, ok := tt.wantNamespaceByID[ri.streamID]
+				if !ok {
+					continue
+				}
+				ds, ok := ri.config["data_stream"].(map[string]any)
+				require.True(t, ok, "stream %q: data_stream must be a map", ri.streamID)
+				assert.Equal(t, wantNS, ds["namespace"],
+					"stream %q: data_stream.namespace must be propagated from unit level", ri.streamID)
+			}
 		})
 	}
+}
+
+func TestGetReceiversConfigHostnameOverride(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-hostname-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-hostname-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	t.Run("env_set", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "override-node")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be injected into receiver config", id)
+		}
+	})
+
+	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "  override-node  ")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be trimmed before injection", id)
+		}
+	})
+
+	t.Run("env_unset", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "")
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.NotContains(t, cfg, "hostname",
+				"receiver %s: hostname should not be present when env var is unset", id)
+		}
+	})
 }

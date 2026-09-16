@@ -13,12 +13,12 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: diagnostics now collects component trace logs in container deployments
+summary: fix diagnostics for otel components containing `/`
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: Components containing `/` in id or stream-id has been skipped from diagnostics
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
