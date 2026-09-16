@@ -7,12 +7,12 @@ This is an independent Elastic Agent release. Independent Elastic Agent releases
 
 ### Fixes [elastic-agent-9.5.4+build202609161310-fixes]
 
-* Add experimental macOS 27 (Golden Gate) support to Elastic Defend.
-* Add a workaround to Elastic Defend on macOS for a Golden Gate bug that broke network connections from apps using Network.framework.
-* Fix unsuccessful macOS updates when Elastic Defend Device Control is enabled.
-* Elastic Defend on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing).
-* Fix `host.name` exception list and trusted app rule matching to be case-insensitive in Elastic Defend.
-* Harden how Elastic Defend restores file ownership and permissions during malware quarantine on Linux and macOS.
-* Fix a crash in Elastic Defend on Windows when processing files or processes whose paths contain CJK (Chinese, Japanese, Korean) characters.
-* Make the Elastic Defend upgrade more robust on slow machines.
-* Elastic Defend diagnostics bundles are no longer readable by unprivileged local users.
+* Adds experimental macOS 27 (Golden Gate) support to {elastic-defend}.
+* Adds a workaround to {elastic-defend} on macOS for a Golden Gate bug that broke network connections from apps using Network.framework.
+* Fixes unsuccessful macOS updates when {elastic-defend} Device Control is enabled.
+* {elastic-defend} on Linux now uses c-ares 1.34.8, fixing CVE-2024-25629 (out-of-bounds read in DNS config parsing).
+* Fixes `host.name` exception list and trusted app rule matching to be case-insensitive in {elastic-defend}.
+* Hardens how {elastic-defend} restores file ownership and permissions during malware quarantine on Linux and macOS.
+* Fixes a crash in {elastic-defend} on Windows when processing files or processes whose paths contain CJK (Chinese, Japanese, Korean) characters.
+* Makes {elastic-defend} upgrade more robust on slow machines.
+* {elastic-defend} diagnostics bundles are no longer readable by unprivileged local users.
