@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,6 +40,7 @@ import (
 	dockerclient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // publicUBIRegistry is the public Red Hat registry used in place of the
@@ -92,9 +94,10 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 	dst := filepath.Join(buildCtx, "elastic-agent-"+version+"-"+osArch+".tar.gz")
 	require.NoError(t, copyFile(agentTarball, dst))
 
-	// tinit and jq are provided by the IronBank pipeline; add minimal stubs here.
-	writeFile(t, filepath.Join(buildCtx, "tinit"), []byte("#!/bin/sh\n"), 0o755)
-	writeFile(t, filepath.Join(buildCtx, "jq"), []byte("#!/bin/sh\n"), 0o755)
+	// tinit and jq are provided by the IronBank pipeline via the hardening
+	// manifest. Download them from the URLs listed in the manifest so the
+	// docker build matches what IronBank actually runs.
+	require.NoError(t, downloadManifestResources(t.Context(), filepath.Join(buildCtx, "hardening_manifest.yaml"), buildCtx, []string{"tinit", "jq"}))
 
 	dockerfile := filepath.Join(buildCtx, "Dockerfile")
 	baseTag := parseDockerfileArg(t, dockerfile, "BASE_TAG")
@@ -217,6 +220,67 @@ func extractTarGz(src, destDir string) error {
 		}
 	}
 	return nil
+}
+
+// downloadManifestResources reads hardening_manifest.yaml and downloads the
+// named resources into destDir, matching the beats ironbank-validation pattern.
+func downloadManifestResources(ctx context.Context, manifestPath, destDir string, filenames []string) error {
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return fmt.Errorf("reading hardening manifest: %w", err)
+	}
+
+	var manifest struct {
+		Resources []struct {
+			Filename string `yaml:"filename"`
+			URL      string `yaml:"url"`
+		} `yaml:"resources"`
+	}
+	if err := yaml.Unmarshal(data, &manifest); err != nil {
+		return fmt.Errorf("parsing hardening manifest: %w", err)
+	}
+
+	want := make(map[string]bool, len(filenames))
+	for _, f := range filenames {
+		want[f] = true
+	}
+
+	for _, r := range manifest.Resources {
+		if !want[r.Filename] {
+			continue
+		}
+		dest := filepath.Join(destDir, r.Filename)
+		if err := downloadFile(ctx, r.URL, dest); err != nil {
+			return fmt.Errorf("downloading %s from %s: %w", r.Filename, r.URL, err)
+		}
+		if err := os.Chmod(dest, 0o755); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// downloadFile fetches url and writes the response body to dest.
+func downloadFile(ctx context.Context, url, dest string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status %d fetching %s", resp.StatusCode, url)
+	}
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
 }
 
 // copyFile copies a file from src to dst, preserving mode bits.
@@ -418,11 +482,6 @@ func readDockerStdout(r io.Reader) ([]byte, error) {
 		}
 	}
 	return out.Bytes(), nil
-}
-
-func writeFile(t *testing.T, path string, content []byte, mode os.FileMode) {
-	t.Helper()
-	require.NoError(t, os.WriteFile(path, content, mode))
 }
 
 func strPtr(s string) *string { return &s }
