@@ -25,6 +25,11 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
+  - dra_prep_plugin: &dra_prep_plugin
+      elastic/dra-prep#v0.1.6:
+        product_id: "elastic-agent-core"
+        stack_version: "${BEAT_VERSION}"
+        workflow: "${DRA_WORKFLOW}"
 
 steps:
   - group: ":beats: DRA Elastic-Agent Core Snapshot :beats:"
@@ -100,15 +105,9 @@ steps:
 
     - wait
 
-    - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
-      command: |
-        echo "+++ Restoring Artifacts"
-        buildkite-agent artifact download "build/**/*" .
-        echo "+++ Changing permissions for the release manager"
-        sudo chown -R :1000 build/distributions/
-        echo "+++ Running DRA publish step"
-        .buildkite/scripts/steps/dra-publish.sh
-      key: "publish-dra-snapshot"
+    - label: ":package: DRA Prep elastic-agent-core / ${BEAT_VERSION} / snapshot"
+      key: "dra-prep-snapshot"
+      command: ".buildkite/scripts/stage_artifacts.sh"
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
@@ -117,7 +116,16 @@ steps:
         DRA_WORKFLOW: "snapshot"
       plugins:
         - *google_oidc_plugin
-        - *docker_login_plugin
+        - *dra_prep_plugin
+
+    - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION} / snapshot"
+      trigger: "unified-release-dra-processing"
+      depends_on: "dra-prep-snapshot"
+      build:
+        env:
+          DRA_PRODUCT_ID: "elastic-agent-core"
+          DRA_STACK_VERSION: "${BEAT_VERSION}"
+          DRA_WORKFLOW: "snapshot"
 
     # TODO: this step should be removed as soon as 8.19 or 9.3 are onboarded to the
     #       helm-charts publishing automation in the DRA.
@@ -208,16 +216,11 @@ steps:
 
     - wait
 
-    - label: ":hammer: DRA Publish Elastic-Agent Core staging"
+    - label: ":package: DRA Prep elastic-agent-core / ${BEAT_VERSION} / staging"
+      key: "dra-prep-staging"
       command: |
         source .buildkite/scripts/version_qualifier.sh
-        echo "+++ Restoring Artifacts"
-        buildkite-agent artifact download "build/**/*" .
-        echo "+++ Changing permissions for the release manager"
-        sudo chown -R :1000 build/distributions/
-        echo "+++ Running DRA publish step"
-        .buildkite/scripts/steps/dra-publish.sh
-      key: "publish-dra-staging"
+        .buildkite/scripts/stage_artifacts.sh
       agents:
         provider: "gcp"
         machineType: "c2-standard-16"
@@ -226,7 +229,16 @@ steps:
         DRA_WORKFLOW: "staging"
       plugins:
         - *google_oidc_plugin
-        - *docker_login_plugin
+        - *dra_prep_plugin
+
+    - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION} / staging"
+      trigger: "unified-release-dra-processing"
+      depends_on: "dra-prep-staging"
+      build:
+        env:
+          DRA_PRODUCT_ID: "elastic-agent-core"
+          DRA_STACK_VERSION: "${BEAT_VERSION}"
+          DRA_WORKFLOW: "staging"
 
 notify:
   - slack: "#ingest-notifications"
