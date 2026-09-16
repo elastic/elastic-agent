@@ -41,13 +41,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// publicUBIRegistry is the registry used when building the Ironbank Dockerfile
-// in environments that cannot reach the restricted Ironbank registry.
+// publicUBIRegistry is the public Red Hat registry used in place of the
+// restricted Ironbank registry (registry1.dsop.io), which requires privileged
+// access not available in standard CI environments.
 const publicUBIRegistry = "registry.access.redhat.com"
 
-// publicUBIImage is the public Red Hat UBI image path that is functionally
-// equivalent to the Ironbank "redhat/ubi/ubi10" image.
-const publicUBIImage = "ubi10/ubi"
+// ironbankToPublicUBIImage converts the Ironbank BASE_IMAGE path
+// (e.g. "redhat/ubi/ubi10") to its public Red Hat registry equivalent
+// (e.g. "ubi10/ubi"), so the test tracks future major-version bumps
+// automatically without hardcoding "ubi10".
+func ironbankToPublicUBIImage(ironbankImage string) string {
+	// "redhat/ubi/ubiN" → "ubiN/ubi"
+	parts := strings.Split(ironbankImage, "/")
+	return parts[len(parts)-1] + "/ubi"
+}
 
 func TestIronbankDockerfilePermissions(t *testing.T) {
 	cli, err := dockerclient.New(dockerclient.FromEnv)
@@ -89,7 +96,9 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 	writeFile(t, filepath.Join(buildCtx, "tinit"), []byte("#!/bin/sh\n"), 0o755)
 	writeFile(t, filepath.Join(buildCtx, "jq"), []byte("#!/bin/sh\n"), 0o755)
 
-	baseTag := parseDockerfileArg(t, filepath.Join(buildCtx, "Dockerfile"), "BASE_TAG")
+	dockerfile := filepath.Join(buildCtx, "Dockerfile")
+	baseTag := parseDockerfileArg(t, dockerfile, "BASE_TAG")
+	publicImage := ironbankToPublicUBIImage(parseDockerfileArg(t, dockerfile, "BASE_IMAGE"))
 
 	imageTag := "elastic-agent-ironbank-perms-test:latest"
 	t.Cleanup(func() {
@@ -104,7 +113,7 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 		Remove: true,
 		BuildArgs: map[string]*string{
 			"BASE_REGISTRY": strPtr(publicUBIRegistry),
-			"BASE_IMAGE":    strPtr(publicUBIImage),
+			"BASE_IMAGE":    strPtr(publicImage),
 			"BASE_TAG":      strPtr(baseTag),
 			"ELASTIC_STACK": strPtr(version),
 			"OS_AND_ARCH":   strPtr(osArch),
