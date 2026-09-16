@@ -324,6 +324,51 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- end }}
 
+{{/*
+Returns "true" when the cluster is OpenShift, controlled by agent.openshift.enabled:
+  auto  - detect via .Capabilities.APIVersions (default)
+  true  - always treat as OpenShift
+  false - never treat as OpenShift
+*/}}
+{{- define "elasticagent.isOpenShift" -}}
+{{- $mode := toString (dig "openshift" "enabled" "auto" .Values.agent) -}}
+{{- if eq $mode "true" -}}true
+{{- else if eq $mode "false" -}}
+{{- else if .Capabilities.APIVersions.Has "security.openshift.io/v1" -}}true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Name of the custom SCC for the unprivileged OpenShift case
+*/}}
+{{- define "elasticagent.scc.name" -}}
+{{- printf "agent-scc-unprivileged-%s-%s" .Release.Name .Release.Namespace | lower | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+OpenShift SCC ClusterRole to bind for the agent service accounts
+*/}}
+{{- define "elasticagent.scc.clusterRole" -}}
+{{- if .Values.agent.unprivileged -}}
+system:openshift:scc:{{ include "elasticagent.scc.name" . }}
+{{- else -}}
+system:openshift:scc:privileged
+{{- end -}}
+{{- end -}}
+
+{{/*
+Whether any agent preset runs with host network
+*/}}
+{{- define "elasticagent.hostNetwork" -}}
+{{- $hostNetwork := false -}}
+{{- range $presetName, $presetVal := .Values.agent.presets -}}
+{{- if ($presetVal).hostNetwork -}}
+{{- $hostNetwork = true -}}
+{{- end -}}
+{{- end -}}
+{{- $hostNetwork -}}
+{{- end -}}
+
 {{- define "elasticagent.init.valueFrom" -}}
 {{- $ := index . 0 -}}
 {{- $valueFrom := index . 1 -}}

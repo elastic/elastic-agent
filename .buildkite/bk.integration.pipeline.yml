@@ -141,16 +141,16 @@ common:
       - slim-wolfi
       - wolfi
     default_variants: &k8s_test_default_variants
+      - wolfi
       - complete
-      - complete-wolfi
       - elastic-otel-collector
     all_variants_without_default: &k8s_test_all_variants_without_default
       - basic
+      - complete-wolfi
       - elastic-otel-collector-wolfi
       - service
       - slim
       - slim-wolfi
-      - wolfi
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
@@ -175,6 +175,56 @@ common:
       - build/*
       - build/diagnostics/**
       - build/k8s-logs-*/**
+
+  # key to hold the list of OpenShift versions to test against
+  - openshift_test:
+    versions: &openshift_test_versions
+      - &openshift_min_test_version v4.20.0
+      - v4.21.0
+      - &openshift_max_test_version v4.22.0
+    versions_without_min_max: &openshift_test_versions_without_min_max
+      - v4.21.0
+    all_variants: &openshift_test_all_variants
+      - basic
+      - complete
+      - complete-wolfi
+      - elastic-otel-collector
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+      - wolfi
+    default_variants: &openshift_test_default_variants
+      - wolfi
+      - complete
+      - elastic-otel-collector
+    extended_variants: &openshift_test_extended_variants
+      - basic
+      - complete-wolfi
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+    env: &openshift_test_env
+      OPENSHIFT_VERSION: "{{matrix.version}}"
+      DOCKER_VARIANTS: "{{matrix.variants}}"
+      TARGET_ARCH: "amd64"
+      K8S_PROVISIONER: "microshift"
+    agent: &openshift_test_agent
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      diskSizeGb: 80
+    command: &openshift_test_command |
+      source .buildkite/scripts/k8s-utils.sh
+      K8S_VERSION="$$(openshift_to_k8s_version "$${OPENSHIFT_VERSION}")"
+      export K8S_VERSION
+      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
+    artifact_paths: &openshift_test_artifact_paths
+      - build/*
+      - build/diagnostics/**
+      - build/*.pod_logs_dump/*
 
 steps:
   - label: "Custom ECH Testing"
@@ -948,7 +998,7 @@ steps:
       - integration-ess
       - packaging-containers-amd64
     steps:
-      - label: ":kubernetes:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
+      - label: "kubernetes:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -970,6 +1020,29 @@ steps:
             version:
               *k8s_test_versions
 
+      - label: "openshift:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          *openshift_test_env
+        command: *openshift_test_command
+        artifact_paths:
+          *openshift_test_artifact_paths
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *openshift_test_agent
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variants:
+              *openshift_test_default_variants
+            version:
+              - *openshift_min_test_version
+              - *openshift_max_test_version
+
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
     if_changed:
@@ -987,7 +1060,7 @@ steps:
       - integration-ess
       - packaging-containers-amd64
     steps:
-      - label: ":kubernetes:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
+      - label: "kubernetes:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -1010,6 +1083,29 @@ steps:
               - *k8s_min_test_version
               - *k8s_max_test_version
 
+      - label: "openshift:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          *openshift_test_env
+        command: *openshift_test_command
+        artifact_paths:
+          *openshift_test_artifact_paths
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *openshift_test_agent
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variants:
+              *openshift_test_extended_variants
+            version:
+              - *openshift_min_test_version
+              - *openshift_max_test_version
+
   - group: ":kubernetes: Kubernetes (tier 3)"
     key: integration-tests-kubernetes-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
@@ -1022,7 +1118,7 @@ steps:
       - integration-ess
       - packaging-containers-amd64
     steps:
-      - label: ":kubernetes:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
+      - label: "kubernetes:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
         env:
           *k8s_test_env
         command: *k8s_test_command_with_sleep
@@ -1043,6 +1139,28 @@ steps:
               *k8s_test_all_variants
             version:
               *k8s_test_versions_without_min_max
+
+      - label: "openshift:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
+        env:
+          *openshift_test_env
+        command: *openshift_test_command
+        artifact_paths:
+          *openshift_test_artifact_paths
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          *openshift_test_agent
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variants:
+              *openshift_test_all_variants
+            version:
+              *openshift_test_versions_without_min_max
 
   - group: "Serverless integration test"
     key: integration-tests-serverless

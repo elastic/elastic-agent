@@ -59,6 +59,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -2171,7 +2172,7 @@ func (Integration) Clean(ctx context.Context) error {
 		}
 	}
 
-	r, err := createTestRunner(cfg, false, "", "")
+	r, err := createTestRunner(ctx, cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -2288,7 +2289,7 @@ func (i Integration) testServerless(ctx context.Context, matrix bool, testName s
 	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs the integration tests defined in testing/integration/k8s
+// TestKubernetes runs the integration tests defined in testing/integration/k8s.
 func (i Integration) TestKubernetes(ctx context.Context) error {
 	return i.testKubernetes(ctx, false, "")
 }
@@ -2334,12 +2335,26 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	}
 
 	// render elastic-agent-standalone kustomize
-	kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"))
-	if err != nil {
-		return fmt.Errorf("failed to render kustomize: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
-		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	for _, kustomize := range []struct {
+		overlay []string
+		target  string
+	}{
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizePath,
+		},
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "openshift", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizeOpenShiftPath,
+		},
+	} {
+		kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join(kustomize.overlay...))
+		if err != nil {
+			return fmt.Errorf("failed to render kustomize %q: %w", filepath.Join(kustomize.overlay...), err)
+		}
+		if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", kustomize.target), kustomizeYaml, 0o644); err != nil {
+			return fmt.Errorf("failed to write %q: %w", kustomize.target, err)
+		}
 	}
 
 	return nil
@@ -3097,7 +3112,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(cfg, matrix, singleTest, goTestFlags, batches...)
+	r, err := createTestRunner(ctx, cfg, matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -3155,7 +3170,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	return agentVersion, agentStackVersion, nil
 }
 
-func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(ctx context.Context, cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion := cfg.GoVersion()
 
 	agentVersion, agentStackVersion, err := getTestRunnerVersions(cfg)
@@ -3208,6 +3223,13 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 			return nil, err
 		}
 		identifier = localIdentifier()
+	case microshift.Name:
+		var err error
+		instanceProvisioner, err = microshift.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
+		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner, err = dockerprov.NewProvisioner()
 		if err != nil {
@@ -3218,7 +3240,16 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = local.NewProvisioner()
 		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf(
+			"INSTANCE_PROVISIONER environment variable must be one of %q, %q, %q, %q, %q, or %q, not %s",
+			gcloud.Name,
+			multipass.Name,
+			kind.Name,
+			microshift.Name,
+			dockerprov.Name,
+			local.Name,
+			instanceProvisionerMode,
+		)
 	}
 
 	// The local stack provisioner runs elastic-package locally and the external one

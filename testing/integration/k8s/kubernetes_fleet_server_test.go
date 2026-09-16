@@ -22,7 +22,9 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8s "sigs.k8s.io/e2e-framework/klient/k8s"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -130,12 +132,19 @@ func k8sStepDeployStatefulSet(statefulSet *appsv1.StatefulSet) k8sTestStep {
 			}
 		})
 
+		objects := []k8s.Object{statefulSet}
+
+		// OpenShift's restricted-v2 SCC forbids hostPath volumes and running as root.
+		if kCtx.openshift {
+			objects = append([]k8s.Object{fleetServerPrivilegedSCCBinding(statefulSet)}, objects...)
+		}
+
 		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{
 			namespace:   namespace,
 			wait:        true,
 			waitTimeout: 5 * time.Minute,
-		}, statefulSet)
-		require.NoError(t, err, "failed to create statefulset %q", statefulSet.Name)
+		}, objects...)
+		require.NoError(t, err, "failed to create statefulset %q objects", statefulSet.Name)
 	}
 }
 
@@ -257,6 +266,28 @@ func fleetServerStatefulSet(kCtx k8sContext, name string, namespace string, poli
 					},
 				},
 			},
+		},
+	}
+}
+
+// fleetServerPrivilegedSCCBinding returns a RoleBinding that grants the privileged SCC to the
+// ServiceAccount used by the given StatefulSet.
+func fleetServerPrivilegedSCCBinding(statefulSet *appsv1.StatefulSet) *rbacv1.RoleBinding {
+	saName := statefulSet.Spec.Template.Spec.ServiceAccountName
+	if saName == "" {
+		saName = "default"
+	}
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: statefulSet.Name + "-privileged-scc",
+		},
+		Subjects: []rbacv1.Subject{
+			{Kind: "ServiceAccount", Name: saName},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "system:openshift:scc:privileged",
 		},
 	}
 }
