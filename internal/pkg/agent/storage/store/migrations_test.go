@@ -137,7 +137,7 @@ func TestStoreMigrations(t *testing.T) {
 				require.NoError(t, err, "could not read action store golden file")
 
 				oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
-				err = os.WriteFile(oldActionStorePath, goldenActionStore, 0666)
+				err = os.WriteFile(oldActionStorePath, goldenActionStore, 0666) //nolint:gosec // G703: path in test temp dir
 				require.NoError(t, err, "could not copy action store golden file")
 
 				newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
@@ -172,7 +172,7 @@ func TestStoreMigrations(t *testing.T) {
 			{
 				name:      "ActionPolicyChange",
 				yamlStore: "8.0.0-action_policy_change.yml",
-				wantState: state{
+				wantState: state{ //nolint:gosec // G101: test token
 					Version: "1",
 					ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
 						ActionID:   "policy:POLICY-ID:1:1",
@@ -204,9 +204,9 @@ func TestStoreMigrations(t *testing.T) {
 						ActionStartTime:  "2024-02-19T17:48:40Z",
 						ActionExpiration: "2025-02-19T17:48:40Z",
 						Data: fleetapi.ActionUpgradeData{
-							Version:   "1.2.3",
-							SourceURI: "https://example.com",
-							Retry:     1,
+							Version: "1.2.3",
+							Sources: []string{"https://example.com"},
+							Retry:   1,
 						},
 						Signed: nil,
 						Err:    nil,
@@ -217,9 +217,9 @@ func TestStoreMigrations(t *testing.T) {
 							ActionStartTime:  "2024-02-19T17:48:40Z",
 							ActionExpiration: "2025-02-19T17:48:40Z",
 							Data: fleetapi.ActionUpgradeData{
-								Version:   "1.2.3",
-								SourceURI: "https://example.com",
-								Retry:     1,
+								Version: "1.2.3",
+								Sources: []string{"https://example.com"},
+								Retry:   1,
 							},
 							Signed: nil,
 							Err:    nil,
@@ -229,7 +229,7 @@ func TestStoreMigrations(t *testing.T) {
 			{
 				name:      "ActionUnenroll",
 				yamlStore: "8.0.0-action_unenroll.yml",
-				wantState: state{
+				wantState: state{ //nolint:gosec // G101: test token
 					Version: "1",
 					ActionSerializer: actionSerializer{Action: &fleetapi.ActionUnenroll{
 						ActionID:   "abc123",
@@ -244,9 +244,9 @@ func TestStoreMigrations(t *testing.T) {
 						ActionStartTime:  "2024-02-19T17:48:40Z",
 						ActionExpiration: "2025-02-19T17:48:40Z",
 						Data: fleetapi.ActionUpgradeData{
-							Version:   "1.2.3",
-							SourceURI: "https://example.com",
-							Retry:     1,
+							Version: "1.2.3",
+							Sources: []string{"https://example.com"},
+							Retry:   1,
 						},
 						Signed: nil,
 						Err:    nil,
@@ -257,9 +257,9 @@ func TestStoreMigrations(t *testing.T) {
 							ActionStartTime:  "2024-02-19T17:48:40Z",
 							ActionExpiration: "2025-02-19T17:48:40Z",
 							Data: fleetapi.ActionUpgradeData{
-								Version:   "1.2.3",
-								SourceURI: "https://example.com",
-								Retry:     1,
+								Version: "1.2.3",
+								Sources: []string{"https://example.com"},
+								Retry:   1,
 							},
 							Signed: nil,
 							Err:    nil,
@@ -269,7 +269,7 @@ func TestStoreMigrations(t *testing.T) {
 			{
 				name:      "unknown",
 				yamlStore: "8.0.0-action_unknown.yml",
-				wantState: state{
+				wantState: state{ //nolint:gosec // G101: test token
 					Version:          "1",
 					ActionSerializer: actionSerializer{Action: nil},
 					AckToken:         "czlV93YBwdkt5lYhBY7S",
@@ -324,7 +324,7 @@ func TestStoreMigrations(t *testing.T) {
 			ctx := context.Background()
 			log, _ := loggertest.New("")
 
-			want := state{
+			want := state{ //nolint:gosec // G101: test token
 				Version: "1",
 				ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
 					ActionID:   "policy:POLICY-ID:1:1",
@@ -356,9 +356,9 @@ func TestStoreMigrations(t *testing.T) {
 					ActionStartTime:  "2024-02-19T17:48:40Z",
 					ActionExpiration: "2025-02-19T17:48:40Z",
 					Data: fleetapi.ActionUpgradeData{
-						Version:   "1.2.3",
-						SourceURI: "https://example.com",
-						Retry:     1,
+						Version: "1.2.3",
+						Sources: []string{"https://example.com"},
+						Retry:   1,
 					},
 					Signed: nil,
 					Err:    nil,
@@ -369,9 +369,9 @@ func TestStoreMigrations(t *testing.T) {
 						ActionStartTime:  "2024-02-19T17:48:40Z",
 						ActionExpiration: "2025-02-19T17:48:40Z",
 						Data: fleetapi.ActionUpgradeData{
-							Version:   "1.2.3",
-							SourceURI: "https://example.com",
-							Retry:     1,
+							Version: "1.2.3",
+							Sources: []string{"https://example.com"},
+							Retry:   1,
 						},
 						Signed: nil,
 						Err:    nil,
@@ -409,7 +409,7 @@ func TestStoreMigrations(t *testing.T) {
 
 		ctx := context.Background()
 
-		want := state{
+		want := state{ //nolint:gosec // G101: test token
 			Version: "1",
 			ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
 				ActionID:   "abc123",
@@ -441,9 +441,9 @@ func TestStoreMigrations(t *testing.T) {
 				ActionStartTime:  "2024-02-19T17:48:40Z",
 				ActionExpiration: "2025-02-19T17:48:40Z",
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "1.2.3",
-					SourceURI: "https://example.com",
-					Retry:     1,
+					Version: "1.2.3",
+					Sources: []string{"https://example.com"},
+					Retry:   1,
 				},
 				Signed: nil,
 				Err:    nil,
@@ -454,9 +454,9 @@ func TestStoreMigrations(t *testing.T) {
 					ActionStartTime:  "2024-02-19T17:48:40Z",
 					ActionExpiration: "2025-02-19T17:48:40Z",
 					Data: fleetapi.ActionUpgradeData{
-						Version:   "1.2.3",
-						SourceURI: "https://example.com",
-						Retry:     1,
+						Version: "1.2.3",
+						Sources: []string{"https://example.com"},
+						Retry:   1,
 					},
 					Signed: nil,
 					Err:    nil,
@@ -528,7 +528,7 @@ func TestStoreMigrations(t *testing.T) {
 			require.NoError(t, err, "could not read action store golden file")
 
 			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
-			err = os.WriteFile(oldActionStorePath, goldenActionStore, 0666)
+			err = os.WriteFile(oldActionStorePath, goldenActionStore, 0666) //nolint:gosec // G703: path in test temp dir
 			require.NoError(t, err, "could not copy action store golden file")
 
 			newStateStorePath := filepath.Join(tempDir, "state_store.yaml")
@@ -552,7 +552,7 @@ func TestStoreMigrations(t *testing.T) {
 			ctx := context.Background()
 			log, _ := loggertest.New("")
 
-			want := state{
+			want := state{ //nolint:gosec // G101: test token
 				Version: "1",
 				ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
 					ActionID:   "policy:POLICY-ID:1:1",
@@ -584,9 +584,9 @@ func TestStoreMigrations(t *testing.T) {
 					ActionStartTime:  "2024-02-19T17:48:40Z",
 					ActionExpiration: "2025-02-19T17:48:40Z",
 					Data: fleetapi.ActionUpgradeData{
-						Version:   "1.2.3",
-						SourceURI: "https://example.com",
-						Retry:     1,
+						Version: "1.2.3",
+						Sources: []string{"https://example.com"},
+						Retry:   1,
 					},
 					Signed: nil,
 					Err:    nil,
@@ -597,9 +597,9 @@ func TestStoreMigrations(t *testing.T) {
 						ActionStartTime:  "2024-02-19T17:48:40Z",
 						ActionExpiration: "2025-02-19T17:48:40Z",
 						Data: fleetapi.ActionUpgradeData{
-							Version:   "1.2.3",
-							SourceURI: "https://example.com",
-							Retry:     1,
+							Version: "1.2.3",
+							Sources: []string{"https://example.com"},
+							Retry:   1,
 						},
 						Signed: nil,
 						Err:    nil,
@@ -633,7 +633,7 @@ func TestStoreMigrations(t *testing.T) {
 
 			ctx := context.Background()
 
-			want := state{
+			want := state{ //nolint:gosec // G101: test token
 				Version: "1",
 				ActionSerializer: actionSerializer{Action: &fleetapi.ActionPolicyChange{
 					ActionID:   "abc123",
@@ -665,9 +665,9 @@ func TestStoreMigrations(t *testing.T) {
 					ActionStartTime:  "2024-02-19T17:48:40Z",
 					ActionExpiration: "2025-02-19T17:48:40Z",
 					Data: fleetapi.ActionUpgradeData{
-						Version:   "1.2.3",
-						SourceURI: "https://example.com",
-						Retry:     1,
+						Version: "1.2.3",
+						Sources: []string{"https://example.com"},
+						Retry:   1,
 					},
 					Signed: nil,
 					Err:    nil,
@@ -678,9 +678,9 @@ func TestStoreMigrations(t *testing.T) {
 						ActionStartTime:  "2024-02-19T17:48:40Z",
 						ActionExpiration: "2025-02-19T17:48:40Z",
 						Data: fleetapi.ActionUpgradeData{
-							Version:   "1.2.3",
-							SourceURI: "https://example.com",
-							Retry:     1,
+							Version: "1.2.3",
+							Sources: []string{"https://example.com"},
+							Retry:   1,
 						},
 						Signed: nil,
 						Err:    nil,

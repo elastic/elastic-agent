@@ -1119,14 +1119,14 @@ func TestLiveVersionedHome(t *testing.T) {
 // When the symlink is absent AND there is no upgrade marker (a fresh volume),
 // no degraded error is returned — that is the expected state at first start.
 func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
-	t.Run("no marker: not degraded, expired TTL swept, orphan kept", func(t *testing.T) {
+	t.Run("no marker: not degraded, expired TTL swept, orphan swept", func(t *testing.T) {
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
 		// Two installs, no symlink, no upgrade marker — models a fresh EFS volume
 		// that has prior versioned directories but the symlink was cleaned:
 		// - expired: has an expired TTL -> should be swept
-		// - orphan : has no TTL         -> must be kept (cannot verify it isn't live)
+		// - orphan : has no TTL and is not caller-protected -> also swept
 		expiredHome := createFakeAgentInstall(t, topDir, "1.2.3", "expire", true)
 		orphanHome := createFakeAgentInstall(t, topDir, "4.5.6", "orphan", true)
 		now := time.Now()
@@ -1145,12 +1145,14 @@ func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
 		// Expired TTL is swept even without a symlink.
 		assert.NoDirExists(t, filepath.Join(topDir, expiredHome),
 			"expired TTL entry should be swept even without a symlink")
-		// Orphan is preserved because we cannot verify it isn't the live install.
-		assert.DirExists(t, filepath.Join(topDir, orphanHome),
-			"orphan must be preserved when symlink is absent")
+		// Orphan is swept: absent symlink is no longer a guard; callerProtected
+		// (derived from paths.Home() in real usage) is the safety net, and no
+		// homes were passed to this cleanup call.
+		assert.NoDirExists(t, filepath.Join(topDir, orphanHome),
+			"orphan must be swept when symlink is absent and no caller-protected homes are set")
 	})
 
-	t.Run("removeMarker=true: marker survives because verification was degraded", func(t *testing.T) {
+	t.Run("removeMarker=true: absent symlink is not degraded; marker is removed", func(t *testing.T) {
 		testLogger, _ := loggertest.New(t.Name())
 		topDir := t.TempDir()
 
@@ -1160,12 +1162,13 @@ func TestCleanup_DegradesGracefullyWhenLiveHomeUnresolvable(t *testing.T) {
 			SaveMarker(paths.DataFrom(topDir), &UpdateMarker{Version: "1.2.3", Hash: "deadbeef"}, true),
 			"writing valid upgrade marker fixture")
 
+		// No symlink. Absent symlink is no longer treated as degraded, so
+		// removeMarker=true must proceed and remove the marker.
 		err := cleanup(testLogger, topDir, true, false, 0)
-		require.Error(t, err)
-		require.ErrorIs(t, err, errCleanupDegraded)
+		require.NoError(t, err)
 
-		assert.FileExists(t, markerPath,
-			"upgrade marker must survive a degraded cleanup so the next run can verify with full info")
+		assert.NoFileExists(t, markerPath,
+			"upgrade marker must be removed when cleanup is not degraded and removeMarker=true")
 	})
 }
 
@@ -1222,8 +1225,10 @@ func TestCleanAvailableRollbacks_AbsentSymlink_NoMarker(t *testing.T) {
 	// Expired TTL — swept even though symlink is unresolvable.
 	assert.NoDirExists(t, filepath.Join(topDir, relC),
 		"expired TTL entry should be swept even when symlink is unresolvable")
-	// Orphan — kept because we cannot prove it is not the live install.
-	assertAgentInstallExists(t, filepath.Join(topDir, relD), agentExecutableName)
+	// Orphan — swept because callerProtected (relB) already identifies the live
+	// install; absent symlink no longer conservatively blocks cleanup.
+	assert.NoDirExists(t, filepath.Join(topDir, relD),
+		"orphan must be swept when symlink is absent and callerProtected identifies the live install")
 }
 
 // TestCleanAvailableRollbacks_NilDetailsMarker_LenientMode verifies that

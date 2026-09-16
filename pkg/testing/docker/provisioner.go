@@ -22,15 +22,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	dockerclient "github.com/moby/moby/client"
 	"golang.org/x/mod/modfile"
 
@@ -76,9 +79,17 @@ type provisioner struct {
 	client *dockerclient.Client
 }
 
-// NewProvisioner creates the docker instance provisioner.
-func NewProvisioner() common.InstanceProvisioner {
-	return &provisioner{}
+// NewProvisioner creates the docker instance provisioner. The Docker client is
+// initialized eagerly so it is available even when Provision is skipped (e.g.
+// the runner resumes from saved state). New() only parses env vars and creates
+// an HTTP transport — no network calls — so connectivity is verified later in
+// Provision.
+func NewProvisioner() (common.InstanceProvisioner, error) {
+	c, err := dockerclient.New(dockerclient.FromEnv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Docker client: %w", err)
+	}
+	return &provisioner{client: c}, nil
 }
 
 func (p *provisioner) Name() string {
@@ -118,18 +129,6 @@ func (p *provisioner) Supported(os define.OS) bool {
 }
 
 func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
-	// The runner reaches sshd on the container's bridge IP at port 22, which only
-	// works when the host can route to the docker bridge (i.e. a Linux host). On
-	// macOS the container IP isn't routable and the SSH port would have to be
-	// published, which the test framework's SSH client doesn't support yet.
-	if runtime.GOOS != "linux" {
-		return nil, fmt.Errorf("the %q instance provisioner currently supports Linux hosts only "+
-			"(macOS would require publishing the SSH port); host is %s", Name, runtime.GOOS)
-	}
-	if err := p.checkDocker(ctx); err != nil {
-		return nil, err
-	}
-
 	publicKeyPath := filepath.Join(cfg.StateDir, "id_rsa.pub")
 	publicKey, err := os.ReadFile(publicKeyPath)
 	if err != nil {
@@ -314,6 +313,13 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 			"/run/lock": "",
 		},
 		Binds: []string{"/sys/fs/cgroup:/sys/fs/cgroup:rw"},
+		// Publish SSH to loopback so the runner can connect regardless of whether
+		// Docker is local or remote (e.g. inside a Lima VM or Docker Desktop VM).
+		// On native Linux the loopback binding is directly reachable; on Lima/Docker
+		// Desktop the host automatically port-forwards loopback bindings from the VM.
+		PortBindings: network.PortMap{
+			network.MustParsePort("22/tcp"): []network.PortBinding{{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: ""}},
+		},
 	}
 	if modCache != "" {
 		// Share the host module cache read-only; configureGoProxy points Go at it.
@@ -353,7 +359,7 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 		return common.Instance{}, err
 	}
 
-	ip, err := p.containerIP(ctx, name)
+	sshPort, err := p.containerSSHPort(ctx, name)
 	if err != nil {
 		return common.Instance{}, err
 	}
@@ -362,9 +368,13 @@ func (p *provisioner) launch(ctx context.Context, batch common.OSBatch, bld imag
 		ID:          batch.ID,
 		Provisioner: Name,
 		Name:        name,
-		IP:          ip,
-		Username:    sshUser,
-		RemotePath:  fmt.Sprintf("/home/%s/agent", sshUser),
+		// The container's 172.x.x.x IP is only reachable inside the Docker host
+		// (which may be a remote VM on Lima or Docker Desktop). Use the published
+		// loopback port instead — reachable on the local machine in all cases.
+		IP:         "127.0.0.1",
+		SSHPort:    sshPort,
+		Username:   sshUser,
+		RemotePath: fmt.Sprintf("/home/%s/agent", sshUser),
 		// the image bakes in build-essential, unzip and the matching Go
 		// toolchain, so the runner can skip its Prepare step entirely.
 		Prepared: true,
@@ -513,29 +523,23 @@ func (p *provisioner) waitForDockerd(ctx context.Context, name string) error {
 	}
 }
 
-func (p *provisioner) containerIP(ctx context.Context, name string) (string, error) {
+func (p *provisioner) containerSSHPort(ctx context.Context, name string) (int, error) {
 	result, err := p.client.ContainerInspect(ctx, name, dockerclient.ContainerInspectOptions{})
 	if err != nil {
-		return "", fmt.Errorf("failed to inspect container %s: %w", name, err)
+		return 0, fmt.Errorf("failed to inspect container %s: %w", name, err)
 	}
-	for _, ep := range result.Container.NetworkSettings.Networks {
-		if ep.IPAddress.IsValid() {
-			return ep.IPAddress.String(), nil
+	bindings := result.Container.NetworkSettings.Ports[network.MustParsePort("22/tcp")]
+	loopback := netip.MustParseAddr("127.0.0.1")
+	unspecified4 := netip.MustParseAddr("0.0.0.0")
+	for _, b := range bindings {
+		if b.HostIP == loopback || b.HostIP == unspecified4 || !b.HostIP.IsValid() {
+			port, err := strconv.Atoi(b.HostPort)
+			if err == nil && port > 0 {
+				return port, nil
+			}
 		}
 	}
-	return "", fmt.Errorf("container %s has no IP address", name)
-}
-
-func (p *provisioner) checkDocker(ctx context.Context) error {
-	c, err := dockerclient.New(dockerclient.FromEnv)
-	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
-	}
-	if _, err := c.ServerVersion(ctx, dockerclient.ServerVersionOptions{}); err != nil {
-		return fmt.Errorf("docker does not appear to be running: %w", err)
-	}
-	p.client = c
-	return nil
+	return 0, fmt.Errorf("container %s has no published SSH port on 127.0.0.1", name)
 }
 
 // containerExec runs cmd inside the named container, optionally piping stdin.

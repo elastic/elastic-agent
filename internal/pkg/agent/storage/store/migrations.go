@@ -183,6 +183,10 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 			continue
 		}
 
+		var sources []string
+		if a.SourceURI != "" {
+			sources = append(sources, a.SourceURI)
+		}
 		queue = append(queue,
 			&fleetapi.ActionUpgrade{
 				ActionID:         a.ActionID,
@@ -190,9 +194,9 @@ func migrateYAMLStateStoreToStateStoreV1(log *logger.Logger, store storage.Stora
 				ActionStartTime:  a.StartTime.Format(time.RFC3339),
 				ActionExpiration: a.ExpirationTime.Format(time.RFC3339),
 				Data: fleetapi.ActionUpgradeData{
-					Version:   a.Version,
-					SourceURI: a.SourceURI,
-					Retry:     a.RetryAttempt,
+					Version: a.Version,
+					Sources: sources,
+					Retry:   a.RetryAttempt,
 				},
 			})
 	}
