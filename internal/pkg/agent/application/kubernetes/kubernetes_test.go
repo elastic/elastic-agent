@@ -715,14 +715,9 @@ func TestTransformAddFieldsToFieldCopies_EmptyFields(t *testing.T) {
 
 // indentYAML prefixes every non-empty line of s with indent.
 func indentYAML(s, indent string) string {
-	lines := fmt.Sprintf("%s", s)
-	var b []byte
-	for _, ch := range []byte(lines) {
-		b = append(b, ch)
-	}
 	// simple line-by-line indent
 	result := ""
-	for _, line := range splitLines(string(b)) {
+	for _, line := range splitLines(s) {
 		if line == "" {
 			result += "\n"
 		} else {
