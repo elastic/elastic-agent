@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // This test exists to notify the cloudbeat team in case the default agent fleet config is changed.
@@ -18,5 +18,5 @@ func TestDefaultAgentFleetConfig(t *testing.T) {
 	err := yaml.Unmarshal(DefaultAgentFleetConfig, &cfg)
 	assert.NoError(t, err)
 
-	assert.Equal(t, map[string]interface{}{"fleet": map[interface{}]interface{}{"enabled": true}}, cfg)
+	assert.Equal(t, map[string]interface{}{"fleet": map[string]interface{}{"enabled": true}}, cfg)
 }

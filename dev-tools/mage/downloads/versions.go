@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/Jeffail/gabs/v2"
-	"github.com/cenkalti/backoff/v4"
 	"go.elastic.co/apm/v2"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -152,7 +151,7 @@ func GetElasticArtifactVersion(version string) (string, error) {
 		return nil
 	}
 
-	err := backoff.Retry(apiStatus, exp)
+	err := retryOperation(apiStatus, exp, time.Minute)
 	if err != nil {
 		return "", err
 	}
@@ -518,6 +517,7 @@ func getObjectURLFromResolvers(resolvers []BucketURLResolver, maxtimeout time.Du
 // Google Cloud Storage bucket used by the CI to push snapshots
 func getObjectURLFromBucket(bucket string, prefix string, object string, maxtimeout time.Duration) (string, error) {
 	exp := getExponentialBackoff(maxtimeout)
+	startTime := time.Now()
 
 	retryCount := 1
 
@@ -534,7 +534,7 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 		if err != nil {
 			logger.Warn("Google Cloud Storage API is not available yet",
 				slog.String("bucket", bucket),
-				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.Duration("elapsedTime", time.Since(startTime)),
 				slog.String("prefix", prefix),
 				slog.String("error", err.Error()),
 				slog.String("object", object),
@@ -548,7 +548,7 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 
 		logger.Log(context.Background(), TraceLevel, "Google Cloud Storage API is available",
 			slog.String("bucket", bucket),
-			slog.Duration("elapsedTime", exp.GetElapsedTime()),
+			slog.Duration("elapsedTime", time.Since(startTime)),
 			slog.String("prefix", prefix),
 			slog.String("object", object),
 			slog.Int("retries", retryCount),
@@ -579,7 +579,7 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 		} else if mediaLink != "" {
 			logger.Debug("Media link found for the object",
 				slog.String("bucket", bucket),
-				slog.Duration("elapsedTime", exp.GetElapsedTime()),
+				slog.Duration("elapsedTime", time.Since(startTime)),
 				slog.String("prefix", prefix),
 				slog.String("medialink", mediaLink),
 				slog.String("object", object),
@@ -605,7 +605,7 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 		logger.Warn("Object not found in current page. Continuing",
 			slog.Int("currentPage", currentPage),
 			slog.String("bucket", bucket),
-			slog.Duration("elapsedTime", exp.GetElapsedTime()),
+			slog.Duration("elapsedTime", time.Since(startTime)),
 			slog.String("prefix", prefix),
 			slog.String("object", object),
 			slog.Int("retries", retryCount),
@@ -614,7 +614,7 @@ func getObjectURLFromBucket(bucket string, prefix string, object string, maxtime
 		return fmt.Errorf("the %s object could not be found in the current page (%d) the %s bucket and %s prefix", object, currentPage, bucket, prefix)
 	}
 
-	err := backoff.Retry(storageAPI, exp)
+	err := retryOperation(storageAPI, exp, maxtimeout)
 	if err != nil {
 		return "", err
 	}

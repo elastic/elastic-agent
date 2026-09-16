@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -32,14 +32,11 @@ type BackoffRoundTripper struct {
 
 func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	exp := backoff.NewExponentialBackOff()
-	boCtx := backoff.WithContext(exp, req.Context())
 
 	opNotify := func(err error, retryAfter time.Duration) {
 		btr.logger.Warnf("request failed: %s, retrying in %s", err, retryAfter)
 	}
 
-	var resp *http.Response
-	var err error
 	var resettableBody *bytes.Reader
 
 	if req.Body != nil {
@@ -59,19 +56,18 @@ func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	// - The response body is closed for failed requests to free resources.
 	// - A successful request (status < 400) stops the retries and returns the response.
 	attempt := 1
-	opFunc := func() error {
+	opFunc := func() (*http.Response, error) {
 		if resettableBody != nil {
-			_, err = resettableBody.Seek(0, io.SeekStart)
-			if err != nil {
+			if _, err := resettableBody.Seek(0, io.SeekStart); err != nil {
 				btr.logger.Errorf("error while resetting request body: %v", err)
 			}
 		}
 
 		attempt++
-		resp, err = btr.next.RoundTrip(req) //nolint:bodyclose // the response body is closed when status code >= 400 or it is closed by the caller
+		resp, err := btr.next.RoundTrip(req)
 		if err != nil {
 			btr.logger.Errorf("attempt %d: error round-trip: %v", attempt, err)
-			return err
+			return nil, err
 		}
 
 		if resp.StatusCode >= 400 {
@@ -79,11 +75,18 @@ func (btr *BackoffRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 				btr.logger.Errorf("attempt %d: error closing the response body: %v", attempt, err)
 			}
 			btr.logger.Errorf("attempt %d: received response status: %d", attempt, resp.StatusCode)
-			return errors.New(fmt.Sprintf("received response status: %d", resp.StatusCode))
+			return nil, errors.New(fmt.Sprintf("received response status: %d", resp.StatusCode))
 		}
 
-		return nil
+		return resp, nil
 	}
 
-	return resp, backoff.RetryNotify(opFunc, boCtx, opNotify)
+	resp, err := backoff.Retry(req.Context(), opFunc, backoff.WithBackOff(exp), backoff.WithNotify(opNotify))
+	if err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return nil, re.LastErr
+		}
+		return nil, err
+	}
+	return resp, nil
 }
