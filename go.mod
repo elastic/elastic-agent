@@ -14,7 +14,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260911171120-2515c6e219dc
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260915222606-868eee045ba3
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.46.3
@@ -25,7 +25,7 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.5
-	github.com/elastic/go-ucfg v0.9.1
+	github.com/elastic/go-ucfg v0.9.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
@@ -672,7 +672,7 @@ require (
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
 	go.etcd.io/bbolt v1.5.0 // indirect
-	go.mongodb.org/mongo-driver v1.17.9 // indirect
+	go.mongodb.org/mongo-driver v1.17.10 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/collector v0.159.0 // indirect
