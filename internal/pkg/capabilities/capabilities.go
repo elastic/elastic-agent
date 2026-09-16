@@ -16,7 +16,8 @@ import (
 )
 
 type Capabilities interface {
-	AllowUpgrade(version string, sourceURI string) bool
+	AllowUpgrade(version string, sources []string) bool
+	FilterUpgradeSources(version string, sources []string) []string
 	AllowInput(name string) bool
 	AllowOutput(name string) bool
 	AllowFleetOverride() bool
@@ -38,8 +39,28 @@ func (cm *capabilitiesManager) AllowOutput(outputType string) bool {
 	return matchString(outputType, cm.outputChecks)
 }
 
-func (cm *capabilitiesManager) AllowUpgrade(version string, uri string) bool {
-	return allowUpgrade(cm.log, version, uri, cm.upgradeCaps)
+func (cm *capabilitiesManager) AllowUpgrade(version string, sources []string) bool {
+	if len(sources) == 0 {
+		return allowUpgrade(cm.log, version, "", cm.upgradeCaps)
+	}
+	for _, source := range sources {
+		if allowUpgrade(cm.log, version, source, cm.upgradeCaps) {
+			return true
+		}
+	}
+	return false
+}
+
+func (cm *capabilitiesManager) FilterUpgradeSources(version string, sources []string) []string {
+	allowed := make([]string, 0, len(sources))
+	for _, source := range sources {
+		if allowUpgrade(cm.log, version, source, cm.upgradeCaps) {
+			allowed = append(allowed, source)
+		} else {
+			cm.log.Infof("Upgrade source %q filtered by capabilities.yml", source)
+		}
+	}
+	return allowed
 }
 
 func (cm *capabilitiesManager) AllowFleetOverride() bool {
