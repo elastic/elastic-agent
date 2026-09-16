@@ -1822,7 +1822,7 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// keep the ordering of everything in between unchanged.
 	currentCfg, currentCfgErr := configuration.NewFromConfig(cfg)
 	if currentCfgErr == nil {
-		k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput)
+		k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput, c.logger)
 	}
 
 	err = c.generateAST(cfg, m)

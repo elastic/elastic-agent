@@ -18,16 +18,49 @@
 package kubernetes
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 const (
-	// containerLogsDataset is the data_stream.dataset value that identifies the
-	// Kubernetes container-logs integration stream.
+	// containerLogsDataset is the canonical data_stream.dataset value for the
+	// Kubernetes container-logs integration.
 	containerLogsDataset = "kubernetes.container_logs"
+
+	// containerLogsSuffix is the suffix shared by renamed datasets
+	// (e.g. "myteam.container_logs").
+	containerLogsSuffix = ".container_logs"
+
+	// fleetPackageName is the value of meta.package.name set by Fleet for every
+	// input coming from the Kubernetes integration. It cannot be changed by the
+	// user through the Fleet UI, so its presence is treated as certain.
+	fleetPackageName = "kubernetes"
+)
+
+// containerLogConfidence is a score in the range [0, 100] expressing how
+// certain we are that a stream belongs to the Kubernetes container-logs
+// integration.
+type containerLogConfidence int
+
+const (
+	// certainConfidence is assigned when Fleet's immutable meta.package.name
+	// field identifies the Kubernetes integration. No further signals are needed.
+	certainConfidence containerLogConfidence = 100
+
+	// highConfidence is the minimum score required to rewrite an input without
+	// any user-visible log message. Combinations of a kubelet log path and a
+	// per-container kubernetes variable in the path each contribute enough to
+	// reach this threshold independently.
+	highConfidence containerLogConfidence = 70
+
+	// suspectedConfidence is the minimum score at which the input is still
+	// rewritten, but a warning is emitted so operators can verify the decision.
+	suspectedConfidence containerLogConfidence = 40
 )
 
 // k8sVarPattern matches elastic-agent variable references scoped to the
@@ -38,18 +71,6 @@ var k8sVarPattern = regexp.MustCompile(`\$\{kubernetes\.[^}]*\}`)
 // ${kubernetes.annotations.elastic.co/dataset|""}. Group 1 is the raw (not
 // dedotted) annotation key as it appears on the pod.
 var k8sAnnotationVarPattern = regexp.MustCompile(`\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|[^}]*)?\}`)
-
-// anyVarPattern matches any elastic-agent variable reference of the form
-// ${provider.key}. Used as a defensive fallback when translating path templates
-// that may still contain non-kubernetes provider references.
-var anyVarPattern = regexp.MustCompile(`\$\{[^}]+\}`)
-
-// starAdjacentVarPattern matches one or more consecutive ${...} variable
-// references together with any immediately adjacent * wildcards. The whole
-// group is replaced by a single * so that *${var} and ${var1}${var2} become *
-// rather than **. Pre-existing ** patterns not adjacent to a variable reference
-// (e.g. /var/log/pods/**/*.log) are left untouched.
-var starAdjacentVarPattern = regexp.MustCompile(`\**(\$\{[^}]+\})+\**`)
 
 // k8sStarAdjacentVarPattern is like starAdjacentVarPattern but only matches
 // ${kubernetes.*} references. Used in path translation so that context-provider
@@ -88,14 +109,15 @@ func translateVarPathToGlob(path string) string {
 //
 // Inputs that are genuinely per-container — hints-based autodiscovery templates,
 // or anything carrying a condition — are left untouched. Streams that do not
-// belong to the container-logs integration are left untouched, and an input is
-// only rewritten when all of its streams belong to it.
+// appear to belong to the container-logs integration (low confidence score) are
+// left untouched, and an input is only rewritten when all of its streams clear
+// the suspectedConfidence threshold.
 //
 // globInput false leaves the per-container inputs in place, but still annotates
 // them so the setting can be toggled without losing read positions: see
 // markContainerLogTakeOver. Eligibility is evaluated identically either way, so
 // an input that would not be collapsed is also never annotated.
-func RewriteContainerLogInputs(m map[string]interface{}, globInput bool) {
+func RewriteContainerLogInputs(m map[string]interface{}, globInput bool, log *logp.Logger) {
 	inputList, ok := m["inputs"].([]interface{})
 	if !ok {
 		return
@@ -105,34 +127,150 @@ func RewriteContainerLogInputs(m map[string]interface{}, globInput bool) {
 		if !ok {
 			continue
 		}
-		if !isRewritableContainerLogInput(inputMap) {
+		if !isRewritableContainerLogInput(inputMap, log) {
 			continue
 		}
 		if globInput {
 			rewriteContainerLogInput(inputMap)
+			if log != nil {
+				inputID, _ := inputMap["id"].(string)
+				log.Infof(
+					"Automatically collapsed kubernetes container-log input %q into a single "+
+						"glob filestream input. To suppress this message, update your Fleet "+
+						"integration to the latest version or update your standalone manifest "+
+						"to use the recommended Kubernetes container-logs configuration.",
+					inputID,
+				)
+			}
 			continue
 		}
 		markContainerLogTakeOver(inputMap)
 	}
 }
 
-// isContainerLogStream reports whether a raw stream config map (as produced by
-// cfg.ToMapStr()) belongs to the Kubernetes container-logs integration by
-// checking data_stream.dataset.
-func isContainerLogStream(stream map[string]interface{}) bool {
-	ds, ok := stream["data_stream"].(map[string]interface{})
-	if !ok {
-		return false
+// containerLogStreamConfidence returns a confidence score for how likely a
+// stream is to be a kubernetes container-logs stream, along with a human-readable
+// list of the signals that contributed to the score.
+//
+// The input map is passed alongside the stream so the Fleet meta.package signal
+// (which lives at the input level, not the stream level) can be checked once.
+//
+// Score thresholds:
+//   - certainConfidence  (100): Fleet-managed; meta.package.name == "kubernetes"
+//   - highConfidence      (70): multiple strong path/id signals; apply silently
+//   - suspectedConfidence (40): some signals; apply but emit a warning
+//   - below suspectedConfidence: do not apply
+func containerLogStreamConfidence(input, stream map[string]interface{}) (containerLogConfidence, []string) {
+	var signals []string
+	score := containerLogConfidence(0)
+
+	// Fleet signal: meta.package.name is set by Fleet and is immutable.
+	if pkg, ok := nestedString(input, "meta", "package", "name"); ok && pkg == fleetPackageName {
+		return certainConfidence, []string{"meta.package.name=kubernetes (Fleet-managed)"}
 	}
-	return ds["dataset"] == containerLogsDataset
+
+	// Path signals — check every path in the stream.
+	kubeletPathSeen := false
+	containerVarSeen := false
+	podUIDSeen := false
+	podVarSeen := false
+	if pathList, ok := stream["paths"].([]interface{}); ok {
+		for _, p := range pathList {
+			path, ok := p.(string)
+			if !ok {
+				continue
+			}
+			if !kubeletPathSeen && isKubeletLogPath(path) {
+				kubeletPathSeen = true
+				signals = append(signals, fmt.Sprintf("path under kubelet log dir: %s", path))
+				score += 40
+			}
+			if !containerVarSeen && containsAny(path, "${kubernetes.container.id}", "${kubernetes.container.name}") {
+				containerVarSeen = true
+				signals = append(signals, "path contains ${kubernetes.container.*} variable")
+				score += 30
+			}
+			if !podUIDSeen && strings.Contains(path, "${kubernetes.pod.uid}") {
+				podUIDSeen = true
+				signals = append(signals, "path contains ${kubernetes.pod.uid}")
+				score += 20
+			}
+			if !podVarSeen && containsAny(path, "${kubernetes.pod.name}", "${kubernetes.namespace}") {
+				podVarSeen = true
+				signals = append(signals, "path contains kubernetes pod/namespace variable")
+				score += 10
+			}
+		}
+	}
+
+	// Dataset signals.
+	if ds, ok := stream["data_stream"].(map[string]interface{}); ok {
+		if dataset, ok := ds["dataset"].(string); ok {
+			if dataset == containerLogsDataset {
+				signals = append(signals, fmt.Sprintf("data_stream.dataset=%s (exact match)", dataset))
+				score += 30
+			} else if strings.HasSuffix(dataset, containerLogsSuffix) {
+				signals = append(signals, fmt.Sprintf("data_stream.dataset=%s (suffix match)", dataset))
+				score += 15
+			}
+		}
+	}
+
+	// Stream ID signals.
+	if id, ok := stream["id"].(string); ok {
+		if containsAny(id, "container-log", "container_log") {
+			signals = append(signals, fmt.Sprintf("stream id contains container-log pattern: %s", id))
+			score += 15
+		}
+		if k8sVarPattern.MatchString(id) {
+			signals = append(signals, "stream id contains ${kubernetes.*} variable")
+			score += 10
+		}
+	}
+
+	return score, signals
+}
+
+// isKubeletLogPath reports whether path is rooted at one of the three kubelet-
+// managed log directories. These directories are exclusive to container runtimes
+// and are a strong signal that the stream is a container-log stream.
+func isKubeletLogPath(path string) bool {
+	return strings.HasPrefix(path, containerLogsPath) ||
+		strings.HasPrefix(path, podLogsPath) ||
+		strings.HasPrefix(path, kubeletPodLogsPath)
+}
+
+// containsAny reports whether s contains any of the provided substrings.
+func containsAny(s string, subs ...string) bool {
+	for _, sub := range subs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+// nestedString walks a map tree following the given keys and returns the string
+// value at the leaf, or ("", false) if any step is missing or not a string.
+func nestedString(m map[string]interface{}, keys ...string) (string, bool) {
+	var cur interface{} = m
+	for _, k := range keys {
+		curMap, ok := cur.(map[string]interface{})
+		if !ok {
+			return "", false
+		}
+		cur = curMap[k]
+	}
+	s, ok := cur.(string)
+	return s, ok
 }
 
 // isRewritableContainerLogInput reports whether the input can be collapsed into
-// a single static filestream. Every stream must belong to the container-logs
-// integration, nothing may carry a condition (conditions are evaluated per
-// variable set, so a conditional input stays dynamic by design), and the input
-// must not reference the hints provider.
-func isRewritableContainerLogInput(input map[string]interface{}) bool {
+// a single static filestream. Hard disqualifiers (conditions, hints provider)
+// are checked first. Then every stream must score at or above suspectedConfidence.
+// A warning is logged for streams that score below highConfidence so that
+// operators can verify the heuristic decision.
+func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logger) bool {
 	streams, ok := input["streams"].([]interface{})
 	if !ok || len(streams) == 0 {
 		return false
@@ -140,19 +278,37 @@ func isRewritableContainerLogInput(input map[string]interface{}) bool {
 	if _, hasCondition := input["condition"]; hasCondition {
 		return false
 	}
+	if referencesHintsProvider(input) {
+		return false
+	}
+
+	inputID, _ := input["id"].(string)
+
 	for _, stream := range streams {
 		streamMap, ok := stream.(map[string]interface{})
 		if !ok {
 			return false
 		}
-		if !isContainerLogStream(streamMap) {
-			return false
-		}
 		if _, hasCondition := streamMap["condition"]; hasCondition {
 			return false
 		}
+
+		score, signals := containerLogStreamConfidence(input, streamMap)
+		streamID, _ := streamMap["id"].(string)
+
+		if score < suspectedConfidence {
+			return false
+		}
+		if score < highConfidence && log != nil {
+			log.Warnf(
+				"applying kubernetes container-log glob rewrite to stream %q in input %q "+
+					"with low confidence (score %d/%d); verify this is the container-logs integration. "+
+					"Detected signals: %s",
+				streamID, inputID, score, highConfidence, strings.Join(signals, "; "),
+			)
+		}
 	}
-	return !referencesHintsProvider(input)
+	return true
 }
 
 // referencesHintsProvider reports whether any string anywhere in the input tree
