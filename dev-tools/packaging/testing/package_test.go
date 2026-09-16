@@ -882,7 +882,9 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 					continue
 				case "DefaultGODEBUG":
 					for _, entry := range strings.Split(setting.Value, ",") {
-						if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && val == "on" {
+						// Accept both "on" (default when GOFIPS140 is set) and "only" (stricter
+						// mode set via //go:debug fips140=only, which disallows non-FIPS fallbacks).
+						if key, val, ok := strings.Cut(entry, "="); ok && key == "fips140" && (val == "on" || val == "only") {
 							foundFIPSDefault = true
 							break
 						}
@@ -893,7 +895,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 
 			require.True(t, foundTags, "Did not find -tags within binary version information")
 			require.True(t, foundFIPS, "Did not find GOFIPS140 within binary version information")
-			require.True(t, foundFIPSDefault, "Did not find fips140=on in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
+			require.True(t, foundFIPSDefault, "Did not find fips140=on or fips140=only in DefaultGODEBUG — binary will not enforce FIPS mode at runtime")
 		})
 	}
 }

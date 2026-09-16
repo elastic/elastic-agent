@@ -24,6 +24,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -452,16 +453,17 @@ func TestGetOtelConfig(t *testing.T) {
 			"user":               "elastic",
 			"max_conns_per_host": 1,
 			"retry": map[string]any{
-				"enabled":          true,
-				"initial_interval": 1 * time.Second,
-				"max_interval":     1 * time.Minute,
-				"max_retries":      3,
-				"retry_on_status":  []int{429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511},
+				"enabled":                  true,
+				"initial_interval":         1 * time.Second,
+				"max_interval":             1 * time.Minute,
+				"max_retries":              3,
+				"retry_on_status":          defaultRetryOnStatus(),
+				"retry_on_document_status": []int{429, 500, 501, 502, 503, 504, 505, 506, 507, 508, 510, 511},
 			},
 			"sending_queue": map[string]any{
 				"enabled":           true,
-				"num_consumers":     1,
-				"queue_size":        3200,
+				"num_consumers":     2,
+				"queue_size":        6400,
 				"block_on_overflow": true,
 				"wait_for_result":   true,
 				"batch": map[string]any{
@@ -482,6 +484,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"authenticator": "beatsauth/_agent-component/" + outputName,
 			},
 			"suppress_conflict_errors": true,
+			"timeout":                  90 * time.Second,
 		}
 	}
 
@@ -506,29 +509,19 @@ func TestGetOtelConfig(t *testing.T) {
 		}
 	}
 
-	defaultGlobalProcessors := []map[string]any{
-		{
-			"add_host_metadata": map[string]any{
-				"when.not.contains.tags": "forwarded",
-			},
-		},
-		{"add_cloud_metadata": nil},
-		{"add_docker_metadata": nil},
-		{"add_kubernetes_metadata": nil},
-	}
 	// beatProcessorID returns the id of the default beat processor for the
 	// component with the given id, matching translate.GetProcessorID.
 	beatProcessorID := func(id string) string {
 		return "beat/_agent-component/" + id
 	}
 	// defaultExpectedProcessors builds the expected top-level "processors" map
-	// for the components with the given ids, each getting its own default
-	// beat processor definition.
-	defaultExpectedProcessors := func(ids ...string) map[string]any {
+	// for the components with the given ids, each getting the beat-specific default
+	// processor definition matching what GetDefaultProcessors returns for that beat.
+	defaultExpectedProcessors := func(beatName string, ids ...string) map[string]any {
 		m := map[string]any{}
 		for _, id := range ids {
 			m[beatProcessorID(id)] = map[string]any{
-				"processors": defaultGlobalProcessors,
+				"processors": GetDefaultProcessors(beatName),
 			}
 		}
 		return m
@@ -545,7 +538,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-					"events": uint64(3200),
+					"events": int64(6400),
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -636,29 +629,33 @@ func TestGetOtelConfig(t *testing.T) {
 
 	// expectedOsquerybeatSingleReceiverConfig is the expected config for an osquery component
 	// with single_receiver: true and two streams merged into one receiver.
+	// The osquery_manager.result stream must be first (index 0) so that
+	// osquerybeat assigns its client to it.
 	expectedOsquerybeatSingleReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
 		cfg["osquerybeat"] = map[string]any{
 			"inputs": []map[string]any{
 				{
-					"id": "action-responses",
-					"data_stream": map[string]any{
-						"dataset": "osquery_manager.action.responses",
-					},
-					"query":      nil,
-					"index":      "logs-osquery_manager.action.responses-default",
-					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
-					"type":       "osquery",
-				},
-				{
 					"id": "results",
 					"data_stream": map[string]any{
-						"dataset": "osquery_manager.result",
+						"dataset":   "osquery_manager.result",
+						"namespace": "default",
 					},
 					"query":      "SELECT * FROM processes",
 					"interval":   "3600",
 					"index":      "logs-osquery_manager.result-default",
 					"processors": defaultInputProcessors("results", "osquery_manager.result", "logs"),
+					"type":       "osquery",
+				},
+				{
+					"id": "action-responses",
+					"data_stream": map[string]any{
+						"dataset":   "osquery_manager.action.responses",
+						"namespace": "default",
+					},
+					"query":      nil,
+					"index":      "logs-osquery_manager.action.responses-default",
+					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
 					"type":       "osquery",
 				},
 			},
@@ -711,7 +708,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-					"events": uint64(3200),
+					"events": int64(6400),
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -845,7 +842,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("filestream-default"),
+				"processors": defaultExpectedProcessors("filebeat", "filestream-default"),
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
 					"filebeatreceiver/_agent-component/filestream-default/test-2": expectedFilestreamConfig("filestream-default", "test-2", "generic-2"),
@@ -959,7 +956,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("filestream-default"),
+				"processors": defaultExpectedProcessors("filebeat", "filestream-default"),
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
 					"filebeatreceiver/_agent-component/filestream-default/test-2": expectedFilestreamConfig("filestream-default", "test-2", "generic-2"),
@@ -1038,7 +1035,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"workers":                  int64(0),
 					},
 				},
-				"processors": defaultExpectedProcessors("beat-metrics-monitoring"),
+				"processors": defaultExpectedProcessors("metricbeat", "beat-metrics-monitoring"),
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": map[string]any{
 						"include_metadata": true,
@@ -1180,7 +1177,7 @@ func TestGetOtelConfig(t *testing.T) {
 				},
 				"processors": map[string]any{
 					beatProcessorID("beat-metrics-monitoring"): map[string]any{
-						"processors": defaultGlobalProcessors,
+						"processors": GetDefaultProcessors("metricbeat"),
 					},
 					"transform/_agent-component/default": map[string]any{
 						"error_mode": "ignore",
@@ -1302,7 +1299,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
-				"processors": defaultExpectedProcessors("beat-metrics-monitoring"),
+				"processors": defaultExpectedProcessors("metricbeat", "beat-metrics-monitoring"),
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
 				},
@@ -1409,7 +1406,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
-				"processors": defaultExpectedProcessors("beat-metrics-monitoring"),
+				"processors": defaultExpectedProcessors("metricbeat", "beat-metrics-monitoring"),
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
 				},
@@ -1598,7 +1595,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 				},
-				"processors": defaultExpectedProcessors("beat-metrics-monitoring", "beat-metrics-monitoring2"),
+				"processors": defaultExpectedProcessors("metricbeat", "beat-metrics-monitoring", "beat-metrics-monitoring2"),
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring2/test-1": map[string]any{
@@ -1731,7 +1728,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("filestream1-default", "filestream2-default"),
+				"processors": defaultExpectedProcessors("filebeat", "filestream1-default", "filestream2-default"),
 				"receivers": map[string]any{
 					"filebeatreceiver/_agent-component/filestream1-default/test-1": expectedFilestreamConfig("filestream1-default", "test-1", "generic-1"),
 					"filebeatreceiver/_agent-component/filestream1-default/test-2": expectedFilestreamConfig("filestream1-default", "test-2", "generic-2"),
@@ -1794,7 +1791,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("beat-metrics-monitoring"),
+				"processors": defaultExpectedProcessors("metricbeat", "beat-metrics-monitoring"),
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": map[string]any{
 						"metricbeat": map[string]any{
@@ -1817,7 +1814,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": uint64(3200),
+								"events": int64(6400),
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",
@@ -1894,7 +1891,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("system-metrics"),
+				"processors": defaultExpectedProcessors("metricbeat", "system-metrics"),
 				"receivers": map[string]any{
 					"metricbeatreceiver/_agent-component/system-metrics/test-1": map[string]any{
 						"metricbeat": map[string]any{
@@ -1928,7 +1925,7 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
-								"events": uint64(3200),
+								"events": int64(6400),
 								"flush": map[string]any{
 									"min_events": uint64(1600),
 									"timeout":    "10s",
@@ -2005,7 +2002,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("auditbeat-default"),
+				"processors": defaultExpectedProcessors("auditbeat", "auditbeat-default"),
 				"receivers": map[string]any{
 					"auditbeatreceiver/_agent-component/auditbeat-default/test-1": expectedAuditbeatReceiverConfig("auditbeat-default"),
 				},
@@ -2113,7 +2110,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("osquerybeat-default"),
+				"processors": defaultExpectedProcessors("osquerybeat", "osquerybeat-default"),
 				"receivers": map[string]any{
 					"osquerybeatreceiver/_agent-component/osquerybeat-default/test-1": expectedOsquerybeatReceiverConfig("osquerybeat-default"),
 				},
@@ -2169,10 +2166,10 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("osquerybeat-default"),
+				"processors": defaultExpectedProcessors("osquerybeat", "osquerybeat-default"),
 				"receivers": map[string]any{
-					// Single receiver keyed by component ID only — no stream suffix.
-					"osquerybeatreceiver/_agent-component/osquerybeat-default": expectedOsquerybeatSingleReceiverConfig("osquerybeat-default"),
+					// Single receiver keyed by component ID with the placeholder "single" stream suffix.
+					"osquerybeatreceiver/_agent-component/osquerybeat-default/single": expectedOsquerybeatSingleReceiverConfig("osquerybeat-default"),
 				},
 				"service": map[string]any{
 					"extensions": []any{"beatsauth/_agent-component/default"},
@@ -2180,7 +2177,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"logs/_agent-component/osquerybeat-default": map[string][]string{
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {beatProcessorID("osquerybeat-default")},
-							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default"},
+							"receivers":  {"osquerybeatreceiver/_agent-component/osquerybeat-default/single"},
 						},
 					},
 				},
@@ -2225,7 +2222,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"extensions": map[string]any{
 					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
-				"processors": defaultExpectedProcessors("packetbeat-default"),
+				"processors": defaultExpectedProcessors("packetbeat", "packetbeat-default"),
 				"receivers": map[string]any{
 					"packetbeatreceiver/_agent-component/packetbeat-default/test-1": expectedPacketbeatReceiverConfig("packetbeat-default"),
 				},
@@ -2236,6 +2233,78 @@ func TestGetOtelConfig(t *testing.T) {
 							"exporters":  {"elasticsearch/_agent-component/default"},
 							"processors": {beatProcessorID("packetbeat-default")},
 							"receivers":  {"packetbeatreceiver/_agent-component/packetbeat-default/test-1"},
+						},
+					},
+				},
+			}),
+		},
+		{
+			name: "fleet policy global add_cloud_metadata stripped from input processors, kept in beatprocessor",
+			model: &component.Model{
+				Components: []component.Component{
+					{
+						ID:         "filestream-default",
+						InputType:  "filestream",
+						OutputType: "elasticsearch",
+						OutputName: "default",
+						InputSpec: &component.InputRuntimeSpec{
+							BinaryName: "elastic-otel-collector",
+							Spec: component.InputSpec{
+								Command: &component.CommandSpec{
+									Args: []string{"filebeat"},
+								},
+							},
+						},
+						Units: []component.Unit{
+							{
+								ID:   "filestream-unit",
+								Type: client.UnitTypeInput,
+								Config: component.MustExpectedConfig(map[string]any{
+									"id":         "test",
+									"use_output": "default",
+									// Fleet integration packages include add_cloud_metadata at
+									// the input root; it must be stripped in OTel mode.
+									"processors": []any{
+										map[string]any{"add_cloud_metadata": nil},
+									},
+									"streams": []any{
+										map[string]any{
+											"id": "test-1",
+											"data_stream": map[string]any{
+												"dataset": "generic-1",
+											},
+											"paths": []any{"/var/log/*.log"},
+										},
+									},
+								}),
+							},
+							{
+								ID:     "filestream-default",
+								Type:   client.UnitTypeOutput,
+								Config: component.MustExpectedConfig(esOutputConfig()),
+							},
+						},
+					},
+				},
+			},
+			expectedConfig: confmap.NewFromStringMap(map[string]any{
+				"exporters": map[string]any{
+					"elasticsearch/_agent-component/default": expectedESConfig("default"),
+				},
+				"extensions": map[string]any{
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+				},
+				"processors": defaultExpectedProcessors("filebeat", "filestream-default"),
+				"receivers": map[string]any{
+					"filebeatreceiver/_agent-component/filestream-default/test-1": expectedFilestreamConfig("filestream-default", "test-1", "generic-1"),
+				},
+				"service": map[string]any{
+					"extensions": []any{"beatsauth/_agent-component/default"},
+					"pipelines": map[string]any{
+						"logs/_agent-component/filestream-default": map[string][]string{
+							"exporters":  {"elasticsearch/_agent-component/default"},
+							"processors": {beatProcessorID("filestream-default")},
+							"receivers":  {"filebeatreceiver/_agent-component/filestream-default/test-1"},
 						},
 					},
 				},
@@ -2511,6 +2580,108 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		},
 	}
 
+	// osquerybeat with single_receiver but without an "osquery" key (no scheduled queries
+	// or packs configured — live-query-only policy). The result stream must still be
+	// placed first so publisher.Configure routes live-query result rows correctly.
+	// Regression test for https://github.com/elastic/elastic-agent/issues/15601.
+	osquerybeatSingleReceiverNoOsqueryKeyComponent := &component.Component{
+		ID:        "osquerybeat-test-id",
+		InputType: "osquery",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "osquery",
+				Command: &component.CommandSpec{
+					Args: []string{"osquerybeat"},
+				},
+				SingleReceiver: true,
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "osquerybeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "osquery",
+					"streams": []any{
+						map[string]any{
+							"id": "action-responses",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.action.responses",
+							},
+							"query": nil,
+						},
+						map[string]any{
+							"id": "results",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.result",
+							},
+						},
+					},
+					// Intentionally no "osquery" key — simulates a live-query-only policy
+					// with no scheduled queries or packs.
+				}),
+			},
+		},
+	}
+
+	// osquerybeat with single_receiver and a custom namespace set at the unit level.
+	osquerybeatCustomNamespaceComponent := &component.Component{
+		ID:        "osquerybeat-test-id",
+		InputType: "osquery",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "osquery",
+				Command: &component.CommandSpec{
+					Args: []string{"osquerybeat"},
+				},
+				SingleReceiver: true,
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "osquerybeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "osquery",
+					"data_stream": map[string]any{
+						"namespace": "custom-ns",
+					},
+					"streams": []any{
+						map[string]any{
+							"id": "action-responses",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.action.responses",
+							},
+							"query": nil,
+						},
+						map[string]any{
+							"id": "results",
+							"data_stream": map[string]any{
+								"dataset": "osquery_manager.result",
+							},
+							"query":    "SELECT * FROM processes",
+							"interval": "3600",
+						},
+					},
+					"osquery": map[string]any{
+						"schedule": map[string]any{
+							"process_list": map[string]any{
+								"query":    "SELECT * FROM processes",
+								"interval": 60,
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
 	packetbeatComponent := &component.Component{
 		ID:        "packetbeat-test-id",
 		InputType: "packet",
@@ -2604,7 +2775,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			name:               "osquerybeat component with single_receiver merges streams",
 			component:          osquerybeatSingleReceiverComponent,
 			outputQueueConfig:  nil,
-			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id",
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/single",
 			expectedBeatName:   "osquerybeat",
 			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
 				inputs, ok := beatConfig["inputs"].([]map[string]any)
@@ -2632,6 +2803,52 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				actionInput := inputs[1]
 				_, hasOsquery := actionInput["osquery"]
 				assert.False(t, hasOsquery, "action-responses stream must not have osquery injected")
+			},
+		},
+		{
+			name:               "osquerybeat single_receiver without osquery key still puts result stream first",
+			component:          osquerybeatSingleReceiverNoOsqueryKeyComponent,
+			outputQueueConfig:  nil,
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/single",
+			expectedBeatName:   "osquerybeat",
+			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+				inputs, ok := beatConfig["inputs"].([]map[string]any)
+				require.True(t, ok, "osquerybeat inputs should be a slice of maps")
+				require.Len(t, inputs, 2, "both streams must be merged into the single receiver")
+
+				// Even without an "osquery" key, the result stream must be at position 0.
+				// If action.responses were first, live-query result rows would be routed to the wrong data stream.
+				assert.Equal(t, "results", inputs[0]["id"], "osquery_manager.result stream must be first even without osquery key")
+
+				_, hasOsquery := inputs[0]["osquery"]
+				assert.False(t, hasOsquery, "no osquery section should be injected when key is absent from unit config")
+			},
+		},
+		{
+			name:               "osquerybeat single_receiver propagates custom namespace to all streams",
+			component:          osquerybeatCustomNamespaceComponent,
+			outputQueueConfig:  nil,
+			expectedReceiverID: "osquerybeatreceiver/_agent-component/osquerybeat-test-id/single",
+			expectedBeatName:   "osquerybeat",
+			verifyBeatConfig: func(t *testing.T, beatConfig map[string]any) {
+				inputs, ok := beatConfig["inputs"].([]map[string]any)
+				require.True(t, ok, "osquerybeat inputs should be a slice of maps")
+				require.Len(t, inputs, 2, "both streams must be merged into the single receiver")
+
+				assert.Equal(t, "results", inputs[0]["id"], "osquery_manager.result stream must be first")
+
+				// osquery section must be injected into the result stream (not action-responses).
+				_, hasOsquery := inputs[0]["osquery"]
+				assert.True(t, hasOsquery, "inputs[0] (result stream) must have osquery section injected")
+				_, hasOsquery = inputs[1]["osquery"]
+				assert.False(t, hasOsquery, "inputs[1] (action-responses) must not have osquery section")
+
+				for i, inp := range inputs {
+					ds, ok := inp["data_stream"].(map[string]any)
+					require.True(t, ok, "inputs[%d] must have a data_stream map", i)
+					assert.Equal(t, "custom-ns", ds["namespace"],
+						"inputs[%d] data_stream.namespace must be the unit-level custom namespace, not the default", i)
+				}
 			},
 		},
 		{
@@ -2667,6 +2884,38 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			},
 			outputQueueConfig: nil,
 			// No expectedReceiverID - no inputs means no receivers
+		},
+		{
+			name: "input unit with nil config is skipped without panic",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			outputQueueConfig: nil,
+			// No expectedReceiverID - nil config input is skipped
 		},
 		{
 			name: "unsupported component type",
@@ -2735,6 +2984,135 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
+// monitor, which compiles into a single synthetics/browser input with a scheduled
+// "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
+// auxiliary streams, produces exactly one heartbeat monitor. The auxiliary streams
+// must be dropped so the heartbeatreceiver does not reject them for missing a schedule.
+// Regression test for https://github.com/elastic/elastic-agent/issues/15968.
+func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
+	testAgentInfo := &info.AgentInfo{}
+
+	browserComponent := &component.Component{
+		ID:        "heartbeat-browser-test-id",
+		InputType: "synthetics/browser",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "synthetics/browser",
+				Command: &component.CommandSpec{
+					Args: []string{"heartbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "heartbeat-browser-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       "synthetics/browser",
+					"streams": []any{
+						map[string]any{
+							"id":   "browser-1",
+							"type": "browser",
+							"data_stream": map[string]any{
+								"dataset": "browser",
+								"type":    "synthetics",
+							},
+							"schedule": "@every 3m",
+						},
+						map[string]any{
+							"id": "browser-network-1",
+							"data_stream": map[string]any{
+								"dataset": "browser.network",
+								"type":    "synthetics",
+							},
+						},
+						map[string]any{
+							"id": "browser-screenshot-1",
+							"data_stream": map[string]any{
+								"dataset": "browser.screenshot",
+								"type":    "synthetics",
+							},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, nil)
+	require.NoError(t, err)
+
+	// Only the scheduled "browser" stream must become a receiver/monitor; the
+	// schedule-less auxiliary streams must be dropped.
+	require.Len(t, result, 1, "only the scheduled browser stream should produce a receiver")
+
+	scheduledReceiverID := "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-1"
+	require.Contains(t, result, scheduledReceiverID)
+	assert.NotContains(t, result, "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-network-1")
+	assert.NotContains(t, result, "heartbeatreceiver/_agent-component/heartbeat-browser-test-id/browser-screenshot-1")
+
+	receiverConfig, ok := result[scheduledReceiverID].(map[string]any)
+	require.True(t, ok, "receiver config should be a map")
+	heartbeatConfig, ok := receiverConfig["heartbeat"].(map[string]any)
+	require.True(t, ok, "heartbeat config should be a map")
+	monitors, ok := heartbeatConfig["monitors"].([]map[string]any)
+	require.True(t, ok, "heartbeat monitors should be a slice of maps")
+	require.Len(t, monitors, 1, "exactly one monitor should be emitted")
+	assert.Equal(t, "@every 3m", monitors[0]["schedule"], "the emitted monitor must carry the schedule")
+	assert.Equal(t, "browser", monitors[0]["type"], "the emitted monitor must be the browser stream")
+}
+
+func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
+	unit := component.Unit{
+		ID:   "heartbeat-api-test-unit",
+		Type: client.UnitTypeInput,
+		Config: component.MustExpectedConfig(map[string]any{
+			"id":         "test",
+			"use_output": "default",
+			"type":       "synthetics/api",
+			"streams": []any{
+				map[string]any{
+					"id": "test-1",
+					"data_stream": map[string]any{
+						"dataset": "generic-1",
+					},
+					"schedule": "@every 5s",
+				},
+			},
+		}),
+	}
+	comp := &component.Component{InputType: "synthetics/api"}
+
+	inputs, err := getInputsForUnit(unit, &info.AgentInfo{}, "logs", comp)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+	assert.Equal(t, "api", inputs[0].config["type"])
+}
+
+// TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
+// auxiliary Synthetics browser sub-streams, including the malformed-config fallback.
+func TestKeepScheduledMonitors(t *testing.T) {
+	scheduled := receiverInput{streamID: "browser-1", config: map[string]any{"schedule": "@every 3m"}}
+	network := receiverInput{streamID: "browser-network-1", config: map[string]any{}}
+	screenshot := receiverInput{streamID: "browser-screenshot-1", config: map[string]any{"schedule": nil}}
+
+	t.Run("drops schedule-less streams", func(t *testing.T) {
+		got := keepScheduledMonitors([]receiverInput{scheduled, network, screenshot})
+		require.Len(t, got, 1)
+		assert.Equal(t, "browser-1", got[0].streamID)
+	})
+
+	t.Run("returns inputs unchanged when none are scheduled", func(t *testing.T) {
+		in := []receiverInput{network, screenshot}
+		got := keepScheduledMonitors(in)
+		assert.Equal(t, in, got)
+	})
 }
 
 // TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
@@ -2949,6 +3327,38 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
+		{
+			name: "input unit with nil config does not panic",
+			component: &component.Component{
+				ID:         "nil-config-comp",
+				InputType:  "filestream",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "filestream-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "filestream-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -2959,115 +3369,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				assert.Equal(t, err.Error(), tt.expectedError)
 			} else {
 				require.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestGetBeatsAuthExtensionConfig(t *testing.T) {
-	tests := []struct {
-		name          string
-		outputCfg     map[string]any
-		expected      map[string]any
-		expectedError string
-	}{
-		{
-			name:      "empty config",
-			outputCfg: map[string]any{},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"timeout":                 "1m30s",
-			},
-		},
-		{
-			name: "with proxy_url and timeout",
-			outputCfg: map[string]any{
-				"proxy_url": "http://proxy.example.com:8080",
-				"timeout":   "2m",
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"proxy_url":               "http://proxy.example.com:8080",
-				"timeout":                 "2m0s",
-			},
-		},
-		{
-			name: "with ssl enabled",
-			outputCfg: map[string]any{
-				"ssl.enabled": true,
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"ssl": map[string]interface{}{
-					"ca_sha256":                  []interface{}{},
-					"ca_trusted_fingerprint":     "",
-					"certificate":                "",
-					"certificate_authorities":    []interface{}{},
-					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
-					"cipher_suites":              []interface{}{},
-					"disable_legacy_pem_support": false,
-					"curve_types":                []interface{}{},
-					"enabled":                    true,
-					"key":                        "",
-					"key_passphrase":             "",
-					"key_passphrase_path":        "",
-					"renegotiation":              int64(0),
-					"supported_protocols":        []interface{}{},
-					"verification_mode":          uint64(0),
-				},
-				"timeout": "1m30s",
-			},
-		},
-		{
-			name: "with ssl enabled and verification_mode certificate",
-			outputCfg: map[string]any{
-				"ssl.enabled":           true,
-				"ssl.verification_mode": "certificate",
-			},
-			expected: map[string]any{
-				"continue_on_error":       true,
-				"idle_connection_timeout": "3s",
-				"proxy_disable":           false,
-				"ssl": map[string]interface{}{
-					"ca_sha256":                  []interface{}{},
-					"ca_trusted_fingerprint":     "",
-					"certificate":                "",
-					"certificate_authorities":    []interface{}{},
-					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
-					"cipher_suites":              []interface{}{},
-					"disable_legacy_pem_support": false,
-					"curve_types":                []interface{}{},
-					"enabled":                    true,
-					"key":                        "",
-					"key_passphrase":             "",
-					"key_passphrase_path":        "",
-					"renegotiation":              int64(0),
-					"supported_protocols":        []interface{}{},
-					"verification_mode":          uint64(2),
-				},
-				"timeout": "1m30s",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg, err := config.NewConfigFrom(tt.outputCfg)
-			require.NoError(t, err)
-
-			actual, err := getBeatsAuthExtensionConfig(cfg)
-			if tt.expectedError != "" {
-				require.Error(t, err)
-				assert.Equal(t, tt.expectedError, err.Error())
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tt.expected, actual)
 			}
 		})
 	}
@@ -3147,17 +3448,33 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, error) {
+		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, map[string]any, error) {
 			if c.HasField("unsupported") {
-				return nil, nil, errors.New("unsupported config")
+				return nil, nil, nil, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
+
 			cfgMap["translated"] = true
-			return cfgMap, nil, nil
+
+			// Perform beats auth extension translation
+			cfgMap["auth"] = map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			}
+
+			// return extension config
+			beatsAuthCfg, err := getBeatsAuthExtensionConfig(c)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+
+			extensionConfig := make(map[string]any)
+			extensionConfig[getBeatsAuthExtensionID("default").String()] = beatsAuthCfg
+
+			return cfgMap, nil, extensionConfig, nil
 		},
 		kafkaExporterType: KafkaToOTelConfig,
 	}
@@ -3639,4 +3956,349 @@ func TestResolveStreamID(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestStripDefaultProcessors(t *testing.T) {
+	tests := []struct {
+		name     string
+		beatName string
+		raw      any
+		want     []any
+	}{
+		{
+			name:     "nil input returns nil",
+			beatName: "filebeat",
+			raw:      nil,
+			want:     nil,
+		},
+		{
+			name:     "non-list input returns nil",
+			beatName: "filebeat",
+			raw:      "not a list",
+			want:     nil,
+		},
+		{
+			name:     "heartbeat gets no defaults, list is unchanged",
+			beatName: "heartbeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": nil},
+			},
+		},
+		{
+			name:     "add_cloud_metadata null matches default and is stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_agent_metadata": map[string]any{"stream_id": "s1"}},
+				map[string]any{"add_cloud_metadata": nil},
+				map[string]any{"timestamp": map[string]any{"field": "datetime"}},
+			},
+			want: []any{
+				map[string]any{"add_agent_metadata": map[string]any{"stream_id": "s1"}},
+				map[string]any{"timestamp": map[string]any{"field": "datetime"}},
+			},
+		},
+		{
+			name:     "add_cloud_metadata with custom config is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": map[string]any{"overwrite": true}},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": map[string]any{"overwrite": true}},
+			},
+		},
+		{
+			name:     "add_host_metadata null does not match default (default has when.not.contains.tags) and is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_host_metadata": nil},
+			},
+			want: []any{
+				map[string]any{"add_host_metadata": nil},
+			},
+		},
+		{
+			name:     "add_host_metadata exact-match default config is stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_host_metadata": map[string]any{"when.not.contains.tags": "forwarded"}},
+			},
+			want: []any{},
+		},
+		{
+			name:     "multi-key processor entry is not a valid single-name proc and is preserved",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil, "extra_key": "value"},
+			},
+			want: []any{
+				map[string]any{"add_cloud_metadata": nil, "extra_key": "value"},
+			},
+		},
+		{
+			name:     "all default processors with null config are stripped",
+			beatName: "filebeat",
+			raw: []any{
+				map[string]any{"add_cloud_metadata": nil},
+				map[string]any{"add_docker_metadata": nil},
+				map[string]any{"add_kubernetes_metadata": nil},
+			},
+			want: []any{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripDefaultProcessors(tt.beatName, tt.raw)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// TestInjectOsqueryConfig verifies that injectOsqueryConfig mirrors the stream ordering
+// produced by osquerybeatCfgFromStreams: the osquery_manager.result stream is always moved
+// to position 0, and all other streams follow in their original relative order.
+func TestInjectOsqueryConfig(t *testing.T) {
+	makeStream := func(id string, isResult bool) receiverInput {
+		dataset := "osquery_manager.action.responses"
+		if isResult {
+			dataset = "osquery_manager.result"
+		}
+		return receiverInput{
+			streamID: id,
+			config: map[string]any{
+				"data_stream": map[string]any{
+					"dataset": dataset,
+				},
+			},
+		}
+	}
+
+	makeStreamWithNamespace := func(id string, isResult bool, ns string) receiverInput {
+		dataset := "osquery_manager.action.responses"
+		if isResult {
+			dataset = "osquery_manager.result"
+		}
+		return receiverInput{
+			streamID: id,
+			config: map[string]any{
+				"data_stream": map[string]any{
+					"dataset":   dataset,
+					"namespace": ns,
+				},
+			},
+		}
+	}
+
+	// unit carries the input-level osquery config, mirroring what osquerybeatCfgFromStreams
+	// receives as rawIn.Source when the integration has scheduled queries.
+	unit := component.Unit{
+		Config: component.MustExpectedConfig(map[string]interface{}{
+			"osquery": map[string]interface{}{
+				"queries": map[string]interface{}{},
+			},
+		}),
+	}
+
+	unitWithCustomNS := component.Unit{
+		Config: component.MustExpectedConfig(map[string]interface{}{
+			"data_stream": map[string]interface{}{
+				"namespace": "custom-ns",
+			},
+			"osquery": map[string]interface{}{
+				"queries": map[string]interface{}{},
+			},
+		}),
+	}
+
+	tests := []struct {
+		name              string
+		inputs            []receiverInput
+		unit              component.Unit
+		wantStreamIDs     []string
+		wantNamespaceByID map[string]string // non-nil: verify data_stream.namespace per stream id
+	}{
+		{
+			name:          "1 stream: result only",
+			inputs:        []receiverInput{makeStream("result", true)},
+			unit:          unit,
+			wantStreamIDs: []string{"result"},
+		},
+		{
+			name:          "2 streams: result first",
+			inputs:        []receiverInput{makeStream("result", true), makeStream("action", false)},
+			unit:          unit,
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			name:          "2 streams: result second",
+			inputs:        []receiverInput{makeStream("action", false), makeStream("result", true)},
+			unit:          unit,
+			wantStreamIDs: []string{"result", "action"},
+		},
+		{
+			// swap(0,2) gives [result, other, action] — wrong relative order of non-result streams
+			name: "3 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other", false),
+				makeStream("result", true),
+			},
+			unit:          unit,
+			wantStreamIDs: []string{"result", "action", "other"},
+		},
+		{
+			// swap(0,3) gives [result, other1, other2, action] — wrong
+			name: "4 streams: result last",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("other1", false),
+				makeStream("other2", false),
+				makeStream("result", true),
+			},
+			unit:          unit,
+			wantStreamIDs: []string{"result", "action", "other1", "other2"},
+		},
+		{
+			name: "default namespace propagates when unit has no data_stream namespace",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("result", true),
+			},
+			unit:          unit,
+			wantStreamIDs: []string{"result", "action"},
+			wantNamespaceByID: map[string]string{
+				"result": "default",
+				"action": "default",
+			},
+		},
+		{
+			name: "custom namespace from unit propagates to all streams",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStream("result", true),
+			},
+			unit:          unitWithCustomNS,
+			wantStreamIDs: []string{"result", "action"},
+			wantNamespaceByID: map[string]string{
+				"result": "custom-ns",
+				"action": "custom-ns",
+			},
+		},
+		{
+			name: "explicit stream namespace is preserved",
+			inputs: []receiverInput{
+				makeStream("action", false),
+				makeStreamWithNamespace("result", true, "stream-ns"),
+			},
+			unit:          unitWithCustomNS,
+			wantStreamIDs: []string{"result", "action"},
+			wantNamespaceByID: map[string]string{
+				"result": "stream-ns",
+				"action": "custom-ns",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := injectOsqueryConfig(tt.inputs, tt.unit)
+			require.Len(t, got, len(tt.wantStreamIDs))
+			gotIDs := make([]string, len(got))
+			for i, ri := range got {
+				gotIDs[i] = ri.streamID
+			}
+			assert.Equal(t, tt.wantStreamIDs, gotIDs,
+				"stream ordering must match osquerybeatCfgFromStreams: result stream first, others in original relative order")
+			assert.NotNil(t, got[0].config["osquery"], "result stream must have osquery config injected")
+
+			for _, ri := range got {
+				wantNS, ok := tt.wantNamespaceByID[ri.streamID]
+				if !ok {
+					continue
+				}
+				ds, ok := ri.config["data_stream"].(map[string]any)
+				require.True(t, ok, "stream %q: data_stream must be a map", ri.streamID)
+				assert.Equal(t, wantNS, ds["namespace"],
+					"stream %q: data_stream.namespace must be propagated from unit level", ri.streamID)
+			}
+		})
+	}
+}
+
+func TestGetReceiversConfigHostnameOverride(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-hostname-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-hostname-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	t.Run("env_set", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "override-node")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be injected into receiver config", id)
+		}
+	})
+
+	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "  override-node  ")
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.Equal(t, "override-node", cfg["hostname"],
+				"receiver %s: hostname should be trimmed before injection", id)
+		}
+	})
+
+	t.Run("env_unset", func(t *testing.T) {
+		t.Setenv(util.EnvHostName, "")
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, result)
+
+		for id, raw := range result {
+			cfg, ok := raw.(map[string]any)
+			require.True(t, ok, "receiver %s: config is not a map", id)
+			assert.NotContains(t, cfg, "hostname",
+				"receiver %s: hostname should not be present when env var is unset", id)
+		}
+	})
 }

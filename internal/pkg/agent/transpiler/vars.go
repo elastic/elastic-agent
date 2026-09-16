@@ -31,6 +31,9 @@ type Vars struct {
 	fetchContextProviders mapstr.M
 	defaultProvider       string
 	dynamicProvider       string
+	// observer, when set, is called with the name of every variable that is successfully
+	// resolved from this vars set. See WithVarObserver.
+	observer func(name string)
 }
 
 // NewVars returns a new instance of vars.
@@ -96,13 +99,35 @@ func NewVarsWithProcessorsFromAst(
 	}
 }
 
+// WithVarObserver returns a shallow copy of the vars that reports the name of every variable
+// successfully resolved from it to the given observer. A copy is returned so that a shared
+// Vars instance can be reused across renders without the observers interfering.
+func (v *Vars) WithVarObserver(observer func(name string)) *Vars {
+	if v == nil {
+		return nil
+	}
+	observed := *v
+	observed.observer = observer
+	return &observed
+}
+
+// observe reports a successfully resolved variable to the observer, if one is set.
+func (v *Vars) observe(name string) {
+	if v.observer != nil {
+		v.observer(name)
+	}
+}
+
 // Replace returns a new value based on variable replacement.
 func (v *Vars) Replace(value string) (Node, error) {
 	return replaceVars(value, func(variable string) (Node, Processors, bool) {
 		var processors Processors
 		node, ok := v.lookupNode(variable)
-		if ok && v.processorsKey != "" && varPrefixMatched(variable, v.processorsKey) {
-			processors = v.processors
+		if ok {
+			if v.processorsKey != "" && varPrefixMatched(variable, v.processorsKey) {
+				processors = v.processors
+			}
+			v.observe(variable)
 		}
 		return node, processors, ok
 	}, true, v.defaultProvider)
@@ -116,7 +141,11 @@ func (v *Vars) ID() string {
 // Lookup returns the value from the vars.
 func (v *Vars) Lookup(name string) (interface{}, bool) {
 	// lookup in the AST tree
-	return v.tree.Lookup(name)
+	val, ok := v.tree.Lookup(name)
+	if ok {
+		v.observe(name)
+	}
+	return val, ok
 }
 
 // Map transforms the variables into a map[string]interface{} and will abort and return any errors related

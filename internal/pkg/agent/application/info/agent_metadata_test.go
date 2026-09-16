@@ -57,6 +57,12 @@ func TestECSMetadata(t *testing.T) {
 	assert.Equal(t, info.IPs, metadata.Host.IP)
 	assert.Equal(t, info.MACs, metadata.Host.MAC)
 
+	var expectedMemory uint64
+	if memInfo, memErr := sysInfo.Memory(); memErr == nil && memInfo != nil {
+		expectedMemory = memInfo.Total
+	}
+	assert.Equal(t, expectedMemory, metadata.Host.Memory)
+
 	assert.Equal(t, info.OS.Family, metadata.OS.Family)
 	assert.Equal(t, info.KernelVersion, metadata.OS.Kernel)
 	assert.Equal(t, info.OS.Platform, metadata.OS.Platform)

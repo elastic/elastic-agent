@@ -18,10 +18,19 @@ func NewMockReadOnlySource(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockReadOnlySource {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockReadOnlySource{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -108,10 +117,19 @@ func NewMockSource(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockSource {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockSource{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -216,7 +234,7 @@ type MockSource_Remove_Call struct {
 
 // Remove is a helper method to define mock.On call
 //   - versionedHome string
-func (_e *MockSource_Expecter) Remove(versionedHome interface{}) *MockSource_Remove_Call {
+func (_e *MockSource_Expecter) Remove(versionedHome any) *MockSource_Remove_Call {
 	return &MockSource_Remove_Call{Call: _e.mock.On("Remove", versionedHome)}
 }
 
@@ -267,7 +285,7 @@ type MockSource_Set_Call struct {
 
 // Set is a helper method to define mock.On call
 //   - m map[string]TTLMarker
-func (_e *MockSource_Expecter) Set(m interface{}) *MockSource_Set_Call {
+func (_e *MockSource_Expecter) Set(m any) *MockSource_Set_Call {
 	return &MockSource_Set_Call{Call: _e.mock.On("Set", m)}
 }
 

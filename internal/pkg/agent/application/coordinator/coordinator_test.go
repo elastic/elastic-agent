@@ -575,7 +575,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 	acker.On("Commit", mock.Anything).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", []string{"http://localhost"}, actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 	acker.AssertCalled(t, "Commit", mock.Anything)
@@ -620,7 +620,7 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 		acker.On("Commit", mock.Anything).Return(nil)
 
 		// A rollback targeting the current version should be detected as replayed and acked without processing
-		require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), "", actionUpgrade, WithRollback(true)))
+		require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), nil, actionUpgrade, WithRollback(true)))
 
 		acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 		acker.AssertCalled(t, "Commit", mock.Anything)
@@ -675,7 +675,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 
 	preUpgradeCallbackErr := errors.New("pre upgrade callback error")
 
-	upgradeErr := coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade,
+	upgradeErr := coord.Upgrade(t.Context(), "9.0", []string{"http://localhost"}, actionUpgrade,
 		WithSkipVerifyOverride(true), WithSkipDefaultPgp(true),
 		WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
 			return preUpgradeCallbackErr
@@ -1066,7 +1066,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
+	err = coord.Upgrade(ctx, "9.0.0", nil, nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -1103,7 +1103,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
+	err = coord.Upgrade(ctx, "9.0.0", nil, nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
@@ -1536,9 +1536,14 @@ type fakeCapabilities struct {
 	mock.Mock
 }
 
-func (f *fakeCapabilities) AllowUpgrade(version string, sourceURI string) bool {
-	args := f.Called(version, sourceURI)
+func (f *fakeCapabilities) AllowUpgrade(version string, sources []string) bool {
+	args := f.Called(version, sources)
 	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) FilterUpgradeSources(version string, sources []string) []string {
+	args := f.Called(version, sources)
+	return args.Get(0).([]string)
 }
 
 func (f *fakeCapabilities) AllowInput(name string) bool {
@@ -1762,7 +1767,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if cbErr := upgrade.InvokePreSymlinkCallback(opts, ctx, nil, action); cbErr != nil {
 		return nil, cbErr
@@ -1947,6 +1952,49 @@ func (f *fakeVarsManager) DefaultProvider() string {
 	return ""
 }
 
+// TestCoordinator_PerformAction_RoutesByRuntimeManager verifies that
+// Coordinator.PerformAction routes to the otel manager for components running
+// under the OTel runtime, and to the runtime (process) manager otherwise.
+func TestCoordinator_PerformAction_RoutesByRuntimeManager(t *testing.T) {
+	var runtimeCalled, otelCalled bool
+	runtimeMgr := &fakeRuntimeManager{
+		performActionCallback: func(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
+			runtimeCalled = true
+			return map[string]interface{}{"via": "runtime"}, nil
+		},
+	}
+	otelMgr := &fakeOTelManager{
+		performActionCallback: func(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
+			otelCalled = true
+			return map[string]interface{}{"via": "otel"}, nil
+		},
+	}
+	coord := &Coordinator{
+		runtimeMgr: runtimeMgr,
+		otelMgr:    otelMgr,
+	}
+
+	t.Run("process runtime routes to runtimeMgr", func(t *testing.T) {
+		runtimeCalled, otelCalled = false, false
+		comp := component.Component{ID: "osquery-default", RuntimeManager: component.ProcessRuntimeManager}
+		res, err := coord.PerformAction(context.Background(), comp, component.Unit{}, "osquery", nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{"via": "runtime"}, res)
+		assert.True(t, runtimeCalled, "runtimeMgr.PerformAction should have been called")
+		assert.False(t, otelCalled, "otelMgr.PerformAction should not have been called")
+	})
+
+	t.Run("otel runtime routes to otelMgr", func(t *testing.T) {
+		runtimeCalled, otelCalled = false, false
+		comp := component.Component{ID: "osquery-default", RuntimeManager: component.OtelRuntimeManager}
+		res, err := coord.PerformAction(context.Background(), comp, component.Unit{}, "osquery", nil)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]interface{}{"via": "otel"}, res)
+		assert.True(t, otelCalled, "otelMgr.PerformAction should have been called")
+		assert.False(t, runtimeCalled, "runtimeMgr.PerformAction should not have been called")
+	})
+}
+
 var _ OTelManager = (*fakeOTelManager)(nil)
 
 type fakeOTelManager struct {
@@ -1954,6 +2002,7 @@ type fakeOTelManager struct {
 	updateComponentCallback             func([]component.Component) error
 	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	performActionCallback               func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
 	errChan                             chan error
 	collectorStatusChan                 chan *status.AggregateStatus
 	componentStateChan                  chan []runtime.ComponentComponentState
@@ -2010,12 +2059,20 @@ func (f *fakeOTelManager) PerformComponentDiagnostics(ctx context.Context, addit
 	return nil, nil
 }
 
+func (f *fakeOTelManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	if f.performActionCallback != nil {
+		return f.performActionCallback(ctx, comp, unit, name, params)
+	}
+	return nil, nil
+}
+
 // An implementation of the RuntimeManager interface for use in testing.
 type fakeRuntimeManager struct {
 	state                               []runtime.ComponentComponentState
 	updateCallback                      func([]component.Component) error
 	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
+	performActionCallback               func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
 	result                              error
 	errChan                             chan error
 }
@@ -2044,7 +2101,10 @@ func (r *fakeRuntimeManager) State() []runtime.ComponentComponentState {
 }
 
 // PerformAction executes an action on a unit.
-func (r *fakeRuntimeManager) PerformAction(_ context.Context, _ component.Component, _ component.Unit, _ string, _ map[string]interface{}) (map[string]interface{}, error) {
+func (r *fakeRuntimeManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	if r.performActionCallback != nil {
+		return r.performActionCallback(ctx, comp, unit, name, params)
+	}
 	return nil, nil
 }
 

@@ -1,0 +1,95 @@
+version: 9.5.1
+entries:
+    - kind: security
+      summary: Sensitive values in JSON diagnostic files are now redacted
+      description: |
+        When collecting diagnostics, files with a JSON content type were not having
+        sensitive values (such as passwords and private keys) redacted before being
+        included in the diagnostic bundle. Only YAML files were redacted. JSON files
+        are now redacted in the same way as YAML files.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15899
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15964
+      impact: ""
+      action: ""
+      timestamp: 1785317648
+      file:
+        name: 1785317648-redact-json-diagnostics.yaml
+        checksum: b5e5bd0248d0f560251ec77fab8b87d68a29d419
+    - kind: enhancement
+      summary: Rename EDOT Collector to Elastic Agent and EDOT Cloud Forwarder to Elastic Cloud Forwarder
+      description: |
+        The EDOT Collector is now built into Elastic Agent as its OpenTelemetry mode. Deploy
+        Elastic Agent and run it in OpenTelemetry mode to collect and forward traces, metrics,
+        and logs to Elastic Observability. Configuration and components are unchanged.
+
+        The EDOT Cloud Forwarder has been renamed to the Elastic Cloud Forwarder.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15826
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785769574
+      file:
+        name: 1785769574-edot-collector-renamed-elastic-agent.yaml
+        checksum: 5ffd7a717ba28c35a93678b23ec58dd9133a6730
+    - kind: bug-fix
+      summary: Fix OTel heartbeat runtime breaking Synthetics browser monitors on Private Locations
+      description: |
+        When heartbeat runs via the OTel heartbeatreceiver, a Synthetics browser monitor
+        compiles into a single synthetics/browser input with three streams: the scheduled
+        "browser" monitor stream plus schedule-less "browser.network" and "browser.screenshot"
+        auxiliary streams used only for data-stream routing. The beat-receiver translation
+        emitted one monitor per stream, so the schedule-less auxiliary streams were rejected
+        ("missing required field accessing 'heartbeat.monitors.0.schedule'") and the whole
+        browser component failed to start. The auxiliary streams are now dropped during
+        translation, matching classic process-runtime heartbeat behavior.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15969
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15968
+      impact: ""
+      action: ""
+      timestamp: 1785779400
+      file:
+        name: 1785779400-fix-otel-heartbeat-browser-monitors.yaml
+        checksum: 701b56eacba2a6093158bffc216e9bf42b7e350c
+    - kind: bug-fix
+      summary: fix ordering of streams for osquerybeat receiver
+      description: ""
+      component: osquerybeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15989
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785860674
+      file:
+        name: 1785860674-fix-ordering-of-streams-for-osquerybeat-receiver.yaml
+        checksum: 38c7b114b4fb70087689d15b86d9fef8fc0c0b8c
+    - kind: bug-fix
+      summary: Bake Synthetics browser binaries into the elastic-agent-complete image
+      description: |
+        npm 12 no longer runs a dependency's `install` lifecycle script during `npm i` by
+        default, so the transitive playwright-chromium `install` hook that used to download
+        the Playwright browsers into the elastic-agent-complete image during build stopped
+        running. As a result the 9.5.0 complete image shipped with no browsers and all
+        Synthetics browser monitors on Fleet-managed Private Locations failed with
+        "browserType.launch: Executable doesn't exist at .../chromium_headless_shell-<rev>/...".
+        The image build now installs the browsers explicitly with the bundled Playwright CLI
+        after `npm i`, independent of npm's install-script policy.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15994
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15993
+      impact: ""
+      action: ""
+      timestamp: 1785872496
+      file:
+        name: 1785872496-fix-complete-image-synthetics-browser-install.yaml
+        checksum: 632e8a2fd52a3010ba28a89d30ef3c7c0675e4bd

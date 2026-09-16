@@ -25,8 +25,10 @@ actions:
     spec:
       automerge: false
       labels:
+        - automation
         - dependencies
         - backport-active-all
+        - Team:Elastic-Agent-Control-Plane
       title: '[Automation] Bump Golang version to {{ source "latestGoVersion" }}'
 
 sources:
@@ -118,12 +120,3 @@ targets:
       content: 'go {{ source "latestGoVersion" }}'
       file: internal/edot/go.mod
       matchpattern: 'go \d+.\d+.\d+'
-  update-buildkite-pipeline:
-    name: "Update .buildkite/pipeline.yml"
-    sourceid: latestGoVersion
-    scmid: githubConfig
-    kind: file
-    spec:
-      content: 'golang:{{ source "latestGoVersion" }}'
-      file: .buildkite/pipeline.yml
-      matchpattern: 'golang:\d+.\d+.\d+'

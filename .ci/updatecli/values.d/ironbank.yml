@@ -5,5 +5,7 @@ config:
 
 pull_request:
   labels:
+    - automation
     - dependencies
     - backport-active-all
+    - Team:Elastic-Agent-Control-Plane

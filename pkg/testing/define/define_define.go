@@ -12,6 +12,9 @@ import (
 	"testing"
 )
 
+// SetKubernetesSupported is a no-op in define mode.
+func SetKubernetesSupported() {}
+
 func defineAction(t *testing.T, req Requirements) *Info {
 	// always validate requirement is valid
 	if err := req.Validate(); err != nil {
@@ -23,6 +26,6 @@ func defineAction(t *testing.T, req Requirements) *Info {
 	if err != nil {
 		panic(fmt.Sprintf("test %s failed to marshal requirements: %s", t.Name(), err))
 	}
-	t.Skip(fmt.Sprintf("define skip; requirements: %s", data))
+	t.Skipf("define skip; requirements: %s", data)
 	return nil
 }

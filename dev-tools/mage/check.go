@@ -14,6 +14,7 @@ import (
 	"github.com/magefile/mage/sh"
 
 	devtools "github.com/elastic/elastic-agent-libs/dev-tools/mage"
+	"github.com/elastic/elastic-agent/dev-tools/licenses"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
@@ -75,7 +76,7 @@ func CheckLicenseHeaders() error {
 	licenser := gotool.Licenser
 	return licenser(
 		licenser.Check(),
-		licenser.License("Elasticv2"),
+		licenser.License(licenses.Elasticv2LicenseName),
 	)
 }
 

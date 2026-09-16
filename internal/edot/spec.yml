@@ -315,6 +315,11 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     command: *heartbeat_command
+  - name: synthetics/api
+    description: "Synthetics API Monitor"
+    platforms: *platforms
+    outputs: *outputs
+    command: *heartbeat_command
   - name: beat/metrics
     description: "Beat metrics"
     platforms: *platforms

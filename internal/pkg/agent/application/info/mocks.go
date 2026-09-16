@@ -23,10 +23,19 @@ func NewMockAgent(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockAgent {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockAgent{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -89,8 +98,8 @@ func (_c *MockAgent_AgentID_Call) RunAndReturn(run func() string) *MockAgent_Age
 }
 
 // ECSMetadata provides a mock function for the type MockAgent
-func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ecsmeta.ECSMeta, error) {
-	ret := _mock.Called(v)
+func (_mock *MockAgent) ECSMetadata(logger1 *logger.Logger) (*ecsmeta.ECSMeta, error) {
+	ret := _mock.Called(logger1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ECSMetadata")
@@ -99,17 +108,17 @@ func (_mock *MockAgent) ECSMetadata(v *logger.Logger) (*ecsmeta.ECSMeta, error) 
 	var r0 *ecsmeta.ECSMeta
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ecsmeta.ECSMeta, error)); ok {
-		return returnFunc(v)
+		return returnFunc(logger1)
 	}
 	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ecsmeta.ECSMeta); ok {
-		r0 = returnFunc(v)
+		r0 = returnFunc(logger1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*ecsmeta.ECSMeta)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(*logger.Logger) error); ok {
-		r1 = returnFunc(v)
+		r1 = returnFunc(logger1)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -122,12 +131,12 @@ type MockAgent_ECSMetadata_Call struct {
 }
 
 // ECSMetadata is a helper method to define mock.On call
-//   - v *logger.Logger
-func (_e *MockAgent_Expecter) ECSMetadata(v interface{}) *MockAgent_ECSMetadata_Call {
-	return &MockAgent_ECSMetadata_Call{Call: _e.mock.On("ECSMetadata", v)}
+//   - logger1 *logger.Logger
+func (_e *MockAgent_Expecter) ECSMetadata(logger1 any) *MockAgent_ECSMetadata_Call {
+	return &MockAgent_ECSMetadata_Call{Call: _e.mock.On("ECSMetadata", logger1)}
 }
 
-func (_c *MockAgent_ECSMetadata_Call) Run(run func(v *logger.Logger)) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) Run(run func(logger1 *logger.Logger)) *MockAgent_ECSMetadata_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 *logger.Logger
 		if args[0] != nil {
@@ -145,7 +154,7 @@ func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ecsmeta.ECSMeta, err error
 	return _c
 }
 
-func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(v *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
+func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(logger1 *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -396,7 +405,7 @@ type MockAgent_ReloadID_Call struct {
 
 // ReloadID is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockAgent_Expecter) ReloadID(ctx interface{}) *MockAgent_ReloadID_Call {
+func (_e *MockAgent_Expecter) ReloadID(ctx any) *MockAgent_ReloadID_Call {
 	return &MockAgent_ReloadID_Call{Call: _e.mock.On("ReloadID", ctx)}
 }
 
@@ -448,7 +457,7 @@ type MockAgent_SetLogLevelOverride_Call struct {
 // SetLogLevelOverride is a helper method to define mock.On call
 //   - ctx context.Context
 //   - level string
-func (_e *MockAgent_Expecter) SetLogLevelOverride(ctx interface{}, level interface{}) *MockAgent_SetLogLevelOverride_Call {
+func (_e *MockAgent_Expecter) SetLogLevelOverride(ctx any, level any) *MockAgent_SetLogLevelOverride_Call {
 	return &MockAgent_SetLogLevelOverride_Call{Call: _e.mock.On("SetLogLevelOverride", ctx, level)}
 }
 
@@ -493,7 +502,7 @@ type MockAgent_SetLogLevelPolicy_Call struct {
 
 // SetLogLevelPolicy is a helper method to define mock.On call
 //   - level string
-func (_e *MockAgent_Expecter) SetLogLevelPolicy(level interface{}) *MockAgent_SetLogLevelPolicy_Call {
+func (_e *MockAgent_Expecter) SetLogLevelPolicy(level any) *MockAgent_SetLogLevelPolicy_Call {
 	return &MockAgent_SetLogLevelPolicy_Call{Call: _e.mock.On("SetLogLevelPolicy", level)}
 }
 

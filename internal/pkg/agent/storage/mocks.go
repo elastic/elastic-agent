@@ -20,10 +20,19 @@ func NewMockStorage(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockStorage {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockStorage{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -173,7 +182,7 @@ type MockStorage_Save_Call struct {
 
 // Save is a helper method to define mock.On call
 //   - reader io.Reader
-func (_e *MockStorage_Expecter) Save(reader interface{}) *MockStorage_Save_Call {
+func (_e *MockStorage_Expecter) Save(reader any) *MockStorage_Save_Call {
 	return &MockStorage_Save_Call{Call: _e.mock.On("Save", reader)}
 }
 

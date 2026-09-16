@@ -1,0 +1,51 @@
+{
+    "id": "placeholder",
+    "name": "placeholder",
+    "namespace": "default",
+    "package": {
+        "name": "osquery_manager",
+        "version": "1.16.0"
+    },
+    "enabled": true,
+    "inputs": [
+        {
+            "type": "osquery",
+            "policy_template": "osquery_manager",
+            "enabled": true,
+            "streams": [
+                {
+                    "enabled": true,
+                    "data_stream": {
+                        "type": "logs",
+                        "dataset": "osquery_manager.action.responses"
+                    },
+                    "vars": {
+                        "query": {
+                            "type": "text"
+                        }
+                    },
+                    "id": "osquery-osquery_manager.action.responses-no-schedule",
+                    "compiled_stream": {
+                        "query": null
+                    }
+                },
+                {
+                    "enabled": true,
+                    "data_stream": {
+                        "type": "logs",
+                        "dataset": "osquery_manager.result"
+                    },
+                    "vars": {
+                        "query": {
+                            "type": "text"
+                        }
+                    },
+                    "id": "osquery-osquery_manager.result-no-schedule",
+                    "compiled_stream": {
+                        "query": null
+                    }
+                }
+            ]
+        }
+    ]
+}

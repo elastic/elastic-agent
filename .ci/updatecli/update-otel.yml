@@ -72,6 +72,7 @@ actions:
       automerge: false
       labels:
       - automation
+      - dependencies
       - skip-changelog
       - "Team:Elastic-Agent-Control-Plane"
       description: |

@@ -22,10 +22,19 @@ func NewMockAcker(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockAcker {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockAcker{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -68,7 +77,7 @@ type MockAcker_Ack_Call struct {
 // Ack is a helper method to define mock.On call
 //   - ctx context.Context
 //   - action fleetapi.Action
-func (_e *MockAcker_Expecter) Ack(ctx interface{}, action interface{}) *MockAcker_Ack_Call {
+func (_e *MockAcker_Expecter) Ack(ctx any, action any) *MockAcker_Ack_Call {
 	return &MockAcker_Ack_Call{Call: _e.mock.On("Ack", ctx, action)}
 }
 
@@ -124,7 +133,7 @@ type MockAcker_Commit_Call struct {
 
 // Commit is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockAcker_Expecter) Commit(ctx interface{}) *MockAcker_Commit_Call {
+func (_e *MockAcker_Expecter) Commit(ctx any) *MockAcker_Commit_Call {
 	return &MockAcker_Commit_Call{Call: _e.mock.On("Commit", ctx)}
 }
 

@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -746,9 +747,6 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads build settings from env vars", func(t *testing.T) {
-		// Disable the USE_PACKAGE_VERSION default so .package-version does
-		// not override BEAT_VERSION etc. during this test.
-		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("SNAPSHOT", "true")
 		t.Setenv("DEV", "true")
 		t.Setenv("EXTERNAL", "true")
@@ -833,9 +831,6 @@ func TestLoadSettings(t *testing.T) {
 	})
 
 	t.Run("loads packaging settings from env vars", func(t *testing.T) {
-		// Disable the USE_PACKAGE_VERSION default so .package-version does
-		// not override AGENT_PACKAGE_VERSION / MANIFEST_URL during this test.
-		t.Setenv("USE_PACKAGE_VERSION", "false")
 		t.Setenv("AGENT_PACKAGE_VERSION", "2.0.0")
 		t.Setenv("MANIFEST_URL", "https://manifest.url")
 		t.Setenv("AGENT_DROP_PATH", "/drop/path")
@@ -850,23 +845,33 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.Packaging.KeepArchive)
 	})
 
-	t.Run("applies .package-version overrides when USE_PACKAGE_VERSION is set", func(t *testing.T) {
-		t.Setenv("USE_PACKAGE_VERSION", "true")
-
+	t.Run("does not apply .package-version overrides by default", func(t *testing.T) {
 		settings, err := LoadSettings()
 		require.NoError(t, err)
 
-		// Read the real .package-version file from the repo root.
-		pv, err := readPackageVersion(settings.RepoInfo.RootDir)
-		require.NoError(t, err)
+		// The overrides are opt-in per target via WithPackageVersionOverrides;
+		// plain settings loading must leave these untouched.
+		assert.Empty(t, settings.Packaging.ManifestURL)
+		assert.Empty(t, settings.Packaging.AgentPackageVersion)
+		assert.Empty(t, settings.IntegrationTest.AgentVersion)
+		assert.Empty(t, settings.IntegrationTest.AgentStackVersion)
+		assert.Empty(t, settings.Packaging.AgentDropPath)
+	})
 
-		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
-		assert.Equal(t, pv.ManifestURL, settings.Packaging.ManifestURL)
-		assert.Equal(t, pv.CoreVersion, settings.Packaging.AgentPackageVersion)
-		assert.Equal(t, isSnapshot, settings.Build.Snapshot)
-		assert.Equal(t, pv.Version, settings.IntegrationTest.AgentVersion)
-		assert.Equal(t, pv.StackVersion, settings.IntegrationTest.AgentStackVersion)
-		assert.NotEmpty(t, settings.Packaging.AgentDropPath)
+	t.Run("allows MANIFEST_URL without disabling USE_PACKAGE_VERSION", func(t *testing.T) {
+		t.Setenv("MANIFEST_URL", "https://manifest.url")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+		assert.Equal(t, "https://manifest.url", settings.Packaging.ManifestURL)
+	})
+
+	t.Run("rejects MANIFEST_URL combined with explicit USE_PACKAGE_VERSION=true", func(t *testing.T) {
+		t.Setenv("MANIFEST_URL", "https://manifest.url")
+		t.Setenv("USE_PACKAGE_VERSION", "true")
+
+		_, err := LoadSettings()
+		assert.ErrorContains(t, err, "mutually exclusive")
 	})
 
 	t.Run("loads integration test settings from env vars", func(t *testing.T) {
@@ -970,6 +975,103 @@ func TestLoadSettings(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "SNAPSHOT")
+	})
+}
+
+func TestWithPackageVersionOverrides(t *testing.T) {
+	t.Run("applies .package-version overrides", func(t *testing.T) {
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		// Read the real .package-version file from the repo root.
+		pv, err := readPackageVersion(settings.RepoInfo.RootDir)
+		require.NoError(t, err)
+
+		overridden, err := settings.WithPackageVersionOverrides()
+		require.NoError(t, err)
+
+		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
+		assert.Equal(t, pv.ManifestURL, overridden.Packaging.ManifestURL)
+		assert.Equal(t, pv.CoreVersion, overridden.Packaging.AgentPackageVersion)
+		assert.Equal(t, isSnapshot, overridden.Build.Snapshot)
+		assert.Equal(t, pv.Version, overridden.IntegrationTest.AgentVersion)
+		assert.Equal(t, pv.StackVersion, overridden.IntegrationTest.AgentStackVersion)
+		assert.NotEmpty(t, overridden.Packaging.AgentDropPath)
+
+		// The receiver must not be mutated.
+		assert.Empty(t, settings.Packaging.ManifestURL)
+	})
+
+	t.Run("explicit env values win over .package-version", func(t *testing.T) {
+		t.Setenv("AGENT_PACKAGE_VERSION", "1.2.3")
+		t.Setenv("BEAT_VERSION", "1.2.3")
+		t.Setenv("AGENT_VERSION", "1.2.3-SNAPSHOT")
+		t.Setenv("AGENT_STACK_VERSION", "1.2.4-SNAPSHOT")
+		t.Setenv("AGENT_DROP_PATH", "/drop/path")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		overridden, err := settings.WithPackageVersionOverrides()
+		require.NoError(t, err)
+
+		pv, err := readPackageVersion(settings.RepoInfo.RootDir)
+		require.NoError(t, err)
+
+		assert.Equal(t, pv.ManifestURL, overridden.Packaging.ManifestURL)
+		assert.Equal(t, "1.2.3", overridden.Packaging.AgentPackageVersion)
+		assert.Equal(t, "1.2.3", overridden.Build.AgentCoreVersion)
+		assert.Equal(t, "1.2.3-SNAPSHOT", overridden.IntegrationTest.AgentVersion)
+		assert.Equal(t, "1.2.4-SNAPSHOT", overridden.IntegrationTest.AgentStackVersion)
+		assert.Equal(t, "/drop/path", overridden.Packaging.AgentDropPath)
+	})
+
+	t.Run("no-op when USE_PACKAGE_VERSION=false", func(t *testing.T) {
+		t.Setenv("USE_PACKAGE_VERSION", "false")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		overridden, err := settings.WithPackageVersionOverrides()
+		require.NoError(t, err)
+		assert.Same(t, settings, overridden)
+	})
+
+	t.Run("no-op when MANIFEST_URL is set", func(t *testing.T) {
+		t.Setenv("MANIFEST_URL", "https://manifest.url")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		overridden, err := settings.WithPackageVersionOverrides()
+		require.NoError(t, err)
+		assert.Same(t, settings, overridden)
+		assert.Equal(t, "https://manifest.url", overridden.Packaging.ManifestURL)
+	})
+
+	t.Run("errors when explicit SNAPSHOT conflicts with .package-version", func(t *testing.T) {
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+
+		pv, err := readPackageVersion(settings.RepoInfo.RootDir)
+		require.NoError(t, err)
+		isSnapshot := strings.HasSuffix(pv.Version, SnapshotSuffix)
+
+		// Request the opposite of what .package-version contains.
+		t.Setenv("SNAPSHOT", strconv.FormatBool(!isSnapshot))
+		settings, err = LoadSettings()
+		require.NoError(t, err)
+
+		_, err = settings.WithPackageVersionOverrides()
+		assert.ErrorContains(t, err, "SNAPSHOT")
+
+		// A matching explicit value is fine.
+		t.Setenv("SNAPSHOT", strconv.FormatBool(isSnapshot))
+		settings, err = LoadSettings()
+		require.NoError(t, err)
+
+		_, err = settings.WithPackageVersionOverrides()
+		assert.NoError(t, err)
 	})
 }
 

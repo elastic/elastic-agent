@@ -323,6 +323,12 @@ func (b GolangCrossBuilder) Build() error {
 		"--env", fmt.Sprintf("SNAPSHOT=%v", cfg.Build.Snapshot),
 		"--env", fmt.Sprintf("DEV=%v", cfg.Build.DevBuild),
 		"--env", fmt.Sprintf("FIPS=%v", cfg.Build.FIPSBuild),
+		// The container re-runs LoadSettings for the inner mage target, so
+		// forward the resolved core version instead of USE_PACKAGE_VERSION:
+		// the inner build must not re-derive values from .package-version,
+		// which would bypass the opt-in decision the host target already made
+		// (see Settings.WithPackageVersionOverrides).
+		"--env", fmt.Sprintf("BEAT_VERSION=%s", cfg.AgentCoreVersion()),
 		"-v", repoInfo.RootDir+":"+mountPoint,
 	)
 

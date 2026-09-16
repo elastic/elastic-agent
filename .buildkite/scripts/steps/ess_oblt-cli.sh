@@ -11,21 +11,18 @@ function ess_up() {
   # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
   local oblt_cmd=(
     oblt-cli cluster create custom
-    --template ess-ea-it
+    --template ess-ea-it-build-id
     --cluster-name-prefix hosted
     --output-file="${PWD}/cluster-info.json"
     --wait 20
     --parameter "StackVersion=$STACK_VERSION"
     --parameter "ExpireInHours=2"
-    --parameter "ElasticTeam=elastic-agent-control-plane"
-    --parameter "ElasticProject=elastic-agent-ci"
   )
 
   # Snapshot stacks need explicit image tags. Released stacks can be created
   # from StackVersion alone until the next snapshot build is available.
   if [ -n "${STACK_BUILD_ID}" ]; then
-    oblt_cmd+=(--parameter "ElasticsearchDockerImage=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${STACK_BUILD_ID}")
-    oblt_cmd+=(--parameter "KibanaDockerImage=docker.elastic.co/cloud-release/kibana-cloud:${STACK_BUILD_ID}")
+    oblt_cmd+=(--parameter "StackBuildId=${STACK_BUILD_ID}")
   fi
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then

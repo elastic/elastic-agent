@@ -33,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -45,11 +46,18 @@ const (
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
 
+	// CollectorLogFileName is the base name of the collector subprocess's own log file.
+	CollectorLogFileName = "elastic-otel-collector"
+
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
 	// elasticMonitoringConnectorName is the component type name for the elastic monitoring connector.
 	// The connector receives pdata.Metrics from the receiver and converts them to Beats-format pdata.Logs.
 	elasticMonitoringConnectorName = "elasticmonitoringconnector"
+	// elasticMonitoringProcessorName is the component type name for the elastic monitoring processor.
+	// The processor aggregates and renames raw collector internal-telemetry metrics into a canonical
+	// form; both the file exporter and the connector consume its output.
+	elasticMonitoringProcessorName = "elasticmonitoringprocessor"
 )
 
 type collectorRecoveryTimer interface {
@@ -132,14 +140,14 @@ type OTelManager struct {
 	// stopTimeout is the timeout to wait for the collector to stop.
 	stopTimeout time.Duration
 
-	// log level of the collector
+	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
 }
 
 // NewOTelManager returns a OTelManager.
 // If execFactory is nil, the default subprocess execution is used.
 func NewOTelManager(
-	logger *logger.Logger,
+	managerLogger *logger.Logger,
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
@@ -195,7 +203,7 @@ func NewOTelManager(
 	}
 
 	return &OTelManager{
-		managerLogger:             logger,
+		managerLogger:             managerLogger,
 		collectorLogger:           collectorLogger,
 		agentInfo:                 agentInfo,
 		healthCheckExtComponentID: healthCheckExtComponentID,
@@ -372,6 +380,14 @@ func (m *OTelManager) Errors() <-chan error {
 	return m.errCh
 }
 
+// PerformAction routes a Fleet action to the receiver instance backing
+// com. The action is delivered  through the elasticdiagnostics extension
+// over its Unix socket (seeotel.PerformActionExt); the receiver's
+// registered action handler runs the action and this returns its result.
+func (m *OTelManager) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	return otel.PerformActionExt(ctx, comp.ID, name, params)
+}
+
 // collectorRunning checks if the otel collector is running.
 func (m *OTelManager) collectorRunning() bool {
 	return m.proc != nil && !m.proc.Stopped()
@@ -399,8 +415,8 @@ func (m *OTelManager) startCollector(ctx context.Context,
 	if m.collectorRunning() {
 		return errors.New("tried to start otel collector, but it's already running")
 	}
-	proc, err := m.execution.startCollector(ctx, m.collectorLogLevel, m.collectorLogger,
-		m.managerLogger, m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+	proc, err := m.execution.startCollector(ctx, m.managerLogger, m.collectorLogger, m.collectorLogLevel,
+		m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
 	if err != nil {
 		// failed to create the collector (this is different then
 		// it's failing to run). we do not retry creation on failure
@@ -488,8 +504,9 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
-	// if the otel log level is unset, use the agent log level
-	if err := maybeInjectLogLevel(mergedOtelCfg, cfgUpdate.agentLogLevel); err != nil {
+	// if the otel log level is unset, use the most verbose level across agent and all units
+	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
+	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
 		return nil, err
 	}
 
@@ -666,6 +683,8 @@ func injectMonitoringReceiver(
 
 	diagName := translate.OtelNamePrefix + receiverName
 	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
+	monitoringProcessorType := otelcomponent.MustNewType(elasticMonitoringProcessorName)
+	monitoringProcessorID := otelcomponent.NewIDWithName(monitoringProcessorType, diagName).String()
 	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + receiverName
 	logsPipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
@@ -685,14 +704,20 @@ func injectMonitoringReceiver(
 		metricsPipelineExporters = append(metricsPipelineExporters, connectorID)
 	}
 	metricsPipelineCfg := map[string]any{
-		"receivers": []string{receiverID},
-		"exporters": metricsPipelineExporters,
+		"receivers":  []string{receiverID},
+		"processors": []string{monitoringProcessorID},
+		"exporters":  metricsPipelineExporters,
 	}
 
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"interval": monitoring.MetricsPeriod,
+			},
+		},
+		"processors": map[string]any{
+			monitoringProcessorID: map[string]any{
+				"exporter_names": outputNameLookup,
 			},
 		},
 		"exporters": map[string]any{
@@ -724,10 +749,8 @@ func injectMonitoringReceiver(
 			// This pipeline forwards Agent's own internal telemetry in beats format,
 			// not a specific beat's data, so it always gets the standard default
 			// processors.
-			collectorCfg["processors"] = map[string]any{
-				processorID: map[string]any{
-					"processors": translate.GetDefaultProcessors(""),
-				},
+			collectorCfg["processors"].(map[string]any)[processorID] = map[string]any{
+				"processors": translate.GetDefaultProcessors(""),
 			}
 			logsPipelineCfg["processors"] = []string{processorID}
 		}
@@ -735,7 +758,6 @@ func injectMonitoringReceiver(
 			connectorID: map[string]any{
 				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
 				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
-				"exporter_names":       outputNameLookup,
 			},
 		}
 		collectorCfg["service"].(map[string]any)["pipelines"].(map[string]any)[logsPipelineID] = logsPipelineCfg
@@ -847,6 +869,8 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:oauth2client"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}

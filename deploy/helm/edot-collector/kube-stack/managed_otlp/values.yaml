@@ -1,7 +1,7 @@
-# For installation and configuration options, refer to the [installation instructions](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md)
+# For installation and configuration options, refer to the [installation instructions](https://www.elastic.co/docs/solutions/observability/get-started/opentelemetry/quickstart/serverless/k8s#manual-installation)
 
-# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
-# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.3.3
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/opentelemetry-kube-stack-0.16.0/charts/opentelemetry-kube-stack/values.yaml)
+# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.16.0
 opentelemetry-operator:
   manager:
     extraArgs:
@@ -79,6 +79,15 @@ collectors:
           timeout: 2s
           override: true
           aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/openshift:
+          # Detects resources from OpenShift. Does nothing on other distributions.
+          detectors: [openshift]
+          timeout: 2s
+          override: true
+          openshift:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
@@ -166,6 +175,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
             receivers:
               - k8s_cluster
@@ -177,6 +187,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
             exporters:
               - debug
@@ -244,6 +255,15 @@ collectors:
           timeout: 2s
           override: true
           aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/openshift:
+          # Detects resources from OpenShift. Does nothing on other distributions.
+          detectors: [openshift]
+          timeout: 2s
+          override: true
+          openshift:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
@@ -346,7 +366,12 @@ collectors:
             http:
               endpoint: 0.0.0.0:4318
         # [File Log Receiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/filelogreceiver)
-        file_log:
+        # Note: using the deprecated name "filelog" intentionally. The logsCollection preset
+        # in the kube-stack chart injects a base filelog: config (include paths, operators,
+        # etc.) that this block merges into via mustMergeOverwrite. If the canonical name
+        # "file_log" is used instead, the preset config lands under a different map key and
+        # the merge doesn't happen, leaving the receiver with no include: paths configured.
+        filelog:
           retry_on_failure:
             enabled: true
           start_at: end
@@ -479,7 +504,7 @@ collectors:
           traces: null
           logs/node:
             receivers:
-              - file_log
+              - filelog
             processors:
               - batch
               - k8s_attributes
@@ -488,6 +513,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
               - resource/cloud
             exporters:
@@ -504,6 +530,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
               - resource/cloud
             exporters:

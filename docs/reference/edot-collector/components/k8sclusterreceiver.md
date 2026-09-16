@@ -1,6 +1,6 @@
 ---
 navigation_title: Kubernetes cluster receiver
-description: The Kubernetes cluster receiver is an OpenTelemetry Collector component that collects Kubernetes cluster-level metrics and entity events for Elastic Observability through the EDOT Collector.
+description: The Kubernetes cluster receiver is an OpenTelemetry Collector component that collects Kubernetes cluster-level metrics and entity events for Elastic Observability through {{agent}}.
 applies_to:
   stack: ga
   serverless:
@@ -13,7 +13,7 @@ products:
 
 # Kubernetes cluster receiver
 
-The Kubernetes cluster receiver (`k8s_cluster`) is a core component of the {{edot}} (EDOT) Collector. It collects cluster-level metrics and entity events from the Kubernetes API server, enabling observability into node health, resource allocation, and workload states in Elastic Observability.
+The Kubernetes cluster receiver (`k8s_cluster`) is a core component of {{agent}}. It collects cluster-level metrics and entity events from the Kubernetes API server, enabling observability into node health, resource allocation, and workload states in Elastic Observability.
 
 For full contrib details, refer to the [OpenTelemetry k8s_cluster receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sclusterreceiver).
 
@@ -23,7 +23,7 @@ For full contrib details, refer to the [OpenTelemetry k8s_cluster receiver docum
 
 To use the Kubernetes cluster receiver, include it in the receivers section of your Collector configuration.
 
-The receiver is already included in the default {{edot}} Collector distribution.
+The receiver is already included in the default {{agent}} distribution.
 
 ```yaml
 receivers:
@@ -42,7 +42,7 @@ service:
 ```
 
 :::{note}
-When deploying with the {{edot}} Helm chart, the `k8s_cluster` receiver runs as a single instance per cluster by default. If you’re configuring the Collector manually, ensure only one active instance of this receiver runs per cluster to avoid duplicate data.
+When deploying with the {{agent}} Helm chart, the `k8s_cluster` receiver runs as a single instance per cluster by default. If you’re configuring the Collector manually, ensure only one active instance of this receiver runs per cluster to avoid duplicate data.
 :::
 
 
@@ -182,7 +182,7 @@ See [contrib RBAC examples](https://github.com/open-telemetry/opentelemetry-coll
 
 ## Caveats and limitations
 
-The following considerations apply when using the `k8s_cluster` receiver in the {{edot}} Collector. These behaviors originate from the contrib OpenTelemetry implementation and also apply to other distributions:
+The following considerations apply when using the `k8s_cluster` receiver in {{agent}}. These behaviors originate from the contrib OpenTelemetry implementation and also apply to other distributions:
 
 - Only one active `k8s_cluster` instance should run per cluster. Use `k8s_leader_elector` extension for high availability (HA).
 - Restricting namespaces turns off some cluster-level metrics.  

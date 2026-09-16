@@ -6,12 +6,11 @@ _SELF=$(dirname $0)
 source "${_SELF}/../common.sh"
 
 # Default behavior (no MANIFEST_URL): compile core from this checkout and read
-# version/snapshot from .package-version (AGENT_CORE_SOURCE=local and
-# USE_PACKAGE_VERSION=true are both defaults). When MANIFEST_URL is provided
-# (DRA full-package run), download core from the manifest instead.
+# version/snapshot from .package-version (the `package` target reads it by
+# default). When MANIFEST_URL is provided (DRA full-package run), the manifest
+# is authoritative instead: download core from it and skip .package-version.
 if [ -n "${MANIFEST_URL:-}" ]; then
   export AGENT_CORE_SOURCE=manifest
-  export USE_PACKAGE_VERSION=false
 fi
 
 mage clean
@@ -30,7 +29,7 @@ mage "${MAGE_TARGETS[@]}"
 
 echo "+++ Generate dependencies report"
 # When the pipeline set MANIFEST_URL we already have it; otherwise read it from
-# .package-version (mage did the same internally via USE_PACKAGE_VERSION).
+# .package-version (the package target read the same file internally).
 REPORT_MANIFEST_URL="${MANIFEST_URL:-$(jq -r .manifest_url .package-version)}"
 BEAT_VERSION_FULL=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors -XGET "${REPORT_MANIFEST_URL}" |jq '.version' -r )
 bash "${_SELF}/../../../dev-tools/dependencies-report"

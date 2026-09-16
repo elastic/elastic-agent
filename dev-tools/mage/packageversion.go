@@ -25,9 +25,11 @@ type packageVersion struct {
 	StackBuildID string `json:"stack_build_id"`
 }
 
-// GetPackageVersionInfo reads the package version file if USE_PACKAGE_VERSION is set.
-// The file is looked up in cfg.RepoInfo.RootDir.
-// Returns nil if USE_PACKAGE_VERSION is not set or the file doesn't exist.
+// GetPackageVersionInfo reads the package version file if
+// cfg.Packaging.UsePackageVersion is true. The file is looked up in
+// cfg.RepoInfo.RootDir.
+// Returns nil if cfg.Packaging.UsePackageVersion is false or the file
+// doesn't exist.
 func GetPackageVersionInfo(cfg *Settings) (*packageVersion, error) {
 	if !cfg.Packaging.UsePackageVersion {
 		return nil, nil
@@ -38,7 +40,7 @@ func GetPackageVersionInfo(cfg *Settings) (*packageVersion, error) {
 	_, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Printf("USE_PACKAGE_VERSION is set, but %q does not exist, not overriding\n", path)
+			log.Printf("%q does not exist, not applying package version overrides\n", path)
 			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to stat %q: %w", path, err)

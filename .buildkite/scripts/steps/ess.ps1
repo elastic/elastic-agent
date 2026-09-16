@@ -29,8 +29,7 @@ function ess_up {
   # Snapshot stacks need explicit image tags. Released stacks can be created
   # from StackVersion alone until the next snapshot build is available.
   if ($StackBuildId) {
-      $params.ElasticsearchDockerImage = "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:$StackBuildId"
-      $params.KibanaDockerImage = "docker.elastic.co/cloud-release/kibana-cloud:$StackBuildId"
+      $params.StackBuildId = "$StackBuildId"
   }
 
   $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
@@ -39,7 +38,7 @@ function ess_up {
     # --output-file must be an absolute path; oblt-cli resolves relative
     # paths against its own config dir (~/.oblt-cli), not CWD.
     & oblt-cli cluster create custom `
-        --template ess-ea-it `
+        --template ess-ea-it-build-id `
         --cluster-name-prefix hosted `
         --parameters-file $paramsPath `
         --parameter "ExpireInHours=4" `

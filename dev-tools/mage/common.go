@@ -659,7 +659,8 @@ func FindFiles(globs ...string) ([]string, error) {
 
 // FindFilesRecursive recursively traverses from the CWD and invokes the given
 // match function on each regular file to determine if the given path should be
-// returned as a match. It ignores files in .git directories.
+// returned as a match. It ignores files in .git directories and the roots of
+// nested git repositories (submodules and worktrees).
 func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, error) {
 	var matches []string
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
@@ -672,9 +673,12 @@ func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, 
 			return filepath.SkipDir
 		}
 
-		// Don't look for files in beats submodule
-		if d.IsDir() && filepath.Base(path) == "beats" {
-			return filepath.SkipDir
+		// Skip directories that are the root of a separate git repository
+		// (submodules and worktrees have a .git file at their root).
+		if d.IsDir() && path != "." {
+			if _, err := os.Lstat(filepath.Join(path, ".git")); err == nil {
+				return filepath.SkipDir
+			}
 		}
 
 		if !d.Type().IsRegular() {

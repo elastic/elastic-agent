@@ -8,9 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
+	"slices"
 	"strings"
-	"syscall"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
@@ -106,16 +105,17 @@ func (m *OTelManager) PerformComponentDiagnostics(
 
 	extDiagnostics, err := otel.PerformDiagnosticsExt(ctx, false)
 	if err != nil {
-		// These three errors mean EDOT is not running, which is expected.
-		// fs.ErrNotExist: the socket file is missing (POSIX ENOENT / Windows ERROR_FILE_NOT_FOUND).
-		// syscall.ECONNREFUSED: the socket file exists but nothing is listening (EDOT crashed or mid-restart).
-		// context.DeadlineExceeded: a Windows pipe-busy dial timed out. This is defensive: production does not
-		// set a dial deadline, so this only fires if the caller passes a deadline.
+		// otel.IsCollectorUnavailable covers the socket being missing or refusing
+		// connections, both of which mean the collector isn't running, which is
+		// expected. context.DeadlineExceeded is additionally treated the same way
+		// here for a Windows-specific case: a pipe-busy dial timing out. This is
+		// defensive: production does not set a dial deadline, so this only fires
+		// if the caller passes one.
 		// Any other error is unexpected, so surface it on each component so it ends up in the diagnostics archive.
-		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, context.DeadlineExceeded) {
-			m.managerLogger.Debugf("EDOT not reachable, no diagnostics available: %v", err)
+		if otel.IsCollectorUnavailable(err) || errors.Is(err, context.DeadlineExceeded) {
+			m.managerLogger.Debugf("collector not reachable, no diagnostics available: %v", err)
 		} else {
-			m.managerLogger.Warnf("failed to fetch diagnostics from EDOT: %v", err)
+			m.managerLogger.Warnf("failed to fetch diagnostics from collector: %v", err)
 			for idx := range diagnostics {
 				diagnostics[idx].Err = fmt.Errorf("error fetching otel diagnostics: %w", err)
 			}
@@ -123,32 +123,49 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		return diagnostics, nil
 	}
 
-	// Receiver names have the form "<receiverType>/_agent-component/<comp.ID>/<streamID>".
-	// All "/" characters are literal string delimiters, not filesystem path separators,
-	// so this is consistent across platforms including Windows.
-	// We extract comp.ID as the segment between OtelNamePrefix and the next "/". This is
-	// exact and unambiguous for normal IDs. Both comp.ID and streamID are user-supplied
-	// (from the policy input "id" field), so either could contain "/" — making the format
-	// ambiguous in that case. The warning below flags such IDs. A proper fix requires
-	// escaping "/" in IDs at the source in the beat receiver.
 	diagIdxByCompID := make(map[string]int)
 	for idx, diag := range diagnostics {
-		if strings.Contains(diag.Component.ID, "/") {
-			m.managerLogger.Warnf("component ID %q contains '/', its EDOT diagnostics will be missing from the archive", diag.Component.ID)
-		}
 		diagIdxByCompID[diag.Component.ID] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-		parts := strings.SplitN(extDiag.Name, translate.OtelNamePrefix, 2)
-		if len(parts) != 2 {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
+		componentIDs := diagnosticComponentIDsFromName(extDiag.Name, currentComponents)
+		if len(componentIDs) == 0 {
+			m.managerLogger.Debugf("skipping EDOT diagnostic for %q: it cannot be associated with an active component", extDiag.Name)
 			continue
 		}
-		compID, _, _ := strings.Cut(parts[1], "/")
-		if idx, ok := diagIdxByCompID[compID]; ok {
-			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+		if len(componentIDs) > 1 {
+			m.managerLogger.Warnf("EDOT diagnostic %q is associated with multiple components %q; preserving it for each component", extDiag.Name, componentIDs)
+		}
+		for _, compID := range componentIDs {
+			if idx, ok := diagIdxByCompID[compID]; ok {
+				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+			}
 		}
 	}
 
 	return diagnostics, nil
+}
+
+// diagnosticComponentIDsFromName matches the receiver type and treats component
+// IDs as opaque candidates, without attempting to split out a stream ID. More
+// than one same-type match is retained so diagnostics remain lossless when
+// component and stream IDs make the flattened receiver name ambiguous.
+func diagnosticComponentIDsFromName(name string, components []component.Component) []string {
+	receiverType, suffix, found := strings.Cut(name, "/"+translate.OtelNamePrefix)
+	if !found {
+		return nil
+	}
+
+	componentIDs := make([]string, 0, 1)
+	for _, comp := range components {
+		beatName := comp.BeatName()
+		if beatName == "" || receiverType != beatName+"receiver" {
+			continue
+		}
+		if suffix == comp.ID || strings.HasPrefix(suffix, comp.ID+"/") {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+	}
+	slices.Sort(componentIDs)
+	return componentIDs
 }

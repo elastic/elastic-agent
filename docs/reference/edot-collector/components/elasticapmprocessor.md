@@ -17,9 +17,9 @@ The Elastic {{product.apm}} processor enriches OpenTelemetry trace data with Ela
 
 The processor works together with the [Elastic {{product.apm}} connector](elasticapmconnector.md), which generates pre-aggregated {{product.apm}} metrics from trace data.
 
-## Default usage in EDOT
+## Default usage in {{agent}} [default-usage-in-edot]
 
-The `elasticapmprocessor` is included by default in EDOT Collector deployments that ingest trace data directly into {{es}}. It's not needed when using the [{{motlp}}](opentelemetry://reference/motlp.md), as the enrichment happens server-side.
+The `elasticapmprocessor` is included by default in {{agent}} deployments that ingest trace data directly into {{es}}. It's not needed when using the [{{motlp}}](opentelemetry://reference/motlp.md), as the enrichment happens server-side.
 
 ### Standalone deployments
 
@@ -115,7 +115,7 @@ Follow these recommendations when using the Elastic APM processor:
 
 * **Use only for direct {{es}} ingestion**: If you're using the {{motlp}}, you don't need the Elastic APM processor, because the endpoint handles enrichment automatically. Using both can cause conflicts or duplicate processing.
 
-* **Keep the processor updated**: The Elastic APM processor evolves with new Elastic {{product.apm}} features. Keep your EDOT Collector version current to benefit from the latest enhancements and compatibility improvements.
+* **Keep the processor updated**: The Elastic APM processor evolves with new Elastic {{product.apm}} features. Keep your {{agent}} version current to benefit from the latest enhancements and compatibility improvements.
 
 * **Configure OTel SDKs with semantic conventions**: The processor relies on OpenTelemetry semantic conventions to identify and enrich trace data correctly. Ensure your SDKs follow standard conventions for service name, span attributes, and resource attributes.
 
@@ -125,7 +125,7 @@ Be aware of these constraints and behaviors when using the Elastic APM processor
 
 * **Required for Elastic {{product.apm}} UIs**: Without the Elastic APM processor, OpenTelemetry traces will be stored in {{es}} but may not render correctly in Elastic {{product.apm}} UIs. Service maps, transaction groups, and other {{product.apm}}-specific visualizations depend on the enrichments this processor provides.
 
-* **Not available in contrib OTel Collector**: The Elastic APM processor is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use EDOT Collector or [build a custom collector](../custom-collector.md) that includes Elastic's components.
+* **Not available in contrib OTel Collector**: The Elastic APM processor is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use {{agent}} or [build a custom collector](../custom-collector.md) that includes Elastic's components.
 
 
 * **Minimal configuration options**: Unlike some processors, the Elastic APM processor operates with fixed behavior and offers few configuration parameters. While this simplifies setup, it also means you can't customize the enrichment logic.

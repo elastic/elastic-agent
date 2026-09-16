@@ -7,6 +7,7 @@ package manager
 import (
 	"context"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -21,7 +22,6 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/yaml.v3"
 
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 
@@ -94,9 +94,8 @@ type subprocessExecution struct {
 // processErrCh channel. Other run errors, such as not able to connect to the health endpoint, are sent to the runErrCh channel.
 func (r *subprocessExecution) startCollector(
 	_ context.Context,
-	lvl logp.Level,
-	collectorLogger *logger.Logger,
-	logger *logger.Logger,
+	agentLogger, collectorLogger *logger.Logger,
+	collectorLevel logp.Level,
 	cfg *confmap.Conf,
 	processErrCh chan error,
 	statusCh chan *otelstatus.AggregateStatus,
@@ -123,21 +122,20 @@ func (r *subprocessExecution) startCollector(
 	}
 
 	// prepare and serialize config first so we can exit early if there's a problem
-	cfgYamlBytes, err := prepareAndSerializeConfig(cfg)
+	cfgBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	stdOutLast := newZapLast(collectorLogger.Core())
-	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(lvl))
-	// info level for stdErr because by default collector writes to stderr
+	stdOut := runtimeLogger.NewLogWriterWithDefaults(stdOutLast, zapcore.Level(collectorLevel))
 	stdErrLast := newZapLast(collectorLogger.Core())
-	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(lvl))
+	stdErr := runtimeLogger.NewLogWriterWithDefaults(stdErrLast, zapcore.Level(collectorLevel))
 
 	env := os.Environ()
 
 	// set collector args and add --config flag with the stdingob:stdin URI
-	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, lvl))
+	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, collectorLevel))
 	if hasProfilesPipeline(cfg) {
 		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
 	}
@@ -163,9 +161,9 @@ func (r *subprocessExecution) startCollector(
 		return nil, fmt.Errorf("failed to start supervised collector: %w", err)
 	}
 
-	logger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
+	agentLogger.Infof("supervised collector started with pid: %d and healthcheck port: %d", processInfo.Process.Pid, httpHealthCheckPort)
 
-	ctl := newProcHandle(processInfo, logger, lvl, r.healthCheckExtensionID, httpHealthCheckPort,
+	ctl := newProcHandle(processInfo, agentLogger, collectorLevel, r.healthCheckExtensionID, httpHealthCheckPort,
 		forceFetchStatusCh,
 		func(ctx context.Context, st *otelstatus.AggregateStatus) {
 			reportCollectorStatus(ctx, statusCh, cloneCollectorStatus(st))
@@ -174,7 +172,7 @@ func (r *subprocessExecution) startCollector(
 		stdOutLast, stdErrLast,
 	)
 	ctl.startBackgroundWorkers()
-	ctl.updateConfigYamlBytes(cfgYamlBytes)
+	ctl.updateConfigBytes(cfgBytes)
 	return ctl, nil
 }
 
@@ -548,24 +546,24 @@ func (s *procHandle) Stopped() bool {
 
 // UpdateConfig submits a new configuration to the collector process.
 func (s *procHandle) UpdateConfig(cfg *confmap.Conf) error {
-	yamlBytes, err := prepareAndSerializeConfig(cfg)
+	cfgBytes, err := prepareAndSerializeConfig(cfg)
 	if err != nil {
 		return err
 	}
 
-	s.updateConfigYamlBytes(yamlBytes)
+	s.updateConfigBytes(cfgBytes)
 
 	return nil
 }
 
-// updateConfigYamlBytes submits a new serialized configuration to the collector process.
-func (s *procHandle) updateConfigYamlBytes(cfgYamlBytes []byte) {
+// updateConfigBytes submits a new serialized configuration to the collector process.
+func (s *procHandle) updateConfigBytes(cfgBytes []byte) {
 	// Drain any pending config (latest-wins semantics).
 	select {
 	case <-s.configCh:
 	default:
 	}
-	s.configCh <- cfgYamlBytes
+	s.configCh <- cfgBytes
 }
 
 // LogLevel return the otel collector's log level.
@@ -573,19 +571,25 @@ func (s *procHandle) LogLevel() logp.Level {
 	return s.collectorLogLevel
 }
 
-// prepareAndSerializeConfig serializes the configuration to yaml.
+// prepareAndSerializeConfig serializes the configuration to JSON.
+// JSON is used rather than YAML because yaml.Marshal can corrupt or fail to
+// round-trip multi-line strings whose content lines have inconsistent leading
+// whitespace (e.g. audit_rules block scalars). JSON strings always use explicit
+// \n escaping, which avoids the YAML block-scalar indentation ambiguity.
+// confmap.NewRetrievedFromYAML on the receiver side accepts JSON because JSON
+// is a strict subset of YAML.
 func prepareAndSerializeConfig(cfg *confmap.Conf) ([]byte, error) {
 	if cfg == nil {
 		return nil, errors.New("no configuration provided")
 	}
 
 	confMap := cfg.ToStringMap()
-	yamlBytes, err := yaml.Marshal(confMap)
+	jsonBytes, err := json.Marshal(confMap)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config to yaml: %w", err)
+		return nil, fmt.Errorf("failed to marshal config to json: %w", err)
 	}
 
-	return yamlBytes, nil
+	return jsonBytes, nil
 }
 
 type zapWriter interface {

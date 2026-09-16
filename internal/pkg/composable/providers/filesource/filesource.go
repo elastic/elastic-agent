@@ -17,22 +17,18 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-func init() {
-	// filesource provider reads and watches for changes on files that are defined in the provider configuration.
-	//
-	// To be notified when a file is change the provider will watch the parent directory of the file so if the file
-	// is replaced that it will read the new contents. If a file doesn't exist or the provider is unable to read
-	// the file then it will report the value as an empty string.
-	//
-	// If the provided path happens to be a directory then it just report the value as an empty string.
-	composable.Providers.MustAddContextProvider("filesource", ContextProviderBuilder)
-}
+// filesource provider reads and watches for changes on files that are defined in the provider configuration.
+//
+// To be notified when a file is change the provider will watch the parent directory of the file so if the file
+// is replaced that it will read the new contents. If a file doesn't exist or the provider is unable to read
+// the file then it will report the value as an empty string.
+//
+// If the provided path happens to be a directory then it just report the value as an empty string.
 
 const (
 	DefaultMaxSize = 4 * 1024 // 4KiB

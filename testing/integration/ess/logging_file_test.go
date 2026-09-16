@@ -7,13 +7,12 @@
 package ess
 
 import (
-	"fmt"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
@@ -29,13 +28,13 @@ import (
 // writes its log files to the new location rather than the default one.
 func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	info := define.Require(t, define.Requirements{
+		Group: integration.Fleet,
 		Stack: &define.Stack{},
-		Local: false,
-		Sudo:  true,
+		Local: true,
+		Sudo:  false,
 		OS: []define.OS{
 			{Type: define.Linux},
 		},
-		Group: integration.Default,
 	})
 
 	deadline := time.Now().Add(15 * time.Minute)
@@ -52,67 +51,151 @@ func TestLoggingFilePathChangedViaFleet(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
 
-	installOutput, err := f.Install(ctx, &atesting.InstallOpts{
-		NonInteractive: true,
-		Force:          true,
-		Privileged:     true,
-		EnrollOpts: atesting.EnrollOpts{
-			URL:             fleetServerURL,
-			EnrollmentToken: enrollmentTokenResp.APIKey,
-		},
+	enrollArgs := []string{
+		"enroll",
+		"--force",
+		"--skip-daemon-reload",
+		"--url",
+		fleetServerURL,
+		"--enrollment-token",
+		enrollmentTokenResp.APIKey,
+	}
+
+	enrollCmd, err := f.PrepareAgentCommand(ctx, enrollArgs)
+	if err != nil {
+		t.Fatalf("could not prepare enroll command: %s", err)
+	}
+	if out, err := enrollCmd.CombinedOutput(); err != nil {
+		t.Fatalf("error enrolling elastic-agent: %s\nOutput:\n%s", err, string(out))
+	}
+
+	err = f.Configure(ctx, []byte(fleetManagedAgentConfig))
+	require.NoError(t, err)
+
+	runAgentCmd, agentOutput := prepareAgentCMD(t, ctx, f, nil, nil)
+	if err := runAgentCmd.Start(); err != nil {
+		t.Fatalf("could not start elastic-agent: %s", err)
+	}
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Errorf("elastic-agent output:\n%s", agentOutput)
+		}
 	})
-	assert.NoErrorf(t, err, "Error installing agent. Install output:\n%s\n", string(installOutput))
 
-	require.Eventuallyf(t, func() bool {
+	require.Eventually(t, func() bool {
 		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 2*time.Minute, 5*time.Second, "agent never became healthy before logging path change")
+	}, 2*time.Minute, 5*time.Second, "elastic-agent did not report healthy")
 
-	// Create a custom directory that the agent (running as root) can write to.
+	// Create a custom directory that the agent can write to.
 	customLogDir := filepath.Join(t.TempDir(), "logs")
 	require.NoError(t, os.MkdirAll(customLogDir, 0o755), "create custom log directory")
-	t.Cleanup(func() { _ = os.RemoveAll(customLogDir) })
 
+	// Apply the logging path override and wait for the agent to pick it up.
 	t.Logf("Applying policy override: agent.logging.files.path=%s", customLogDir)
-	applyLoggingFilePathPolicy(t, info, policyResp.AgentPolicy, customLogDir)
+	err = applyLoggingFilePathPolicy(ctx, info, policyResp.AgentPolicy, customLogDir)
+	require.NoError(t, err)
 
-	// Wait for the agent to re-exec (due to Files config change) and recover.
-	require.Eventuallyf(t, func() bool {
-		return waitForAgentAndFleetHealthy(ctx, t, f)
-	}, 5*time.Minute, 5*time.Second, "agent never became healthy after logging path change")
+	require.Eventually(t, func() bool {
+		inspectOutput, inspectErr := f.ExecInspect(ctx)
+		return inspectErr == nil &&
+			!inspectOutput.Agent.Logging.ToStderr &&
+			inspectOutput.Agent.Logging.ToFiles &&
+			inspectOutput.Agent.Logging.Files.Path == customLogDir
+	}, 2*time.Minute, time.Second, "elastic-agent did not apply the policy change")
 
-	// The agent must create at least one log file in the new directory.
-	require.Eventuallyf(t, func() bool {
-		matches, _ := filepath.Glob(filepath.Join(customLogDir, "*.ndjson"))
-		return len(matches) > 0
-	}, 2*time.Minute, 5*time.Second,
-		"no log files found in custom log directory %s after path change", customLogDir)
-
-	inspectOutput, err := f.ExecInspect(ctx)
-	require.NoError(t, err, "failed to exec inspect after logging policy change")
-	require.False(t, inspectOutput.Agent.Logging.ToStderr)
-	require.True(t, inspectOutput.Agent.Logging.ToFiles)
-	require.Equal(t, customLogDir, inspectOutput.Agent.Logging.Files.Path)
+	requireLogFileInDir(t, customLogDir, "logs in custom log directory")
 }
 
-func applyLoggingFilePathPolicy(t *testing.T, info *define.Info, policy kibana.AgentPolicy, logPath string) {
-	t.Helper()
+// TestContainerLoggingFilePathChangedViaFleet verifies that when LOGS_PATH configures
+// the container logging path, a Fleet policy can update the path and the agent writes
+// its log files to the new location.
+func TestContainerLoggingFilePathChangedViaFleet(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Container,
+		Stack: &define.Stack{},
+		Local: true,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
 
-	body := fmt.Sprintf(`
-{
-  "name": %q,
-  "namespace": %q,
-  "overrides": {
-    "agent": {
-      "logging": {
-        "to_stderr": false,
-        "to_files": true,
-        "files": {
-          "path": %q
-        }
-      }
-    }
-  }
-}`, policy.Name, policy.Namespace, logPath)
+	deadline := time.Now().Add(15 * time.Minute)
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), deadline)
+	defer cancel()
 
-	sendPolicyUpdate(t, info, policy.ID, body)
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err, "failed creating agent fixture")
+	err = f.Prepare(ctx)
+	require.NoError(t, err, "failed preparing agent fixture")
+
+	policyResp, enrollmentTokenResp := createPolicyAndEnrollmentToken(
+		ctx, t, info.KibanaClient, createBasicPolicy())
+	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
+	require.NoError(t, err, "failed getting Fleet Server URL")
+
+	startupLogDir := filepath.Join(t.TempDir(), "startup-logs")
+	require.NoError(t, os.MkdirAll(startupLogDir, 0o755), "create startup log directory")
+
+	env := []string{
+		"FLEET_ENROLL=1",
+		"FLEET_URL=" + fleetServerURL,
+		"FLEET_ENROLLMENT_TOKEN=" + enrollmentTokenResp.APIKey,
+		"STATE_PATH=" + f.WorkDir(),
+		"LOGS_PATH=" + startupLogDir,
+	}
+	cmd, agentOutput := prepareAgentCMD(t, ctx, f, []string{"container"}, env)
+	err = cmd.Start()
+	require.NoError(t, err, "failed starting container agent")
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Errorf("elastic-agent output:\n%s", agentOutput)
+		}
+	})
+
+	// Wait for the container agent to become healthy.
+	require.Eventually(t, func() bool {
+		return f.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env))) == nil
+	}, 2*time.Minute, time.Second, "elastic-agent did not report healthy")
+
+	// Create a custom directory that the agent can write to.
+	customLogDir := filepath.Join(t.TempDir(), "logs")
+	require.NoError(t, os.MkdirAll(customLogDir, 0o755), "create custom log directory")
+
+	// Apply the logging path override and wait for the agent to pick it up.
+	err = applyLoggingFilePathPolicy(ctx, info, policyResp.AgentPolicy, customLogDir)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		inspectOutput, inspectErr := f.ExecInspect(ctx, withEnv(env))
+		return inspectErr == nil &&
+			!inspectOutput.Agent.Logging.ToStderr &&
+			inspectOutput.Agent.Logging.ToFiles &&
+			inspectOutput.Agent.Logging.Files.Path == customLogDir
+	}, 2*time.Minute, time.Second, "elastic-agent did not apply the policy change")
+
+	// The agent must create at least one log file in the new directory.
+	requireLogFileInDir(t, customLogDir, "logs in custom log directory")
+}
+
+func applyLoggingFilePathPolicy(ctx context.Context, info *define.Info, policy kibana.AgentPolicy, logPath string) error {
+	req := kibana.AgentPolicyUpdateRequest{
+		Name:      policy.Name,
+		Namespace: policy.Namespace,
+		Overrides: map[string]any{
+			"agent": map[string]any{
+				"logging": map[string]any{
+					"to_stderr": false,
+					"to_files":  true,
+					"files": map[string]any{
+						"path": logPath,
+					},
+				},
+			},
+		},
+	}
+	_, err := info.KibanaClient.UpdatePolicy(ctx, policy.ID, req)
+	return err
 }

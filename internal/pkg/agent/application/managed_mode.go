@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
+	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
@@ -38,9 +39,17 @@ import (
 // dispatchFlushInterval is the max time between calls to dispatcher.Dispatch
 const dispatchFlushInterval = time.Minute * 5
 
+// restartAcker is the subset of the fleet acker used to synchronously
+// acknowledge a completed restart. It is kept separate from the lazy/buffered
+// acker so a nil error is a genuine confirmation that Fleet received the ack.
+type restartAcker interface {
+	Ack(ctx context.Context, action fleetapi.Action) error
+}
+
 type managedConfigManager struct {
 	log                      *logger.Logger
 	agentInfo                info.Agent
+	startupCfg               *configuration.Configuration
 	cfg                      *configuration.Configuration
 	client                   *remote.Client
 	store                    storage.Store
@@ -52,6 +61,7 @@ type managedConfigManager struct {
 	fleetInitTimeout         time.Duration
 	initialClientSetters     []actions.ClientSetter
 	fleetAcker               *fleet.Acker
+	restartAcker             restartAcker
 	actionAcker              acker.Acker
 	retrier                  *retrier.Retrier
 	availableRollbacksSource ttl.ReadOnlySource
@@ -60,7 +70,7 @@ type managedConfigManager struct {
 	errCh chan error
 }
 
-func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo info.Agent, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
+func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCfg, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
@@ -69,6 +79,7 @@ func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo 
 	return &managedConfigManager{
 		log:                      log,
 		agentInfo:                agentInfo,
+		startupCfg:               startupCfg,
 		cfg:                      cfg,
 		client:                   client,
 		store:                    storeSaver,
@@ -81,6 +92,7 @@ func newManagedConfigManager(ctx context.Context, log *logger.Logger, agentInfo 
 		errCh:                    make(chan error),
 		initialClientSetters:     clientSetters,
 		fleetAcker:               fleetAcker,
+		restartAcker:             fleetAcker,
 		actionAcker:              actionAcker,
 		retrier:                  retrier,
 		availableRollbacksSource: source,
@@ -116,6 +128,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		m.log.Warnf("Failed to ack upgrade: %v", err)
 	}
 
+	// Acknowledge a completed restart, if one was pending. This runs in the
+	// background and retries until Fleet confirms receipt or the action
+	// expires; the action stays persisted until then so it survives further
+	// restarts.
+	m.ackPendingRestart(ctx)
+
 	// Run the retrier.
 	retrierRun := make(chan bool)
 	retrierCtx, retrierCancel := context.WithCancel(ctx)
@@ -148,7 +166,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
 		} else {
-			err := m.initFleetServer(ctx, m.cfg.Fleet.Server)
+			err := m.initFleetServer(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to initialize Fleet Server: %w", err)
 			}
@@ -222,6 +240,94 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	return gatewayRunner.Err()
 }
 
+const (
+	restartAckBackoffInit = 1 * time.Second
+	restartAckBackoffMax  = 1 * time.Minute
+)
+
+// ackPendingRestart acknowledges a restart action that was persisted before the
+// agent re-executed. Unlike the upgrade ack, we cannot rely on a single
+// (possibly buffered) ack being delivered: the action remains persisted until
+// Fleet actually confirms receipt, so it is retried on every startup as well as
+// in-session via the background loop started here. If the action has expired,
+// Fleet has already inferred the failure, so we simply discard it.
+func (m *managedConfigManager) ackPendingRestart(ctx context.Context) {
+	action := m.stateStore.PendingAckAction()
+	if action == nil {
+		return
+	}
+
+	if m.restartActionExpired(action, time.Now()) {
+		m.log.Warnf("restart action %q expired or has an invalid expiration before it could be acknowledged; discarding", action.ID())
+		m.clearPendingRestart()
+		return
+	}
+
+	m.log.Infof("acknowledging completed restart action %q", action.ID())
+	go m.retryAckPendingRestart(ctx, action)
+}
+
+// retryAckPendingRestart synchronously acks the action against Fleet, retrying
+// with exponential backoff until it succeeds, the action expires, or the
+// context is cancelled. On success or expiration the persisted action is
+// cleared; on cancellation it is left in place to be retried on the next
+// startup.
+func (m *managedConfigManager) retryAckPendingRestart(ctx context.Context, action fleetapi.Action) {
+	bo := backoff.NewExpBackoff(ctx.Done(), restartAckBackoffInit, restartAckBackoffMax)
+	for {
+		// Use the fleet acker directly (not the lazy/buffered acker) so a nil
+		// error is a genuine confirmation that Fleet received the ack.
+		err := m.restartAcker.Ack(ctx, action)
+		if err == nil {
+			m.log.Infof("restart action %q acknowledged", action.ID())
+			m.clearPendingRestart()
+			return
+		}
+
+		if m.restartActionExpired(action, time.Now()) {
+			m.log.Warnf("restart action %q expired or has an invalid expiration before its ack could be delivered; discarding", action.ID())
+			m.clearPendingRestart()
+			return
+		}
+
+		m.log.Warnf("failed to ack restart action %q, will retry: %v", action.ID(), err)
+		if !bo.Wait() {
+			// Context cancelled; leave the action persisted for the next startup.
+			return
+		}
+	}
+}
+
+// restartActionExpired reports whether a persisted restart action should be
+// discarded instead of acknowledged: either its expiration is in the past, or
+// it carries a malformed expiration. A malformed expiration is treated as
+// expired so an invalid action is discarded rather than retried indefinitely.
+func (m *managedConfigManager) restartActionExpired(action fleetapi.Action, now time.Time) bool {
+	sa, ok := action.(fleetapi.ScheduledAction)
+	if !ok {
+		return false
+	}
+	exp, err := sa.Expiration()
+	if errors.Is(err, fleetapi.ErrNoExpiration) {
+		// No expiration set; the action never expires.
+		return false
+	}
+	if err != nil {
+		// Malformed expiration; treat as expired so the invalid action is
+		// discarded rather than persisted and retried forever.
+		return true
+	}
+	return now.After(exp)
+}
+
+// clearPendingRestart removes the persisted pending-ack restart action.
+func (m *managedConfigManager) clearPendingRestart() {
+	m.stateStore.ClearPendingAckAction()
+	if err := m.stateStore.Save(); err != nil {
+		m.log.Warnf("failed to clear pending restart action from state store: %v", err)
+	}
+}
+
 // runDispatcher passes actions collected from gateway to dispatcher or calls Dispatch with no actions every flushInterval.
 func runDispatcher(ctx context.Context, actionDispatcher dispatcher.Dispatcher, fleetGateway coordinator.FleetGateway, detailsSetter details.Observer, actionAcker acker.Acker, flushInterval time.Duration) {
 	t := time.NewTimer(flushInterval)
@@ -258,7 +364,7 @@ func (m *managedConfigManager) wasUnenrolled() bool {
 		m.stateStore.Action().Type() == fleetapi.ActionTypeUnenroll
 }
 
-func (m *managedConfigManager) initFleetServer(ctx context.Context, cfg *configuration.FleetServerConfig) error {
+func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
 	if m.fleetInitTimeout == 0 {
 		m.fleetInitTimeout = 30 * time.Second
 	}
@@ -323,6 +429,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	policyChanger := handlers.NewPolicyChangeHandler(
 		m.log,
 		m.agentInfo,
+		m.startupCfg,
 		m.cfg,
 		m.store,
 		m.stateStore,
@@ -393,6 +500,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionPrivilegeLevelChange{},
 		handlers.NewPrivilegeLevelChange(m.log, m.coord, m.ch),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionRestart{},
+		handlers.NewRestart(m.log, m.coord, m.stateStore),
 	)
 
 	m.dispatcher.MustRegister(
