@@ -179,11 +179,11 @@ common:
   # key to hold the list of OpenShift versions to test against
   - openshift_test:
     versions: &openshift_test_versions
-      - &openshift_min_test_version v4.20.0
-      - v4.21.0
-      - &openshift_max_test_version v4.22.0
+      - &openshift_min_test_version v1.33.0 # OpenShift 4.20
+      - v1.34.0                             # OpenShift 4.21
+      - &openshift_max_test_version v1.35.0 # OpenShift 4.22
     versions_without_min_max: &openshift_test_versions_without_min_max
-      - v4.21.0
+      - v1.34.0
     all_variants: &openshift_test_all_variants
       - basic
       - complete
@@ -206,7 +206,7 @@ common:
       - slim
       - slim-wolfi
     env: &openshift_test_env
-      OPENSHIFT_VERSION: "{{matrix.version}}"
+      K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
       TARGET_ARCH: "amd64"
       K8S_PROVISIONER: "microshift"
@@ -216,9 +216,6 @@ common:
       image: "${IMAGE_UBUNTU_2404_X86_64}"
       diskSizeGb: 80
     command: &openshift_test_command |
-      source .buildkite/scripts/k8s-utils.sh
-      K8S_VERSION="$$(openshift_to_k8s_version "$${OPENSHIFT_VERSION}")"
-      export K8S_VERSION
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
     artifact_paths: &openshift_test_artifact_paths
