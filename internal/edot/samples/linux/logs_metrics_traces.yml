@@ -95,6 +95,19 @@ exporters:
     api_key: ${env:ELASTIC_API_KEY}
     mapping:
       mode: otel
+  # OTLP/HTTP exporter sending metrics to Elasticsearch's native OTLP endpoint.
+  # Elasticsearch exposes OTLP over HTTP only (no gRPC) at <es_endpoint>/_otlp.
+  # The exporter appends the signal path (/v1/metrics) to the configured endpoint.
+  otlp_http/ingest_metrics:
+    endpoint: ${env:ELASTIC_ENDPOINT}/_otlp
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+    timeout: 15s
 
 service:
   extensions: [file_storage]
@@ -107,17 +120,17 @@ service:
     metrics/fromsdk:
       receivers: [otlp/fromsdk]
       processors: []
-      exporters: [elasticsearch/otel]
+      exporters: [otlp_http/ingest_metrics]
 
     metrics/hostmetrics:
       receivers: [hostmetrics/system]
       processors: [resourcedetection]
-      exporters: [elasticsearch/otel]
+      exporters: [otlp_http/ingest_metrics]
 
     metrics/aggregated-metrics:
       receivers: [elasticapm]
       processors: []
-      exporters: [elasticsearch/otel]
+      exporters: [otlp_http/ingest_metrics]
 
     logs/fromsdk:
       receivers: [otlp/fromsdk]
