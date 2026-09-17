@@ -174,8 +174,7 @@ func diagnosticComponentIDsFromName(name string, components []component.Componen
 	return componentIDs
 }
 
-// streamIDForComponent returns the receiver-name suffix after compID. The
-// single_receiver placeholder is not a policy stream.
+// streamIDForComponent returns the receiver-name suffix after the component ID.
 func streamIDForComponent(name, compID string) string {
 	_, suffix, found := strings.Cut(name, "/"+translate.OtelNamePrefix)
 	if !found || suffix == "" || suffix == compID {
@@ -185,14 +184,14 @@ func streamIDForComponent(name, compID string) string {
 }
 
 // streamPrefixedDiagnostic returns a copy of res whose Filename is prefixed
-// with streamID
+// with streamID. Empty IDs and the single_receiver placeholder are left
+// unprefixed so files stay at components/<compID>/. A policy stream whose ID
+// is also "single" would skip the subdir the same way.
 func streamPrefixedDiagnostic(res *proto.ActionDiagnosticUnitResult, streamID string) *proto.ActionDiagnosticUnitResult {
-	if res == nil || streamID == "" {
+	if res == nil || streamID == "" || streamID == translate.SingleReceiverStreamID {
 		return res
 	}
-	if streamID == translate.singleReceiverStreamID {
-		return nil
-	}
+
 	return &proto.ActionDiagnosticUnitResult{
 		Name:        res.GetName(),
 		Filename:    strings.ReplaceAll(streamID, "/", "-") + "/" + res.GetFilename(),

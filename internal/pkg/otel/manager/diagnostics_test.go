@@ -437,7 +437,7 @@ func TestBeatMetricsMultipleStreamsSameComponent(t *testing.T) {
 }
 
 // TestBeatMetricsSingleReceiver verifies that a single_receiver component
-// (osquerybeat) does not include diagnostics named with the placeholder stream ID.
+// (osquerybeat) keeps diagnostics at the component directory, without a stream subfolder.
 func TestBeatMetricsSingleReceiver(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("Skip test on Windows.",
@@ -453,7 +453,7 @@ func TestBeatMetricsSingleReceiver(t *testing.T) {
 	osqueryComp.InputSpec.Spec.Command.Args = []string{"osquerybeat"}
 	osqueryComp.InputSpec.Spec.SingleReceiver = true
 
-	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("osquerybeatreceiver"), osqueryComp.ID+"/"+singleReceiverStreamID).String()
+	receiverName := translate.GetReceiverID(otelcomponent.MustNewType("osquerybeatreceiver"), osqueryComp.ID+"/"+translate.SingleReceiverStreamID).String()
 
 	metricData, err := json.MarshalIndent(map[string]any{"test": "test"}, "", "  ")
 	require.NoError(t, err)
@@ -480,7 +480,13 @@ func TestBeatMetricsSingleReceiver(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, called)
 	require.Len(t, diags, 1)
-	assert.Empty(t, diags[0].Results)
+	require.Len(t, diags[0].Results, 2)
+
+	filenames := make([]string, 0, len(diags[0].Results))
+	for _, r := range diags[0].Results {
+		filenames = append(filenames, r.Filename)
+	}
+	assert.ElementsMatch(t, []string{"beat_metrics.json", "input_metrics.json"}, filenames)
 }
 
 func TestStreamPrefixedDiagnostic(t *testing.T) {
@@ -510,10 +516,10 @@ func TestStreamPrefixedDiagnostic(t *testing.T) {
 		assert.Equal(t, "system-cpu/beat_metrics.json", got.Filename)
 	})
 
-	t.Run("single_receiver placeholder is omitted", func(t *testing.T) {
-		got := streamPrefixedDiagnostic(res, singleReceiverStreamID)
-		assert.Nil(t, got)
-		assert.Equal(t, "beat_metrics.json", res.Filename)
+	t.Run("single_receiver placeholder is not prefixed", func(t *testing.T) {
+		got := streamPrefixedDiagnostic(res, translate.SingleReceiverStreamID)
+		assert.Same(t, res, got)
+		assert.Equal(t, "beat_metrics.json", got.Filename)
 	})
 }
 
