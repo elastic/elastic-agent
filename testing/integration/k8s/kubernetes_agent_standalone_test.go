@@ -1259,9 +1259,7 @@ func k8sStepCreateNamespace() k8sTestStep {
 
 		t.Cleanup(func() {
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
-			if err != nil {
-				t.Logf("failed to delete namespace: %v", err)
-			}
+			assert.NoError(t, err, "failed to delete namespace")
 		})
 
 		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, k8sNamespace)
@@ -1401,9 +1399,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 			}
 
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, objects...)
-			if err != nil {
-				t.Logf("failed to delete objects: %v", err)
-			}
+			assert.NoError(t, err, "failed to delete objects")
 		})
 
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)

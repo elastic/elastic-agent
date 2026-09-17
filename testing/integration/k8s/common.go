@@ -361,8 +361,8 @@ func k8sDeleteObjects(ctx context.Context, client klient.Client, opts k8sDeleteO
 	}
 
 	if opts.waitTimeout == 0 {
-		// default to 20 seconds
-		opts.waitTimeout = 20 * time.Second
+		// default to 1 minute
+		opts.waitTimeout = 1 * time.Minute
 	}
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, opts.waitTimeout)
