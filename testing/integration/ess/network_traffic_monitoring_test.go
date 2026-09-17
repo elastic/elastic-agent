@@ -128,7 +128,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 
 	t.Logf("starting to query ES for network traffic events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		dialTLS(t, serverName, port)
+		dialTLS(t, ctx, serverName, port)
 
 		query = genESQuery(agentID,
 			[][]string{
@@ -151,13 +151,12 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 
 // dialTLS triggers a TLS handshake to host:port for the packet component to
 // capture. A dial error is fine: the SNI is sent before cert verification.
-func dialTLS(t *testing.T, host, port string) {
-	conn, err := tls.DialWithDialer(
-		&net.Dialer{Timeout: 10 * time.Second},
-		"tcp",
-		net.JoinHostPort(host, port),
-		&tls.Config{ServerName: host},
-	)
+func dialTLS(t *testing.T, ctx context.Context, host, port string) {
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 10 * time.Second},
+		Config:    &tls.Config{ServerName: host},
+	}
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
 	if err != nil {
 		t.Logf("TLS dial to %s:%s returned %v (handshake still captured)", host, port, err)
 		return
@@ -208,8 +207,9 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "packet") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected packet component to be healthy, got %s", cproto.State(comp.State))
+					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
+					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
+						"expected packet component to be healthy, got %s", compStateProto)
 					foundReceiver = true
 					break
 				}

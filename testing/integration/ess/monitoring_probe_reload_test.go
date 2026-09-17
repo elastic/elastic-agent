@@ -107,7 +107,10 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	require.NoError(runner.T(), err)
 
-	_, err = client.Do(req)
+	resp, err := client.Do(req)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	require.Error(runner.T(), err)
 
 	overrideUpdateRequest := kibana.AgentPolicyUpdateRequest{
