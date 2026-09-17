@@ -27,19 +27,22 @@ const (
 	beatsOutputEventsBatchesKey = "beat.stats.libbeat.output.events.batches"
 	beatsOutputWriteBytesKey    = "beat.stats.libbeat.output.write.bytes"
 
-	otelQueueCapacityKey       = "otelcol_exporter_queue_capacity"
-	otelQueueSizeKey           = "otelcol_exporter_queue_size"
-	otelSentLogsKey            = "otelcol_exporter_sent_log_records"
-	otelSentSpansKey           = "otelcol_exporter_sent_spans"
-	otelSentMetricsKey         = "otelcol_exporter_sent_metric_points"
-	otelFailedLogsKey          = "otelcol_exporter_send_failed_log_records"
-	otelFailedSpansKey         = "otelcol_exporter_send_failed_spans"
-	otelFailedMetricsKey       = "otelcol_exporter_send_failed_metric_points"
-	otelDocsProcessedKey       = "otelcol.elasticsearch.docs.processed"
-	otelDocsRetriedKey         = "otelcol.elasticsearch.docs.retried"
-	otelDocsRetriedHTTPRequest = "otelcol.elasticsearch.docs.retried_http_request"
-	otelBulkRequestsKey        = "otelcol.elasticsearch.bulk_requests.count"
-	otelFlushedBytesKey        = "otelcol.elasticsearch.flushed.bytes"
+	otelQueueCapacityKey        = "otelcol_exporter_queue_capacity"
+	otelQueueSizeKey            = "otelcol_exporter_queue_size"
+	otelSentLogsKey             = "otelcol_exporter_sent_log_records"
+	otelSentSpansKey            = "otelcol_exporter_sent_spans"
+	otelSentMetricsKey          = "otelcol_exporter_sent_metric_points"
+	otelFailedLogsKey           = "otelcol_exporter_send_failed_log_records"
+	otelFailedSpansKey          = "otelcol_exporter_send_failed_spans"
+	otelFailedMetricsKey        = "otelcol_exporter_send_failed_metric_points"
+	otelEnqueueFailedLogsKey    = "otelcol_exporter_enqueue_failed_log_records"
+	otelEnqueueFailedSpansKey   = "otelcol_exporter_enqueue_failed_spans"
+	otelEnqueueFailedMetricsKey = "otelcol_exporter_enqueue_failed_metric_points"
+	otelDocsProcessedKey        = "otelcol.elasticsearch.docs.processed"
+	otelDocsRetriedKey          = "otelcol.elasticsearch.docs.retried"
+	otelDocsRetriedHTTPRequest  = "otelcol.elasticsearch.docs.retried_http_request"
+	otelBulkRequestsKey         = "otelcol.elasticsearch.bulk_requests.count"
+	otelFlushedBytesKey         = "otelcol.elasticsearch.flushed.bytes"
 
 	otelComponentIDKey   = "otelcol.component.id"
 	otelComponentKindKey = "otelcol.component.kind"
@@ -64,19 +67,22 @@ const (
 // themselves; retried docs are reported under two source names that feed the
 // same counter.
 var exporterMetricNames = map[string]string{
-	otelQueueSizeKey:           otelQueueSizeKey,
-	otelQueueCapacityKey:       otelQueueCapacityKey,
-	otelSentLogsKey:            otelSentLogsKey,
-	otelSentSpansKey:           otelSentSpansKey,
-	otelSentMetricsKey:         otelSentMetricsKey,
-	otelFailedLogsKey:          otelFailedLogsKey,
-	otelFailedSpansKey:         otelFailedSpansKey,
-	otelFailedMetricsKey:       otelFailedMetricsKey,
-	otelDocsProcessedKey:       otelDocsProcessedKey,
-	otelDocsRetriedKey:         otelDocsRetriedKey,
-	otelDocsRetriedHTTPRequest: otelDocsRetriedKey,
-	otelBulkRequestsKey:        otelBulkRequestsKey,
-	otelFlushedBytesKey:        otelFlushedBytesKey,
+	otelQueueSizeKey:            otelQueueSizeKey,
+	otelQueueCapacityKey:        otelQueueCapacityKey,
+	otelSentLogsKey:             otelSentLogsKey,
+	otelSentSpansKey:            otelSentSpansKey,
+	otelSentMetricsKey:          otelSentMetricsKey,
+	otelFailedLogsKey:           otelFailedLogsKey,
+	otelFailedSpansKey:          otelFailedSpansKey,
+	otelFailedMetricsKey:        otelFailedMetricsKey,
+	otelEnqueueFailedLogsKey:    otelEnqueueFailedLogsKey,
+	otelEnqueueFailedSpansKey:   otelEnqueueFailedSpansKey,
+	otelEnqueueFailedMetricsKey: otelEnqueueFailedMetricsKey,
+	otelDocsProcessedKey:        otelDocsProcessedKey,
+	otelDocsRetriedKey:          otelDocsRetriedKey,
+	otelDocsRetriedHTTPRequest:  otelDocsRetriedKey,
+	otelBulkRequestsKey:         otelBulkRequestsKey,
+	otelFlushedBytesKey:         otelFlushedBytesKey,
 }
 
 // exporterMetrics accumulates raw values for a single exporter, keyed by
@@ -319,12 +325,16 @@ func appendExporterMetrics(sm pmetric.ScopeMetrics, em *exporterMetrics) {
 	sentTotal := em.values[otelSentLogsKey] + em.values[otelSentSpansKey] + em.values[otelSentMetricsKey]
 	appendSum(beatsOutputEventsAckedKey, sentTotal)
 
-	failedTotal := em.values[otelFailedLogsKey] + em.values[otelFailedSpansKey] + em.values[otelFailedMetricsKey]
-	appendSum(beatsOutputEventsDroppedKey, failedTotal)
+	// Enqueue failures never reach the bulk indexer and are not counted in
+	// docs.processed. Keep them separate from send failures when deriving active.
+	sendFailedTotal := em.values[otelFailedLogsKey] + em.values[otelFailedSpansKey] + em.values[otelFailedMetricsKey]
+	enqueueFailedTotal := em.values[otelEnqueueFailedLogsKey] + em.values[otelEnqueueFailedSpansKey] + em.values[otelEnqueueFailedMetricsKey]
+	appendSum(beatsOutputEventsDroppedKey, sendFailedTotal+enqueueFailedTotal)
 
 	if docsProcessed, ok := em.values[otelDocsProcessedKey]; ok {
-		appendSum(beatsOutputEventsTotalKey, docsProcessed)
-		appendGauge(beatsOutputEventsActiveKey, docsProcessed-sentTotal-failedTotal)
+		// Include queue rejections so total = acked + dropped + active.
+		appendSum(beatsOutputEventsTotalKey, docsProcessed+enqueueFailedTotal)
+		appendGauge(beatsOutputEventsActiveKey, docsProcessed-sentTotal-sendFailedTotal)
 	}
 	if docsRetried, ok := em.values[otelDocsRetriedKey]; ok {
 		appendSum(beatsOutputEventsFailedKey, docsRetried)
