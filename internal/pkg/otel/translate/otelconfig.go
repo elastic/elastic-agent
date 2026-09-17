@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -480,6 +481,12 @@ func getReceiversConfigForComponent(
 		},
 	}
 
+	// OTel Beat receivers never see CLI flags, so pass ELASTIC_AGENT_HOSTNAME via the
+	// native Beat hostname config key for the receiver's own identity initialisation.
+	if hostname := util.HostnameOverride(); hostname != "" {
+		sharedConfig["hostname"] = hostname
+	}
+
 	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
 	// creating one receiver per stream. Some components have shared state that cannot
 	// easily be split across receivers. The receiver still gets a placeholder stream ID
@@ -611,7 +618,8 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	exporterCfg map[string]any,
 	queueCfg map[string]any,
 	extensionCfg map[string]any,
-	processors map[string]any, err error) {
+	processors map[string]any, err error,
+) {
 	outputUnit, ok := comp.OutputUnit()
 	if !ok {
 		return nil, nil, nil, nil, nil
@@ -667,7 +675,8 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	exportersCfg map[string]any,
 	queueSettings map[string]any,
 	extensionCfg map[string]any,
-	processorCfg map[string]any, err error) {
+	processorCfg map[string]any, err error,
+) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
@@ -960,6 +969,28 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 		result[0] = resultStream
 		break
 	}
+
+	// Mirror osquerybeatCfgFromStreams: propagate unit-level namespace to each stream's
+	// data_stream.namespace when not already set.
+	ns := unit.Config.GetDataStream().GetNamespace()
+	if ns == "" {
+		ns = "default"
+	}
+	for i, ri := range result {
+		ds, ok := ri.config["data_stream"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasNS := ds["namespace"]; hasNS {
+			continue
+		}
+		cloned := maps.Clone(ri.config)
+		clonedDS := maps.Clone(ds)
+		clonedDS["namespace"] = ns
+		cloned["data_stream"] = clonedDS
+		result[i].config = cloned
+	}
+
 	return result
 }
 

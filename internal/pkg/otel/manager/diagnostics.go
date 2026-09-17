@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
@@ -122,26 +123,49 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		return diagnostics, nil
 	}
 
-	// See translate.ComponentIDFromReceiverName for the receiver-name format and
-	// the "/"-in-ID ambiguity this warning flags. A proper fix requires escaping
-	// "/" in IDs at the source in the beat receiver.
 	diagIdxByCompID := make(map[string]int)
 	for idx, diag := range diagnostics {
-		if strings.Contains(diag.Component.ID, "/") {
-			m.managerLogger.Warnf("component ID %q contains '/', its EDOT diagnostics will be missing from the archive", diag.Component.ID)
-		}
 		diagIdxByCompID[diag.Component.ID] = idx
 	}
 	for _, extDiag := range extDiagnostics.ComponentDiagnostics {
-		compID, ok := translate.ComponentIDFromReceiverName(extDiag.Name)
-		if !ok {
-			m.managerLogger.Debugf("skipping EDOT diagnostic %q: diagnostic name does not contain expected prefix %q", extDiag.Name, translate.OtelNamePrefix)
+		componentIDs := diagnosticComponentIDsFromName(extDiag.Name, currentComponents)
+		if len(componentIDs) == 0 {
+			m.managerLogger.Debugf("skipping EDOT diagnostic for %q: it cannot be associated with an active component", extDiag.Name)
 			continue
 		}
-		if idx, ok := diagIdxByCompID[compID]; ok {
-			diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+		if len(componentIDs) > 1 {
+			m.managerLogger.Warnf("EDOT diagnostic %q is associated with multiple components %q; preserving it for each component", extDiag.Name, componentIDs)
+		}
+		for _, compID := range componentIDs {
+			if idx, ok := diagIdxByCompID[compID]; ok {
+				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+			}
 		}
 	}
 
 	return diagnostics, nil
+}
+
+// diagnosticComponentIDsFromName matches the receiver type and treats component
+// IDs as opaque candidates, without attempting to split out a stream ID. More
+// than one same-type match is retained so diagnostics remain lossless when
+// component and stream IDs make the flattened receiver name ambiguous.
+func diagnosticComponentIDsFromName(name string, components []component.Component) []string {
+	receiverType, suffix, found := strings.Cut(name, "/"+translate.OtelNamePrefix)
+	if !found {
+		return nil
+	}
+
+	componentIDs := make([]string, 0, 1)
+	for _, comp := range components {
+		beatName := comp.BeatName()
+		if beatName == "" || receiverType != beatName+"receiver" {
+			continue
+		}
+		if suffix == comp.ID || strings.HasPrefix(suffix, comp.ID+"/") {
+			componentIDs = append(componentIDs, comp.ID)
+		}
+	}
+	slices.Sort(componentIDs)
+	return componentIDs
 }
