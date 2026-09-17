@@ -5,9 +5,7 @@ entries:
       description: Components containing `/` in id or stream-id has been skipped from diagnostics
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16662
-        - https://github.com/elastic/elastic-agent/pull/16693
-        - https://github.com/elastic/elastic-agent/pull/16695
+        - https://github.com/elastic/elastic-agent/pull/16635
       issue: []
       impact: ""
       action: ""
@@ -20,9 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16662
-        - https://github.com/elastic/elastic-agent/pull/16693
-        - https://github.com/elastic/elastic-agent/pull/16695
+        - https://github.com/elastic/elastic-agent/pull/16479
       issue:
         - https://github.com/elastic/elastic-agent/issues/16470
       impact: ""
@@ -49,9 +45,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16662
-        - https://github.com/elastic/elastic-agent/pull/16693
-        - https://github.com/elastic/elastic-agent/pull/16695
+        - https://github.com/elastic/elastic-agent/pull/16504
       issue:
         - https://github.com/elastic/elastic-agent/issues/16226
       impact: ""
@@ -65,9 +59,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/16662
-        - https://github.com/elastic/elastic-agent/pull/16693
-        - https://github.com/elastic/elastic-agent/pull/16695
+        - https://github.com/elastic/elastic-agent/pull/16575
       issue: []
       impact: ""
       action: ""
