@@ -10,18 +10,23 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
 
+const (
+	// KubernetesDistro is the distro name for vanilla Kubernetes clusters.
+	KubernetesDistro = "kubernetes"
+)
+
 // ErrUnknownDockerVariant is the error returned when the variant is unknown.
 var ErrUnknownDockerVariant = errors.New("unknown docker variant type")
 
 // arches defines the list of supported architectures of Kubernetes
 var arches = []string{define.AMD64, define.ARM64}
 
-// versions defines the list of supported version of Kubernetes.
-var versions = []define.OS{
+// kubernetesVersions defines the list of supported versions of Kubernetes.
+var kubernetesVersions = []define.OS{
 	// Kubernetes 1.36
 	{
 		Type:    define.Kubernetes,
-		Version: "1.36.0",
+		Version: "1.36.1",
 	},
 	// Kubernetes 1.35
 	{
@@ -51,17 +56,17 @@ var versions = []define.OS{
 	// Kubernetes 1.30
 	{
 		Type:    define.Kubernetes,
-		Version: "1.30.2",
+		Version: "1.30.0",
 	},
 	// Kubernetes 1.29
 	{
 		Type:    define.Kubernetes,
-		Version: "1.29.4",
+		Version: "1.29.14",
 	},
 	// Kubernetes 1.28
 	{
 		Type:    define.Kubernetes,
-		Version: "1.28.9",
+		Version: "1.28.15",
 	},
 	// Kubernetes 1.27
 	{
@@ -122,12 +127,13 @@ var variants = []struct {
 
 // GetSupported returns the list of supported OS types for Kubernetes.
 func GetSupported() []define.OS {
-	supported := make([]define.OS, 0, len(versions)*len(variants)*2)
+	supported := make([]define.OS, 0, len(kubernetesVersions)*len(variants)*len(arches))
 	for _, a := range arches {
-		for _, v := range versions {
+		for _, v := range kubernetesVersions {
 			for _, variant := range variants {
 				c := v
 				c.Arch = a
+				c.Distro = KubernetesDistro
 				c.DockerVariant = variant.Name
 				supported = append(supported, c)
 			}
@@ -136,8 +142,8 @@ func GetSupported() []define.OS {
 	return supported
 }
 
-// VariantToImage returns the image name from the variant.
-func VariantToImage(variant string) (string, error) {
+// variantRepository returns the untagged image repository for the variant.
+func variantRepository(variant string) (string, error) {
 	for _, v := range variants {
 		if v.Name == variant {
 			return v.Image, nil

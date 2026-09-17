@@ -8,11 +8,12 @@ package docker
 
 import (
 	"context"
-	"net"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/network"
 	dockerclient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,11 +25,16 @@ import (
 // the test if Docker is unavailable.
 func newTestProvisioner(t *testing.T) *provisioner {
 	t.Helper()
-	p := &provisioner{logger: &tLogger{t}}
+	ip, err := NewProvisioner()
+	if err != nil {
+		t.Skipf("docker not available: %s", err)
+	}
+	p := ip.(*provisioner)
+	p.logger = &tLogger{t}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := p.checkDocker(ctx); err != nil {
-		t.Skipf("docker not available: %s", err)
+	if _, err := p.client.ServerVersion(ctx, dockerclient.ServerVersionOptions{}); err != nil {
+		t.Skipf("docker daemon not reachable: %s", err)
 	}
 	return p
 }
@@ -96,20 +102,31 @@ func startAlpineLabeled(t *testing.T, p *provisioner, name string) {
 	})
 }
 
-func TestCheckDocker(t *testing.T) {
-	p := newTestProvisioner(t) // skips if docker unavailable
-	assert.NotNil(t, p.client)
-}
-
-func TestContainerIP(t *testing.T) {
+func TestContainerSSHPort(t *testing.T) {
 	p := newTestProvisioner(t)
 	name := containerName(t.Name())
-	startAlpine(t, p, name)
-
-	ip, err := p.containerIP(context.Background(), name)
+	pullImage(t, p, "alpine")
+	ctx := context.Background()
+	resp, err := p.client.ContainerCreate(ctx, dockerclient.ContainerCreateOptions{
+		Config: &container.Config{Image: "alpine", Cmd: []string{"sleep", "60"}},
+		HostConfig: &container.HostConfig{
+			PortBindings: network.PortMap{
+				network.MustParsePort("22/tcp"): []network.PortBinding{{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: ""}},
+			},
+		},
+		Name: name,
+	})
 	require.NoError(t, err)
-	assert.NotEmpty(t, ip)
-	assert.NotNil(t, net.ParseIP(ip), "expected a valid IP address, got %q", ip)
+	_, err = p.client.ContainerStart(ctx, resp.ID, dockerclient.ContainerStartOptions{})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = p.client.ContainerRemove(context.Background(), name,
+			dockerclient.ContainerRemoveOptions{Force: true, RemoveVolumes: true})
+	})
+
+	port, err := p.containerSSHPort(context.Background(), name)
+	require.NoError(t, err)
+	assert.Greater(t, port, 0)
 }
 
 func TestClean(t *testing.T) {

@@ -1774,7 +1774,7 @@ func (aso *AgentStatusOutput) IsZero() bool {
 type AgentInspectOutput struct {
 	Agent struct {
 		Download struct {
-			SourceURI string `yaml:"sourceURI"`
+			Sources []string `yaml:"sources"`
 		} `yaml:"download"`
 		Features interface{} `yaml:"features"`
 		Headers  interface{} `yaml:"headers"`
