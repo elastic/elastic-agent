@@ -593,6 +593,15 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
+  - id: system-metrics
+    type: system/metrics
+    use_output: default
+    streams:
+      - id: system/metrics-system.cpu
+        metricsets:
+          - cpu
+        period: 1s
+        data_stream.dataset: system.cpu
 agent.grpc:
     port: 6790
 outputs:
@@ -602,6 +611,7 @@ outputs:
     api_key: placeholder
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.metricbeat.system/metrics: otel
 `
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -654,6 +664,8 @@ agent.internal.runtime.filebeat.filestream: otel
 	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
 	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
 	// at the component level and land under the component directory, same as for process-runtime beats.
+	// The system/metrics component and stream IDs contain "/", exercising association using the
+	// complete component ID before the archive path is normalized to "system-metrics-default".
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
 		"edot/environment.yaml",
@@ -666,13 +678,18 @@ agent.internal.runtime.filebeat.filestream: otel
 		"components/filestream-default/registry.tar.gz",
 		"components/filestream-default/beat_metrics.json",
 		"components/filestream-default/input_metrics.json",
+		"components/system-metrics-default/beat_metrics.json",
+		"components/system-metrics-default/input_metrics.json",
+		"logs/elastic-agent-*/elastic-agent-*.ndjson",
 	}
 
 	for _, f := range expectedFiles {
-		path := filepath.Join(extractionDir, f)
-		stat, err := os.Stat(path)
-		require.NoErrorf(t, err, "stat file %q failed", path)
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		matches, err := filepath.Glob(filepath.Join(extractionDir, f))
+		require.NoErrorf(t, err, "glob %q failed", f)
+		require.NotEmptyf(t, matches, "no file matching %q", f)
+		stat, err := os.Stat(matches[0])
+		require.NoErrorf(t, err, "stat file %q failed", matches[0])
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
 }
