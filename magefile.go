@@ -2102,7 +2102,14 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
 
 	data := map[string]interface{}{
-		"MajorMinor": majorMinor(cfg),
+		"MajorMinor":        majorMinor(cfg),
+		"base_registry":     "registry1.dsop.io",
+		"base_image":        "redhat/ubi/ubi10",
+		"base_tag":          "10.2",
+		"license_source":    "LICENSE",
+		"tinit_source":      "tinit",
+		"jq_source":         "jq",
+		"entrypoint_source": "config/docker-entrypoint",
 	}
 
 	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {

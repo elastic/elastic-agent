@@ -2,12 +2,13 @@
 # Build stage 0
 # Extract Elastic Agent and make various file manipulations.
 ################################################################################
-ARG BASE_REGISTRY=registry1.dsop.io
-ARG BASE_IMAGE=redhat/ubi/ubi10
-ARG BASE_TAG=10.2
+ARG BASE_REGISTRY={{ .base_registry }}
+ARG BASE_IMAGE={{ .base_image }}
+ARG BASE_TAG={{ .base_tag }}
 
-FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} as prep_files
+FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} AS prep_files
 
+{{- if contains .base_registry "dsop.io" }}
 ARG ELASTIC_STACK={{ agent_package_version }}
 ARG ELASTIC_PRODUCT=elastic-agent
 ARG OS_AND_ARCH=linux-x86_64
@@ -17,6 +18,13 @@ WORKDIR /usr/share/${ELASTIC_PRODUCT}
 COPY --chown=1000:0 ${ELASTIC_PRODUCT}-${ELASTIC_STACK}-${OS_AND_ARCH}.tar.gz  .
 RUN tar --strip-components=1 -zxf ${ELASTIC_PRODUCT}-${ELASTIC_STACK}-${OS_AND_ARCH}.tar.gz \
   && rm  ${ELASTIC_PRODUCT}-${ELASTIC_STACK}-${OS_AND_ARCH}.tar.gz
+{{- else }}
+ARG ELASTIC_PRODUCT=elastic-agent
+
+RUN mkdir /usr/share/${ELASTIC_PRODUCT}
+WORKDIR /usr/share/${ELASTIC_PRODUCT}
+COPY --chown=1000:0 beat .
+{{- end }}
 
 # Support arbitrary user ids
 # Ensure that group permissions are the same as user permissions.
@@ -41,10 +49,12 @@ FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG}
 
 ARG ELASTIC_PRODUCT=elastic-agent
 
-COPY LICENSE /licenses/elastic-${ELASTIC_PRODUCT}
+COPY {{ .license_source }} /licenses/elastic-${ELASTIC_PRODUCT}
 
 # Add a dumb init process
-COPY tinit /tinit
+# Keep these resources synchronized with hardening_manifest.yaml.tmpl.
+ADD {{ .tinit_source }} /tinit
+RUN echo '93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c  /tinit' | sha256sum -c -
 RUN chmod +x /tinit
 # Help with supporting the override in the ECK entrypoint
 # https://github.com/elastic/cloud-on-k8s/blob/272fd0f2b344b1f86f04decb561eceab8a5a3254/pkg/controller/agent/pod.go#L455
@@ -93,10 +103,11 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
     find /usr/share/elastic-agent/data/elastic-agent-*/components -name "*.yml" -type f -exec chmod 0644 {} \; && \
     chmod +x /usr/share/elastic-agent/data/elastic-agent-*/elastic-agent
 
-COPY jq /usr/local/bin
+ADD {{ .jq_source }} /usr/local/bin/jq
+RUN echo 'af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44  /usr/local/bin/jq' | sha256sum -c -
 RUN chown root:root /usr/local/bin/jq && chmod 0755 /usr/local/bin/jq
 
-COPY config/docker-entrypoint /usr/local/bin/docker-entrypoint
+COPY {{ .entrypoint_source }} /usr/local/bin/docker-entrypoint
 RUN chmod 755 /usr/local/bin/docker-entrypoint
 
 USER ${ELASTIC_PRODUCT}
