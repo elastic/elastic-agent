@@ -732,6 +732,16 @@ Notes:
   `/var/lib/containerd` are backed by volumes (removed with the container via
   `docker rm -fv`) because the nested daemon's overlay storage cannot stack on the
   container's own overlay rootfs.
+- **Known limitation — kernel audit tests (`TestAuditdCorrectBinaries`):** The Linux
+  kernel audit subsystem (`NETLINK_AUDIT`) restricts control operations such as
+  `AUDIT_GET` and `AUDIT_ADD_RULE` to processes running in the **initial PID namespace**.
+  Docker containers always run in their own PID namespace; even a fully `--privileged`
+  container cannot access the audit subsystem. Running with `--pid=host` would grant
+  access but is incompatible with the container design (systemd must be PID 1).
+  `TestAuditdCorrectBinaries` therefore cannot pass with the Docker instance provisioner
+  and must be run against a real VM (e.g. `INSTANCE_PROVISIONER=multipass`), a cloud
+  environment, or locally as root via `mage integration:local` (which runs directly on
+  the host in the initial PID namespace).
 
 ## Troubleshooting Tips
 
