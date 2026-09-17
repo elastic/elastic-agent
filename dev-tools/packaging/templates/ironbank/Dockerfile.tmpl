@@ -89,6 +89,7 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/pf-host-agent || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/otelcol || true) && \
     (chmod 0755 /usr/share/elastic-agent/otelcol || true) && \
+    find /usr/share/elastic-agent/data/elastic-agent-*/components -name "*.yml" -type f -exec chmod 0644 {} \; && \
     chmod +x /usr/share/elastic-agent/data/elastic-agent-*/elastic-agent
 
 COPY jq /usr/local/bin

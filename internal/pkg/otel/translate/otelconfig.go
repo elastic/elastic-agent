@@ -194,10 +194,15 @@ func getPipelineID(comp *component.Component) (pipeline.ID, error) {
 	return pipeline.NewIDWithName(signal, pipelineName), nil
 }
 
-// getReceiverID returns the receiver id for the given unit and exporter type.
-func getReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
+// GetReceiverID returns the receiver id for the given receiver type and unit ID.
+func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
 	receiverName := fmt.Sprintf("%s%s", OtelNamePrefix, unitID)
 	return otelcomponent.NewIDWithName(receiverType, receiverName)
+}
+
+// getReceiverID is an unexported alias kept for internal callers.
+func getReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
+	return GetReceiverID(receiverType, unitID)
 }
 
 // getExporterID returns the exporter id for the given exporter type and output name.
@@ -282,7 +287,7 @@ func getReceiversConfigForComponent(
 	// we run a single receiver for each component to mirror what beats processes do
 	var inputs []map[string]any
 	for _, unit := range comp.Units {
-		if unit.Type == client.UnitTypeInput {
+		if unit.Type == client.UnitTypeInput && unit.Config != nil {
 			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp.InputType)
 			if err != nil {
 				return nil, err
