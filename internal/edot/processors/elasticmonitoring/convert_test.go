@@ -344,18 +344,21 @@ func TestBuildReceiverPipelineMetrics_NoData(t *testing.T) {
 func TestConvertAllExporterMetrics(t *testing.T) {
 	const exporterID = "elasticsearch/_agent-component/monitoring"
 	const (
-		queueCapacity = int64(1000)
-		queueSize     = int64(500)
-		sentLogs      = int64(1)
-		sentSpans     = int64(2)
-		sentMetrics   = int64(3)
-		failedLogs    = int64(4)
-		failedSpans   = int64(5)
-		failedMetrics = int64(6)
-		docsProcessed = int64(100)
-		docsRetried   = int64(8)
-		bulkRequests  = int64(9)
-		flushedBytes  = int64(10)
+		queueCapacity        = int64(1000)
+		queueSize            = int64(500)
+		sentLogs             = int64(1)
+		sentSpans            = int64(2)
+		sentMetrics          = int64(3)
+		failedLogs           = int64(4)
+		failedSpans          = int64(5)
+		failedMetrics        = int64(6)
+		enqueueFailedLogs    = int64(7)
+		enqueueFailedSpans   = int64(8)
+		enqueueFailedMetrics = int64(9)
+		docsProcessed        = int64(200)
+		docsRetried          = int64(11)
+		bulkRequests         = int64(12)
+		flushedBytes         = int64(13)
 	)
 
 	md, sm := newMetricsWithExporterScope(exporterID)
@@ -367,6 +370,9 @@ func TestConvertAllExporterMetrics(t *testing.T) {
 	appendSumInt(sm, otelFailedLogsKey, failedLogs)
 	appendSumInt(sm, otelFailedSpansKey, failedSpans)
 	appendSumInt(sm, otelFailedMetricsKey, failedMetrics)
+	appendSumInt(sm, otelEnqueueFailedLogsKey, enqueueFailedLogs)
+	appendSumInt(sm, otelEnqueueFailedSpansKey, enqueueFailedSpans)
+	appendSumInt(sm, otelEnqueueFailedMetricsKey, enqueueFailedMetrics)
 	appendSumInt(sm, otelDocsProcessedKey, docsProcessed)
 	appendSumInt(sm, otelDocsRetriedKey, docsRetried)
 	appendSumInt(sm, otelFlushedBytesKey, flushedBytes)
@@ -385,14 +391,48 @@ func TestConvertAllExporterMetrics(t *testing.T) {
 	expectedSent := sentLogs + sentSpans + sentMetrics
 	assert.Equal(t, expectedSent, findMetricValue(t, out, 0, beatsOutputEventsAckedKey))
 
-	expectedFailed := failedLogs + failedSpans + failedMetrics
+	expectedSendFailed := failedLogs + failedSpans + failedMetrics
+	expectedEnqueueFailed := enqueueFailedLogs + enqueueFailedSpans + enqueueFailedMetrics
+	expectedFailed := expectedSendFailed + expectedEnqueueFailed
 	assert.Equal(t, expectedFailed, findMetricValue(t, out, 0, beatsOutputEventsDroppedKey))
 
-	assert.Equal(t, docsProcessed, findMetricValue(t, out, 0, beatsOutputEventsTotalKey))
+	assert.Equal(t, docsProcessed+expectedEnqueueFailed, findMetricValue(t, out, 0, beatsOutputEventsTotalKey))
 	assert.Equal(t, docsRetried, findMetricValue(t, out, 0, beatsOutputEventsFailedKey))
 	assert.Equal(t, flushedBytes, findMetricValue(t, out, 0, beatsOutputWriteBytesKey))
-	assert.Equal(t, docsProcessed-expectedSent-expectedFailed, findMetricValue(t, out, 0, beatsOutputEventsActiveKey))
+	assert.Equal(t, docsProcessed-expectedSent-expectedSendFailed, findMetricValue(t, out, 0, beatsOutputEventsActiveKey))
 	assert.Equal(t, bulkRequests, findMetricValue(t, out, 0, beatsOutputEventsBatchesKey))
+}
+
+// Queue rejections with block_on_overflow: false must not reduce active events:
+// docs.processed only counts records that reached the bulk indexer.
+func TestConvertMetricsEnqueueFailedKeepsActiveNonNegative(t *testing.T) {
+	const exporterID = "elasticsearch/_agent-component/default"
+	const (
+		docsProcessed     = int64(1000)
+		sentLogs          = int64(1000)
+		enqueueFailedLogs = int64(5000)
+	)
+
+	md, sm := newMetricsWithExporterScope(exporterID)
+	appendSumInt(sm, otelDocsProcessedKey, docsProcessed)
+	appendSumInt(sm, otelSentLogsKey, sentLogs)
+	appendSumInt(sm, otelEnqueueFailedLogsKey, enqueueFailedLogs)
+
+	cfg := &Config{ExporterNames: map[string]string{exporterID: "default"}}
+	out := buildProcessedMetrics(zap.NewNop(), cfg, md)
+	require.Equal(t, 1, out.ResourceMetrics().Len())
+
+	active := findMetricValue(t, out, 0, beatsOutputEventsActiveKey)
+	assert.Equal(t, int64(0), active, "every processed doc was sent, so nothing is in flight")
+	acked := findMetricValue(t, out, 0, beatsOutputEventsAckedKey)
+	assert.Equal(t, sentLogs, acked)
+	dropped := findMetricValue(t, out, 0, beatsOutputEventsDroppedKey)
+	assert.Equal(t, enqueueFailedLogs, dropped, "queue rejections are drops")
+	total := findMetricValue(t, out, 0, beatsOutputEventsTotalKey)
+	assert.Equal(t, docsProcessed+enqueueFailedLogs, total,
+		"total covers rejected records too, not just what the indexer saw")
+	assert.Equal(t, total, acked.(int64)+dropped.(int64)+active.(int64),
+		"total should equal acked + dropped + active")
 }
 
 func TestBuildInputMetrics_InputTypeAttribute(t *testing.T) {
