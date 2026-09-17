@@ -1,0 +1,77 @@
+version: 8.19.22
+entries:
+    - kind: bug-fix
+      summary: fix diagnostics for otel components containing `/`
+      description: Components containing `/` in id or stream-id has been skipped from diagnostics
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16662
+        - https://github.com/elastic/elastic-agent/pull/16693
+        - https://github.com/elastic/elastic-agent/pull/16695
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788339094
+      file:
+        name: 1788339094-fix-diagnostics-for-otel-components.yaml
+        checksum: 5ca55dc430d0fba17b74fb74f2c1f2b8bedcc407
+    - kind: bug-fix
+      summary: prevent panic when translating otel config and unit has nil configuration
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16662
+        - https://github.com/elastic/elastic-agent/pull/16693
+        - https://github.com/elastic/elastic-agent/pull/16695
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16470
+      impact: ""
+      action: ""
+      timestamp: 1788375679
+      file:
+        name: 1788375679-handle-units-with-nil-config.yaml
+        checksum: df1d5fd5efbca47ed405b0d8bc5f668f29beaca6
+    - kind: other
+      summary: Update OTel Collector dependencies to v0.159.0/v1.65.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16346
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788436606
+      file:
+        name: 1788436606-update-otel-collector-dependencies-to-v0.159.0-v1.65.0.yaml
+        checksum: 44a752789574fe5b9a250d805e4d87d650cc0924
+    - kind: security
+      summary: validate component working directory path to prevent path traversal
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16662
+        - https://github.com/elastic/elastic-agent/pull/16693
+        - https://github.com/elastic/elastic-agent/pull/16695
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16226
+      impact: ""
+      action: ""
+      timestamp: 1788440317
+      file:
+        name: 1788440317-validate-component-working-directory-path-to-prevent-path-traversal.yaml
+        checksum: 5e14a7b888af0bdcc02148e1488ea4968ca8082a
+    - kind: bug-fix
+      summary: Fix Ironbank Dockerfile to restore module yml file permissions to 0644 after broad 0666 chmod.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16662
+        - https://github.com/elastic/elastic-agent/pull/16693
+        - https://github.com/elastic/elastic-agent/pull/16695
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789073037
+      file:
+        name: 1789073037-ironbank-fix-yml-permissions.yaml
+        checksum: 5329cb2100f67ac28bc95720a8e4a9fc60c3480c
