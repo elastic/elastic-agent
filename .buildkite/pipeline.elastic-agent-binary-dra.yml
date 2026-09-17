@@ -104,9 +104,10 @@ steps:
       key: "dra-prep-snapshot"
       command: ".buildkite/scripts/stage_artifacts.sh"
       agents:
-        provider: "gcp"
-        machineType: "c2-standard-16"
-        image: "${IMAGE_UBUNTU_2404_X86_64}"
+        image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
+        cpu: "2"
+        memory: "4Gi"
+        ephemeralStorage: "10Gi"
       env:
         DRA_WORKFLOW: "snapshot"
       plugins:
@@ -220,9 +221,10 @@ steps:
         source .buildkite/scripts/version_qualifier.sh
         .buildkite/scripts/stage_artifacts.sh
       agents:
-        provider: "gcp"
-        machineType: "c2-standard-16"
-        image: "${IMAGE_UBUNTU_2404_X86_64}"
+        image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
+        cpu: "2"
+        memory: "4Gi"
+        ephemeralStorage: "10Gi"
       env:
         DRA_WORKFLOW: "staging"
       plugins:

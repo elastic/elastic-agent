@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# Prepares the artifacts/ directory for the elastic/dra-prep-buildkite-plugin.
+#
+# Downloads build output from the Buildkite artifact store, then
+# copies the relevant files into artifacts/:
+#   - Binary packages (.tar.gz, .zip, .deb, .rpm) from build/distributions/
+#   - Dependency report CSV from build/distributions/reports/
+#     (SNAPSHOT-named for snapshot workflow, non-SNAPSHOT for staging)
+#
+# Required env variables:
+#   DRA_WORKFLOW  - "snapshot" or "staging"
+#
+# Required Buildkite artifacts (uploaded by prior build steps):
+#   build/distributions/**/*
 set -euo pipefail
 
 WORKFLOW="${DRA_WORKFLOW:?DRA_WORKFLOW is required}"
