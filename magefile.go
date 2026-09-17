@@ -3778,7 +3778,7 @@ func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
 		}
 		if platform == "windows/amd64" {
 			image = strings.ReplaceAll(image, "beats-dev", "observability-ci") // Temporarily work around naming of npcap image.
-			image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian11")
+			image = strings.ReplaceAll(image, "main", "npcap-"+xpacketbeat.NpcapVersion+"-debian9")
 		}
 		return image, nil
 	}
