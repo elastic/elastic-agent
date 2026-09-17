@@ -79,6 +79,15 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     # explicitly; systemd then starts the daemon at boot
     && systemctl enable containerd.service docker.service
 
+# Restrict the nested daemon's bridge and address pools to the 192.168.100.x/101.x range
+# so they never overlap with the outer Docker's compose networks (which use 172.x.x.x).
+# Without this, the nested daemon claims e.g. 172.18.0.0/16 for docker0, and when the
+# outer Docker later tries to attach this container to a compose network on that same
+# subnet the kernel rejects it with "conflicts with existing route".
+# bip gives docker0 the entire 192.168.100.0/24; additional networks (compose stacks,
+# testcontainers) draw from the non-overlapping 192.168.101.0/24 pool.
+RUN mkdir -p /etc/docker && echo '{"bip":"192.168.100.1/24","default-address-pools":[{"base":"192.168.101.0/24","size":28}]}' > /etc/docker/daemon.json
+
 # The nested daemon's layer storage uses overlay, which the kernel refuses to stack on
 # top of another overlay filesystem (the container's rootfs) — it fails with EINVAL.
 # Back both storage roots with volumes so they sit on the host's real filesystem

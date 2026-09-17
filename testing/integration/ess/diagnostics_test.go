@@ -675,10 +675,9 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 
 	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
 	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
-	// at the component level and written under a stream subdirectory so two streams of the
-	// same component do not overwrite beat_metrics.json. Slash characters in component and
-	// stream IDs are replaced with "-" in archive paths, e.g. system/metrics-default →
-	// system-metrics-default and system/metrics-system.cpu → system-metrics-system.cpu.
+	// at the component level and land under the component directory, same as for process-runtime beats.
+	// The system/metrics component and stream IDs contain "/", exercising association using the
+	// complete component ID before the archive path is normalized to "system-metrics-default".
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
 		"edot/environment.yaml",

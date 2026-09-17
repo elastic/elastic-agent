@@ -111,6 +111,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/k8sleaderelector"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	opampextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
@@ -134,6 +135,7 @@ import (
 
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	elasticmonitoringconnector "github.com/elastic/elastic-agent/internal/edot/connectors/elasticmonitoring"
+	elasticmonitoringprocessor "github.com/elastic/elastic-agent/internal/edot/processors/elasticmonitoring"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
 	profilingmetricsconnector "github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector"
 
@@ -235,6 +237,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			tailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
+			elasticmonitoringprocessor.NewFactory(),
 		)
 		if err != nil {
 			return otelcol.Factories{}, err
@@ -281,6 +284,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
 			bearertokenauthextension.NewFactory(),
+			oauth2clientauthextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),

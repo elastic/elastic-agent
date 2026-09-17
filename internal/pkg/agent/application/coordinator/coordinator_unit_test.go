@@ -1984,7 +1984,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
+	err := coord.Upgrade(ctx, "1.2.3", nil, nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -2663,7 +2663,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 
@@ -2723,7 +2723,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 		wg.Done()
 	}()
 
-	err := coord.Upgrade(t.Context(), "", "", nil)
+	err := coord.Upgrade(t.Context(), "", nil, nil)
 	require.Error(t, err)
 	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
 
@@ -2922,6 +2922,58 @@ func TestGetDynamicInputs(t *testing.T) {
 				}, tt.staticVariables)
 				assert.Equal(t, tt.wantDynamic, result["input-1"])
 			})
+		}
+	})
+}
+
+type recordingReExecManager struct {
+	called bool
+}
+
+func (r *recordingReExecManager) ReExec(_ reexec.ShutdownCallbackFn, _ ...string) {
+	r.called = true
+}
+
+func TestCoordinator_Restart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	action := &fleetapi.ActionRestart{ActionID: "r1", ActionType: fleetapi.ActionTypeRestart}
+
+	t.Run("not restartable returns ErrNotRestartable and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			// buffered so SetOverrideState (via ReExec) never blocks without a run loop
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canReExec:         func() bool { return false },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrNotRestartable)
+		assert.False(t, reexecMgr.called, "should not re-exec when not restartable")
+	})
+
+	t.Run("restartable triggers re-exec and override state", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canReExec:         func() bool { return true },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.NoError(t, err)
+		assert.True(t, reexecMgr.called, "should re-exec when restartable")
+
+		select {
+		case os := <-coord.overrideStateChan:
+			require.NotNil(t, os, "restart should set an override state")
+			assert.Equal(t, agentclient.Stopping, os.state)
+		default:
+			t.Fatal("expected an override state to be set")
 		}
 	})
 }

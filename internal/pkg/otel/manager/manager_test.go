@@ -1815,6 +1815,9 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 							"extension:kafkapartitioner/test": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
+							"extension:oauth2client/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
 						},
 					},
 				},

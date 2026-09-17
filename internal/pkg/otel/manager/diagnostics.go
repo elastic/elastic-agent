@@ -185,13 +185,12 @@ func streamIDForComponent(name, compID string) string {
 }
 
 // streamPrefixedDiagnostic returns a copy of res whose Filename is prefixed
-// with the stream ID so ZipArchive writes unique paths under the component
-// directory (components/<comp.ID>/<streamID>/<filename>).
+// with streamID
 func streamPrefixedDiagnostic(res *proto.ActionDiagnosticUnitResult, streamID string) *proto.ActionDiagnosticUnitResult {
 	if res == nil || streamID == "" {
 		return res
 	}
-	if streamID == singleReceiverStreamID {
+	if streamID == translate.singleReceiverStreamID {
 		return nil
 	}
 	return &proto.ActionDiagnosticUnitResult{
@@ -203,7 +202,3 @@ func streamPrefixedDiagnostic(res *proto.ActionDiagnosticUnitResult, streamID st
 		Generated:   res.GetGenerated(),
 	}
 }
-
-// singleReceiverStreamID matches translate.singleReceiverStreamID, the
-// placeholder stream segment used when single_receiver: true.
-const singleReceiverStreamID = "single"
