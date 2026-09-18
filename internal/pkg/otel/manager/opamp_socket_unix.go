@@ -8,7 +8,6 @@ package manager
 
 import (
 	"net"
-	"path/filepath"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -19,6 +18,5 @@ import (
 // On Unix this is a Unix domain socket; ipc.CreateListener handles stale-file
 // removal and permission hardening (0700 / 0770).
 func listenOpAMPSocket(log *logger.Logger) (net.Listener, error) {
-	addr := "unix://" + filepath.Join(paths.Top(), "opamp.sock")
-	return ipc.CreateListener(log, addr)
+	return ipc.CreateListener(log, paths.OpAMPSocket())
 }

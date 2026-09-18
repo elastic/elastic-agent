@@ -203,16 +203,6 @@ func NewOTelManager(
 	}
 	opampExtComponentID := otelcomponent.NewIDWithName(componentType, opampInstanceUID).String()
 
-	opampLis, err := listenOpAMPSocket(managerLogger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create opamp ipc listener: %w", err)
-	}
-	opampSrv, err := NewOpAMPServerOnListener(managerLogger.Named("opamp_server"), opampLis)
-	if err != nil {
-		_ = opampLis.Close()
-		return nil, fmt.Errorf("failed to start opamp server: %w", err)
-	}
-
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
@@ -222,9 +212,6 @@ func NewOTelManager(
 	}
 	exec, err = execFactory(executable)
 	if err != nil {
-		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-		_ = opampSrv.Stop(stopCtx)
-		cancel()
 		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
 
@@ -234,7 +221,6 @@ func NewOTelManager(
 		agentInfo:                 agentInfo,
 		opampExtComponentID:       opampExtComponentID,
 		opampInstanceUID:          opampInstanceUID,
-		opampServer:               opampSrv,
 		collectorMetricsPort:      collectorMetricsPort,
 		errCh:                     make(chan error, 1), // holds at most one error
 		internalCollectorStatusCh: make(chan *status.AggregateStatus, 1),
@@ -257,6 +243,22 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	var err error
 	m.proc = nil
 
+	opampLis, err := listenOpAMPSocket(m.managerLogger)
+	if err != nil {
+		return fmt.Errorf("failed to create opamp ipc listener: %w", err)
+	}
+	opampSrv, err := NewOpAMPServerOnListener(m.managerLogger.Named("opamp_server"), opampLis)
+	if err != nil {
+		_ = opampLis.Close()
+		return fmt.Errorf("failed to start opamp server: %w", err)
+	}
+	m.opampServer = opampSrv
+	defer func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_ = m.opampServer.Stop(stopCtx)
+		cancel()
+	}()
+
 	// statusFn receives translated statuses from the active opamp session and
 	// forwards them onto m.internalCollectorStatusCh, where the Run loop's
 	// select picks them up for post-processing.
@@ -272,9 +274,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			m.stopCollector()
-			stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-			_ = m.opampServer.Stop(stopCtx)
-			cancel()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
 			m.recoveryTimer.Stop()

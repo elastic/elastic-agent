@@ -9,18 +9,15 @@ package manager
 import (
 	"net"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
-// opampPipeAddress is the npipe address for the OpAMP server's named pipe.
-// ipc.CreateListener converts this to \\.\pipe\elastic-agent-opamp via
-// npipe.TransformString, which requires the npipe:/// (three-slash) prefix.
-const opampPipeAddress = "npipe:///elastic-agent-opamp"
-
 // listenOpAMPSocket creates the platform IPC listener for the OpAMP server.
-// On Windows this is a named pipe; ipc.CreateListener sets the correct security
-// descriptor (owner + SYSTEM + Administrators, plus group SID when unprivileged).
+// On Windows this is a named pipe whose address is derived from paths.OpAMPSocket()
+// (a hash-based unique name under \\.\pipe\). ipc.CreateListener sets the correct
+// security descriptor (owner + SYSTEM + Administrators, plus group SID when unprivileged).
 func listenOpAMPSocket(log *logger.Logger) (net.Listener, error) {
-	return ipc.CreateListener(log, opampPipeAddress)
+	return ipc.CreateListener(log, paths.OpAMPSocket())
 }

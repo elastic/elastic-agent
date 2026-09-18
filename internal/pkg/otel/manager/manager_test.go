@@ -1254,9 +1254,6 @@ func TestOTelManager_Ports(t *testing.T) {
 	)
 	require.NoError(t, err, "could not create otel manager")
 
-	// The OpAMP server uses an IPC channel (Unix socket / named pipe).
-	require.Equal(t, "http://localhost/v1/opamp", m.opampServer.Endpoint())
-
 	go func() {
 		err := m.Run(ctx)
 		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
