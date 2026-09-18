@@ -32,8 +32,13 @@ changelog/fragments/
 /.github/workflows/update-docs.yml @elastic/ski-docs @elastic/docs-engineering
 /.github/workflows/validate-docs-structure.yml @elastic/ski-docs @elastic/docs-engineering
 /docs/reference/edot-collector @elastic/ski-docs
+<<<<<<< HEAD
 /docs/scripts/update-docs @elastic/ski-docs
 /internal/edot/samples @elastic/ingest-otel-data @elastic/ski-docs
+=======
+/docs/scripts/update-docs @elastic/ski-docs @elastic/docs-engineering
+/internal/edot/samples @elastic/obs-signals-team @elastic/ski-docs
+>>>>>>> 0b85838 (Add docs-engineering as CODEOWNER of the docs update scripts. (#16646))
 /internal/edot/components.yml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
 /internal/edot/samples/darwin/autoops_es*.yml @elastic/opex
