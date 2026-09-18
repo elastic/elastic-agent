@@ -4,16 +4,16 @@
 
 package testing
 
-// TestIronbankDockerfilePermissions builds the Ironbank Dockerfile using a
-// publicly accessible UBI base image in place of the restricted Ironbank
-// registry and verifies that .yml files inside components/ are restored to
-// 0644 permissions after the broad 0666 chmod applied earlier in the RUN layer.
+// TestIronbankDockerfilePermissions loads the pre-built Ironbank Docker image
+// (produced by 'DOCKER_VARIANTS=ironbank PACKAGES=docker mage package') and
+// verifies that .yml files inside components/ are restored to 0644 permissions
+// after the broad 0666 chmod applied earlier in the RUN layer.
 //
-// The test uses pre-built artifacts from build/distributions/:
-//   - the ironbank docker build context tarball (*-ironbank-*-docker-build-context.tar.gz)
-//   - the linux x86_64 agent tarball (elastic-agent-*-linux-x86_64.tar.gz)
+// The image is built using the public Red Hat registry in place of the
+// restricted Ironbank registry, so this test runs in standard CI without
+// privileged registry access.
 //
-// Run after 'mage Package Ironbank':
+// Run after 'DOCKER_VARIANTS=ironbank PACKAGES=docker mage package':
 //
 //	go test -v -run TestIronbankDockerfilePermissions ./dev-tools/packaging/testing/
 
@@ -28,8 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -40,23 +38,7 @@ import (
 	dockerclient "github.com/moby/moby/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
-
-// publicUBIRegistry is the public Red Hat registry used in place of the
-// restricted Ironbank registry (registry1.dsop.io), which requires privileged
-// access not available in standard CI environments.
-const publicUBIRegistry = "registry.access.redhat.com"
-
-// ironbankToPublicUBIImage converts the Ironbank BASE_IMAGE path
-// (e.g. "redhat/ubi/ubi10") to its public Red Hat registry equivalent
-// (e.g. "ubi10/ubi"), so the test tracks future major-version bumps
-// automatically without hardcoding "ubi10".
-func ironbankToPublicUBIImage(ironbankImage string) string {
-	// "redhat/ubi/ubiN" → "ubiN/ubi"
-	parts := strings.Split(ironbankImage, "/")
-	return parts[len(parts)-1] + "/ubi"
-}
 
 func TestIronbankDockerfilePermissions(t *testing.T) {
 	cli, err := dockerclient.New(dockerclient.FromEnv)
@@ -69,62 +51,17 @@ func TestIronbankDockerfilePermissions(t *testing.T) {
 
 	distDir := filepath.Join(*sourceRoot, "../build/distributions")
 
-	ironbankCtxFile := findFile(t, distDir, regexp.MustCompile(`-ironbank-.*-docker-build-context\.tar\.gz$`))
-	if ironbankCtxFile == "" {
-		t.Skip("no ironbank docker build context found in build/distributions; run 'mage Ironbank' first")
+	// Find the ironbank Docker image produced by DOCKER_VARIANTS=ironbank mage package.
+	imageFile := findFile(t, distDir, regexp.MustCompile(`-ironbank-.*\.docker\.tar\.gz$`))
+	if imageFile == "" {
+		t.Skip("no ironbank docker image found in build/distributions; run 'DOCKER_VARIANTS=ironbank PACKAGES=docker mage package' first")
 	}
 
-	agentTarball := findFile(t, distDir, regexp.MustCompile(`^elastic-agent-[\d.].*-linux-x86_64\.tar\.gz$`))
-	if agentTarball == "" {
-		t.Skip("no elastic-agent linux-x86_64 tarball found in build/distributions; run 'mage Package' first")
-	}
-
-	// Parse version and OS/arch from the agent tarball filename.
-	// e.g. "elastic-agent-8.18.0-SNAPSHOT-linux-x86_64.tar.gz" → version="8.18.0-SNAPSHOT", osArch="linux-x86_64"
-	const osArch = "linux-x86_64"
-	base := strings.TrimSuffix(filepath.Base(agentTarball), ".tar.gz")
-	version := strings.TrimSuffix(strings.TrimPrefix(base, "elastic-agent-"), "-"+osArch)
-
-	buildCtx := t.TempDir()
-
-	// Extract the ironbank docker build context (Dockerfile, config/, LICENSE).
-	require.NoError(t, extractTarGz(ironbankCtxFile, buildCtx))
-
-	// The Dockerfile COPYs the agent tarball; it must be present in the build context.
-	dst := filepath.Join(buildCtx, "elastic-agent-"+version+"-"+osArch+".tar.gz")
-	require.NoError(t, copyFile(agentTarball, dst))
-
-	// tinit and jq are provided by the IronBank pipeline via the hardening
-	// manifest. Download them from the URLs listed in the manifest so the
-	// docker build matches what IronBank actually runs.
-	require.NoError(t, downloadManifestResources(t.Context(), filepath.Join(buildCtx, "hardening_manifest.yaml"), buildCtx, []string{"tinit", "jq"}))
-
-	dockerfile := filepath.Join(buildCtx, "Dockerfile")
-	baseTag := parseDockerfileArg(t, dockerfile, "BASE_TAG")
-	publicImage := ironbankToPublicUBIImage(parseDockerfileArg(t, dockerfile, "BASE_IMAGE"))
-
-	imageTag := "elastic-agent-ironbank-perms-test:latest"
+	imageTag, err := loadDockerImage(t.Context(), cli, imageFile)
+	require.NoError(t, err, "loading ironbank docker image")
 	t.Cleanup(func() {
 		_, _ = cli.ImageRemove(context.Background(), imageTag, dockerclient.ImageRemoveOptions{Force: true, PruneChildren: true})
 	})
-
-	buildCtxTar, err := dirTar(buildCtx)
-	require.NoError(t, err)
-
-	buildResp, err := cli.ImageBuild(t.Context(), buildCtxTar, dockerclient.ImageBuildOptions{
-		Tags:   []string{imageTag},
-		Remove: true,
-		BuildArgs: map[string]*string{
-			"BASE_REGISTRY": strPtr(publicUBIRegistry),
-			"BASE_IMAGE":    strPtr(publicImage),
-			"BASE_TAG":      strPtr(baseTag),
-			"ELASTIC_STACK": strPtr(version),
-			"OS_AND_ARCH":   strPtr(osArch),
-		},
-	})
-	require.NoError(t, err)
-	defer buildResp.Body.Close()
-	require.NoError(t, consumeBuildOutput(buildResp.Body), "docker build failed")
 
 	out, err := runContainerOneShot(t.Context(), cli, imageTag,
 		"/bin/sh", []string{"-c",
@@ -163,246 +100,73 @@ func findFile(t *testing.T, dir string, pattern *regexp.Regexp) string {
 	return ""
 }
 
-// extractTarGz extracts a .tar.gz file into destDir.
-func extractTarGz(src, destDir string) error {
-	f, err := os.Open(src)
+// loadDockerImage loads a gzip-compressed Docker image tar into the daemon and
+// returns the first image reference (repository:tag) embedded in the archive.
+func loadDockerImage(ctx context.Context, cli *dockerclient.Client, path string) (string, error) {
+	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer f.Close()
 
 	gr, err := gzip.NewReader(f)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer gr.Close()
 
-	tr := tar.NewReader(gr)
+	resp, err := cli.ImageLoad(ctx, gr)
+	if err != nil {
+		return "", fmt.Errorf("ImageLoad: %w", err)
+	}
+	defer resp.Close()
+	if _, err := io.Copy(io.Discard, resp); err != nil {
+		return "", fmt.Errorf("draining ImageLoad response: %w", err)
+	}
+
+	// Re-open to read the manifest embedded in the tar for the image reference.
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return "", err
+	}
+	gr2, err := gzip.NewReader(f)
+	if err != nil {
+		return "", err
+	}
+	defer gr2.Close()
+	return readImageRefFromTar(gr2)
+}
+
+// readImageRefFromTar walks a Docker image tar looking for manifest.json and
+// returns the first RepoTag entry it finds.
+func readImageRefFromTar(r io.Reader) (string, error) {
+	tr := tar.NewReader(r)
 	for {
 		hdr, err := tr.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return err
+			return "", err
 		}
-
-		rel := filepath.Clean(strings.TrimPrefix(hdr.Name, "./"))
-		if rel == "." {
+		if hdr.Name != "manifest.json" {
 			continue
 		}
-		dest := filepath.Join(destDir, rel)
-
-		//nolint:gosec // G115: hdr.Mode is a POSIX mode stored as int64; upper bits are always 0 in valid archives
-		mode := fs.FileMode(uint32(hdr.Mode))
-		switch hdr.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(dest, mode); err != nil {
-				return err
-			}
-		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-				return err
-			}
-			out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-			if err != nil {
-				return err
-			}
-			//nolint:gosec // G110: src is our own build artifact, not user-supplied input
-			_, copyErr := io.Copy(out, tr)
-			closeErr := out.Close()
-			if copyErr != nil {
-				return copyErr
-			}
-			if closeErr != nil {
-				return closeErr
-			}
-		}
-	}
-	return nil
-}
-
-// downloadManifestResources reads hardening_manifest.yaml and downloads the
-// named resources into destDir, matching the beats ironbank-validation pattern.
-func downloadManifestResources(ctx context.Context, manifestPath, destDir string, filenames []string) error {
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return fmt.Errorf("reading hardening manifest: %w", err)
-	}
-
-	var manifest struct {
-		Resources []struct {
-			Filename string `yaml:"filename"`
-			URL      string `yaml:"url"`
-		} `yaml:"resources"`
-	}
-	if err := yaml.Unmarshal(data, &manifest); err != nil {
-		return fmt.Errorf("parsing hardening manifest: %w", err)
-	}
-
-	want := make(map[string]bool, len(filenames))
-	for _, f := range filenames {
-		want[f] = true
-	}
-
-	for _, r := range manifest.Resources {
-		if !want[r.Filename] {
-			continue
-		}
-		dest := filepath.Join(destDir, r.Filename)
-		if err := downloadFile(ctx, r.URL, dest); err != nil {
-			return fmt.Errorf("downloading %s from %s: %w", r.Filename, r.URL, err)
-		}
-		if err := os.Chmod(dest, 0o755); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// downloadFile fetches url and writes the response body to dest.
-func downloadFile(ctx context.Context, url, dest string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status %d fetching %s", resp.StatusCode, url)
-	}
-	f, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
-	return err
-}
-
-// copyFile copies a file from src to dst, preserving mode bits.
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	info, err := in.Stat()
-	if err != nil {
-		return err
-	}
-
-	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
-}
-
-// parseDockerfileArg reads the default value of a Docker ARG from a Dockerfile
-// (or Dockerfile template), returning the value after the "=" sign.
-func parseDockerfileArg(t *testing.T, dockerfilePath, argName string) string {
-	t.Helper()
-	data, err := os.ReadFile(dockerfilePath)
-	require.NoError(t, err, "reading %s", dockerfilePath)
-
-	prefix := fmt.Sprintf("ARG %s=", argName)
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, prefix) {
-			return strings.TrimPrefix(line, prefix)
-		}
-	}
-	t.Fatalf("ARG %s not found in %s", argName, dockerfilePath)
-	return ""
-}
-
-// dirTar creates an uncompressed tar archive of all files under dir, with
-// paths relative to dir (no leading path component). The result is suitable
-// for use as a Docker image build context.
-func dirTar(dir string) (io.Reader, error) {
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		data, err := io.ReadAll(tr)
 		if err != nil {
-			return err
+			return "", err
 		}
-		rel, err := filepath.Rel(dir, path)
-		if err != nil {
-			return err
+		var manifests []struct {
+			RepoTags []string `json:"RepoTags"`
 		}
-		if rel == "." {
-			return nil
+		if err := json.Unmarshal(data, &manifests); err != nil {
+			return "", fmt.Errorf("parsing manifest.json: %w", err)
 		}
-
-		info, err := d.Info()
-		if err != nil {
-			return err
+		if len(manifests) > 0 && len(manifests[0].RepoTags) > 0 {
+			return manifests[0].RepoTags[0], nil
 		}
-
-		hdr := &tar.Header{
-			Name: filepath.ToSlash(rel),
-			Mode: int64(info.Mode()),
-		}
-		if d.IsDir() {
-			hdr.Typeflag = tar.TypeDir
-			hdr.Name += "/"
-			return tw.WriteHeader(hdr)
-		}
-
-		hdr.Typeflag = tar.TypeReg
-		hdr.Size = info.Size()
-		if err := tw.WriteHeader(hdr); err != nil {
-			return err
-		}
-
-		//nolint:gosec // path comes from WalkDir over a temp directory we own; no TOCTOU risk
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = io.Copy(tw, f)
-		return err
-	})
-	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("manifest.json has no RepoTags")
 	}
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-	return &buf, nil
-}
-
-// buildOutputMsg is the subset of Docker's streaming build JSON we care about.
-type buildOutputMsg struct {
-	Stream string `json:"stream"`
-	Error  string `json:"error"`
-}
-
-// consumeBuildOutput drains the streaming JSON from an image build response
-// body, returning a non-nil error if Docker reported a build failure.
-func consumeBuildOutput(r io.Reader) error {
-	dec := json.NewDecoder(r)
-	for {
-		var msg buildOutputMsg
-		if err := dec.Decode(&msg); errors.Is(err, io.EOF) {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		if msg.Error != "" {
-			return fmt.Errorf("%s", strings.TrimRight(msg.Error, "\n"))
-		}
-	}
+	return "", fmt.Errorf("manifest.json not found in docker image tar")
 }
 
 // runContainerOneShot creates a container from image, runs entrypoint with cmd,
@@ -483,5 +247,3 @@ func readDockerStdout(r io.Reader) ([]byte, error) {
 	}
 	return out.Bytes(), nil
 }
-
-func strPtr(s string) *string { return &s }
