@@ -2096,10 +2096,57 @@ func getIronbankContextName(cfg *devtools.Settings) string {
 	return outputDir
 }
 
+// ironbankResource holds the download URL and sha256 hash for a binary
+// resource listed in hardening_manifest.yaml.tmpl.
+type ironbankResource struct {
+	URL    string
+	SHA256 string
+}
+
+// ironbankResourcesFromManifest parses hardening_manifest.yaml.tmpl and
+// returns the resource info keyed by filename. Template expressions ({{ … }})
+// are stripped before parsing so the YAML is well-formed.
+func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankResource, error) {
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Strip Go template expressions so the file parses as plain YAML.
+	stripped := regexp.MustCompile(`\{\{[^}]*\}\}`).ReplaceAll(raw, []byte(`""`))
+
+	var manifest struct {
+		Resources []struct {
+			Filename   string `yaml:"filename"`
+			URL        string `yaml:"url"`
+			Validation struct {
+				Type  string `yaml:"type"`
+				Value string `yaml:"value"`
+			} `yaml:"validation"`
+		} `yaml:"resources"`
+	}
+	if err := yaml.Unmarshal(stripped, &manifest); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", manifestPath, err)
+	}
+
+	resources := make(map[string]ironbankResource, len(manifest.Resources))
+	for _, r := range manifest.Resources {
+		if r.Validation.Type == "sha256" {
+			resources[r.Filename] = ironbankResource{URL: r.URL, SHA256: r.Validation.Value}
+		}
+	}
+	return resources, nil
+}
+
 func prepareIronbankBuild(cfg *devtools.Settings) error {
 	fmt.Println(">> prepareIronbankBuild: prepare the IronBank container context.")
 	buildDir := filepath.Join("build", getIronbankContextName(cfg))
 	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
+
+	resources, err := ironbankResourcesFromManifest(filepath.Join(templatesDir, "hardening_manifest.yaml.tmpl"))
+	if err != nil {
+		return fmt.Errorf("reading ironbank resource hashes: %w", err)
+	}
 
 	data := map[string]interface{}{
 		"MajorMinor":        majorMinor(cfg),
@@ -2108,9 +2155,9 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 		"base_tag":          "10.2",
 		"license_source":    "LICENSE",
 		"tinit_source":      "tinit",
-		"tinit_sha256":      "93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c",
+		"tinit_sha256":      resources["tinit"].SHA256,
 		"jq_source":         "jq",
-		"jq_sha256":         "af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44",
+		"jq_sha256":         resources["jq"].SHA256,
 		"entrypoint_source": "config/docker-entrypoint",
 	}
 
