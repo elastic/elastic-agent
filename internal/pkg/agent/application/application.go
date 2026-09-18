@@ -69,7 +69,6 @@ func New(
 	cfg *configuration.Configuration,
 	initialUpdateMarker *upgrade.UpdateMarker,
 	availableRollbacksSource ttl.Source,
-	opampSrv *otelmanager.OpAMPServer,
 	grpcLis net.Listener,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
@@ -273,7 +272,6 @@ func New(
 		otelmanager.CollectorStopTimeout,
 		nil,
 		cfg.Settings.Internal.Runtime.OtelPartialConfigReload,
-		opampSrv,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)

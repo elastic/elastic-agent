@@ -4,10 +4,9 @@
 
 //go:build !windows
 
-package cmd
+package manager
 
 import (
-	"context"
 	"net"
 	"path/filepath"
 
@@ -19,7 +18,7 @@ import (
 // listenOpAMPSocket creates the platform IPC listener for the OpAMP server.
 // On Unix this is a Unix domain socket; ipc.CreateListener handles stale-file
 // removal and permission hardening (0700 / 0770).
-func listenOpAMPSocket(_ context.Context, log *logger.Logger) (net.Listener, error) {
+func listenOpAMPSocket(log *logger.Logger) (net.Listener, error) {
 	addr := "unix://" + filepath.Join(paths.Top(), "opamp.sock")
 	return ipc.CreateListener(log, addr)
 }

@@ -864,7 +864,7 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 			factory, testExec := testExecutionFactory(testBinary, innerFactory)
 
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true, newTestOpAMPServer(t))
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 			require.NoError(t, err, "could not create otel manager")
 			m.recoveryTimer = tc.restarter
 			if tc.makeExecFactory != nil {
@@ -942,7 +942,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	collectorLogger, err := logger.NewNamedLogger(CollectorLogFileName, logger.DefaultLoggingConfig(), logger.DefaultEventLoggingConfig())
 	require.NoError(t, err, "could not create collector logger")
 
-	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true, newTestOpAMPServer(t))
+	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 	require.NoError(t, err, "could not create otel manager")
 
 	var wg sync.WaitGroup
@@ -1017,7 +1017,7 @@ func TestOTelManager_PartialReceiverReload(t *testing.T) {
 	l, _ := loggertest.New("otel-manager")
 
 	factory, _ := testExecutionFactory(testBinary, nil)
-	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true, newTestOpAMPServer(t))
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
@@ -1125,7 +1125,7 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 		return newSubprocessExecution(collectorPath, false)
 	}
 	factory, _ := testExecutionFactory(testBinary, innerFactory)
-	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false, newTestOpAMPServer(t))
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
@@ -1212,14 +1212,10 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 }
 
 func TestOTelManager_Ports(t *testing.T) {
-	// HealthCheckConfig.Endpoint is repurposed as the OpAMP server's bind address.
-	ports, err := findRandomTCPPorts(2)
+	ports, err := findRandomTCPPorts(1)
 	require.NoError(t, err)
-	opampPort, metricsPort := ports[0], ports[1]
+	metricsPort := ports[0]
 	agentCollectorConfig := configuration.CollectorConfig{
-		HealthCheckConfig: configuration.CollectorHealthCheckConfig{
-			Endpoint: fmt.Sprintf("http://localhost:%d", opampPort),
-		},
 		TelemetryConfig: configuration.CollectorTelemetryConfig{
 			Endpoint: fmt.Sprintf("http://localhost:%d", metricsPort),
 		},
@@ -1246,9 +1242,6 @@ func TestOTelManager_Ports(t *testing.T) {
 	})
 
 	factory, _ := testExecutionFactory(testBinary, nil)
-	opampSrv, err := NewOpAMPServer(l, fmt.Sprintf("127.0.0.1:%d", opampPort))
-	require.NoError(t, err, "could not create opamp server")
-	t.Cleanup(func() { _ = opampSrv.Stop(context.Background()) })
 	m, err := NewOTelManager(
 		l,
 		logp.InfoLevel,
@@ -1258,13 +1251,11 @@ func TestOTelManager_Ports(t *testing.T) {
 		waitTimeForStop,
 		factory,
 		true,
-		opampSrv,
 	)
 	require.NoError(t, err, "could not create otel manager")
 
-	// The OpAMP server is bound during NewOTelManager. Confirm that its
-	// endpoint resolves to the user-configured port.
-	require.Equal(t, fmt.Sprintf("http://127.0.0.1:%d/v1/opamp", opampPort), m.opampServer.Endpoint())
+	// The OpAMP server uses an IPC channel (Unix socket / named pipe).
+	require.Equal(t, "http://localhost/v1/opamp", m.opampServer.Endpoint())
 
 	go func() {
 		err := m.Run(ctx)
@@ -1297,20 +1288,6 @@ func TestOTelManager_Ports(t *testing.T) {
 		case <-ctx.Done():
 			require.NoError(collect, ctx.Err())
 		}
-	}, time.Second*10, time.Second)
-
-	// The OpAMP server should be accepting connections on the configured port.
-	// A request without the shared secret returns 401, which proves binding.
-	opampURL := fmt.Sprintf("http://localhost:%d/v1/opamp", opampPort)
-	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, opampURL, nil)
-		assert.NoError(collect, err)
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(collect, err)
-		defer func() {
-			_ = resp.Body.Close()
-		}()
-		assert.Equal(collect, http.StatusUnauthorized, resp.StatusCode)
 	}, time.Second*10, time.Second)
 
 	// The collector should expose its metrics on the configured port.
@@ -1949,7 +1926,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		newTestOpAMPServer(t),
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2173,7 +2149,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	mockFactory := func(string) (collectorExecution, error) {
 		return execution, nil
 	}
-	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true, newTestOpAMPServer(t))
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
 
@@ -2238,7 +2214,7 @@ func TestOTelManager_StaleExitErrorIgnoredAfterRestart(t *testing.T) {
 	mockFactory := func(string) (collectorExecution, error) {
 		return execution, nil
 	}
-	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true, newTestOpAMPServer(t))
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
 
@@ -2329,7 +2305,6 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		newTestOpAMPServer(t),
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2387,7 +2362,6 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		newTestOpAMPServer(t),
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2501,7 +2475,6 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		time.Second,
 		mockFactory,
 		true,
-		newTestOpAMPServer(t),
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
@@ -2600,7 +2573,6 @@ func TestManagerEmitsStoppedOnClearConfig(t *testing.T) {
 		time.Second,
 		mockFactory,
 		false,
-		newTestOpAMPServer(t),
 	)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
