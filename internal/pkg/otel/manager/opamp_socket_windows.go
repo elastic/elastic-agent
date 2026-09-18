@@ -9,15 +9,15 @@ package manager
 import (
 	"net"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
 
 // listenOpAMPSocket creates the platform IPC listener for the OpAMP server.
-// On Windows this is a named pipe whose address is derived from paths.OpAMPSocket()
-// (a hash-based unique name under \\.\pipe\). ipc.CreateListener sets the correct
-// security descriptor (owner + SYSTEM + Administrators, plus group SID when unprivileged).
-func listenOpAMPSocket(log *logger.Logger) (net.Listener, error) {
-	return ipc.CreateListener(log, paths.OpAMPSocket())
+// On Windows this is a named pipe whose address is derived from the per-instance
+// address (a hash-based unique name under \\.\pipe\). ipc.CreateListener sets the
+// correct security descriptor (owner + SYSTEM + Administrators, plus group SID
+// when unprivileged).
+func listenOpAMPSocket(log *logger.Logger, address string) (net.Listener, error) {
+	return ipc.CreateListener(log, address)
 }
