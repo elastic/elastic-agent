@@ -102,7 +102,7 @@ type OTelManager struct {
 	// restarts present as the same OpAMP agent.
 	opampInstanceUID string
 	// opampServer is the OpAMP HTTP server the supervised collector polls for
-	// status reporting. Its lifetime is managed by the caller.
+	// status reporting. Its lifetime is managed by the Run loop.
 	opampServer *OpAMPServer
 
 	collectorMetricsPort int
@@ -175,7 +175,6 @@ func NewOTelManager(
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
 	enablePartialReload bool,
-	opampSrv *OpAMPServer,
 ) (*OTelManager, error) {
 	var exec collectorExecution
 	var recoveryTimer collectorRecoveryTimer
@@ -204,6 +203,16 @@ func NewOTelManager(
 	}
 	opampExtComponentID := otelcomponent.NewIDWithName(componentType, opampInstanceUID).String()
 
+	opampLis, err := listenOpAMPSocket(managerLogger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create opamp ipc listener: %w", err)
+	}
+	opampSrv, err := NewOpAMPServerOnListener(managerLogger.Named("opamp_server"), opampLis)
+	if err != nil {
+		_ = opampLis.Close()
+		return nil, fmt.Errorf("failed to start opamp server: %w", err)
+	}
+
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
@@ -213,6 +222,9 @@ func NewOTelManager(
 	}
 	exec, err = execFactory(executable)
 	if err != nil {
+		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_ = opampSrv.Stop(stopCtx)
+		cancel()
 		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
 
@@ -260,6 +272,9 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
 			m.stopCollector()
+			stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			_ = m.opampServer.Stop(stopCtx)
+			cancel()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
 			m.recoveryTimer.Stop()

@@ -450,27 +450,8 @@ func runElasticAgent(
 	}
 	defer lis.Close()
 
-	// Create the platform IPC listener for the OpAMP server (Unix domain socket
-	// on non-Windows, named pipe on Windows). This avoids sharing the gRPC TCP
-	// port via cmux: the gRPC listener stays pure TCP/TLS while OpAMP is off-network.
-	opampLis, err := listenOpAMPSocket(ctx, l)
-	if err != nil {
-		return fmt.Errorf("failed to create opamp ipc listener: %w", err)
-	}
-	defer opampLis.Close()
-
-	opampSrv, err := otelmanager.NewOpAMPServerOnListener(l.Named("opamp_server"), opampLis)
-	if err != nil {
-		return fmt.Errorf("failed to start opamp server: %w", err)
-	}
-	defer func() {
-		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-		_ = opampSrv.Stop(stopCtx)
-		cancel()
-	}()
-
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, opampSrv, lis, modifiers...)
+		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, lis, modifiers...)
 	if err != nil {
 		return err
 	}

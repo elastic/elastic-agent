@@ -4,10 +4,9 @@
 
 //go:build windows
 
-package cmd
+package manager
 
 import (
-	"context"
 	"net"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -22,6 +21,6 @@ const opampPipeAddress = "npipe:///elastic-agent-opamp"
 // listenOpAMPSocket creates the platform IPC listener for the OpAMP server.
 // On Windows this is a named pipe; ipc.CreateListener sets the correct security
 // descriptor (owner + SYSTEM + Administrators, plus group SID when unprivileged).
-func listenOpAMPSocket(_ context.Context, log *logger.Logger) (net.Listener, error) {
+func listenOpAMPSocket(log *logger.Logger) (net.Listener, error) {
 	return ipc.CreateListener(log, opampPipeAddress)
 }
