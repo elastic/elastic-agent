@@ -13,6 +13,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/version"
 )
@@ -133,6 +134,34 @@ func (mfw *MarkerFileWatcher) Run(ctx context.Context) error {
 	return nil
 }
 
+// fallbackToWatcherMarker is called on startup when no upgrade marker is present.
+// It reads the watcher marker and emits an UpdateMarker derived from it so the
+// coordinator can re-report the terminal upgrade state to Fleet.
+func (mfw *MarkerFileWatcher) fallbackToWatcherMarker(ctx context.Context) {
+	dataDir := filepath.Dir(mfw.markerFilePath)
+	wm, err := LoadWatcherMarker(dataDir)
+	if err != nil {
+		mfw.logger.Debugf("could not load watcher marker on startup: %v", err)
+		return
+	}
+	if wm == nil {
+		return
+	}
+
+	synthetic := UpdateMarker{
+		Version:     wm.TargetVersion,
+		PrevVersion: wm.PreviousVersion,
+	}
+	if wm.ActionID != "" {
+		synthetic.Action = &fleetapi.ActionUpgrade{ActionID: wm.ActionID}
+	}
+	mfw.lastMarker = &synthetic
+	select {
+	case mfw.updateCh <- synthetic:
+	case <-ctx.Done():
+	}
+}
+
 func (mfw *MarkerFileWatcher) processMarker(ctx context.Context, currentVersion string, commit string) {
 	marker, err := loadMarker(mfw.markerFilePath)
 	if err != nil {
@@ -140,8 +169,11 @@ func (mfw *MarkerFileWatcher) processMarker(ctx context.Context, currentVersion 
 		return
 	}
 
-	// Nothing to do if marker is not (yet) present
+	// Nothing to do if marker is not (yet) present. Fall back to the watcher
+	// marker so the coordinator can re-report the terminal state to Fleet after
+	// a restart that follows successful watcher cleanup.
 	if marker == nil {
+		mfw.fallbackToWatcherMarker(ctx)
 		return
 	}
 
