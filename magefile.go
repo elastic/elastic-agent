@@ -672,6 +672,13 @@ func Package(ctx context.Context) error {
 		return fmt.Errorf("error loading agent package spec: %w", err)
 	}
 
+	// Inject ironbank resource hashes from the hardening manifest into any
+	// ironbank Docker variant specs, so packages.yml doesn't need to duplicate
+	// values that are authoritative in the manifest template.
+	if err := injectIronbankManifestVars(pkgSpec); err != nil {
+		return fmt.Errorf("injecting ironbank manifest vars: %w", err)
+	}
+
 	// Pass the resolved settings to dependency targets. Without this,
 	// PackageAgentCore would re-load settings from the environment and — not
 	// being a .package-version opt-in target — name the core archive with
@@ -2136,6 +2143,25 @@ func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankReso
 		}
 	}
 	return resources, nil
+}
+
+// injectIronbankManifestVars reads the hardening manifest template and injects
+// tinit_sha256 / jq_sha256 into every ironbank Docker variant spec so that
+// packages.yml does not need to duplicate values that are authoritative in the
+// manifest.
+func injectIronbankManifestVars(specs []devtools.OSPackageArgs) error {
+	manifestPath := filepath.Join("dev-tools", "packaging", "templates", "ironbank", "hardening_manifest.yaml.tmpl")
+	resources, err := ironbankResourcesFromManifest(manifestPath)
+	if err != nil {
+		return err
+	}
+	for i := range specs {
+		if specs[i].Spec.DockerVariant == devtools.Ironbank {
+			specs[i].Spec.ExtraVar("tinit_sha256", resources["tinit"].SHA256)
+			specs[i].Spec.ExtraVar("jq_sha256", resources["jq"].SHA256)
+		}
+	}
+	return nil
 }
 
 func prepareIronbankBuild(cfg *devtools.Settings) error {
