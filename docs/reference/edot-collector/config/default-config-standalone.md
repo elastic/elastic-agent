@@ -120,17 +120,83 @@ The `elasticinframetrics` processor is deprecated in {{agent}} 9.2 but is retain
 
 When ingesting OTel data through the [{{motlp}}](opentelemetry://reference/motlp.md), all the enrichment that is required for an optimal experience in the Elastic solutions happens at the endpoint level and is transparent to users.
 
+:::{note}
+The {{motlp}} isn't available for [self-managed](docs-content://deploy-manage/deploy/self-managed.md), [{{ece}}](docs-content://deploy-manage/deploy/cloud-enterprise.md), or [{{eck}}](docs-content://deploy-manage/deploy/cloud-on-k8s.md) deployments. For those deployment types, forward data to {{agent}} in Gateway mode instead, as described in [Forwarding to a self-managed Gateway](#forwarding-to-a-self-managed-gateway).
+:::
+
 The Collector configuration for all use cases that involve the {{motlp}} is only concerned with local data collection and context enrichment.
 
 Platform logs are scraped with the [`filelog`] receiver, host metrics are collected through the [`hostmetrics`] receiver and both signals are enriched with meta information through the [`resourcedetection`] processor.
 
 Data from OTel SDKs is piped through the [`OTLP`] receiver directly to the OTLP exporter that sends data for all signals to the {{motlp}}.
 
-With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`] processors, the [`elasticapm`] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
+With the {{motlp}}, there is no need to configure any Elastic-specific components, such as the [`elasticinframetrics`] and [`elasticapm`][`elasticapm` processor] processors, the [`elasticapm`][`elasticapm` connector] connector, or the [`elasticsearch`] exporter. Edge setup and configuration can be fully vendor agnostic.
+
+### Forwarding to a self-managed Gateway [forwarding-to-a-self-managed-gateway]
+
+When the {{motlp}} isn't an option, {{agent}} in Agent mode can forward all signals over OTLP to {{agent}} in Gateway mode instead.
+
+Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic: no Elastic-specific components are required in Agent mode. Data enrichment and the authenticated export to {{es}} happen centrally in Gateway mode. For guidance on when to use Gateway mode, and the components it requires in self-managed environments, refer to [Deployment modes](/reference/edot-collector/modes.md#edot-collector-as-gateway).
+
+The receivers and processors are the same as in the {{motlp}} configuration. Only the export destination changes, from the {{motlp}} to the OTLP endpoint of your own Gateway:
+
+```yaml
+exporters:
+  # Forwards all signals to a self-managed Gateway over OTLP/gRPC.
+  otlp_grpc/gateway:
+    endpoint: "gateway-host:4317"
+    tls:
+      insecure: false
+      ca_file: /path/to/gateway-ca.crt
+    # Queueing and batching settings match the sample configurations.
+    sending_queue:
+      enabled: true
+      sizer: bytes
+      queue_size: 50000000 # 50MB uncompressed
+      block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1_000_000 # 1MB uncompressed
+        max_size: 4_000_000 # 4MB uncompressed
+
+service:
+  extensions: [file_storage]
+  pipelines:
+    logs/platformlogs:
+      receivers: [file_log/platformlogs]
+      processors: [resourcedetection]
+      exporters: [otlp_grpc/gateway]
+    logs/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp_grpc/gateway]
+    metrics/hostmetrics:
+      receivers: [hostmetrics/system]
+      processors: [resourcedetection]
+      exporters: [otlp_grpc/gateway]
+    metrics/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp_grpc/gateway]
+    traces/fromsdk:
+      receivers: [otlp/fromsdk]
+      processors: []
+      exporters: [otlp_grpc/gateway]
+```
+
+Data from OTel SDKs stays in separate `fromsdk` pipelines without processors, so that the [`resourcedetection`] processor enriches only the locally collected platform logs and host metrics.
+
+The Agent mode configuration needs no [`elasticsearch`] exporter and none of the `elasticapm` or [`elasticinframetrics`] components, because enrichment and the authenticated export to Elastic happen in Gateway mode. To configure the receiving side, refer to [Gateway mode](#gateway-mode).
+
+:::{note}
+With a self-managed Gateway, you own authentication, scaling, and availability. Authentication to {{es}} is configured in Gateway mode, not in Agent mode, so the `otlp_grpc/gateway` exporter needs no Elastic API key. To secure the connection between the two, use TLS or mutual TLS as described in [Secure connection](#secure-connection), or the `apikeyauth` extension.
+:::
+
+To send data from an upstream OpenTelemetry Collector to {{agent}} in Gateway mode, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
 
 ### Batching configuration for contrib OpenTelemetry Collector
 
-When using contrib or upstream OpenTelemetry collectors, the following batching configuration is recommended when sending data to the {{motlp}}:
+When using contrib or upstream OpenTelemetry collectors, the following batching configuration is recommended when sending data to the {{motlp}} or to {{agent}} in Gateway mode:
 
 ```yaml
 otlp/ingest:
@@ -188,7 +254,7 @@ The following example configuration files are available for the Gateway mode:
 ::::
 :::::
 
-Use the previous example configurations as a reference when configuring your Gateway Collector or customizing your {{agent}} configuration.
+Use the previous example configurations as a reference when configuring or customizing {{agent}} in Gateway mode.
 
 ### Data collection
 
