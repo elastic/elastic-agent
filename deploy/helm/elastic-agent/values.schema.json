@@ -547,6 +547,30 @@
                     "type": "boolean",
                     "description": "Enable unprivileged mode."
                 },
+                "openshift": {
+                    "type": "object",
+                    "description": "OpenShift-specific configuration.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": ["string", "boolean"],
+                            "description": "OpenShift detection mode. auto detects via API groups, true always enables, false always disables.",
+                            "default": "auto"
+                        },
+                        "securityContextConstraints": {
+                            "type": "object",
+                            "description": "SCC configuration.",
+                            "additionalProperties": false,
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Create SCC RoleBindings granting the privileged SCC to agent and kube-state-metrics service accounts.",
+                                    "default": true
+                                }
+                            }
+                        }
+                    }
+                },
                 "fleet": {
                     "type": "object",
                     "description": "Elastic-Agent managed configuration.",

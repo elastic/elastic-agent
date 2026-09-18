@@ -1,0 +1,50 @@
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: elastic-agent-standalone
+  labels:
+    app.kubernetes.io/name: elastic-agent-standalone
+  annotations:
+    kubernetes.io/description: >-
+      SCC for Elastic Agent standalone on OpenShift.
+      Grants the least privilege that elastic-agent-standalone-daemonset.yaml needs.
+      Uses spc_t SELinux type for cross-MCS container log access.
+allowHostPID: false
+allowHostIPC: false
+# Required because the daemonset runs with hostNetwork by default.
+allowHostNetwork: true
+allowHostPorts: false
+# Required for /proc, /sys/fs/cgroup, /var/log, and /var/lib/elastic-agent-standalone mounts.
+allowHostDirVolumePlugin: true
+allowPrivilegedContainer: false
+allowPrivilegeEscalation: false
+allowedCapabilities: []
+requiredDropCapabilities:
+  - ALL
+defaultAddCapabilities: []
+# Required because the daemonset runs as root by default.
+runAsUser:
+  type: MustRunAs
+  uid: 0
+fsGroup:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+# Required so the agent can read logs from all containers on the node. The spc_t
+# type bypasses MCS label separation.
+seLinuxContext:
+  type: MustRunAs
+  seLinuxOptions:
+    user: system_u
+    role: system_r
+    type: spc_t
+    level: s0
+volumes:
+  - configMap
+  - downwardAPI
+  - emptyDir
+  - hostPath
+  - projected
+  - secret
+seccompProfiles: []
+readOnlyRootFilesystem: false

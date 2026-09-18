@@ -164,14 +164,18 @@ share similar leavers as the packaging process.
  - `SNAPSHOT=true|false`: Use snapshot build when running Kubernetes
    tests.
 
+ - `BUILD_AGENT=true|false`: Build the agent for the current platform before running.
+
  - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
    instances, possible values are:
      - `gcloud`: Uses the `gcloud` CLI to create VMs on GCP, if not set, that's the default.
      - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
        create local VMs.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
-       in Docker. This needs to be set if running Kubernetes integration
-       tests.
+       in Docker. Use this to run Kubernetes integration tests on Kind.
+     - `microshift`: Uses [MicroShift](https://microshift.io/) to run
+       OpenShift locally. Use this to run Kubernetes integration tests on
+       MicroShift.
      - `docker`: Runs each test batch in a local, systemd-enabled Docker
        container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
        runner drives the container over SSH exactly like a VM. Requires Docker.
@@ -241,8 +245,11 @@ When running local mode integration tests, `BUILD_AGENT=true` will build the age
 
 An example for running a single test, including packaging the artifacts for it is:
 ```
-DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
-INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
+# Create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
+DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package 
+
+# Run TEST_NAME on a multipass VM
+INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME 
 ```
 
 ### TL;DR: Packaging and running tests
@@ -280,11 +287,11 @@ SNAPSHOT=true INSTANCE_PROVISIONER=kind mage -v integration:testKubernetesSingle
 
 #### Kubernetes oriented tests
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
 
 #### Serverless oriented tests
 
@@ -314,7 +321,8 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04" mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022" mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.36.1/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.36.1 with wolfi docker variant under kind cluster.
+- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/amd64/1.36.1/wolfi" mage integration:testKubernetes` to execute Kubernetes tests on Kubernetes version 1.36.1 with the wolfi Docker variant under a Kind cluster.
+- `INSTANCE_PROVISIONER="microshift" TEST_PLATFORMS="kubernetes/amd64/1.35.0/basic" mage integration:testKubernetes` to execute Kubernetes tests on OpenShift version 4.22.0 (Kubernetes 1.35) with the basic Docker variant under a MicroShift cluster.
 
 > [!NOTE]
 > This only filters down the tests based on the platform. It will not execute a tests on a platform unless
@@ -700,6 +708,11 @@ not cause already provisioned resources to be replaced with an instance created 
 Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
 
 - `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
+
+### MicroShift Instance Provisioner
+Use only when running Kubernetes tests on OpenShift. Uses local installed MicroShift to create OpenShift clusters on the fly.
+
+- `INSTANCE_PROVISIONER="microshift" mage integration:testKubernetes`
 
 ### Docker Instance Provisioner
 Runs each test batch in a local, systemd-enabled Docker container (running `sshd`)

@@ -48,8 +48,8 @@ ess_load_secrets
 # Run integration tests
 echo "~~~ Running integration tests"
 
-if [[ "${GROUP_NAME}" == "kubernetes" ]]; then
-  source .buildkite/scripts/install-kubectl.sh
+if [[ "${GROUP_NAME}" == "kubernetes" || "${GROUP_NAME}" == "openshift" ]]; then
+  .buildkite/scripts/install-kubectl.sh
   .buildkite/scripts/buildkite-k8s-integration-tests.sh "$@"
 else
   # test binaries are needed only when running integration tests outside of k8s

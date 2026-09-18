@@ -466,6 +466,16 @@ agent:
   # -- enable unprivileged mode
   # @section -- 6 - Elastic-Agent Configuration
   unprivileged: false
+  # -- OpenShift-specific configuration
+  # @section -- 6 - Elastic-Agent Configuration
+  openshift:
+    # -- OpenShift detection mode. auto detects via API groups, true always enables, false always disables
+    # @section -- 6 - Elastic-Agent Configuration
+    enabled: auto
+    securityContextConstraints:
+      # -- create the SecurityContextConstraints and RoleBindings that let the agent and kube-state-metrics service accounts run on OpenShift
+      # @section -- 6 - Elastic-Agent Configuration
+      create: true
   fleet:
     # -- enable elastic-agent managed
     # @section -- 6.1 - Elastic-Agent Managed Configuration

@@ -18,6 +18,6 @@ spec:
     spec:
       containers:
         - name: flog-unstructured-cont-rot
-          image: mingrammer/flog
+          image: docker.io/mingrammer/flog
           #          too small "-d" won't give kubelet time to rotate the files
           args: ["-t", "stdout", "-d", "1us", "-l"]

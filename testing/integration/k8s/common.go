@@ -25,13 +25,13 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 	configv1 "github.com/openshift/api/config/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 	"github.com/stretchr/testify/require"
 	helmKube "helm.sh/helm/v3/pkg/kube"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -47,6 +47,7 @@ import (
 	aclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
@@ -135,12 +136,11 @@ func k8sGetContext(t *testing.T, info *define.Info) k8sContext {
 	enrollParams, err := fleettools.NewEnrollParams(context.Background(), info.KibanaClient)
 	require.NoError(t, err, "failed to create fleet enroll params")
 
-	// TODO(samuelvl): compare against microshift.Name once the MicroShift instance provisioner is implemented.
-	openshift := os.Getenv("INSTANCE_PROVISIONER") == "microshift"
+	openshift := os.Getenv("INSTANCE_PROVISIONER") == microshift.Name
 	if openshift {
 		scheme := client.Resources().GetScheme()
+		require.NoError(t, securityv1.Install(scheme))
 		require.NoError(t, configv1.Install(scheme))
-		require.NoError(t, apiextensionsv1.AddToScheme(scheme))
 	}
 
 	return k8sContext{
@@ -309,6 +309,18 @@ func k8sKustomizeAdjustObjects(objects []k8s.Object, namespace string, container
 			continue
 		}
 
+		hasTargetContainer := false
+		for _, c := range podSpec.Containers {
+			if c.Name == containerName {
+				hasTargetContainer = true
+				break
+			}
+		}
+
+		if !hasTargetContainer {
+			continue
+		}
+
 		if cbPod != nil {
 			cbPod(podSpec)
 		}
@@ -349,8 +361,8 @@ func k8sDeleteObjects(ctx context.Context, client klient.Client, opts k8sDeleteO
 	}
 
 	if opts.waitTimeout == 0 {
-		// default to 20 seconds
-		opts.waitTimeout = 20 * time.Second
+		// default to 1 minute
+		opts.waitTimeout = 1 * time.Minute
 	}
 
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, opts.waitTimeout)
