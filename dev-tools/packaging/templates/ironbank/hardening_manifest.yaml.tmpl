@@ -45,15 +45,15 @@ resources:
       type: "sha512"
       value: "<insert SHA 512 here>"
   - filename: tinit
-    url: https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64
+    url: {{ .tinit_source }}
     validation:
       type: sha256
-      value: 93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c
+      value: {{ .tinit_sha256 }}
   - filename: jq
-    url: https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+    url: {{ .jq_source }}
     validation:
       type: sha256
-      value: af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44
+      value: {{ .jq_sha256 }}
 
 # List of project maintainers
 maintainers:
