@@ -111,6 +111,7 @@ RUN for unit in \
         getty.target \
         console-getty.service \
         sys-kernel-config.mount \
+        systemd-journald-audit.socket \
     ; do ln -sf /dev/null "/etc/systemd/system/$unit"; done
 
 # This signal causes systemd to halt the machine.
