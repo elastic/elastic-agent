@@ -2108,7 +2108,9 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 		"base_tag":          "10.2",
 		"license_source":    "LICENSE",
 		"tinit_source":      "tinit",
+		"tinit_sha256":      "93dcc18adc78c65a028a84799ecf8ad40c936fdfc5f2a57b1acda5a8117fa82c",
 		"jq_source":         "jq",
+		"jq_sha256":         "af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44",
 		"entrypoint_source": "config/docker-entrypoint",
 	}
 
