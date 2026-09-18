@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"sync"
@@ -60,6 +61,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
+	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
 
@@ -85,6 +87,29 @@ var ErrNotUpgradable = errors.New(
 var ErrNotRestartable = errors.New(
 	"cannot be restarted; must be installed with install sub-command and " +
 		"running under control of the systems supervisor")
+
+// ErrNotUninstallable error is returned when an uninstall cannot be performed
+// because the agent is not an installed, self-managed agent (for example when
+// running from a non-installed binary). Uninstall in a container is reported
+// separately with ErrContainerNotSupported.
+var ErrNotUninstallable = errors.New(
+	"cannot be uninstalled; must be installed with the install sub-command")
+
+// ErrUninstallRequiresRoot error is returned when an uninstall cannot be
+// performed because the agent process lacks the administrator/root privileges
+// required to remove the service. This is the case for unprivileged
+// installations whose service runs as a non-root user; such an agent cannot
+// uninstall itself and the action is acknowledged as failed instead of failing
+// silently.
+var ErrUninstallRequiresRoot = errors.New(
+	"cannot be uninstalled; requires administrator (root) privileges")
+
+// UninstallFleetAckActionIDFlag is the name of the hidden uninstall sub-command
+// flag that carries the Fleet UNINSTALL action ID. The detached uninstaller uses
+// it to acknowledge the action to Fleet. It is defined here because the
+// coordinator builds the uninstall invocation; the uninstall command registers
+// the flag under the same name.
+const UninstallFleetAckActionIDFlag = "fleet-ack-action-id"
 
 // ErrUpgradeInProgress error is returned if two or more upgrades are
 // attempted at the same time.
@@ -727,6 +752,99 @@ func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) erro
 
 	// ReExec sets the override state to Stopping and performs the re-execution.
 	c.ReExec(nil)
+	return nil
+}
+
+// uninstallCmd is overridable in tests so Uninstall can be exercised without
+// actually spawning a process. It builds a detached command that runs the
+// uninstall sub-command from the given executable.
+var uninstallCmd = func(executable string, args ...string) *exec.Cmd {
+	return upgrade.InvokeCmdWithArgs(executable, args...)
+}
+
+// uninstallHasRoot reports whether the current process has the
+// administrator/root privileges required to uninstall. It is a var so tests can
+// override it; it defaults to utils.HasRoot.
+var uninstallHasRoot = utils.HasRoot
+
+// Uninstall fulfils an UNINSTALL action by spawning a detached process that runs
+// the uninstall sub-command. The uninstall cannot run in-process: it stops (and
+// removes) the agent service, which would kill this process mid-operation, so
+// the detached process is created in its own session/process group to outlive
+// the agent.
+//
+// The action is NOT acknowledged here. The detached uninstaller acknowledges it
+// to Fleet at the point of no return, and acknowledges a failure if the
+// uninstall fails before that point (see install.Uninstall). Uninstalling is
+// only possible for an installed agent, running with root/administrator
+// privileges, and is unsupported in containers. When those preconditions are
+// not met an error is returned so the handler can acknowledge the failure to
+// Fleet rather than spawning an uninstaller that would fail silently.
+// Called from external goroutines.
+func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninstall) error {
+	if c.isContainerizedEnvironment() {
+		return ErrContainerNotSupported
+	}
+	if !paths.RunningInstalled() {
+		return ErrNotUninstallable
+	}
+	// An unprivileged agent's service runs as a non-root user and cannot remove
+	// its own service, so it cannot uninstall itself. Fail explicitly instead of
+	// spawning an uninstaller that would exit before it could ack.
+	hasRoot, err := uninstallHasRoot()
+	if err != nil {
+		return fmt.Errorf("failed to determine privileges for uninstall: %w", err)
+	}
+	if !hasRoot {
+		return ErrUninstallRequiresRoot
+	}
+
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to resolve agent executable for uninstall: %w", err)
+	}
+
+	args := []string{
+		"uninstall",
+		"--force",
+		"--path.home", paths.Top(),
+		"--path.config", paths.Config(),
+	}
+	if action != nil && action.ActionID != "" {
+		args = append(args, "--"+UninstallFleetAckActionIDFlag, action.ActionID)
+	}
+
+	cmd := uninstallCmd(executable, args...)
+	// The uninstall sub-command refuses to run from within the install
+	// directory on Windows, so run the detached process from elsewhere.
+	cmd.Dir = os.TempDir()
+
+	// Reflect the imminent shutdown in the reported state.
+	c.SetOverrideState(agentclient.Stopping, "Uninstalling")
+
+	if err := cmd.Start(); err != nil {
+		c.ClearOverrideState()
+		return fmt.Errorf("failed to start uninstall process: %w", err)
+	}
+
+	c.logger.Infow("Uninstall process started",
+		"uninstall.process.pid", cmd.Process.Pid,
+		"agent.process.pid", os.Getpid())
+
+	// A successful uninstall stops the agent's service, which terminates this
+	// process; this goroutine then dies with it. If the uninstaller instead exits
+	// while the agent is still installed (an uninstall failure before the service
+	// is stopped), reap it to avoid a zombie and clear the Stopping override so
+	// the agent does not report Stopping indefinitely after it recovers.
+	go func() {
+		_ = cmd.Wait()
+		if paths.RunningInstalled() {
+			c.logger.Warnw("Uninstall process exited but the agent is still installed; clearing Stopping state",
+				"uninstall.process.pid", cmd.Process.Pid)
+			c.ClearOverrideState()
+		}
+	}()
+
 	return nil
 }
 

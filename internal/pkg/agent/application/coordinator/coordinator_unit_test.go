@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -2976,4 +2977,154 @@ func TestCoordinator_Restart(t *testing.T) {
 			t.Fatal("expected an override state to be set")
 		}
 	})
+}
+
+func TestCoordinator_Uninstall(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	action := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
+
+	// linuxSpecs is a non-container platform so isContainerizedEnvironment is false.
+	linuxSpecs, err := pkgcomponent.NewRuntimeSpecs(
+		pkgcomponent.PlatformDetail{Platform: pkgcomponent.Platform{OS: "linux"}}, nil)
+	require.NoError(t, err)
+
+	t.Run("containerized returns ErrContainerNotSupported and does not spawn", func(t *testing.T) {
+		containerSpecs, err := pkgcomponent.NewRuntimeSpecs(
+			pkgcomponent.PlatformDetail{Platform: pkgcomponent.Platform{OS: pkgcomponent.Container}}, nil)
+		require.NoError(t, err)
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             containerSpecs,
+			logger:            logp.NewLogger("testing"),
+		}
+		err = coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrContainerNotSupported)
+		assert.False(t, spawned, "should not spawn uninstaller in a container")
+	})
+
+	t.Run("not installed returns ErrNotUninstallable and does not spawn", func(t *testing.T) {
+		top := paths.Top()
+		paths.SetTop(t.TempDir()) // empty dir, no install marker
+		t.Cleanup(func() { paths.SetTop(top) })
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+		}
+		err := coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrNotUninstallable)
+		assert.False(t, spawned, "should not spawn uninstaller when not installed")
+	})
+
+	t.Run("installed but not root returns ErrUninstallRequiresRoot and does not spawn", func(t *testing.T) {
+		top := paths.Top()
+		tmpTop := t.TempDir()
+		paths.SetTop(tmpTop)
+		t.Cleanup(func() { paths.SetTop(top) })
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return false, nil })()
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+		}
+		err := coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrUninstallRequiresRoot)
+		assert.False(t, spawned, "should not spawn uninstaller without root")
+	})
+
+	t.Run("installed spawns uninstaller and sets stopping override state", func(t *testing.T) {
+		top := paths.Top()
+		tmpTop := t.TempDir()
+		paths.SetTop(tmpTop)
+		t.Cleanup(func() { paths.SetTop(top) })
+		// Create the install marker so RunningInstalled() reports installed.
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		// Unit tests may run as a non-root user; force the root check to pass so
+		// the spawn path is exercised deterministically.
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		var gotArgs []string
+		restore := overrideUninstallCmd(func(_ string, args ...string) *exec.Cmd {
+			gotArgs = args
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+		}
+		err := coord.Uninstall(ctx, action)
+		require.NoError(t, err)
+
+		assert.Contains(t, gotArgs, "uninstall")
+		assert.Contains(t, gotArgs, "--force")
+		assert.Contains(t, gotArgs, "--"+UninstallFleetAckActionIDFlag)
+		assert.Contains(t, gotArgs, action.ActionID)
+
+		select {
+		case os := <-coord.overrideStateChan:
+			require.NotNil(t, os, "uninstall should set an override state")
+			assert.Equal(t, agentclient.Stopping, os.state)
+		default:
+			t.Fatal("expected an override state to be set")
+		}
+	})
+}
+
+// overrideUninstallCmd swaps the package-level uninstallCmd for tests and returns
+// a function that restores the original.
+func overrideUninstallCmd(fn func(string, ...string) *exec.Cmd) func() {
+	orig := uninstallCmd
+	uninstallCmd = fn
+	return func() { uninstallCmd = orig }
+}
+
+// overrideUninstallHasRoot swaps the package-level uninstallHasRoot for tests and
+// returns a function that restores the original.
+func overrideUninstallHasRoot(fn func() (bool, error)) func() {
+	orig := uninstallHasRoot
+	uninstallHasRoot = fn
+	return func() { uninstallHasRoot = orig }
+}
+
+// noopUninstallCmd returns a harmless, fast-exiting command used in tests to
+// stand in for the real detached uninstaller: it re-invokes the test binary with
+// a run filter that matches no tests, so Start() succeeds on any OS without side
+// effects.
+func noopUninstallCmd() *exec.Cmd {
+	// #nosec G204 G702 -- test-only; arguments are constant and reference the test binary.
+	return exec.CommandContext(context.Background(), os.Args[0], "-test.run", "^$")
 }
