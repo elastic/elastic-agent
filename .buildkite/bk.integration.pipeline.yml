@@ -3,25 +3,25 @@
 env:
   VAULT_PATH: "kv/ci-shared/observability-ingest/cloud/gcp"
   ASDF_MAGE_VERSION: 1.14.0
-  ASDF_KIND_VERSION: "0.27.0"
+  ASDF_KIND_VERSION: "0.32.0"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1781485336"
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1781485336"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1781485336"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1781485336"
-  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1781485336"
-  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1781485336"
-  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1781485336"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1788224497"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1788224497"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1788224497"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1788224497"
+  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1788224497"
+  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1788224497"
+  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1788224497"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1781485336"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1781485336"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1781485336"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1788224497"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1788224497"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1788224497"
   # Same version for all the azure images
-  IMAGE_WIN_VERSION: "1.0.1781485336"
+  IMAGE_WIN_VERSION: "1.0.1789054294"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -118,7 +118,9 @@ common:
       - v1.31.0
       - v1.32.0
       - v1.33.0
-      - &k8s_max_test_version v1.34.0
+      - v1.34.0
+      - v1.35.0
+      - &k8s_max_test_version v1.36.1 # kind doesn't have a v1.36.0 image
     versions_without_min_max: &k8s_test_versions_without_min_max
       - v1.28.15
       - v1.29.14
@@ -126,7 +128,9 @@ common:
       - v1.31.0
       - v1.32.0
       - v1.33.0
-    variants: &k8s_test_variants
+      - v1.34.0
+      - v1.35.0
+    all_variants: &k8s_test_all_variants
       - basic
       - cloud
       - complete
@@ -136,10 +140,16 @@ common:
     default_variants: &k8s_test_default_variants
       - complete
       - complete-wolfi
+    all_variants_without_default: &k8s_test_all_variants_without_default
+      - basic
+      - cloud
+      - service
+      - wolfi
     env: &k8s_test_env
       K8S_VERSION: "{{matrix.version}}"
       DOCKER_VARIANTS: "{{matrix.variants}}"
       TARGET_ARCH: "amd64"
+      K8S_PROVISIONER: "kind"
     agent: &k8s_test_agent
       provider: "gcp"
       machineType: "n2-standard-8"
@@ -158,7 +168,7 @@ common:
     artifact_paths: &k8s_test_artifact_paths
       - build/*
       - build/diagnostics/**
-      - build/*.pod_logs_dump/*
+      - build/k8s-logs-*/**
 
 steps:
   - label: "Custom ECH Testing"
@@ -891,7 +901,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants_without_default
             version:
               - *k8s_min_test_version
               - *k8s_max_test_version
@@ -926,7 +936,7 @@ steps:
         matrix:
           setup:
             variants:
-              *k8s_test_variants
+              *k8s_test_all_variants
             version:
               *k8s_test_versions_without_min_max
 
@@ -1062,4 +1072,3 @@ steps:
           tags:
             - "fips=false"
       - *google_oidc_observability_plugin
-

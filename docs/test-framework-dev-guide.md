@@ -63,18 +63,16 @@ Before you can run any test, you first need to package the Elastic
 Agent version you want to test. For that you'll need to run `mage package`, for example:
 
 ```
-DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+DEV=true mage -v package
 ```
 
-The packaging process has many leavers that need to be correctly set:
+The packaging process has many levers that you may need to set depending on what kind of test you're running. A more advanced invocation might look like:
+
+```bash
+SNAPSHOT=false PLATFORMS=linux/arm64 PACKAGES=docker DOCKER_VARIANTS=complete mage package
+```
 
  - `DEV=true|false`: Build with debug symbols
- - `EXTERNAL=true|false`: If `false` it will not download any components
-   and only include the `elastic-otel-collector` which has `beats` bundled in
-   the resulting package.
- - `SNAPSHOT=true|false`: Whether to use snapshot versions of dependencies
-   (like Beats). Defaults to `true`, which is required to package from the
-   `main` branch with `EXTERNAL=true`. Set `SNAPSHOT=false` for release builds.
  - `PLATFORMS`: Comma separated list of platforms you want to build. If
   not set, it defaults to the **host platform** only. [Selecting specific
   platform](#selecting-specific-platform) contains a list of common
@@ -107,6 +105,32 @@ The packaging process has many leavers that need to be correctly set:
     - `elastic-otel-collector-wolfi`
     - `slim-wolfi`
 
+#### Choosing dependencies and metadata
+
+By default, packaging will build the `elastic-agent` binary from this repository
+and pull the remaining dependencies (beats, osquery, endpoint, ...) from a
+manifest specified in [.package-version](/.package-version).
+This process can be controlled through the following environment variables:
+
+- `AGENT_CORE_SOURCE=local|manifest`: Build the aforementioned binaries locally or pull from the manifest. Default is `local`. Manifest is defined either by [.package-version](/.package-version) or the `MANIFEST_URL` environment variable.
+- `USE_PACKAGE_VERSION=true|false`: Use the content of [.package-version](/.package-version) for configuring the package, most importantly the manifest url, but the version is effective as well. Default is `true`.
+  Only targets that need consistency with the published snapshot build read this file (`package` and the targets built on it,
+  `downloadManifest`, `ironbank`, the `cloud:*` image targets, and the `integration:*` test runners); it has no effect on any
+  other target (for example `helm:package` or plain builds). Providing `MANIFEST_URL` also disables it, since the manifest is
+  then authoritative; explicitly setting both `MANIFEST_URL` and `USE_PACKAGE_VERSION=true` is an error.
+- `MANIFEST_URL`: The manifest url from which to pull the dependencies. Takes precedence over [.package-version](/.package-version). Default is empty.
+- `SNAPSHOT=true|false`: Create a snapshot build. This is just versioning metadata indicating that the
+  package doesn't contain a release build. Read from the manifest if present, otherwise defaults to `true`.
+  For targets that read [.package-version](/.package-version), an explicit value that contradicts the file is an error,
+  because mixing snapshot dependencies with a release package (or vice versa) produces a broken artifact.
+- `EXTERNAL=true|false`: If you want to build with dependencies you've provided locally (you have a custom build of endpoint, for example), then set this to `false` and `USE_PACKAGE_VERSION=false`. Default is `true`.
+
+For example, if you want to create a package the same way as the unified release job, you'd run:
+
+```bash
+MANIFEST_URL=... AGENT_CORE_SOURCE=manifest mage package
+```
+
 ### Running the tests
 
 The test are run with mage using the `integration` namespace, they
@@ -129,21 +153,86 @@ share similar leavers as the packaging process.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
        in Docker. This needs to be set if running Kubernetes integration
        tests.
+     - `docker`: Runs each test batch in a local, systemd-enabled Docker
+       container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
+       runner drives the container over SSH exactly like a VM. Requires Docker.
 
+ - `STACK_PROVISIONER`: Sets the provisioner used to create the Elastic Stack
+   (Elasticsearch, Kibana, Fleet Server) the tests talk to. Possible values are:
+     - `stateful`: Provisions a cloud ESS deployment (the default). Requires an
+       ESS API key (`mage integration:auth`).
+     - `serverless`: Provisions a cloud serverless project. Also requires an ESS
+       API key.
+     - `external`: Uses an existing stack supplied via environment variables
+       (`ELASTICSEARCH_HOST`, `KIBANA_HOST`, `ELASTICSEARCH_USERNAME`,
+       `ELASTICSEARCH_PASSWORD`). It creates and deletes nothing, and needs no
+       cloud account or local stack. Useful in CI, where a stack is provisioned
+       separately before the tests run.
+     - `local`: Brings up a fully local stack with
+       [`elastic-package stack up`](https://github.com/elastic/elastic-package) —
+       no cloud account needed. Requires the `elastic-package` binary on `PATH`
+       (`go install github.com/elastic/elastic-package@latest`, or point
+       `ELASTIC_PACKAGE_BIN` at it). It uses a dedicated elastic-package profile
+       (`elastic-agent-integration`, override with `ELASTIC_PACKAGE_PROFILE`) so it
+       does not disturb a stack you may run yourself in the `default` profile.
+
+       The stack pulls Elastic images from `docker.elastic.co`, including the
+       package-registry image, which requires authentication. Run a one-time
+       `docker login docker.elastic.co` before first use. (elastic-package has no
+       supported way to skip the package-registry — Kibana depends on it — and its
+       image has no override, so authenticating is currently the simplest path.)
+
+   The `local` stack is designed to pair with the `docker` instance provisioner.
+   The local stack serves Elasticsearch/Kibana/Fleet over HTTPS with a self-signed
+   CA, so the runner:
+     - installs that CA into the test container's system trust store, so both the
+       test clients and the agent under test trust the stack with no `--insecure`
+       or per-test certificate configuration (both fall back to the system trust
+       store when no CA is configured); and
+     - attaches the test container to elastic-package's compose network, so the
+       container reaches the stack by service name (`https://elasticsearch:9200`,
+       `https://kibana:5601`, `https://fleet-server:8220`) — the names covered by
+       each service certificate's SANs, so TLS hostname verification passes; and
+     - relaxes a couple of Elasticsearch cluster settings on the single-node local
+       stack (disables disk-watermark-based allocation and raises the per-node shard
+       cap), since the suites create many data streams and would otherwise hit
+     `503 no_shard_available_action_exception`.
+
+   It also works with `mage integration:local`: host-mode tests use the stack's
+   published loopback endpoints and trust its CA via `SSL_CERT_FILE`, without
+   modifying the host's system trust store.
+
+   Remote stack provisioners work with both local and remote instance
+   provisioners. The local stack provisioner requires a local instance
+   provisioner with an implemented connectivity bridge; currently `docker` and
+   the host-local runner are supported. Multipass and Kind are rejected before
+   provisioning until their local-stack networking support is implemented.
+
+   On **macOS** you need to build a Linux package on the same arch as your host. 
+
+   Example (no cloud account required):
+   ```
+   PLATFORMS=linux/$(go env GOARCH) mage package
+   STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
+     TEST_PLATFORMS="linux/$(go env GOARCH)/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
+     TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
+   ```
+
+When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
 An example for running a single test, including packaging the artifacts for it is:
 ```
-EXTERNAL=true DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (default) using external sources for components
+DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
 INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
 ```
 
 ### TL;DR: Packaging and running tests
 **Package the Elastic Agent**
 ```
-# If testing on VMs. SNAPSHOT=true is the default; omit or pass SNAPSHOT=false for release builds.
-DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
+# SNAPSHOT state comes from the manifest in .package-version (a snapshot build); pass SNAPSHOT=false to override.
+DEV=true PACKAGES="tar.gz,deb,rpm" PLATFORMS=linux/amd64 mage -v package
 
 # If running Kubernetes tests. Adjust the variants according to your tests
-DEV=true EXTERNAL=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
+DEV=true PACKAGES="tar.gz,deb,rpm" DOCKER_VARIANTS="basic,complete,elastic-otel-collector" PLATFORMS=linux/amd64 mage -v package
 ```
 
 **Run the tests**
@@ -205,7 +294,7 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04 mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022 mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.33.0/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.33.0 with wolfi docker variant under kind cluster.
+- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.36.1/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.36.1 with wolfi docker variant under kind cluster.
 
 > **_NOTE:_**  This only filters down the tests based on the platform. It will not execute a tests on a platform unless
 > the test defines as supporting it.
@@ -263,6 +352,24 @@ The test itself can be run via the `integration:TestForResourceLeaks` mage targe
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
 is split on space, so not all combination of flags and their values may be correctly split.
+
+#### Test output / live progress (`GOTESTSUM_FORMAT`)
+
+Tests are driven by [`gotestsum`](https://github.com/gotestyourself/gotestsum). By
+default remote runs use its quiet format, which prints nothing until a package
+finishes — so a long-running test appears to hang with no feedback. Set
+`GOTESTSUM_FORMAT` to change the output format (see `gotestsum --help` for the full
+list); the most useful values are:
+
+- `standard-verbose` — streams the full `go test -v` output live, including each
+  test's `t.Log` progress. Best for watching a single long test.
+- `testname` — prints one line per test as it finishes. Less noisy for large batches.
+
+`GOTESTSUM_FORMAT` is honored locally and propagated to the remote host, so it works
+for `integration:test`/`integration:single` as well. For the local provisioners
+(`multipass`/`kind`/`docker`) and `mage integration:local`, `standard-verbose` is the
+default (a human is watching); set `GOTESTSUM_FORMAT` explicitly to override. CI
+(`gcloud`) keeps the quiet default unless the variable is set.
 
 ### Cleaning up resources
 
@@ -532,6 +639,38 @@ not cause already provisioned resources to be replaced with an instance created 
 Use only when running Kubernetes tests. Uses local installed kind to create Kubernetes clusters on the fly.
 
 - `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
+
+### Docker Instance Provisioner
+Runs each test batch in a local, systemd-enabled Docker container (running `sshd`)
+instead of a VM. Because the container runs systemd as PID 1, the privileged
+("sudo") tests that install the Elastic Agent as a systemd service work locally
+without provisioning a cloud VM. The existing Linux runner drives the container over
+SSH exactly like a VM.
+
+- `INSTANCE_PROVISIONER="docker" mage integration:test`
+
+Notes:
+- Requires a running Docker daemon. An Ubuntu image (`elastic-agent-test-systemd`)
+  is built on first use and reused afterwards. The image bakes in the build toolchain
+  (`build-essential`, `unzip`) and the exact Go version from `.go-version`, so the
+  runner's per-instance `Prepare` step is skipped — containers start ready to build.
+  It also pre-installs `mage` and `gotestsum` (at the versions pinned in `go.mod`)
+  with warm Go module/build caches, so the per-run `make mage && mage
+  integration:prepareOnRemote` resolves from cache instead of downloading and
+  compiling. The Go/mage/gotestsum versions and a hash of the `Dockerfile` are part of
+  the image tag, so bumping any of them (`.go-version` or `go.mod`) or editing the
+  `Dockerfile` rebuilds the image.
+- The image also installs Docker Engine and runs a **nested daemon** (docker-in-docker)
+  so tests that start helper containers via testcontainers' docker-compose (e.g. the
+  Kafka and Logstash output tests in `testing/integration/ess/otel_test.go`) work. Those
+  helper containers publish their ports on the test container's own `localhost`, which
+  is what the test code and agent expect (e.g. `KAFKA_ADVERTISED_HOST=localhost`); a
+  mounted host socket could not provide that. The provisioner waits for the nested
+  daemon to be ready before starting tests. The non-root test user (`ubuntu`) is in the
+  `docker` group, so non-sudo tests reach the daemon too. `/var/lib/docker` and
+  `/var/lib/containerd` are backed by volumes (removed with the container via
+  `docker rm -fv`) because the nested daemon's overlay storage cannot stack on the
+  container's own overlay rootfs.
 
 ## Troubleshooting Tips
 

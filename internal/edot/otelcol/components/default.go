@@ -24,7 +24,6 @@ import (
 	hostmetricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/hostmetricsreceiver"
 	httpcheckreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/httpcheckreceiver"
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
-	jmxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jmxreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
@@ -116,7 +115,6 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			zipkinreceiver.NewFactory(),
 			fbreceiver.NewFactory(),
 			mbreceiver.NewFactory(),
-			jmxreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
 			azuremonitorreceiver.NewFactory(),
 		}

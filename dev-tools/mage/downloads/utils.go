@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
@@ -27,15 +28,20 @@ type downloadRequest struct {
 	TargetPath string
 }
 
+// downloadFileBackoff returns the retry policy for downloadFile; a variable so
+// tests can substitute a fast policy.
+var downloadFileBackoff = func() backoff.BackOff {
+	return getExponentialBackoff(time.Minute)
+}
+
 // downloadFile will download a url and store it in a temporary path.
 // It writes to the destination file as it downloads it, without
 // loading the entire file into memory.
 func downloadFile(downloadRequest *downloadRequest) error {
 	stat, _ := os.Stat(downloadRequest.TargetPath)
 
-	exp := getExponentialBackoff(3)
+	exp := downloadFileBackoff()
 
-	retryCount := 1
 	download := func() error {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, downloadRequest.URL, nil)
 		if err != nil {
@@ -48,7 +54,6 @@ func downloadFile(downloadRequest *downloadRequest) error {
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			retryCount++
 			return fmt.Errorf("downloading file %s: %w", downloadRequest.URL, err)
 		}
 		defer func() {
@@ -57,6 +62,14 @@ func downloadFile(downloadRequest *downloadRequest) error {
 
 		if resp.StatusCode == http.StatusNotModified {
 			return nil
+		}
+
+		// Return an error on a bad HTTP status so transient failures (429, 5xx)
+		// are retried instead of the error body being saved as the downloaded
+		// file. Drain the body so the connection can be reused.
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			_, _ = io.Copy(io.Discard, resp.Body)
+			return fmt.Errorf("downloading file %s: bad HTTP status: %d - %q", downloadRequest.URL, resp.StatusCode, resp.Status)
 		}
 
 		targetFile, err := os.Create(downloadRequest.TargetPath)

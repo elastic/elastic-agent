@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source .buildkite/scripts/retry.sh
 source .buildkite/scripts/steps/ess_oblt-cli.sh
 source .buildkite/scripts/steps/fleet.sh
 
 # Make sure that all tools are installed
-asdf install
+retry 3 asdf install
 
 GROUP_NAME=$1
 TEST_SUDO=$2
@@ -24,7 +25,7 @@ fi
 # There is a time when the current snapshot is not available on cloud yet, so we cannot use the latest version automatically
 # This file is managed by an automation (mage integration:UpdateAgentPackageVersion) that check if the snapshot is ready.
 STACK_VERSION="$(jq -r '.stack_version' .package-version)"
-STACK_BUILD_ID="$(jq -r '.stack_build_id' .package-version)"
+STACK_BUILD_ID="$(jq -r '.stack_build_id // ""' .package-version)"
 
 METADATA_PREFIX=""
 if [[ "${FIPS:-false}" == "true" ]]; then

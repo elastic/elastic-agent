@@ -3,11 +3,10 @@ set -euo pipefail
 
 function ess_up() {
   : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
-  : "${2:?Error: Specify stack build id: ess_up [stack_version] [stack_build_id]}"
 
   echo "~~~ Starting ESS Stack"
   local STACK_VERSION=$1
-  local STACK_BUILD_ID=$2
+  local STACK_BUILD_ID=${2:-""}
 
   # Build the oblt-cli command with conditional ElasticAgentDockerImage parameter
   local oblt_cmd=(
@@ -22,9 +21,12 @@ function ess_up() {
     --parameter "ElasticProject=elastic-agent-ci"
   )
 
-  # TODO: use the new template parameter to pass the stack build id, and simplify how to use this.
-  oblt_cmd+=(--parameter "ElasticsearchDockerImage=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${STACK_BUILD_ID}")
-  oblt_cmd+=(--parameter "KibanaDockerImage=docker.elastic.co/cloud-release/kibana-cloud:${STACK_BUILD_ID}")
+  # Snapshot stacks need explicit image tags. Released stacks can be created
+  # from StackVersion alone until the next snapshot build is available.
+  if [ -n "${STACK_BUILD_ID}" ]; then
+    oblt_cmd+=(--parameter "ElasticsearchDockerImage=docker.elastic.co/cloud-release/elasticsearch-cloud-ess:${STACK_BUILD_ID}")
+    oblt_cmd+=(--parameter "KibanaDockerImage=docker.elastic.co/cloud-release/kibana-cloud:${STACK_BUILD_ID}")
+  fi
 
   if [ -n "${INTEGRATION_SERVER_DOCKER_IMAGE:-}" ]; then
     oblt_cmd+=(--parameter "ElasticAgentDockerImage=${INTEGRATION_SERVER_DOCKER_IMAGE}")

@@ -23,6 +23,7 @@ jobs:
           env-vars: |
             SNAPSHOT=false
             HELM_REPO_ENV=prod
+            USE_PACKAGE_VERSION=false
 
       - uses: elastic/oblt-actions/slack/send@v1
         if: ${{ failure()  }}

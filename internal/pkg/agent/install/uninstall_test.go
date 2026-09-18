@@ -7,7 +7,6 @@ package install
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -30,6 +28,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
+
+// noopProgressDescriber is a no-op ProgressDescriber for use in tests.
+type noopProgressDescriber struct{}
+
+func (n *noopProgressDescriber) Describe(string) {}
 
 func Test_checkForUnprivilegedVault(t *testing.T) {
 	type postVaultInit func(t *testing.T, vaultPath string)
@@ -178,7 +181,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 	}}
 
 	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())
-	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
+	pt := &noopProgressDescriber{}
 	var agentID agentInfo = "testID"
 
 	for _, tc := range tests {
@@ -233,13 +236,13 @@ type MockNotifyFleetAuditUninstall struct {
 	Called bool
 }
 
-func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) {
+func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) {
 	m.Called = true
 }
 
 func TestSkipFleetAuditUnenroll(t *testing.T) {
 	log := &logp.Logger{}
-	pt := &progressbar.ProgressBar{}
+	pt := &noopProgressDescriber{}
 	cfg := &configuration.Configuration{}
 	var agentID agentInfo = "testID"
 

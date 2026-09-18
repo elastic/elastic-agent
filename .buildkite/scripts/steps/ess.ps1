@@ -11,11 +11,6 @@ function ess_up {
       return 1
   }
 
-  if (-not $StackBuildId) {
-      Write-Error "Error: Specify stack build id: ess_up [stack_version] [stack_build_id]"
-      return 1
-  }
-
   # Write parameters to a JSON file and pass via --parameters-file.
   # Windows PowerShell 5.1 mangles native-command arguments that contain
   # embedded double quotes (even when passed as a separate argument), so
@@ -31,8 +26,12 @@ function ess_up {
       $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
   }
 
-  $params.ElasticsearchDockerImage = "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:$StackBuildId"
-  $params.KibanaDockerImage = "docker.elastic.co/cloud-release/kibana-cloud:$StackBuildId"
+  # Snapshot stacks need explicit image tags. Released stacks can be created
+  # from StackVersion alone until the next snapshot build is available.
+  if ($StackBuildId) {
+      $params.ElasticsearchDockerImage = "docker.elastic.co/cloud-release/elasticsearch-cloud-ess:$StackBuildId"
+      $params.KibanaDockerImage = "docker.elastic.co/cloud-release/kibana-cloud:$StackBuildId"
+  }
 
   $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
 

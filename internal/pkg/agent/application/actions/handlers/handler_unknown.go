@@ -7,9 +7,9 @@ package handlers
 import (
 	"context"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 // Unknown is a handler for unrecognized actions.

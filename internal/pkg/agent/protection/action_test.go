@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/fleetapi"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"

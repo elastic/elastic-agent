@@ -54,7 +54,7 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 
 	resp, reqErr := http.DefaultClient.Do(req)
 	if reqErr != nil {
-		return filepath, fmt.Errorf("failed to download manifest [%s]\n %w", url, err)
+		return filepath, fmt.Errorf("failed to download manifest [%s]\n %w", url, reqErr)
 	}
 	defer func() {
 		if err := resp.Body.Close(); err != nil {
@@ -62,9 +62,16 @@ func downloadFile(ctx context.Context, url string, filepath string) (string, err
 		}
 	}()
 
+	// Return an error on a bad HTTP status so transient failures (429, 5xx)
+	// are retried by the caller instead of the error body being saved as the
+	// downloaded file.
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("bad HTTP status for GET %q: %d - %q", url, resp.StatusCode, resp.Status)
+	}
+
 	_, errCopy := io.Copy(outFile, resp.Body)
 	if errCopy != nil {
-		return "", fmt.Errorf("failed to decode manifest response [%s]\n %w", url, err)
+		return "", fmt.Errorf("failed to write downloaded file [%s]\n %w", url, errCopy)
 	}
 	if mg.Verbose() {
 		log.Printf("<<<<<<<<< Downloaded: %s to %s", url, filepath)
@@ -89,6 +96,10 @@ func downloadManifestData(ctx context.Context, url string) (Build, error) {
 			panic(err)
 		}
 	}()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return response, fmt.Errorf("bad HTTP status for GET %q: %d - %q", url, resp.StatusCode, resp.Status)
+	}
 
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {

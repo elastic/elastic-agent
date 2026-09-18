@@ -39,8 +39,6 @@ import (
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
-const diagnosticsArchiveGlobPattern = "elastic-agent-diagnostics-*.zip"
-
 var diagnosticsFiles = []string{
 	"package.version",
 	"agent-info.yaml",
@@ -491,6 +489,9 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
+			// Beat receivers register diagnostic hooks per input stream via the OTel receiver
+			// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
+			// at the component level and land under the component directory, same as for process-runtime beats.
 			name:    "filebeat receiver",
 			runtime: "otel",
 			expectedCompDiagnosticsFiles: []string{
@@ -563,7 +564,8 @@ agent.internal.runtime.filebeat.httpjson: process
 					"edot/block.profile.gz",
 					"edot/mutex.profile.gz",
 					"edot/threadcreate.profile.gz",
-					"edot/otel-merged-actual.yaml")
+					"edot/otel-merged-actual.yaml",
+					"edot/environment.yaml")
 			}
 			err = f.Run(ctx, integrationtest.State{
 				Configure:  configBuffer.String(),
@@ -591,6 +593,15 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
+  - id: system-metrics
+    type: system/metrics
+    use_output: default
+    streams:
+      - id: system/metrics-system.cpu
+        metricsets:
+          - cpu
+        period: 1s
+        data_stream.dataset: system.cpu
 agent.grpc:
     port: 6790
 outputs:
@@ -600,6 +611,7 @@ outputs:
     api_key: placeholder
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.metricbeat.system/metrics: otel
 `
 
 	ctx, cancel := testcontext.WithDeadline(t, context.Background(), time.Now().Add(10*time.Minute))
@@ -649,8 +661,14 @@ agent.internal.runtime.filebeat.filestream: otel
 
 	extractZipArchive(t, diagZip, extractionDir)
 
+	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
+	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
+	// at the component level and land under the component directory, same as for process-runtime beats.
+	// The system/metrics component and stream IDs contain "/", exercising association using the
+	// complete component ID before the archive path is normalized to "system-metrics-default".
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
+		"edot/environment.yaml",
 		"edot/allocs.profile.gz",
 		"edot/block.profile.gz",
 		"edot/goroutine.profile.gz",
@@ -660,15 +678,156 @@ agent.internal.runtime.filebeat.filestream: otel
 		"components/filestream-default/registry.tar.gz",
 		"components/filestream-default/beat_metrics.json",
 		"components/filestream-default/input_metrics.json",
+		"components/system-metrics-default/beat_metrics.json",
+		"components/system-metrics-default/input_metrics.json",
+		"logs/elastic-agent-*/elastic-agent-*.ndjson",
 	}
 
 	for _, f := range expectedFiles {
-		path := filepath.Join(extractionDir, f)
-		stat, err := os.Stat(path)
-		require.NoErrorf(t, err, "stat file %q failed", path)
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", path)
+		matches, err := filepath.Glob(filepath.Join(extractionDir, f))
+		require.NoErrorf(t, err, "glob %q failed", f)
+		require.NotEmptyf(t, matches, "no file matching %q", f)
+		stat, err := os.Stat(matches[0])
+		require.NoErrorf(t, err, "stat file %q failed", matches[0])
+		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
 	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
+}
+
+// TestContainerDiagnostics verifies that `elastic-agent diagnostics` collects
+// input request-tracer logs when the agent runs via the `elastic-agent container`
+// entrypoint with a custom STATE_PATH that diverges from the install tree
+// (https://github.com/elastic/elastic-agent/issues/15771).
+func TestContainerDiagnostics(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: "container",
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+	})
+
+	esURL := integration.StartMockES(t, 0, 0, 0, 0)
+
+	// Mock HTTP server polled by the httpjson tracer.
+	httpjsonServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"message":"hello"}`)
+	}))
+	t.Cleanup(httpjsonServer.Close)
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version(), integrationtest.WithAllowErrors())
+	require.NoError(t, err)
+
+	err = agentFixture.Prepare(ctx)
+	require.NoError(t, err)
+
+	// State path is intentionally a subdirectory of the fixture's work dir,
+	// distinct from the install tree (<workDir>/data/elastic-agent-<hash>).
+	// This reproduces the container path layout: paths.Components() points at
+	// the install tree while topPath resolves to STATE_PATH/data.
+	statePath := filepath.Join(agentFixture.WorkDir(), "agent-state")
+	env := []string{"STATE_PATH=" + statePath}
+
+	configTmpl := `
+inputs:
+  - type: httpjson
+    id: httpjson-container-diag-test
+    use_output: default
+    streams:
+      - id: httpjson-container-stream
+        data_stream:
+          dataset: httpjson.generic
+          type: logs
+        request.url: {{ .MockServerURL }}
+        request.tracer.filename: http-request-trace-*.ndjson
+        interval: 1s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{ .ESHost }}]
+    api_key: placeholder
+agent.monitoring.enabled: false
+# otel mode does not initialise paths.Paths.Logs, so the tracer filename validation fails
+agent.internal.runtime.filebeat.httpjson: process
+`
+	var cfgBuf bytes.Buffer
+	require.NoError(t, template.Must(template.New("cfg").Parse(configTmpl)).Execute(&cfgBuf, map[string]any{
+		"MockServerURL": httpjsonServer.URL,
+		"ESHost":        esURL.Host,
+	}))
+
+	cfgFile := filepath.Join(t.TempDir(), "elastic-agent.yml")
+	require.NoError(t, os.WriteFile(cfgFile, cfgBuf.Bytes(), 0o600))
+
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container", "-c", cfgFile}, env)
+	t.Logf("starting agent with: %v", cmd.Args)
+	require.NoError(t, cmd.Start(), "failed to start container cmd")
+	t.Cleanup(func() {
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
+		}
+	})
+
+	require.Eventuallyf(t, func() bool {
+		err = agentFixture.IsHealthy(ctx, integrationtest.WithCmdOptions(withEnv(env)))
+		return err == nil
+	}, 5*time.Minute, time.Second,
+		"agent did not become healthy. Error: %v\nAgent output:\n%s", err, agentOutput)
+
+	// Wait for the tracer to flush; httpjson fires every 1s so 10s is generous.
+	select {
+	case <-time.After(10 * time.Second):
+	case <-ctx.Done():
+		t.Fatal("context cancelled waiting for tracer flush")
+	}
+
+	// Collect diagnostics with STATE_PATH env so the CLI resolves the same control socket.
+	zipPath := filepath.Join(t.TempDir(), "container-diag.zip")
+	_, err = agentFixture.Exec(ctx, []string{"diagnostics", "-f", zipPath}, withEnv(env))
+	require.NoError(t, err, "diagnostics command failed")
+
+	// Verify the trace file is present in the bundle. Before the fix the bundle had an
+	// empty logs/data/components/ directory and no trace files anywhere.
+	extractionDir := t.TempDir()
+	extractZipArchive(t, zipPath, extractionDir)
+
+	traceLogs, err := filepath.Glob(filepath.Join(extractionDir, "logs", "elastic-agent-*", "components", "httpjson", "http-request-trace-*.ndjson"))
+	require.NoError(t, err)
+	require.NotEmpty(t, traceLogs,
+		"container diagnostics bundle is missing httpjson request-tracer logs (reproduces #15771); "+
+			"bundle contents:\n%s", listZipEntries(t, zipPath))
+
+	for _, f := range traceLogs {
+		info, err := os.Stat(f)
+		require.NoError(t, err)
+		assert.Greaterf(t, info.Size(), int64(0), "trace log file %q is empty", f)
+	}
+
+	if t.Failed() {
+		agentFixture.MoveToDiagnosticsDir(zipPath)
+	}
+}
+
+// listZipEntries returns a newline-separated list of all entries in the zip archive,
+// used to produce helpful failure messages.
+func listZipEntries(t *testing.T, zipPath string) string {
+	t.Helper()
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Sprintf("(failed to open zip: %v)", err)
+	}
+	defer r.Close()
+	var sb strings.Builder
+	for _, f := range r.File {
+		sb.WriteString(f.Name)
+		sb.WriteByte('\n')
+	}
+	return sb.String()
 }
 
 func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.ComponentState, diagFiles []string, diagCompFiles []string, fix *integrationtest.Fixture, cmd []string, checkBeatReceiverTraceLogs bool, extraPatterns ...filePattern) func(ctx context.Context) error {
@@ -695,6 +854,7 @@ func testDiagnosticsFactory(t *testing.T, compSetup map[string]integrationtest.C
 		}
 
 		diagZip, err := fix.ExecDiagnostics(ctx, cmd...)
+		require.NoError(t, err)
 
 		// get the version of the running agent
 		avi, err := getRunningAgentVersion(ctx, fix)
@@ -794,7 +954,7 @@ func extractZipArchive(t *testing.T, zipFile string, dst string) {
 
 	t.Logf("extracting diagnostic archive in dir %q", dst)
 	for _, zf := range zReader.File {
-		filePath := filepath.Join(dst, zf.Name)
+		filePath := filepath.Join(dst, zf.Name) //nolint:gosec // G305: test file
 		t.Logf("unzipping file %q", filePath)
 		require.Truef(t, strings.HasPrefix(filePath, filepath.Clean(dst)+string(os.PathSeparator)), "file %q points outside of extraction dir %q", filePath, dst)
 
@@ -824,7 +984,7 @@ func extractSingleFileFromArchive(t *testing.T, src *zip.File, dst string) {
 
 	defer srcFile.Close()
 
-	_, err = io.Copy(dstFile, srcFile)
+	_, err = io.Copy(dstFile, srcFile) //nolint:gosec // G110: test file
 	require.NoErrorf(t, err, "error copying content from zipped file %q to extracted file %q", src.Name, dst)
 }
 

@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+_SELF=$(dirname "$0")
+# shellcheck source=.buildkite/scripts/retry.sh
+source "${_SELF}/../retry.sh"
+
 DRY_RUN="${DRA_DRY_RUN:=""}"
 WORKFLOW="${DRA_WORKFLOW:=""}"
 COMMIT="${DRA_COMMIT:="${BUILDKITE_COMMIT:=""}"}"
@@ -57,7 +61,7 @@ function run_release_manager() {
 }
 
 echo "~~~ Fetch Release Manager Docker image"
-docker pull docker.elastic.co/infra/release-manager:latest
+retry 3 docker pull docker.elastic.co/infra/release-manager:latest
 
 echo "+++ Release Manager Workflow: ${WORKFLOW} / Branch: ${BRANCH} / VERSION_QUALIFIER: ${VERSION_QUALIFIER} / Commit: ${COMMIT}"
 run_release_manager "list" "${DRA_PROJECT_ID}" "${DRA_PROJECT_ARTIFACT_ID}" "${WORKFLOW}" "${COMMIT}" "${BRANCH}" "${PACKAGE_VERSION}"

@@ -1,4 +1,5 @@
 # Directories
+/.claude/worktrees
 /.agent-testing
 /.integration-cache
 /.ogc-cache
@@ -62,4 +63,5 @@ pkg/component/fake/component/component
 pkg/core/process/testsignal/testsignal
 internal/pkg/agent/install/testblocking/testblocking
 internal/pkg/otel/manager/testing/testing
-pkg/core/process/testsignal/testsignal
+internal/edot/testing/testing
+.claude/settings.local.json
