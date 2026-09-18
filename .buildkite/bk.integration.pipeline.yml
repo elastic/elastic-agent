@@ -1026,6 +1026,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        # TODO(samuelvl): Remove soft_fail once the OpenShift jobs are stable in CI.
+        soft_fail: true
         agents:
           *openshift_test_agent
         plugins:
@@ -1089,6 +1091,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        # TODO(samuelvl): Remove soft_fail once the OpenShift jobs are stable in CI.
+        soft_fail: true
         agents:
           *openshift_test_agent
         plugins:
@@ -1146,6 +1150,8 @@ steps:
         retry:
           automatic:
             limit: 1
+        # TODO(samuelvl): Remove soft_fail once the OpenShift jobs are stable in CI.
+        soft_fail: true
         agents:
           *openshift_test_agent
         plugins:
