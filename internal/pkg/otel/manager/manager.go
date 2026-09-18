@@ -13,6 +13,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -94,10 +95,27 @@ type OTelManager struct {
 	// Agent info for otel config generation
 	agentInfo info.Agent
 
-	healthCheckExtComponentID string
-	collectorMetricsPort      int
-	collectorCfg              *confmap.Conf
-	components                []component.Component
+	// opampExtComponentID is the OTel component ID of the opamp extension we
+	// inject into every collector configuration (e.g. "opamp/<uuid>").
+	opampExtComponentID string
+	// opampInstanceUID is the UUIDv7 the opamp extension reports as its
+	// instance ID. It is stable for the lifetime of the manager so collector
+	// restarts present as the same OpAMP agent.
+	opampInstanceUID string
+	// opampSocketPath is the unique per-instance IPC address for the OpAMP
+	// server. The full UUID (not just the timestamp prefix) is embedded in the
+	// name: UUIDv7's high 32 bits only change every ~65 s, so tests running
+	// within that window would collide if only the prefix were used. Go's
+	// UnixListener.Close() unlinks the socket file by path, so two managers at
+	// the same path would cause one manager's Close() to delete the other's file.
+	opampSocketPath string
+	// opampServer is the OpAMP HTTP server the supervised collector polls for
+	// status reporting. Its lifetime is managed by the Run loop.
+	opampServer *OpAMPServer
+
+	collectorMetricsPort int
+	collectorCfg         *confmap.Conf
+	components           []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
 	// the mergedCollectorCfg is nil then the collector is not running.
@@ -106,6 +124,16 @@ type OTelManager struct {
 
 	currentCollectorStatus *status.AggregateStatus
 	currentComponentStates map[string]runtime.ComponentComponentState
+
+	// opampSession is the active per-collector status session. nil while the
+	// collector is not running. Owned by the run loop; do not access from
+	// other goroutines.
+	opampSession *opampSession
+
+	// internalCollectorStatusCh carries translated statuses from the active
+	// opamp session into the run loop. Buffered(1); use reportCollectorStatus
+	// to write so older statuses are dropped in favor of newer ones.
+	internalCollectorStatusCh chan *status.AggregateStatus
 
 	// Update channels for forwarding updates to the run loop
 	updateCh chan configUpdate
@@ -160,22 +188,15 @@ func NewOTelManager(
 	var recoveryTimer collectorRecoveryTimer
 	var err error
 
-	hcUUID, err := uuid.NewV4()
+	opampUUID, err := uuid.NewV7()
 	if err != nil {
-		return nil, fmt.Errorf("cannot generate UUID: %w", err)
+		return nil, fmt.Errorf("cannot generate opamp instance UUID: %w", err)
 	}
-	hcUUIDStr := hcUUID.String()
+	opampInstanceUID := opampUUID.String()
 
 	// determine the otel collector metrics port
 	collectorMetricsPort := 0
-	collectorHealthCheckPort := 0
 	if agentCollectorConfig != nil {
-		if agentCollectorConfig.HealthCheckConfig.Endpoint != "" {
-			collectorHealthCheckPort, err = agentCollectorConfig.HealthCheckConfig.Port()
-			if err != nil {
-				return nil, fmt.Errorf("invalid collector health check port: %w", err)
-			}
-		}
 		if agentCollectorConfig.TelemetryConfig.Endpoint != "" {
 			collectorMetricsPort, err = agentCollectorConfig.TelemetryConfig.Port()
 			if err != nil {
@@ -184,20 +205,28 @@ func NewOTelManager(
 		}
 	}
 
-	componentType, err := otelcomponent.NewType(healthCheckExtensionName)
+	componentType, err := otelcomponent.NewType(opampExtensionName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create component type: %w", err)
 	}
-	healthCheckExtComponentID := otelcomponent.NewIDWithName(componentType, hcUUIDStr).String()
+	opampExtComponentID := otelcomponent.NewIDWithName(componentType, opampInstanceUID).String()
+
+	// Derive a unique socket path from the full UUID (dashes stripped). Using all
+	// 128 bits (not just the timestamp prefix) avoids collisions: UUIDv7's high
+	// 32 bits only change every ~65 s, so sequential tests sharing that prefix
+	// would pick the same socket path and Go's UnixListener.Close() would unlink
+	// the other manager's file.
+	opampSocketName := "opamp-" + strings.ReplaceAll(opampInstanceUID, "-", "") + ".sock"
+	opampSocketPath := paths.SocketFromPath(goruntime.GOOS, paths.Top(), opampSocketName)
 
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
-		execFactory = func(collectorPath string, healthCheckExtensionID string, healthCheckPort int) (collectorExecution, error) {
-			return newSubprocessExecution(collectorPath, healthCheckExtensionID, healthCheckPort, enablePartialReload)
+		execFactory = func(collectorPath string) (collectorExecution, error) {
+			return newSubprocessExecution(collectorPath, enablePartialReload)
 		}
 	}
-	exec, err = execFactory(executable, healthCheckExtComponentID, collectorHealthCheckPort)
+	exec, err = execFactory(executable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create execution: %w", err)
 	}
@@ -206,9 +235,12 @@ func NewOTelManager(
 		managerLogger:             managerLogger,
 		collectorLogger:           collectorLogger,
 		agentInfo:                 agentInfo,
-		healthCheckExtComponentID: healthCheckExtComponentID,
+		opampExtComponentID:       opampExtComponentID,
+		opampInstanceUID:          opampInstanceUID,
+		opampSocketPath:           opampSocketPath,
 		collectorMetricsPort:      collectorMetricsPort,
 		errCh:                     make(chan error, 1), // holds at most one error
+		internalCollectorStatusCh: make(chan *status.AggregateStatus, 1),
 		collectorStatusCh:         make(chan *status.AggregateStatus, 1),
 		// componentStateCh uses a buffer channel to ensure that no state transitions are missed and to prevent
 		// any possible case of deadlock, 5 is used just to give a small buffer.
@@ -228,11 +260,28 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	var err error
 	m.proc = nil
 
-	// collectorStatusCh is used internally by the otel collector to send status updates to the manager
-	// this channel is buffered because it's possible for the collector to send a status update while the manager is
-	// waiting for the collector to exit
-	collectorStatusCh := make(chan *status.AggregateStatus, 1)
-	forceFetchStatusCh := make(chan struct{}, 1)
+	opampLis, err := listenOpAMPSocket(m.managerLogger, m.opampSocketPath)
+	if err != nil {
+		return fmt.Errorf("failed to create opamp ipc listener: %w", err)
+	}
+	opampSrv, err := NewOpAMPServerOnListener(m.managerLogger.Named("opamp_server"), opampLis)
+	if err != nil {
+		_ = opampLis.Close()
+		return fmt.Errorf("failed to start opamp server: %w", err)
+	}
+	m.opampServer = opampSrv
+	defer func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		_ = m.opampServer.Stop(stopCtx)
+		cancel()
+	}()
+
+	// statusFn receives translated statuses from the active opamp session and
+	// forwards them onto m.internalCollectorStatusCh, where the Run loop's
+	// select picks them up for post-processing.
+	statusFn := func(ctx context.Context, st *status.AggregateStatus) {
+		reportCollectorStatus(ctx, m.internalCollectorStatusCh, st)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -241,7 +290,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			m.recoveryTimer.Stop()
 			// our caller context is cancelled so stop the collector and return
-			// has exited.
 			m.stopCollector()
 			return ctx.Err()
 		case <-m.recoveryTimer.C():
@@ -259,7 +307,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 			newRetries := m.recoveryRetries.Add(1)
 			m.managerLogger.Infof("collector recovery restarting, total retries: %d", newRetries)
-			err = m.startCollector(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
+			err = m.startCollector(ctx, statusFn, m.collectorRunErr)
 			if err != nil {
 				m.reportStartupErr(ctx, err)
 			}
@@ -272,12 +320,17 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					continue
 				}
 
+				// the collector has exited; tear down the active opamp session
+				// so the watchdog stops.
+				m.closeOpAMPSession()
+
 				// no critical error from this point forward
 				reportErr(ctx, m.errCh, nil)
 
 				if !m.collectorShouldRun() {
 					// no configuration then the collector should not be
-					// running.
+					// running. Signal "collector is off" downstream.
+					m.emitCollectorOff(ctx)
 					continue
 				}
 
@@ -285,7 +338,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 
 				// in this rare case the collector stopped running but a configuration was
 				// provided and the collector stopped with a clean exit
-				err = m.startCollector(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
+				err = m.startCollector(ctx, statusFn, m.collectorRunErr)
 				if err != nil {
 					m.reportStartupErr(ctx, err)
 				}
@@ -297,6 +350,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				// in the case that the configuration is invalid there is no reason to
 				// try again as it will keep failing so we do not trigger a restart
 				// pass the error to the errCh so the coordinator, unless it's a cancel error
+				m.closeOpAMPSession()
 				if !errors.Is(err, context.Canceled) {
 					// report a startup error (this gets reported as status)
 					m.reportStartupErr(ctx, err)
@@ -340,7 +394,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				m.managerLogger.Debugf(
 					"new config hash (%d) is different than the old config hash (%d), applying update",
 					m.mergedCollectorCfgHash, previousConfigHash)
-				applyErr := m.applyMergedConfig(ctx, collectorStatusCh, m.collectorRunErr, forceFetchStatusCh)
+				applyErr := m.applyMergedConfig(ctx, statusFn, m.collectorRunErr)
 				// only report the error if we actually apply the update
 				// otherwise, we could override an actual error with a nil in the channel when the collector
 				// state doesn't actually change
@@ -351,17 +405,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 					m.mergedCollectorCfgHash, previousConfigHash)
 
 				// there was a config update, but the hash hasn't changed.
-				// Force fetch the latest collector status in case the user modified the output.status_reporting flag.
-				//
-				// drain the channel first
-				select {
-				case <-forceFetchStatusCh:
-				default:
+				// Re-emit the latest status in case the user modified the
+				// output.status_reporting flag.
+				if m.opampSession != nil {
+					m.opampSession.ForceResend()
 				}
-				forceFetchStatusCh <- struct{}{}
 			}
 
-		case otelStatus := <-collectorStatusCh:
+		case otelStatus := <-m.internalCollectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
 			if err != nil {
 				// critical error and not handling the status update correctly
@@ -398,25 +449,56 @@ func (m *OTelManager) collectorShouldRun() bool {
 	return m.mergedCollectorCfg != nil
 }
 
-// stopCollector stops the otel collector. This function is idempotent.
+// stopCollector stops the otel collector and tears down the active opamp
+// session. This function is idempotent.
 func (m *OTelManager) stopCollector() {
 	if m.proc != nil {
 		m.proc.Stop(m.stopTimeout)
 		m.proc = nil
 	}
+	m.closeOpAMPSession()
+}
+
+// closeOpAMPSession closes the active opamp session if one exists, and
+// drains any pending status update from the internal channel so a stale
+// status from the closed session can't overwrite a subsequent emit.
+func (m *OTelManager) closeOpAMPSession() {
+	if m.opampSession != nil {
+		m.opampServer.CloseSession()
+		m.opampSession = nil
+	}
+	select {
+	case <-m.internalCollectorStatusCh:
+	default:
+	}
+}
+
+// emitCollectorOff signals to consumers (via the public collector status
+// channel) that the collector is fully off — no longer running and no
+// configuration to start it. Used when the collector has been shut down
+// intentionally (configuration removed, manager stopped) rather than due to
+// an error, since error paths report the fatal-error status instead.
+func (m *OTelManager) emitCollectorOff(ctx context.Context) {
+	reportCollectorStatus(ctx, m.collectorStatusCh, nil)
 }
 
 // startCollector starts the otel collector. This function is not idempotent and will error if the collector is running.
+// It opens an opamp session before launching the process so the initial
+// StatusStarting and the watchdog are active even if the process dies before
+// it manages to connect back.
 func (m *OTelManager) startCollector(ctx context.Context,
-	collectorStatusCh chan *status.AggregateStatus,
+	statusFn func(context.Context, *status.AggregateStatus),
 	collectorRunErr chan error,
-	forceFetchStatusCh chan struct{},
 ) error {
 	if m.collectorRunning() {
 		return errors.New("tried to start otel collector, but it's already running")
 	}
+
+	// Open the opamp session first; it emits StatusStarting synchronously.
+	m.opampSession = m.opampServer.StartSession(ctx, statusFn)
+
 	proc, err := m.execution.startCollector(ctx, m.managerLogger, m.collectorLogger, m.collectorLogLevel,
-		m.mergedCollectorCfg, collectorRunErr, collectorStatusCh, forceFetchStatusCh)
+		m.mergedCollectorCfg, collectorRunErr)
 	if err != nil {
 		// failed to create the collector (this is different then
 		// it's failing to run). we do not retry creation on failure
@@ -424,6 +506,7 @@ func (m *OTelManager) startCollector(ctx context.Context,
 		// it not to fail (a new configuration will result in the retry)
 		// since this is a new configuration we want to start the timer
 		// from the initial delay
+		m.closeOpAMPSession()
 		recoveryDelay := m.recoveryTimer.ResetNext()
 		m.managerLogger.Errorf("collector exited with error (will try to recover in %s): %v", recoveryDelay.String(), err)
 	} else {
@@ -510,11 +593,19 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, err
 	}
 
-	// Inject health check extension with port 0 as a placeholder. The actual port is resolved
-	// per-start by the execution layer and passed to the collector via a CLI flag, where a
-	// confmap converter overrides the placeholder with the real port.
-	if err := injectHealthCheckV2Extension(mergedOtelCfg, m.healthCheckExtComponentID, 0); err != nil {
-		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
+	// Inject the opamp extension pointed at the manager's local OpAMP server.
+	// The endpoint is stable for the lifetime of the manager so the same
+	// merged config is reusable across collector restarts.
+	if err := injectOpAMPExtension(
+		mergedOtelCfg,
+		m.opampExtComponentID,
+		m.opampInstanceUID,
+		m.opampServer.Endpoint(),
+		m.opampServer.SocketPath(),
+		m.opampServer.SocketTransport(),
+		m.opampServer.secret,
+	); err != nil {
+		return nil, fmt.Errorf("failed to inject opamp extension: %w", err)
 	}
 
 	if err := addCollectorMetricsReader(mergedOtelCfg, m.collectorMetricsPort); err != nil {
@@ -768,13 +859,21 @@ func injectMonitoringReceiver(
 
 func (m *OTelManager) applyMergedConfig(
 	ctx context.Context,
-	collectorStatusCh chan *status.AggregateStatus,
+	statusFn func(context.Context, *status.AggregateStatus),
 	collectorRunErr chan error,
-	forceFetchStatusCh chan struct{},
 ) error {
 	// No configuration, the collector should not be running.
 	if !m.collectorShouldRun() {
+		wasRunning := m.collectorRunning() || m.opampSession != nil
 		m.stopCollector()
+		if wasRunning {
+			m.emitCollectorOff(ctx)
+			// Emit STOPPED for all tracked otel-managed components. When the collector
+			// stops, the OpAMP session is closed and no further status updates arrive, so
+			// we must proactively emit STOPPED here to clear them from the coordinator state.
+			stoppedUpdates := m.processComponentStates(nil)
+			m.reportComponentStateUpdates(ctx, stoppedUpdates)
+		}
 		return nil
 	}
 
@@ -782,7 +881,7 @@ func (m *OTelManager) applyMergedConfig(
 
 	// Collector isn't running yet, start it.
 	if !m.collectorRunning() {
-		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+		err := m.startCollector(ctx, statusFn, collectorRunErr)
 		if err != nil {
 			// this is a new configuration, so reset the recovery timer
 			m.recoveryTimer.ResetInitial()
@@ -796,7 +895,16 @@ func (m *OTelManager) applyMergedConfig(
 	// stdout and stderr.
 	if m.proc.LogLevel() != m.collectorLogLevel {
 		m.stopCollector()
-		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
+		// stopCollector() waits for the old process to be reaped. If the process was
+		// SIGKILLed (shutdown timeout exceeded), reportProcessExitErr sends the last
+		// log line as an error to collectorRunErr. Drain it here so the run loop does
+		// not misinterpret the stale exit error as a failure of the new process we're
+		// about to start.
+		select {
+		case <-collectorRunErr:
+		default:
+		}
+		err := m.startCollector(ctx, statusFn, collectorRunErr)
 		if err != nil {
 			// this is a new configuration, so reset the recovery timer
 			m.recoveryTimer.ResetInitial()
@@ -866,7 +974,7 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:elastic_diagnostics"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case extensionKey == "extension:"+m.healthCheckExtComponentID:
+				case extensionKey == "extension:"+m.opampExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)

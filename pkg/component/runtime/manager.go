@@ -108,6 +108,10 @@ type Manager struct {
 	monitor    MonitoringManager
 	grpcConfig *configuration.GRPCConfig
 
+	// preCreatedListener is set via WithListener to share a port (e.g. via
+	// cmux). When non-nil, Run uses it instead of creating its own listener.
+	preCreatedListener net.Listener
+
 	// Set when the RPC server is ready to receive requests, for use by tests.
 	serverReady chan struct{}
 
@@ -137,6 +141,18 @@ type Manager struct {
 	doneChan chan struct{}
 }
 
+// ManagerOption configures a Manager.
+type ManagerOption func(*Manager)
+
+// WithListener supplies a pre-created TCP listener for the gRPC server.
+// When set, Run skips creating its own listener and uses this one instead.
+// Intended for sharing a port with other services via connection multiplexing.
+func WithListener(lis net.Listener) ManagerOption {
+	return func(m *Manager) {
+		m.preCreatedListener = lis
+	}
+}
+
 // NewManager creates a new manager.
 func NewManager(
 	logger,
@@ -145,6 +161,7 @@ func NewManager(
 	tracer *apm.Tracer,
 	monitor MonitoringManager,
 	grpcConfig *configuration.GRPCConfig,
+	opts ...ManagerOption,
 ) (*Manager, error) {
 	ca, err := authority.NewCA()
 	if err != nil {
@@ -180,6 +197,9 @@ func NewManager(
 		serverReady:   make(chan struct{}),
 		doneChan:      make(chan struct{}),
 	}
+	for _, opt := range opts {
+		opt(m)
+	}
 	return m, nil
 }
 
@@ -197,7 +217,9 @@ func (m *Manager) Run(ctx context.Context) error {
 		server   *grpc.Server
 		wgServer sync.WaitGroup
 	)
-	if m.isLocal {
+	if m.preCreatedListener != nil {
+		listener = m.preCreatedListener
+	} else if m.isLocal {
 		listener, err = ipc.CreateListener(m.logger, m.listenAddr)
 	} else {
 		listener, err = (&net.ListenConfig{}).Listen(ctx, "tcp", m.listenAddr)
