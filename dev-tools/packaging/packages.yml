@@ -854,6 +854,23 @@ shared:
     <<: *agent_docker_spec
     docker_variant: 'complete-wolfi'
 
+  - &agent_docker_ironbank_spec
+    <<: *agent_docker_spec
+    docker_variant: 'ironbank'
+    extra_vars:
+      dockerfile: '../ironbank/Dockerfile.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      base_registry: 'registry.access.redhat.com'
+      base_image: 'ubi10/ubi'
+      base_tag: '10.2'
+      license_source: 'beat/LICENSE.txt'
+      tinit_source: 'https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64'
+      jq_source: 'https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
+      entrypoint_source: 'docker-entrypoint'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+
   #
   # License modifiers for the Elastic License
   #
@@ -942,6 +959,14 @@ specs:
         <<: *docker_ubi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_complete_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *agent_docker_ironbank_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
 
