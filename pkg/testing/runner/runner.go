@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	tssh "github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"github.com/elastic/elastic-agent/pkg/testing/supported"
@@ -79,6 +81,9 @@ type Runner struct {
 
 // NewRunner creates a new runner based on the provided batches.
 func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.StackProvisioner, batches ...define.Batch) (*Runner, error) {
+	if err := validateProvisionerCompatibility(ip, sp); err != nil {
+		return nil, err
+	}
 	err := cfg.Validate()
 	if err != nil {
 		return nil, err
@@ -128,6 +133,20 @@ func NewRunner(cfg common.Config, ip common.InstanceProvisioner, sp common.Stack
 		return nil, err
 	}
 	return r, nil
+}
+
+func validateProvisionerCompatibility(ip common.InstanceProvisioner, sp common.StackProvisioner) error {
+	if sp.Location() == common.ProvisionerLocationRemote {
+		return nil
+	}
+	if ip.Location() == common.ProvisionerLocationRemote {
+		return fmt.Errorf("instance provisioner %q is remote and cannot reach local stack provisioner %q", ip.Name(), sp.Name())
+	}
+	compatible, ok := ip.(common.LocalStackCompatible)
+	if !ok || !compatible.SupportsLocalStack() {
+		return fmt.Errorf("local instance provisioner %q does not yet support local stack provisioner %q", ip.Name(), sp.Name())
+	}
+	return nil
 }
 
 // Logger returns the logger used by the runner.
@@ -240,10 +259,8 @@ func (r *Runner) Clean() error {
 	for _, i := range r.state.Instances {
 		instances = append(instances, i.Instance)
 	}
-	r.state.Instances = nil
 	stacks := make([]common.Stack, len(r.state.Stacks))
 	copy(stacks, r.state.Stacks)
-	r.state.Stacks = nil
 	r.logger.Logf("Cleaning up %d instance(s) and %d stack(s) from state", len(instances), len(stacks))
 	for _, inst := range instances {
 		r.logger.Logf("  - instance: name=%s provisioner=%s ip=%s", inst.Name, inst.Provisioner, inst.IP)
@@ -251,11 +268,6 @@ func (r *Runner) Clean() error {
 	for _, st := range stacks {
 		r.logger.Logf("  - stack: id=%s provisioner=%s", st.ID, st.Provisioner)
 	}
-	err := r.writeState()
-	if err != nil {
-		return err
-	}
-
 	var g errgroup.Group
 	g.Go(func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -271,7 +283,14 @@ func (r *Runner) Clean() error {
 			}
 		}(stack))
 	}
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		// Preserve the state so cleanup can be retried. Provisioner cleanup
+		// operations are expected to tolerate resources that are already gone.
+		return err
+	}
+	r.state.Instances = nil
+	r.state.Stacks = nil
+	return r.writeState()
 }
 
 func (r *Runner) stackEnv(batch common.OSBatch, logger common.Logger) (map[string]string, error) {
@@ -285,16 +304,34 @@ func (r *Runner) stackEnv(batch common.OSBatch, logger common.Logger) (map[strin
 		if err != nil {
 			return nil, err
 		}
-		env["ELASTICSEARCH_HOST"] = stack.Elasticsearch
+		elasticsearchHost := stack.Elasticsearch
+		kibanaHost := stack.Kibana
+		integrationsServer := stack.IntegrationsServer
+		if r.ip.Type() == common.ProvisionerTypeLocal {
+			elasticsearchHost = internalString(stack.Internal, "host_elasticsearch", elasticsearchHost)
+			kibanaHost = internalString(stack.Internal, "host_kibana", kibanaHost)
+			integrationsServer = internalString(stack.Internal, "host_integrations_server", integrationsServer)
+			if caCertPath := internalString(stack.Internal, "ca_cert_path", ""); caCertPath != "" {
+				env["SSL_CERT_FILE"] = caCertPath
+			}
+		}
+		env["ELASTICSEARCH_HOST"] = elasticsearchHost
 		env["ELASTICSEARCH_USERNAME"] = stack.Username
 		env["ELASTICSEARCH_PASSWORD"] = stack.Password
-		env["KIBANA_HOST"] = stack.Kibana
+		env["KIBANA_HOST"] = kibanaHost
 		env["KIBANA_USERNAME"] = stack.Username
 		env["KIBANA_PASSWORD"] = stack.Password
-		env["ELASTIC_APM_SERVER_URL"] = stack.IntegrationsServer
-		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", stack.Kibana)
+		env["ELASTIC_APM_SERVER_URL"] = integrationsServer
+		logger.Logf("Using Stack with Kibana host %s, credentials available under .integration-cache", kibanaHost)
 	}
 	return env, nil
+}
+
+func internalString(internal map[string]interface{}, key, fallback string) string {
+	if value, ok := internal[key].(string); ok && value != "" {
+		return value
+	}
+	return fallback
 }
 
 func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
@@ -407,8 +444,12 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return common.OSRunnerResult{}, fmt.Errorf("failed to determine SSH private key path: %w", err)
 	}
 
-	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, instance.Username, instance.IP)
-	client := tssh.NewClient(instance.IP, instance.Username, sshAuth, logger)
+	sshPort := ""
+	if instance.SSHPort != 0 {
+		sshPort = strconv.Itoa(instance.SSHPort)
+	}
+	logger.Logf("Starting SSH; connect with `ssh -i %s -p %s %s@%s`", sshPrivateKeyPath, sshPort, instance.Username, instance.IP)
+	client := tssh.NewClient(instance.IP, sshPort, instance.Username, sshAuth, logger)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	err = client.Connect(connectCtx)
@@ -447,6 +488,38 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return common.OSRunnerResult{}, err
 	}
 
+	if batch.Batch.Stack != nil {
+		stack, err := r.getStackForBatchID(batch.ID)
+		if err != nil {
+			return common.OSRunnerResult{}, err
+		}
+
+		// If the stack serves TLS with a private CA (local stacks do; cloud stacks
+		// use publicly-trusted certs and leave this empty), install it into the
+		// instance's system trust store. Both the test clients and the agent under
+		// test fall back to the system trust store when no CA is configured, so this
+		// makes them trust the stack with no per-test configuration.
+		if stack.CACert != "" {
+			if err := installStackCA(ctx, client, logger, stack.CACert); err != nil {
+				return common.OSRunnerResult{}, fmt.Errorf("failed to install stack CA on instance %s: %w", instance.Name, err)
+			}
+		}
+
+		// If the stack lives on its own network (local stacks) and the instance
+		// provisioner can attach to it, join the instance so it resolves the stack's
+		// services by name — which is what their TLS certificate SANs cover.
+		if network, ok := stack.Internal["network"].(string); ok && network != "" {
+			if na, ok := r.ip.(common.InstanceNetworkAttacher); ok {
+				logger.Logf("Attaching instance to stack network %s", network)
+				if err := na.AttachInstanceToNetwork(ctx, instance.Instance, network); err != nil {
+					return common.OSRunnerResult{}, fmt.Errorf("failed to attach instance %s to stack network %s: %w", instance.Name, network, err)
+				}
+			} else {
+				logger.Logf("Stack advertises network %s but instance provisioner %q cannot attach to it; tests may not reach the stack", network, r.ip.Name())
+			}
+		}
+	}
+
 	// set the go test flags
 	env["GOTEST_FLAGS"] = r.cfg.TestFlags
 	env["TEST_BINARY_NAME"] = r.cfg.BinaryName
@@ -469,6 +542,23 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 	}
 
 	return result, nil
+}
+
+// installStackCA installs the PEM-encoded CA certificate into the instance's system
+// trust store over SSH and refreshes the trust store. Used for local stacks that
+// serve TLS with a self-signed CA.
+func installStackCA(ctx context.Context, client tssh.SSHClient, logger common.Logger, caPEM string) error {
+	logger.Logf("Installing stack CA certificate into instance trust store")
+	const dest = "/usr/local/share/ca-certificates/elastic-package-stack-ca.crt"
+	// `tee` (as root) writes the CA piped over stdin; the .crt extension under
+	// /usr/local/share/ca-certificates is what update-ca-certificates picks up.
+	if _, _, err := client.Exec(ctx, "sudo", []string{"tee", dest}, strings.NewReader(caPEM)); err != nil {
+		return fmt.Errorf("failed to write CA certificate to %s: %w", dest, err)
+	}
+	if _, _, err := client.Exec(ctx, "sudo", []string{"update-ca-certificates"}, nil); err != nil {
+		return fmt.Errorf("failed to refresh CA trust store: %w", err)
+	}
+	return nil
 }
 
 // validate ensures that required builds of Elastic Agent exist
@@ -817,6 +907,11 @@ func (r *Runner) findStack(id string) *common.Stack {
 }
 
 func (r *Runner) addOrUpdateStack(stack common.Stack) error {
+	// do not update state for an external stack
+	if stack.Provisioner == ess.ProvisionerExternal {
+		return nil
+	}
+
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 

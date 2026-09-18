@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/confmap/xconfmap"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/extension"
@@ -622,7 +621,7 @@ func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exp
 	require.NoError(t, esConf.Unmarshal(cfg), "error unmarshalling user config into ES config")
 
 	// validate the config
-	require.NoError(t, xconfmap.Validate(cfg))
+	require.NoError(t, confmap.Validate(cfg))
 
 	settings := exportertest.NewNopSettings(component.MustNewType(esExporterName))
 
