@@ -221,7 +221,7 @@ common:
     artifact_paths: &openshift_test_artifact_paths
       - build/*
       - build/diagnostics/**
-      - build/*.pod_logs_dump/*
+      - build/k8s-logs-*/**
 
 steps:
   - label: "Custom ECH Testing"
