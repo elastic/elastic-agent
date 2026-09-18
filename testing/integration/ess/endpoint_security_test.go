@@ -74,6 +74,10 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_DEB(t *testing.T) {
 			},
 		},
 	})
+	// The CI VM image was updated to a kernel 7.0.0 base (GCP ubuntu-2204-lts family,
+	// image timestamp 1789054294+). The previous minor (8.18.x) endpoint security component
+	// never becomes HEALTHY on kernel 7.0.0, and 8.18.x is EOL with no further releases.
+	t.Skip("endpoint upgrade from 8.18.x (EOL) is incompatible with kernel 7.0.0 CI images")
 
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
@@ -109,6 +113,8 @@ func TestUpgradeAgentWithTamperProtectedEndpoint_RPM(t *testing.T) {
 			},
 		},
 	})
+	// See TestUpgradeAgentWithTamperProtectedEndpoint_DEB for the rationale.
+	t.Skip("endpoint upgrade from 8.18.x (EOL) is incompatible with kernel 7.0.0 CI images")
 
 	t.Run("Upgrade from older version to newer version", func(t *testing.T) {
 		upgradeFromVersion, err := upgradetest.PreviousMinor()
