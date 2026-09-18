@@ -9,7 +9,6 @@ package manager
 import (
 	"net"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
@@ -17,6 +16,6 @@ import (
 // listenOpAMPSocket creates the platform IPC listener for the OpAMP server.
 // On Unix this is a Unix domain socket; ipc.CreateListener handles stale-file
 // removal and permission hardening (0700 / 0770).
-func listenOpAMPSocket(log *logger.Logger) (net.Listener, error) {
-	return ipc.CreateListener(log, paths.OpAMPSocket())
+func listenOpAMPSocket(log *logger.Logger, address string) (net.Listener, error) {
+	return ipc.CreateListener(log, address)
 }

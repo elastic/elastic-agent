@@ -13,6 +13,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -101,6 +102,13 @@ type OTelManager struct {
 	// instance ID. It is stable for the lifetime of the manager so collector
 	// restarts present as the same OpAMP agent.
 	opampInstanceUID string
+	// opampSocketPath is the unique per-instance IPC address for the OpAMP
+	// server. The full UUID (not just the timestamp prefix) is embedded in the
+	// name: UUIDv7's high 32 bits only change every ~65 s, so tests running
+	// within that window would collide if only the prefix were used. Go's
+	// UnixListener.Close() unlinks the socket file by path, so two managers at
+	// the same path would cause one manager's Close() to delete the other's file.
+	opampSocketPath string
 	// opampServer is the OpAMP HTTP server the supervised collector polls for
 	// status reporting. Its lifetime is managed by the Run loop.
 	opampServer *OpAMPServer
@@ -203,6 +211,14 @@ func NewOTelManager(
 	}
 	opampExtComponentID := otelcomponent.NewIDWithName(componentType, opampInstanceUID).String()
 
+	// Derive a unique socket path from the full UUID (dashes stripped). Using all
+	// 128 bits (not just the timestamp prefix) avoids collisions: UUIDv7's high
+	// 32 bits only change every ~65 s, so sequential tests sharing that prefix
+	// would pick the same socket path and Go's UnixListener.Close() would unlink
+	// the other manager's file.
+	opampSocketName := "opamp-" + strings.ReplaceAll(opampInstanceUID, "-", "") + ".sock"
+	opampSocketPath := paths.SocketFromPath(goruntime.GOOS, paths.Top(), opampSocketName)
+
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
@@ -221,6 +237,7 @@ func NewOTelManager(
 		agentInfo:                 agentInfo,
 		opampExtComponentID:       opampExtComponentID,
 		opampInstanceUID:          opampInstanceUID,
+		opampSocketPath:           opampSocketPath,
 		collectorMetricsPort:      collectorMetricsPort,
 		errCh:                     make(chan error, 1), // holds at most one error
 		internalCollectorStatusCh: make(chan *status.AggregateStatus, 1),
@@ -243,7 +260,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	var err error
 	m.proc = nil
 
-	opampLis, err := listenOpAMPSocket(m.managerLogger)
+	opampLis, err := listenOpAMPSocket(m.managerLogger, m.opampSocketPath)
 	if err != nil {
 		return fmt.Errorf("failed to create opamp ipc listener: %w", err)
 	}
