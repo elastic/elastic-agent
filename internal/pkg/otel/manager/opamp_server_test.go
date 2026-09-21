@@ -57,6 +57,7 @@ func newTestSession(t *testing.T) (*opampSession, *sessionCapture) {
 		log:              log,
 		statusFn:         cap.record,
 		healthCh:         make(chan *otelstatus.AggregateStatus, 1),
+		heartbeatCh:      make(chan struct{}, 1),
 		forceCh:          make(chan struct{}, 1),
 		closeCh:          make(chan struct{}),
 		doneCh:           make(chan struct{}),
@@ -226,6 +227,31 @@ func TestOpAMPSession_StartingThenStatusFlow(t *testing.T) {
 			assert.Equal(t, componentstatus.StatusOK, statuses[1].Status())
 
 			t.Cleanup(sess.close)
+		})
+	})
+
+	t.Run("heartbeat_resets_watchdog_without_status_change", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			sess, cap := newTestSession(t)
+			go sess.run(t.Context())
+			synctest.Wait()
+
+			// Simulate steady-state: collector polls without sending Health.
+			// Heartbeat just before the watchdog would fire to reset it.
+			time.Sleep(opampWatchdogDuration - 5*time.Second)
+			sess.heartbeat()
+			synctest.Wait()
+
+			// Sleep past the original deadline to confirm watchdog didn't fire.
+			time.Sleep(10 * time.Second)
+			synctest.Wait()
+
+			statuses := cap.snapshot()
+			// Only the initial StatusStarting; no failed-to-connect emitted.
+			require.Len(t, statuses, 1)
+			assert.Equal(t, componentstatus.StatusStarting, statuses[0].Status())
+
+			sess.close()
 		})
 	})
 }

@@ -233,12 +233,13 @@ func (s *OpAMPServer) SocketTransport() string {
 // incoming Health messages, plus watchdog/force-resend events.
 func (s *OpAMPServer) StartSession(ctx context.Context, statusFn func(context.Context, *otelstatus.AggregateStatus)) *opampSession {
 	sess := &opampSession{
-		log:      s.log,
-		statusFn: statusFn,
-		healthCh: make(chan *otelstatus.AggregateStatus, 1),
-		forceCh:  make(chan struct{}, 1),
-		closeCh:  make(chan struct{}),
-		doneCh:   make(chan struct{}),
+		log:         s.log,
+		statusFn:    statusFn,
+		healthCh:    make(chan *otelstatus.AggregateStatus, 1),
+		heartbeatCh: make(chan struct{}, 1),
+		forceCh:     make(chan struct{}, 1),
+		closeCh:     make(chan struct{}),
+		doneCh:      make(chan struct{}),
 	}
 
 	s.mx.Lock()
@@ -292,14 +293,19 @@ func (s *OpAMPServer) checkAuth(req *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(got), []byte(want)) == 1
 }
 
-// onMessage forwards Health messages from the collector to the active session.
-// Messages received without an active session are dropped.
+// onMessage forwards messages from the collector to the active session.
+// Every valid poll resets the watchdog so the session doesn't declare the
+// collector dead during steady-state operation where Health data is only
+// included on status changes, not on every poll.
 func (s *OpAMPServer) onMessage(ctx context.Context, _ types.Connection, msg *protobufs.AgentToServer) *protobufs.ServerToAgent {
-	if msg != nil && msg.Health != nil {
-		s.mx.Lock()
-		sess := s.session
-		s.mx.Unlock()
-		if sess != nil {
+	s.mx.Lock()
+	sess := s.session
+	s.mx.Unlock()
+	if sess != nil {
+		// Heartbeat on every valid poll to keep the watchdog alive even when
+		// the collector is healthy and sends no Health field.
+		sess.heartbeat()
+		if msg != nil && msg.Health != nil {
 			sess.deliverHealth(componentHealthToAggregate(msg.Health))
 		}
 	}
@@ -319,13 +325,29 @@ type opampSession struct {
 	log      *logger.Logger
 	statusFn func(context.Context, *otelstatus.AggregateStatus)
 
-	healthCh chan *otelstatus.AggregateStatus
-	forceCh  chan struct{}
-	closeCh  chan struct{}
-	doneCh   chan struct{}
+	healthCh    chan *otelstatus.AggregateStatus
+	heartbeatCh chan struct{}
+	forceCh     chan struct{}
+	closeCh     chan struct{}
+	doneCh      chan struct{}
 
 	// watchdogDuration is overridable for testing.
 	watchdogDuration time.Duration
+}
+
+// heartbeat signals the session that the collector is still alive. It resets
+// the watchdog without changing the status. Called on every valid OpAMP poll
+// so the watchdog doesn't fire during steady-state operation where the collector
+// sends no Health field (only sends Health on connect and status changes).
+func (s *opampSession) heartbeat() {
+	select {
+	case <-s.heartbeatCh:
+	default:
+	}
+	select {
+	case s.heartbeatCh <- struct{}{}:
+	case <-s.closeCh:
+	}
 }
 
 // deliverHealth pushes a translated status to the session goroutine,
@@ -387,7 +409,7 @@ func (s *opampSession) run(ctx context.Context) {
 		case <-s.closeCh:
 			return
 		case st := <-s.healthCh:
-			// reset the watchdog on every successful delivery
+			// reset the watchdog on health status delivery
 			if !timer.Stop() {
 				select {
 				case <-timer.C:
@@ -400,6 +422,17 @@ func (s *opampSession) run(ctx context.Context) {
 				current = st
 				s.statusFn(ctx, st)
 			}
+		case <-s.heartbeatCh:
+			// Collector is polling but sent no Health update (steady-state).
+			// Reset the watchdog to avoid a false "failed to connect" DEGRADED
+			// state while the collector is running normally.
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timer.Reset(watchdogDuration)
 		case <-s.forceCh:
 			s.statusFn(ctx, current)
 		case <-timer.C:
