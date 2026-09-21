@@ -47,8 +47,8 @@ require (
 	github.com/moby/moby/client v0.6.0
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.161.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.159.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.159.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.161.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.161.0
 	github.com/openshift/api v0.0.0-20251015095338-264e80a2b6e7
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
