@@ -2250,8 +2250,6 @@ func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	t.Skip("per-component pipeline status is not available via the OpAMP transport for pipelines using single receivers (e.g. metricbeatreceiver); see https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/50749")
-
 	// Create the otel configuration file
 	type otelConfigOptions struct {
 		ESEndpoint string
