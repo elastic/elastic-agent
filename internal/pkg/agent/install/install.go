@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jaypipes/ghw"
 	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 
@@ -243,19 +242,18 @@ func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error
 	return manifest, nil
 }
 
-func calculateCopyConcurrency(streams *cli.IOStreams) int {
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := HasAllSSDs()
-	if detectHWErr != nil {
-		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
-
-	return copyConcurrency
+func calculateCopyConcurrency(_ *cli.IOStreams) int {
+	// Use a fixed concurrency of 4. Benchmarking showed that the gains from
+	// concurrent file copies saturate around 4 workers (1→2→4 each roughly
+	// halve install time; beyond 4 the improvement is marginal). Hardware
+	// detection via ghw was previously used to distinguish SSDs from HDDs, but
+	// it is unreliable: virtual and paravirtualised block devices (VirtIO,
+	// device-mapper, NVMe-in-VM) are often misclassified, and the distinction
+	// that actually matters — whether fsync flushes through QEMU emulation or
+	// directly to hardware — is not visible from inside the guest at all. On
+	// real HDDs, 4 concurrent requests are handled well by the I/O scheduler
+	// without measurable head-seek regression.
+	return 4
 }
 
 func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir string, topPath string, skipFn func(string) bool) error {
@@ -500,42 +498,6 @@ func verifyDirectory(dir string) error {
 		return fmt.Errorf("missing %s", paths.BinaryName)
 	}
 	return nil
-}
-
-// HasAllSSDs returns true if the host we are on uses SSDs for
-// all its persistent storage; false otherwise. Returns any error
-// encountered detecting the hardware type for informational purposes.
-// Errors from this function are not fatal. Note that errors may be
-// returned on some Mac hardware configurations as the ghw package
-// does not fully support MacOS.
-func HasAllSSDs() (bool, error) {
-	block, err := ghw.Block()
-	if err != nil {
-		return false, err
-	}
-
-	return hasAllSSDs(*block), nil
-}
-
-// Internal version of HasAllSSDs for testing.
-func hasAllSSDs(block ghw.BlockInfo) bool {
-	for _, disk := range block.Disks {
-		switch disk.DriveType {
-		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
-			// Floppy or optical drive; we don't care about these
-			continue
-		case ghw.DRIVE_TYPE_SSD:
-			// SSDs
-			continue
-		case ghw.DRIVE_TYPE_HDD:
-			// HDD (spinning hard disk)
-			return false
-		default:
-			return false
-		}
-	}
-
-	return true
 }
 
 // CreateInstallMarker creates a `.installed` file at the given install path,
