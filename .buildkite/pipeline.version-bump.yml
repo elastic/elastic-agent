@@ -7,16 +7,8 @@ notify:
   - slack:
       channels:
         - "#ingest-notifications"
-      message: |
-        <!subteam^S030QSX59PH|agent-control-plane-team>
-        🚦 Pipeline waiting to be unblocked 🚦
-        Repo: `${REPO}`
-
-        New version: `${NEW_VERSION}`
-        Branch: `${BRANCH}`
-        Workflow: `${WORKFLOW}`
-        ${BUILDKITE_BUILD_URL}
-    if: build.state == "blocked"
+      message: "<!subteam^S030QSX59PH|agent-control-plane-team> Version bump to ${NEW_VERSION} started — ${BUILDKITE_BUILD_URL}"
+    if: (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/) && build.state == 'running'
 
 steps:
   # Phase 3: trigger ingest-dev release automation for this repository only.
@@ -47,25 +39,3 @@ steps:
         CURRENT_RELEASE: "${NEW_VERSION}"
         DISABLE_DEV_ISSUE: "true"
         REVIEWERS: "elastic/elastic-agent-release"
-
-  - block: "Placeholder blocked step"
-    prompt: |
-      Unblock when your team is ready to proceed.
-
-      Trigger parameters:
-      - NEW_VERSION: ${NEW_VERSION}
-      - BRANCH: ${BRANCH}
-      - WORKFLOW: ${WORKFLOW}
-    key: block-get-dra-artifacts
-    blocked_state: running
-
-  - label: "Create branch for version bump"
-    key: branch-for-version-bump
-    depends_on: block-get-dra-artifacts
-    agents:
-      image: docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest
-      cpu: 500m
-      memory: 1Gi
-      ephemeralStorage: 1Gi
-    command:
-      - echo "Placeholder"
