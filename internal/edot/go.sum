@@ -579,8 +579,8 @@ github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceive
 github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0/go.mod h1:wxuk1s8hoiG0apiFowbT0d5tru+2oTwP6tDyA4STjfw=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.74.0 h1:koowswXTtPAhiGoteeiI/FcicRvQ0i39ANU2anYzpdU=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.74.0/go.mod h1:VEjKwpGMgpoBcv1sYH+queI71tMRFTUOu9ptNeT2hAY=
-github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260623161606-914313578a72 h1:DS/wAeQb9D+qAS2q4tAJycu9MbkKXkleTonSIN2d38o=
-github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260623161606-914313578a72/go.mod h1:p2j6xOQqCCXa5mRN6Kepb2EeYFbQFVsb/OBsqTHC6lk=
+github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b h1:e2vBkk6UyTNNP+2pR84VZC/LlBqnv4doLYsgjQNQ5pg=
+github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b/go.mod h1:pPlGoG0TbinC1TLZXt3czi2tdetTHya4a5iEa/HIWGE=
 github.com/elastic/opentelemetry-lib v0.47.0 h1:MDInaJYqqOJS5S5n6MT5O+OElZj+mu06qFmkMDeCoT0=
 github.com/elastic/opentelemetry-lib v0.47.0/go.mod h1:GW9juMQXi7irDoVVIY7OJy/OWRwgVsYt3BatW23ZzzQ=
 github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
