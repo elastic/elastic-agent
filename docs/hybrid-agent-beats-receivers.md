@@ -328,6 +328,34 @@ service:
                 - metricbeatreceiver
 ```
 
+### Agent metadata available to Collector components
+
+When Elastic Agent supervises the Collector, it adds the following attributes to
+`service.telemetry.resource`, including when monitoring is disabled or only custom
+OTel pipelines are configured:
+
+```yaml
+service:
+  telemetry:
+    resource:
+      elastic_agent.id: "<agent ID>"
+      elastic_agent.version: "<agent version>"
+      elastic_agent.snapshot: "false"
+```
+
+Agent supplies the actual values automatically and overrides configured values for
+these three keys. Other resource attributes are preserved. Both the legacy inline
+resource map and the declarative `resource.attributes` list are supported. Snapshot
+is a string (`"true"` or `"false"`) in both formats.
+
+Custom receivers, processors, and connectors can read these attributes from
+`Settings.Resource.Attributes()` in their factories. They also appear on the
+Collector's internal telemetry. They are not automatically added to telemetry
+passing through pipelines: components must explicitly copy the required fields.
+For Elasticsearch `bodymap` documents, copy them into the log body. Stock OTTL
+`resource.attributes` accesses the incoming telemetry's resource, not this shared
+Collector resource.
+
 ### Beats receivers delivery guarantees in OTel mode
 
 When Beat receivers are used in OTel mode, event delivery guarantees depend on the configuration of the OpenTelemetry Collector `sending_queue` and retry settings.

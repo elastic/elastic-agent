@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1591,6 +1592,9 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 
 			require.NotNil(t, result)
+			assert.Equal(t, commonAgentInfo.AgentID(), result.Get("service::telemetry::resource::elastic_agent.id"))
+			assert.Equal(t, commonAgentInfo.Version(), result.Get("service::telemetry::resource::elastic_agent.version"))
+			assert.Equal(t, strconv.FormatBool(commonAgentInfo.Snapshot()), result.Get("service::telemetry::resource::elastic_agent.snapshot"))
 			for _, key := range tt.expectedKeys {
 				assert.True(t, result.IsSet(key), "Expected key %s to be set", key)
 			}
@@ -2088,6 +2092,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 			t.Fatal("timeout waiting for collector config update")
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
+		assert.NoError(t, injectAgentTelemetryResource(expectedCfg, agentInfo))
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
