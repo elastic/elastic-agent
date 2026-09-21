@@ -34,8 +34,8 @@ Review important information about the  8.19.22 release.
 
 
 
-* Fix diagnostics for otel components containing `/`. https://github.com/elastic/elastic-agent/pull/16635[#16635] 
-* Prevent panic when translating otel config and unit has nil configuration. https://github.com/elastic/elastic-agent/pull/16479[#16479] https://github.com/elastic/elastic-agent/issues/16470[#16470]
-* Fix Ironbank Dockerfile to restore module yml file permissions to 0644 after broad 0666 chmod. https://github.com/elastic/elastic-agent/pull/16575[#16575] 
+* Fix diagnostics for OTel components containing `/`. https://github.com/elastic/elastic-agent/pull/16635[#16635] 
+* Prevent panic when the OTel translation path encounters an input unit without a configuration. https://github.com/elastic/elastic-agent/pull/16479[#16479] https://github.com/elastic/elastic-agent/issues/16470[#16470]
+* Fix the Ironbank Dockerfile to restore module YML file permissions to `0644` after a broad `chmod 0666`. https://github.com/elastic/elastic-agent/pull/16575[#16575] 
 
 // end 8.19.22 relnotes
