@@ -2250,7 +2250,15 @@ func TestOtelBeatsAuthExtensionInvalidCertificates(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	t.Skip("per-component pipeline status is not available via the OpAMP transport for pipelines using single receivers (e.g. metricbeatreceiver); see https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/50749")
+	// The opampextension's statusAggregatorEventLoop deduplicates health
+	// updates based only on the top-level aggregate status+error. When
+	// beatsauth holds the aggregate at PermanentError, subsequent
+	// RecoverableError events from the ES exporter don't change the
+	// top-level status and are swallowed, so the agent never learns the
+	// exporter degraded. Fixing this requires patching the upstream fork
+	// (github.com/dpaasman00/opentelemetry-collector-contrib) to compare
+	// the full ComponentHealth tree instead of just the top-level.
+	t.Skip("opampextension dedup bug: sub-component status changes swallowed when higher-priority extension dominates aggregate; exporter RecoverableError is not forwarded to the agent")
 
 	// Create the otel configuration file
 	type otelConfigOptions struct {
