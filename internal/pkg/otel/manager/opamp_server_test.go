@@ -336,6 +336,43 @@ func TestOpAMPServer_HTTP(t *testing.T) {
 		_ = sess
 	})
 
+	t.Run("poll_without_health_resets_watchdog", func(t *testing.T) {
+		// Regression test: steady-state polls that carry no Health field must
+		// still reset the watchdog so the agent doesn't report DEGRADED during
+		// normal operation (the collector only sends Health on connect/change).
+		const shortWatchdog = 200 * time.Millisecond
+		cap := &sessionCapture{}
+		sess := srv.startSessionWithDuration(t.Context(), cap.record, shortWatchdog)
+		t.Cleanup(srv.CloseSession)
+
+		// Wait for the initial Starting emit.
+		require.Eventually(t, func() bool { return len(cap.snapshot()) >= 1 },
+			time.Second, 10*time.Millisecond)
+
+		// Send polls without Health repeatedly so the watchdog never fires.
+		pollBody := mustMarshalAgentToServer(t, &protobufs.AgentToServer{
+			InstanceUid: []byte("steady-state-instance"),
+		})
+		deadline := time.Now().Add(5 * shortWatchdog)
+		for time.Now().Before(deadline) {
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, endpoint, bytes.NewReader(pollBody))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/x-protobuf")
+			req.Header.Set(opampAuthorizationHeader, "Bearer secret-1234")
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+			time.Sleep(shortWatchdog / 4)
+		}
+
+		statuses := cap.snapshot()
+		// Only StatusStarting; watchdog must not have fired.
+		require.Len(t, statuses, 1, "watchdog fired during steady-state polling (no Health updates)")
+		assert.Equal(t, componentstatus.StatusStarting, statuses[0].Status())
+
+		_ = sess
+	})
+
 	t.Run("message_with_no_active_session_is_dropped", func(t *testing.T) {
 		// No session in flight (previous subtest ran t.Cleanup(srv.CloseSession)).
 		body := mustMarshalAgentToServer(t, &protobufs.AgentToServer{

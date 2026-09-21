@@ -257,6 +257,34 @@ func (s *OpAMPServer) StartSession(ctx context.Context, statusFn func(context.Co
 	return sess
 }
 
+// startSessionWithDuration is like StartSession but overrides the watchdog
+// duration. Exposed for unit tests only; production callers use StartSession.
+func (s *OpAMPServer) startSessionWithDuration(ctx context.Context, statusFn func(context.Context, *otelstatus.AggregateStatus), watchdogDuration time.Duration) *opampSession {
+	sess := &opampSession{
+		log:              s.log,
+		statusFn:         statusFn,
+		healthCh:         make(chan *otelstatus.AggregateStatus, 1),
+		heartbeatCh:      make(chan struct{}, 1),
+		forceCh:          make(chan struct{}, 1),
+		closeCh:          make(chan struct{}),
+		doneCh:           make(chan struct{}),
+		watchdogDuration: watchdogDuration,
+	}
+
+	s.mx.Lock()
+	prev := s.session
+	s.session = sess
+	s.mx.Unlock()
+
+	if prev != nil {
+		s.log.Warn("opamp server: closing prior session that was still active")
+		prev.close()
+	}
+
+	go sess.run(ctx)
+	return sess
+}
+
 // CloseSession terminates the active session, if any. Safe to call multiple
 // times. Blocks until the session goroutine exits.
 func (s *OpAMPServer) CloseSession() {
