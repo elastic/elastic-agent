@@ -308,7 +308,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		// single_receiver: true means all streams share one receiver named after the
 		// component ID with a placeholder stream suffix. Map every stream's resolved ID to it.
-		singleReceiverName := OtelNamePrefix + comp.ID + "/" + singleReceiverStreamID
+		singleReceiverName := OtelNamePrefix + comp.ID + "/" + SingleReceiverStreamID
 		for receiverOtelID, rs := range receiverStatuses {
 			if receiverOtelID.Name() != singleReceiverName {
 				continue
