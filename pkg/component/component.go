@@ -1027,8 +1027,10 @@ func (r *RuntimeSpecs) PolicyToComponents(
 		opt(&options)
 	}
 
+	agentCfg := agentSection(policy)
+
 	// get feature flags from policy
-	featureFlags, err := features.Parse(agentSection(policy))
+	featureFlags, err := features.Parse(agentCfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
 	}
@@ -1049,7 +1051,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	sort.Strings(outputKeys)
 
 	// get agent limits from the policy
-	limits, err := limits.Parse(agentSection(policy))
+	limits, err := limits.Parse(agentCfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse limits from policy: %w", err)
 	}

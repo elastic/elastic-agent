@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"net"
 	"net/url"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,10 +106,10 @@ func (runner *NetworkTrafficRunner) SetupSuite() {
 
 }
 
-// validateNetworkTrafficEvents generates TLS traffic to serverName and returns
+// validateNetworkTrafficEvents generates TLS traffic to serverName:port and returns
 // the captured event for it. Traffic is generated on every poll so a missed
 // capture is retried rather than failing the test.
-func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID, serverName string, since time.Time) mapstr.M {
+func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, ctx context.Context, agentID, serverName, port string, since time.Time) mapstr.M {
 	now := time.Now()
 	var query map[string]any
 	var doc mapstr.M
@@ -129,7 +128,7 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 
 	t.Logf("starting to query ES for network traffic events at %s", now.Format(time.RFC3339Nano))
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		dialTLS(t, serverName)
+		dialTLS(t, ctx, serverName, port)
 
 		query = genESQuery(agentID,
 			[][]string{
@@ -150,27 +149,16 @@ func (runner *NetworkTrafficRunner) validateNetworkTrafficEvents(t *testing.T, c
 	return doc
 }
 
-// esServerName returns the Elasticsearch hostname, used as the TLS SNI.
-func esServerName(t *testing.T) string {
-	raw := os.Getenv("ELASTICSEARCH_HOST")
-	require.NotEmpty(t, raw, "ELASTICSEARCH_HOST must be set")
-	u, err := url.Parse(raw)
-	require.NoError(t, err, "parsing ELASTICSEARCH_HOST")
-	require.NotEmpty(t, u.Hostname(), "ELASTICSEARCH_HOST has no hostname")
-	return u.Hostname()
-}
-
-// dialTLS triggers a TLS handshake to host:443 for the packet component to
+// dialTLS triggers a TLS handshake to host:port for the packet component to
 // capture. A dial error is fine: the SNI is sent before cert verification.
-func dialTLS(t *testing.T, host string) {
-	conn, err := tls.DialWithDialer(
-		&net.Dialer{Timeout: 10 * time.Second},
-		"tcp",
-		net.JoinHostPort(host, "443"),
-		&tls.Config{ServerName: host},
-	)
+func dialTLS(t *testing.T, ctx context.Context, host, port string) {
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 10 * time.Second},
+		Config:    &tls.Config{ServerName: host},
+	}
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(host, port))
 	if err != nil {
-		t.Logf("TLS dial to %s returned %v (handshake still captured)", host, err)
+		t.Logf("TLS dial to %s:%s returned %v (handshake still captured)", host, port, err)
 		return
 	}
 	_ = conn.Close()
@@ -186,12 +174,21 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 	require.NoError(t, err, "could not get agent status")
 
 	// Use one fixed destination for both runtimes so the captured handshakes are
-	// directly comparable.
-	serverName := esServerName(t)
+	// directly comparable. Use the actual port from ELASTICSEARCH_HOST so that
+	// the TLS dial succeeds on local stacks (port 9200) as well as ESS (port 443).
+	rawESHost, err := integration.GetESHost()
+	require.NoError(t, err, "could not get ES host")
+	esURL, err := url.Parse(rawESHost)
+	require.NoError(t, err, "could not parse ES host URL")
+	serverName := esURL.Hostname()
+	port := esURL.Port()
+	if port == "" {
+		port = "443"
+	}
 
 	var processDoc mapstr.M
 	t.Run("process", func(t *testing.T) {
-		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, time.Now())
+		processDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, port, time.Now())
 	})
 
 	var otelDoc mapstr.M
@@ -210,8 +207,9 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			for _, comp := range status.Components {
 				if strings.HasPrefix(comp.ID, "packet") &&
 					comp.VersionInfo.Name == componentVersionInfoNameForRuntime(component.OtelRuntimeManager) {
-					assert.Equal(collect, int(cproto.State_HEALTHY), comp.State,
-						"expected packet component to be healthy, got %s", cproto.State(comp.State))
+					compStateProto := cproto.State(comp.State) //nolint:gosec // guaranteed to be valid
+					assert.Equal(collect, cproto.State_HEALTHY, compStateProto,
+						"expected packet component to be healthy, got %s", compStateProto)
 					foundReceiver = true
 					break
 				}
@@ -219,7 +217,7 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 			assert.True(collect, foundReceiver, "expected a packet (network_traffic) component to be running as beats receiver")
 		}, 2*time.Minute, 5*time.Second, "beat component should be running as beats receiver")
 
-		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, otelSince)
+		otelDoc = runner.validateNetworkTrafficEvents(t, ctx, agentStatus.Info.ID, serverName, port, otelSince)
 	})
 
 	t.Run("compare", func(t *testing.T) {
