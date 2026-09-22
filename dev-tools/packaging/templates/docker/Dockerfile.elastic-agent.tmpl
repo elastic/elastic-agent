@@ -267,7 +267,7 @@ USER root
 # Install additional fonts as well
 RUN for iter in {1..10}; do \
         microdnf -y update --nodocs && \
-        microdnf -y --nodocs --setopt install_weak_deps=0 install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
+        microdnf -y --nodocs install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
         at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss libX11 \
         libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon libxshmfence glib2 \
         libicu mesa-libGL unzip && \
