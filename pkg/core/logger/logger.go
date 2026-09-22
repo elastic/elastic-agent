@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
+	libpaths "github.com/elastic/elastic-agent-libs/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -130,7 +131,10 @@ func new(name string, cfg, eventLoggerCfg *Config, logInternal bool) (*Logger, e
 		return nil, fmt.Errorf("could not convert event log config: %w", err)
 	}
 
-	logger, err := configure.LoggingWithTypedOutputsLocal("", commonCfg, eventLoggercommonCfg, "log.type", "event", outputs...)
+	// An empty Path preserves historical behavior: the agent never initialized
+	// the libs global paths, so Files.Path is used as-is (it is already set to
+	// the agent logs dir; user-set relative values resolve against the CWD).
+	logger, err := configure.LoggingWithTypedOutputsLocal("", commonCfg, eventLoggercommonCfg, libpaths.New(), "log.type", "event", outputs...)
 	if err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
