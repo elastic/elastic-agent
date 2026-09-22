@@ -58,6 +58,8 @@ func (a agentInfoMock) GetLogLevelPolicy() string          { panic("implement me
 func (a agentInfoMock) GetLogLevelOverride() string        { panic("implement me") }
 func (a agentInfoMock) ReloadID(ctx context.Context) error { panic("implement me") }
 func (a agentInfoMock) SetLogLevelPolicy(level string)     { panic("implement me") }
+func (a agentInfoMock) GetTags() []string                  { panic("implement me") }
+func (a agentInfoMock) SetTags(tags []string)              { panic("implement me") }
 func (a agentInfoMock) SetLogLevelOverride(_ context.Context, _ string) error {
 	panic("implement me")
 }
