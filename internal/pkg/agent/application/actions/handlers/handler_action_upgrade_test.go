@@ -38,7 +38,7 @@ type mockUpgradeManager struct {
 	UpgradeFn func(
 		ctx context.Context,
 		version string,
-		sourceURI string,
+		sources []string,
 		action *fleetapi.ActionUpgrade,
 		details *details.Details,
 		skipVerifyOverride bool,
@@ -54,12 +54,12 @@ func (u *mockUpgradeManager) Reload(rawConfig *config.Config) error {
 	return nil
 }
 
-func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (reexec.ShutdownCallbackFn, error) {
+func (u *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (reexec.ShutdownCallbackFn, error) {
 
 	return u.UpgradeFn(
 		ctx,
 		version,
-		sourceURI,
+		sources,
 		action,
 		details,
 		skipVerifyOverride,
@@ -102,7 +102,7 @@ func TestUpgradeHandler(t *testing.T) {
 			UpgradeFn: func(
 				ctx context.Context,
 				version string,
-				sourceURI string,
+				sources []string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
 				skipVerifyOverride bool,
@@ -119,7 +119,7 @@ func TestUpgradeHandler(t *testing.T) {
 
 	u := NewUpgrade(log, c)
 	a := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
-		Version: "8.3.0", SourceURI: "http://localhost"}}
+		Version: "8.3.0", Sources: []string{"http://localhost"}}}
 	ack := noopacker.New()
 	err := u.Handle(ctx, &a, ack)
 	require.NoError(t, err)
@@ -156,7 +156,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 			UpgradeFn: func(
 				ctx context.Context,
 				version string,
-				sourceURI string,
+				sources []string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
 				skipVerifyOverride bool,
@@ -178,7 +178,7 @@ func TestUpgradeHandlerSameVersion(t *testing.T) {
 
 	u := NewUpgrade(log, c)
 	a := fleetapi.ActionUpgrade{Data: fleetapi.ActionUpgradeData{
-		Version: "8.3.0", SourceURI: "http://localhost"}}
+		Version: "8.3.0", Sources: []string{"http://localhost"}}}
 	ack := noopacker.New()
 	err1 := u.Handle(ctx, &a, ack)
 	err2 := u.Handle(ctx, &a, ack)
@@ -217,7 +217,7 @@ func TestDuplicateActionsHandled(t *testing.T) {
 			UpgradeFn: func(
 				ctx context.Context,
 				version string,
-				sourceURI string,
+				sources []string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
 				skipVerifyOverride bool,
@@ -239,13 +239,13 @@ func TestDuplicateActionsHandled(t *testing.T) {
 	a1 := fleetapi.ActionUpgrade{
 		ActionID: "action-8.5-1",
 		Data: fleetapi.ActionUpgradeData{
-			Version: "8.5.0", SourceURI: "http://localhost",
+			Version: "8.5.0", Sources: []string{"http://localhost"},
 		},
 	}
 	a2 := fleetapi.ActionUpgrade{
 		ActionID: "action-8.5-2",
 		Data: fleetapi.ActionUpgradeData{
-			Version: "8.5.0", SourceURI: "http://localhost",
+			Version: "8.5.0", Sources: []string{"http://localhost"},
 		},
 	}
 
@@ -308,7 +308,7 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 			UpgradeFn: func(
 				ctx context.Context,
 				version string,
-				sourceURI string,
+				sources []string,
 				action *fleetapi.ActionUpgrade,
 				details *details.Details,
 				skipVerifyOverride bool,
@@ -333,13 +333,13 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	a1 := fleetapi.ActionUpgrade{
 		ActionID: "action-8.2",
 		Data: fleetapi.ActionUpgradeData{
-			Version: "8.2.0", SourceURI: "http://localhost",
+			Version: "8.2.0", Sources: []string{"http://localhost"},
 		},
 	}
 	a2 := fleetapi.ActionUpgrade{
 		ActionID: "action-8.5",
 		Data: fleetapi.ActionUpgradeData{
-			Version: "8.5.0", SourceURI: "http://localhost",
+			Version: "8.5.0", Sources: []string{"http://localhost"},
 		},
 	}
 	ack := noopacker.New()
@@ -381,8 +381,8 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			upgradeAction: &fleetapi.ActionUpgrade{
 				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "255.0.0",
-					SourceURI: "http://localhost",
+					Version: "255.0.0",
+					Sources: []string{"http://localhost"},
 				},
 			},
 			shouldProxyToEndpoint: true,
@@ -393,8 +393,8 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			upgradeAction: &fleetapi.ActionUpgrade{
 				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "255.0.0",
-					SourceURI: "http://localhost",
+					Version: "255.0.0",
+					Sources: []string{"http://localhost"},
 				},
 			},
 			shouldProxyToEndpoint: true,
@@ -404,8 +404,8 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			upgradeAction: &fleetapi.ActionUpgrade{
 				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "255.0.0",
-					SourceURI: "http://localhost",
+					Version: "255.0.0",
+					Sources: []string{"http://localhost"},
 				},
 			},
 			coordUpgradeErr: errors.New("test error"),
@@ -415,8 +415,8 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			upgradeAction: &fleetapi.ActionUpgrade{
 				ActionType: fleetapi.ActionTypeUpgrade,
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "255.0.0",
-					SourceURI: "http://localhost",
+					Version: "255.0.0",
+					Sources: []string{"http://localhost"},
 				},
 			},
 		},
@@ -452,14 +452,14 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 
 			upgradeCalledChan := make(chan struct{})
 			if tc.shouldProxyToEndpoint {
-				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt"), mock.AnythingOfType("coordinator.UpgradeOpt")).
-					RunAndReturn(func(ctx context.Context, s string, s2 string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
+				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.Sources, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt"), mock.AnythingOfType("coordinator.UpgradeOpt")).
+					RunAndReturn(func(ctx context.Context, v string, s []string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
 						upgradeCalledChan <- struct{}{}
 						return tc.coordUpgradeErr
 					})
 			} else {
-				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt")).
-					RunAndReturn(func(ctx context.Context, s string, s2 string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
+				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.Sources, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt")).
+					RunAndReturn(func(ctx context.Context, v string, s []string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
 						upgradeCalledChan <- struct{}{}
 						return tc.coordUpgradeErr
 					})

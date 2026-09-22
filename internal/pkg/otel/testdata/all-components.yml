@@ -34,6 +34,10 @@ extensions:
       access_key_id: tom 
       secret_access_key: tom
       session_token: dG9tCg==
+  oauth2client:
+    client_id: someclientid
+    client_secret: someclientsecret
+    token_url: https://example.com/oauth2/default/v1/token
 
 processors:
   attributes:
@@ -115,6 +119,7 @@ receivers:
     credentials_provider: awscredentialsprovider
     region: us-east-1
     logs:
+      initial_lookback: 1h
       poll_interval: 1m
       groups:
         autodiscover:
@@ -227,6 +232,7 @@ service:
     - awslogs_encoding/elbaccess
     - azure_auth
     - azure_encoding
+    - oauth2client
   pipelines:
     logs:
       exporters:

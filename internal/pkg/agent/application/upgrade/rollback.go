@@ -303,13 +303,21 @@ func restartAgent(ctx context.Context, log *logger.Logger, c client.Client) erro
 	return nil
 }
 
+// errSymlinkAbsent is returned by liveVersionedHome when the agent symlink
+// file itself does not exist. It wraps os.ErrNotExist so callers can
+// distinguish this expected-on-fresh-volume case from a dangling symlink
+// (symlink present, target directory absent), which wraps os.ErrNotExist too
+// but is a different condition.
+var errSymlinkAbsent = fmt.Errorf("live symlink absent: %w", os.ErrNotExist)
+
 // liveVersionedHome resolves the versioned home that the top-level agent
 // symlink points at, returned as a path relative to topDirPath. Used by
 // cleanup as a defense against stale keep lists deleting the live install
 // (https://github.com/elastic/elastic-agent/issues/13505).
 //
 // Returns the empty string and a non-nil error if the symlink can't be read
-// or doesn't resolve to a path under topDirPath.
+// or doesn't resolve to a path under topDirPath. Returns errSymlinkAbsent
+// specifically when the symlink file itself does not exist.
 func liveVersionedHome(topDirPath string) (string, error) {
 	symlinkPath := filepath.Join(topDirPath, AgentName)
 	if runtime.GOOS == windowsOSName {
@@ -317,6 +325,9 @@ func liveVersionedHome(topDirPath string) (string, error) {
 	}
 	target, err := os.Readlink(symlinkPath)
 	if err != nil {
+		if goerrors.Is(err, os.ErrNotExist) {
+			return "", errSymlinkAbsent
+		}
 		return "", fmt.Errorf("reading symlink %q: %w", symlinkPath, err)
 	}
 	// Resolve a relative symlink target against the symlink's directory.

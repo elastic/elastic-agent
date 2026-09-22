@@ -74,9 +74,14 @@ func (s *Server) Restart(ctx context.Context, _ *proto.Empty) (*proto.RestartRes
 
 // Upgrade performs the upgrade operation.
 func (s *Server) Upgrade(ctx context.Context, request *proto.UpgradeRequest) (*proto.UpgradeResponse, error) {
+
+	var sources []string
+	if request.SourceURI != "" {
+		sources = append(sources, request.SourceURI)
+	}
 	resp, _ := s.v2Server.Upgrade(ctx, &v2proto.UpgradeRequest{
-		Version:   request.Version,
-		SourceURI: request.SourceURI,
+		Version: request.Version,
+		Sources: sources,
 	})
 
 	if resp.Status == v2proto.ActionStatus_FAILURE {

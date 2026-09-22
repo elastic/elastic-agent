@@ -14,10 +14,12 @@ import (
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
+	otelcomponent "go.opentelemetry.io/collector/component"
 
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
@@ -131,13 +133,14 @@ var defaultOptions = esToOTelOptions{
 }
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
-func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
+// Note: This method may override output queue settings defined by user.
+func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
 	escfg := defaultOptions
 
 	// check for unsupported config
-	err := checkUnsupportedConfig(output)
+	err = checkUnsupportedConfig(output)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// Preset must be applied before unpacking the config because it can override output fields.
@@ -155,7 +158,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 
 		overriddenFields, presetConfig, applyErr := elasticsearch.ApplyPreset(preset, output)
 		if applyErr != nil {
-			return nil, nil, applyErr
+			return nil, nil, nil, applyErr
 		}
 		// output now has all preset values applied (including worker count), so
 		// getTotalNumConnections reads the correct connection count for sizing.
@@ -187,7 +190,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		// Write the OTel-adjusted queue size back into output so the subsequent
 		// decode picks up the correct value.
 		if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
-			return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
 		}
 
 		// Build a log copy with the OTel-effective queue.mem.events. storedPresetConfig
@@ -213,7 +216,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 	unpackedMap := make(map[string]any)
 	// unpack and validate ES config
 	if err := output.Unpack(&unpackedMap); err != nil {
-		return nil, nil, fmt.Errorf("failed unpacking config. %w", err)
+		return nil, nil, nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -223,21 +226,21 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		DecodeHook:      cfgDecodeHookFunc(),
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed creating decoder. %w", err)
+		return nil, nil, nil, fmt.Errorf("failed creating decoder. %w", err)
 	}
 
 	err = decoder.Decode(&unpackedMap)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed decoding config. %w", err)
+		return nil, nil, nil, fmt.Errorf("failed decoding config. %w", err)
 	}
 
 	if err := escfg.Validate(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	hosts, err := getURL(escfg, output)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
+		return nil, nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
 
 	otelYAMLCfg := map[string]any{
@@ -306,11 +309,25 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		otelYAMLCfg["timeout"] = escfg.Transport.Timeout
 	}
 
-	// ssl block, idle_connection_timeout, proxy_url, proxy_headers, and proxy_disable
-	// are handled by beatsauthextension https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/beatsauthextension
-	// caller of this method should take care of integrating the extension
+	// idle_connection_timeout, timeout, ssl block,
+	// proxy_url, proxy_headers, proxy_disable are handled by beatsauthextension
+	extensionID := getBeatsAuthExtensionID(outputName)
+	extensionConfig, err := getBeatsAuthExtensionConfig(output)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, error: %w", outputName, err)
+	}
 
-	return otelYAMLCfg, nil, nil
+	// sets extensionCfg
+	extensionCfg = map[string]any{
+		extensionID.String(): extensionConfig,
+	}
+
+	// add authenticator to ES config
+	otelYAMLCfg["auth"] = map[string]any{
+		"authenticator": extensionID.String(),
+	}
+
+	return otelYAMLCfg, nil, extensionCfg, nil
 }
 
 // calcNamedPresetSizing computes the OTel queue size and consumer count for a
@@ -418,6 +435,57 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 	}
 
 	return hosts, nil
+}
+
+// getBeatsAuthExtensionID returns the id for beatsauth extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
+}
+
+// getBeatsAuthExtensionConfig sets http transport settings on beatsauth
+// this is only required for elasticsearch output
+func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
+	authSettings := beatsauthextension.BeatsAuthConfig{
+		Transport: elasticsearch.ESDefaultTransportSettings(),
+	}
+
+	if err := outputCfg.Unpack(&authSettings); err != nil {
+		return nil, err
+	}
+
+	newConfig, err := config.NewConfigFrom(authSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
+	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
+	if authSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
+		if err != nil {
+			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
+	}
+
+	if authSettings.Kerberos != nil {
+		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
+		if err != nil {
+			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
+		}
+	}
+
+	var newMap map[string]any
+	err = newConfig.Unpack(&newMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// required to make the extension not cause the collector to fail and exit on startup
+	newMap["continue_on_error"] = true
+
+	return newMap, nil
 }
 
 // log warning for unsupported config
