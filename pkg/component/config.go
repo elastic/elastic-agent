@@ -6,21 +6,15 @@ package component
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 
-	"github.com/go-viper/mapstructure/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/pkg/limits"
-)
-
-const (
-	sourceFieldName = "source"
 )
 
 // For now the component limits match the agent limits.
@@ -73,206 +67,303 @@ func MustExpectedConfig(cfg map[string]interface{}) *proto.UnitExpectedConfig {
 }
 
 // ExpectedConfig converts a map[string]interface{} to a proto.UnitExpectedConfig.
+//
+// The complete map is converted into the message's source once; the sources of the nested
+// messages (meta, package, data_stream and streams) are the matching parts of it rather than
+// separate conversions. The typed fields are read directly from the map: keys are matched
+// exactly or, failing that, case-insensitively, and scalar values are converted the way a weakly
+// typed decoder would.
 func ExpectedConfig(cfg map[string]interface{}) (*proto.UnitExpectedConfig, error) {
-	result := &proto.UnitExpectedConfig{}
-	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		ZeroFields:           true,
-		WeaklyTypedInput:     true,
-		TagName:              "json",
-		IgnoreUntaggedFields: true,
-		Result:               result,
-		MatchName: func(mapKey, fieldName string) bool {
-			if fieldName == sourceFieldName {
-				// never match for 'source' field that is set manually later
-				return false
-			}
-			return strings.EqualFold(mapKey, fieldName)
-		},
-	})
+	source, err := structpb.NewStruct(cfg)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := decoder.Decode(cfg); err != nil {
-		return nil, fmt.Errorf("decoding error: %w", err)
+	result := &proto.UnitExpectedConfig{Source: source}
+	if result.Id, err = stringField(cfg, "id", ""); err != nil {
+		return nil, decodeError(err)
 	}
-
-	if err := setSource(result, cfg); err != nil {
+	if result.Type, err = stringField(cfg, "type", ""); err != nil {
+		return nil, decodeError(err)
+	}
+	if result.Name, err = stringField(cfg, "name", ""); err != nil {
+		return nil, decodeError(err)
+	}
+	if result.Revision, err = uint64Field(cfg, "revision", ""); err != nil {
+		return nil, decodeError(err)
+	}
+	if metaKey, metaRaw, ok := lookupField(cfg, "meta"); ok && metaRaw != nil {
+		metaMap, ok := metaRaw.(map[string]interface{})
+		if !ok {
+			return nil, decodeError(unexpectedTypeError("meta", "a map or struct", metaRaw))
+		}
+		result.Meta = &proto.Meta{Source: source.Fields[metaKey].GetStructValue()}
+		if pkgKey, pkgRaw, ok := lookupField(metaMap, "package"); ok && pkgRaw != nil {
+			pkgMap, ok := pkgRaw.(map[string]interface{})
+			if !ok {
+				return nil, decodeError(unexpectedTypeError("meta.package", "a map or struct", pkgRaw))
+			}
+			result.Meta.Package = &proto.Package{Source: result.Meta.Source.Fields[pkgKey].GetStructValue()}
+			if result.Meta.Package.Name, err = stringField(pkgMap, "name", "meta.package."); err != nil {
+				return nil, decodeError(err)
+			}
+			if result.Meta.Package.Version, err = stringField(pkgMap, "version", "meta.package."); err != nil {
+				return nil, decodeError(err)
+			}
+		}
+	}
+	if result.DataStream, err = dataStreamField(cfg, source, ""); err != nil {
 		return nil, err
 	}
 
-	if err := updateDataStreamsFromSource(result); err != nil {
-		return nil, fmt.Errorf("could not dedot 'data_stream': %w", err)
+	if streamsKey, streamsRaw, ok := lookupField(cfg, "streams"); ok && streamsRaw != nil {
+		var streams []interface{}
+		var streamSources []*structpb.Struct
+		switch t := streamsRaw.(type) {
+		case []interface{}:
+			streams = t
+			for _, value := range source.Fields[streamsKey].GetListValue().GetValues() {
+				streamSources = append(streamSources, value.GetStructValue())
+			}
+		case map[string]interface{}:
+			// a weakly typed decoder turns a single value into a slice of one, and an
+			// empty map into an empty slice
+			if len(t) > 0 {
+				streams = []interface{}{t}
+				streamSources = []*structpb.Struct{source.Fields[streamsKey].GetStructValue()}
+			}
+		default:
+			return nil, decodeError(unexpectedTypeError("streams", "a slice", streamsRaw))
+		}
+		result.Streams = make([]*proto.Stream, 0, len(streams))
+		for i, streamRaw := range streams {
+			name := fmt.Sprintf("streams[%d]", i)
+			streamMap, ok := streamRaw.(map[string]interface{})
+			if !ok {
+				return nil, decodeError(unexpectedTypeError(name, "a map or struct", streamRaw))
+			}
+			stream := &proto.Stream{Source: streamSources[i]}
+			if stream.Id, err = stringField(streamMap, "id", name+"."); err != nil {
+				return nil, decodeError(err)
+			}
+			if stream.DataStream, err = dataStreamField(streamMap, stream.Source, name+"."); err != nil {
+				return nil, err
+			}
+			result.Streams = append(result.Streams, stream)
+		}
 	}
 
 	return result, nil
 }
 
-func deDotDataStream(ds *proto.DataStream, source *structpb.Struct) (*proto.DataStream, error) {
-	if ds == nil {
-		ds = &proto.DataStream{}
-	}
-
-	cfg, err := config.NewConfigFrom(source.AsMap())
-	if err != nil {
-		return nil, fmt.Errorf("cannot generate config from source field: %w", err)
-	}
-
-	// Create a temporary struct to unpack the configuration.
-	// UnpackTo correctly handles any flattened fields like
-	// data_stream.type. So all we need to do is to call UnpackTo,
-	// ensure the DataStream does not have a different value,
-	// them merge them both.
-	tmp := struct {
-		DataStream struct {
-			Dataset   string `config:"dataset" yaml:"dataset"`
-			Type      string `config:"type" yaml:"type"`
-			Namespace string `config:"namespace" yaml:"namespace"`
-		} `config:"data_stream" yaml:"data_stream"`
-	}{}
-
-	if err := cfg.Unpack(&tmp); err != nil {
-		return nil, fmt.Errorf("cannot unpack source field into struct: %w", err)
-	}
-
-	if (ds.Dataset != tmp.DataStream.Dataset) && (ds.Dataset != "" && tmp.DataStream.Dataset != "") {
-		return nil, errors.New("duplicated key 'datastream.dataset'")
-	}
-
-	if (ds.Type != tmp.DataStream.Type) && (ds.Type != "" && tmp.DataStream.Type != "") {
-		return nil, errors.New("duplicated key 'datastream.type'")
-	}
-
-	if (ds.Namespace != tmp.DataStream.Namespace) && (ds.Namespace != "" && tmp.DataStream.Namespace != "") {
-		return nil, errors.New("duplicated key 'datastream.namespace'")
-	}
-
-	ret := &proto.DataStream{
-		Dataset:   valueOrDefault(tmp.DataStream.Dataset, ds.Dataset),
-		Type:      valueOrDefault(tmp.DataStream.Type, ds.Type),
-		Namespace: valueOrDefault(tmp.DataStream.Namespace, ds.Namespace),
-		Source:    ds.GetSource(),
-	}
-
-	return ret, nil
+func decodeError(err error) error {
+	return fmt.Errorf("decoding error: %w", err)
 }
 
-// valueOrDefault returns b if a is an empty string
-func valueOrDefault(a, b string) string {
-	if a == "" {
-		return b
+func unexpectedTypeError(name string, expected string, got interface{}) error {
+	kind := "nil"
+	if got != nil {
+		kind = reflect.TypeOf(got).Kind().String()
 	}
-	return a
+	return fmt.Errorf("'%s' expected %s, got %q", name, expected, kind)
 }
 
-func updateDataStreamsFromSource(unitConfig *proto.UnitExpectedConfig) error {
-	var err error
-	unitConfig.DataStream, err = deDotDataStream(unitConfig.GetDataStream(), unitConfig.GetSource())
-	if err != nil {
-		return fmt.Errorf("could not parse data_stream from input: %w", err)
+// lookupField returns the key and value of the field, matching the key exactly or, failing
+// that, case-insensitively.
+func lookupField(m map[string]interface{}, name string) (string, interface{}, bool) {
+	if v, ok := m[name]; ok {
+		return name, v, true
 	}
+	for k, v := range m {
+		if strings.EqualFold(k, name) {
+			return k, v, true
+		}
+	}
+	return "", nil, false
+}
 
-	for i, stream := range unitConfig.Streams {
-		stream.DataStream, err = deDotDataStream(stream.GetDataStream(), stream.GetSource())
+// stringValue converts a scalar value into a string the way a weakly typed decoder would. nil
+// converts into the empty string. Non-scalar values are rejected.
+func stringValue(v interface{}) (string, error) {
+	switch t := v.(type) {
+	case nil:
+		return "", nil
+	case string:
+		return t, nil
+	case bool:
+		if t {
+			return "1", nil
+		}
+		return "0", nil
+	case []byte:
+		return string(t), nil
+	case json.Number:
+		return string(t), nil
+	}
+	if f, ok := numberValue(v); ok {
+		switch t := v.(type) {
+		case float32, float64:
+			return strconv.FormatFloat(f, 'f', -1, 64), nil
+		case uint, uint8, uint16, uint32, uint64:
+			return strconv.FormatUint(reflect.ValueOf(t).Uint(), 10), nil
+		default:
+			return strconv.FormatInt(reflect.ValueOf(t).Int(), 10), nil
+		}
+	}
+	return "", fmt.Errorf("expected type 'string', got unconvertible type '%T'", v)
+}
+
+// stringField returns the field as a string, see stringValue. prefix is only used in error messages.
+func stringField(m map[string]interface{}, name string, prefix string) (string, error) {
+	_, v, ok := lookupField(m, name)
+	if !ok {
+		return "", nil
+	}
+	s, err := stringValue(v)
+	if err != nil {
+		return "", fmt.Errorf("'%s%s' %w", prefix, name, err)
+	}
+	return s, nil
+}
+
+// uint64Field returns the field as a uint64, converting values the way a weakly typed decoder
+// would, except that negative values are rejected instead of wrapping around. prefix is only
+// used in error messages.
+func uint64Field(m map[string]interface{}, name string, prefix string) (uint64, error) {
+	_, v, ok := lookupField(m, name)
+	if !ok || v == nil {
+		return 0, nil
+	}
+	switch t := v.(type) {
+	case bool:
+		if t {
+			return 1, nil
+		}
+		return 0, nil
+	case string:
+		if t == "" {
+			return 0, nil
+		}
+		u, err := strconv.ParseUint(t, 0, 64)
 		if err != nil {
-			return fmt.Errorf("could not parse data_stream from stream [%d]: %w",
-				i, err)
+			return 0, fmt.Errorf("cannot parse '%s%s' as uint: %w", prefix, name, err)
+		}
+		return u, nil
+	case json.Number:
+		u, err := strconv.ParseUint(string(t), 0, 64)
+		if err != nil {
+			return 0, fmt.Errorf("cannot parse '%s%s' as uint: %w", prefix, name, err)
+		}
+		return u, nil
+	}
+	if f, ok := numberValue(v); ok {
+		if f < 0 || f >= float64(^uint64(0)) {
+			return 0, fmt.Errorf("cannot parse '%s%s', %v overflows uint", prefix, name, v)
+		}
+		switch t := v.(type) {
+		case uint, uint8, uint16, uint32, uint64:
+			return reflect.ValueOf(t).Uint(), nil
+		case float32, float64:
+			return uint64(f), nil
+		default:
+			return uint64(reflect.ValueOf(t).Int()), nil //nolint:gosec // checked to be positive above
 		}
 	}
-
-	return nil
+	return 0, fmt.Errorf("'%s%s' expected type 'uint64', got unconvertible type '%T'", prefix, name, v)
 }
 
-func setSource(val interface{}, cfg map[string]interface{}) error {
-	// find the source field on the val
-	resVal := reflect.ValueOf(val).Elem()
-	sourceFieldByTag, ok := getSourceField(resVal.Type())
-	if !ok {
-		return fmt.Errorf("%T does not define a source field", val)
+// numberValue returns the value as a float64 when it is a numeric type supported by structpb.
+func numberValue(v interface{}) (float64, bool) {
+	switch t := v.(type) {
+	case int:
+		return float64(t), true
+	case int8:
+		return float64(t), true
+	case int16:
+		return float64(t), true
+	case int32:
+		return float64(t), true
+	case int64:
+		return float64(t), true
+	case uint:
+		return float64(t), true
+	case uint8:
+		return float64(t), true
+	case uint16:
+		return float64(t), true
+	case uint32:
+		return float64(t), true
+	case uint64:
+		return float64(t), true
+	case float32:
+		return float64(t), true
+	case float64:
+		return t, true
+	case json.Number:
+		f, err := t.Float64()
+		return f, err == nil
 	}
-	sourceField := resVal.FieldByName(sourceFieldByTag.Name)
-	if !sourceField.CanSet() {
-		return fmt.Errorf("%T.source cannot be set", val)
-	}
+	return 0, false
+}
 
-	// create the source (as the original source is always sent)
-	source, err := structpb.NewStruct(cfg)
-	if err != nil {
-		return err
-	}
-	sourceField.Set(reflect.ValueOf(source))
+// dataStreamField returns the proto.DataStream of the map: the nested data_stream dictionary,
+// if any, merged with the flattened data_stream.<field> keys (which take precedence).
+// source is the converted form of the map, prefix is only used in error messages.
+func dataStreamField(m map[string]interface{}, source *structpb.Struct, prefix string) (*proto.DataStream, error) {
+	ds := &proto.DataStream{}
 
-	// look into every field that could also have a source field
-	for i := 0; i < resVal.NumField(); i++ {
-		typeField := resVal.Type().Field(i)
-		if !typeField.IsExported() {
-			continue
-		}
-		jsonName := getJSONFieldName(typeField)
-		if jsonName == "" || jsonName == sourceFieldName {
-			// skip fields without a json name or named 'source'
-			continue
-		}
-		cfgVal, ok := cfg[jsonName]
+	// Read the nested data_stream dict.
+	if key, dsRaw, ok := lookupField(m, "data_stream"); ok && dsRaw != nil {
+		dsMap, ok := dsRaw.(map[string]interface{})
 		if !ok {
-			// doesn't exist in config (so no source)
+			return nil, decodeError(unexpectedTypeError(prefix+"data_stream", "a map or struct", dsRaw))
+		}
+		ds.Source = source.Fields[key].GetStructValue()
+		var err error
+		if ds.Dataset, err = stringField(dsMap, "dataset", prefix+"data_stream."); err != nil {
+			return nil, decodeError(err)
+		}
+		if ds.Type, err = stringField(dsMap, "type", prefix+"data_stream."); err != nil {
+			return nil, decodeError(err)
+		}
+		if ds.Namespace, err = stringField(dsMap, "namespace", prefix+"data_stream."); err != nil {
+			return nil, decodeError(err)
+		}
+	}
+
+	// Apply flattened data_stream.* keys; they take precedence over the nested dict.
+	// Return an error if both specify the same field with conflicting values.
+	for _, f := range []struct {
+		key    string
+		errKey string
+		dest   *string
+	}{
+		{"data_stream.dataset", "datastream.dataset", &ds.Dataset},
+		{"data_stream.type", "datastream.type", &ds.Type},
+		{"data_stream.namespace", "datastream.namespace", &ds.Namespace},
+	} {
+		v, ok := m[f.key]
+		if !ok {
 			continue
 		}
-		valField := resVal.Field(i)
-		valType := valField.Type()
-		switch valType.Kind() {
-		case reflect.Ptr:
-			cfgDict, ok := cfgVal.(map[string]interface{})
-			if ok && hasSourceField(valType.Elem()) {
-				err := setSource(valField.Interface(), cfgDict)
-				if err != nil {
-					return fmt.Errorf("setting source for field %s failed: %w", jsonName, err)
-				}
-			}
-		case reflect.Slice:
-			cfgSlice, ok := cfgVal.([]interface{})
-			if ok {
-				valElem := reflect.ValueOf(valField.Interface())
-				for j := 0; j < valElem.Len(); j++ {
-					valIdx := valElem.Index(j)
-					cfgDict, ok := cfgSlice[j].(map[string]interface{})
-					if ok && hasSourceField(valIdx.Elem().Type()) {
-						err := setSource(valIdx.Interface(), cfgDict)
-						if err != nil {
-							return fmt.Errorf("setting source for field %s.%d failed: %w", jsonName, j, err)
-						}
-					}
-				}
-			}
+		val, err := flattenedValue(v, f.key)
+		if err != nil {
+			return nil, fmt.Errorf("could not dedot '%sdata_stream': %w", prefix, err)
 		}
-	}
-	return nil
-}
-
-func getSourceField(t reflect.Type) (reflect.StructField, bool) {
-	for i := 0; i < t.NumField(); i++ {
-		typeField := t.Field(i)
-		jsonName := getJSONFieldName(typeField)
-		if typeField.IsExported() && jsonName == sourceFieldName {
-			return typeField, true
+		if *f.dest != "" && *f.dest != val {
+			return nil, fmt.Errorf("could not dedot '%sdata_stream': duplicated key '%s'", prefix, f.errKey)
 		}
+		*f.dest = val
 	}
-	return reflect.StructField{}, false
+
+	return ds, nil
 }
 
-func hasSourceField(t reflect.Type) bool {
-	_, ok := getSourceField(t)
-	return ok
-}
-
-func getJSONFieldName(field reflect.StructField) string {
-	tag, ok := field.Tag.Lookup("json")
-	if !ok {
-		return ""
+// flattenedValue converts a data_stream value into a string, rejecting non-scalar values the way
+// unpacking them with go-ucfg did.
+func flattenedValue(v interface{}, key string) (string, error) {
+	s, err := stringValue(v)
+	if err != nil {
+		return "", fmt.Errorf("can not convert '%T' into 'string' accessing '%s'", v, key)
 	}
-	if tag == "" {
-		return ""
-	}
-	split := strings.Split(tag, ",")
-	return strings.TrimSpace(split[0])
+	return s, nil
 }
