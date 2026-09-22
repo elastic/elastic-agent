@@ -492,16 +492,15 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
-			// Beat receivers register diagnostic hooks per input stream via the OTel receiver
-			// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
-			// at the component level and land under the component directory, same as for process-runtime beats.
+			// Beat receivers register diagnostic hooks per input stream via the OTel
+			// receiver instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>").
 			name:              "filebeat receiver",
 			runtime:           "otel",
 			monitoringEnabled: true,
 			expectedCompDiagnosticsFiles: []string{
-				"registry.tar.gz",
-				"beat_metrics.json",
-				"input_metrics.json",
+				"*/registry.tar.gz",
+				"*/beat_metrics.json",
+				"*/input_metrics.json",
 			},
 			agentCompState: fileStreamAgentCompState,
 			diagCompSetup: map[string]integrationtest.ComponentState{
@@ -687,11 +686,11 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		"edot/heap.profile.gz",
 		"edot/mutex.profile.gz",
 		"edot/threadcreate.profile.gz",
-		"components/filestream-default/registry.tar.gz",
-		"components/filestream-default/beat_metrics.json",
-		"components/filestream-default/input_metrics.json",
-		"components/system-metrics-default/beat_metrics.json",
-		"components/system-metrics-default/input_metrics.json",
+		"components/filestream-default/*/registry.tar.gz",
+		"components/filestream-default/*/beat_metrics.json",
+		"components/filestream-default/*/input_metrics.json",
+		"components/system-metrics-default/*/beat_metrics.json",
+		"components/system-metrics-default/*/input_metrics.json",
 		"logs/elastic-agent-*/elastic-agent-*.ndjson",
 		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
@@ -704,7 +703,10 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		require.NoErrorf(t, err, "stat file %q failed", matches[0])
 		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
-	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
+	registryMatches, err := filepath.Glob(filepath.Join(extractionDir, "components/filestream-default/*/registry.tar.gz"))
+	require.NoError(t, err)
+	require.NotEmpty(t, registryMatches)
+	verifyFilebeatRegistry(t, registryMatches[0])
 }
 
 // TestContainerDiagnostics verifies that `elastic-agent diagnostics` collects
