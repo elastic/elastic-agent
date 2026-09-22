@@ -15,6 +15,11 @@ const EnrollBackoffInit = 5 * time.Second
 // EnrollBackoffMax is the maximum backoff duration for enrollment retries.
 const EnrollBackoffMax = 10 * time.Minute
 
+// EnrollClientTimeout is the per-attempt HTTP client timeout for enrollment requests.
+// Exported so external consumers (e.g. Horde) can align their client timeouts with
+// elastic-agent and avoid silent drift when the value changes.
+const EnrollClientTimeout = 10 * time.Minute
+
 // AckBackoffInit is the initial backoff duration for action-ack retries.
 const AckBackoffInit = 1 * time.Minute
 
