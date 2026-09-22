@@ -9738,11 +9738,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/api
-Version: v0.35.4
+Version: v0.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.35.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.37.0/LICENSE:
 
 
                                  Apache License
@@ -9950,11 +9950,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.35.4/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/apimachinery
-Version: v0.35.4
+Version: v0.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.35.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.37.0/LICENSE:
 
 
                                  Apache License
@@ -10162,11 +10162,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.35.4/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/client-go
-Version: v0.35.4
+Version: v0.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.35.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.37.0/LICENSE:
 
 
                                  Apache License
@@ -116133,11 +116133,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/kubelet@v0.37.0/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : sigs.k8s.io/controller-runtime
-Version: v0.25.0
+Version: v0.25.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/sigs.k8s.io/controller-runtime@v0.25.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/sigs.k8s.io/controller-runtime@v0.25.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004
