@@ -44,6 +44,14 @@ const (
 	outputOtelOverrideFieldName           = "otel"
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
+<<<<<<< HEAD
+=======
+	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
+	// SingleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// components with single_receiver: true, so that all receiver names uniformly have
+	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
+	SingleReceiverStreamID = "single"
+>>>>>>> a6bbfeb ([beatreceivers] Add stream-id to the diagnostic path (#16459))
 )
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
@@ -265,8 +273,15 @@ func getCollectorConfigForComponent(
 	return confmap.NewFromStringMap(fullConfig), nil
 }
 
+<<<<<<< HEAD
 // getReceiversConfigForComponent returns the receivers configuration for a component. Usually this will be a single
 // receiver, but in principle it could be more.
+=======
+// getReceiversConfigForComponent returns the receivers configuration for a component.
+// By default each input stream produces its own receiver. When the component's InputSpec has
+// SingleReceiver set, all streams are merged into one receiver keyed by the component ID with
+// the placeholder SingleReceiverStreamID as the stream suffix.
+>>>>>>> a6bbfeb ([beatreceivers] Add stream-id to the diagnostic path (#16459))
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -360,9 +375,58 @@ func getReceiversConfigForComponent(
 	receiverConfig["management.otel.enabled"] = true
 	koanfmaps.Merge(monitoringConfig, receiverConfig)
 
+<<<<<<< HEAD
 	return map[string]any{
 		receiverId.String(): receiverConfig,
 	}, nil
+=======
+	if receiverFeatures := beatReceiverFeatures(comp); len(receiverFeatures) > 0 {
+		sharedConfig["features"] = receiverFeatures
+	}
+
+	// OTel Beat receivers never see CLI flags, so pass ELASTIC_AGENT_HOSTNAME via the
+	// native Beat hostname config key for the receiver's own identity initialisation.
+	if hostname := util.HostnameOverride(); hostname != "" {
+		sharedConfig["hostname"] = hostname
+	}
+
+	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
+	// creating one receiver per stream. Some components have shared state that cannot
+	// easily be split across receivers. The receiver still gets a placeholder stream ID
+	// suffix so that all receiver names uniformly contain a stream segment.
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+		allInputConfigs := make([]map[string]any, 0, len(inputs))
+		for _, ri := range inputs {
+			allInputConfigs = append(allInputConfigs, ri.config)
+		}
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+SingleReceiverStreamID)
+		receiverConfig := maps.Clone(sharedConfig)
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): allInputConfigs,
+		}
+		return map[string]any{receiverID.String(): receiverConfig}, nil
+	}
+
+	// Create one receiver per input stream.
+	receiversConfig := make(map[string]any, len(inputs))
+	for _, ri := range inputs {
+		if ri.streamID == "" {
+			return nil, fmt.Errorf("input missing stream ID in component %s", comp.ID)
+		}
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+ri.streamID)
+
+		// Create a new config map for this receiver, copying shared config entries.
+		// This is a shallow copy — nested map values (path, logging, http) are shared
+		// across receivers. This is safe because nothing mutates them after construction.
+		receiverConfig := maps.Clone(sharedConfig)
+		receiverConfig[beatName] = map[string]any{
+			beatInputsKey(beatName): []map[string]any{ri.config},
+		}
+		receiversConfig[receiverID.String()] = receiverConfig
+	}
+
+	return receiversConfig, nil
+>>>>>>> a6bbfeb ([beatreceivers] Add stream-id to the diagnostic path (#16459))
 }
 
 // getReceiversConfigForComponent returns the exporters configuration and queue settings for a component. Usually this will be a single
