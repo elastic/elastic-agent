@@ -367,10 +367,12 @@ func dataStreamFromSource(source map[string]interface{}) (dataStreamFields, erro
 		"data_stream.type":      &tmp.DataStream.Type,
 		"data_stream.namespace": &tmp.DataStream.Namespace,
 	} {
-		if v, ok := source[key]; ok {
-			if *field, err = flattenedValue(v, key); err != nil {
-				return tmp, err
-			}
+		_, v, ok := lookupField(source, key)
+		if !ok {
+			continue
+		}
+		if *field, err = flattenedValue(v, key); err != nil {
+			return tmp, err
 		}
 	}
 	return tmp, nil

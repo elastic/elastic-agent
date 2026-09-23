@@ -56,9 +56,6 @@ func (r *RenderedInputs) Node() Node {
 func (r *RenderedInputs) Maps() []interface{} {
 	maps := make([]interface{}, 0, len(r.entries))
 	for _, entry := range r.entries {
-		if entry.mapped == nil {
-			entry.mapped = toInterface(entry.rendered).(map[string]interface{})
-		}
 		maps = append(maps, entry.mapped)
 	}
 	return maps
@@ -247,6 +244,7 @@ func renderInput(dict *Dict, vars *Vars, hasher *xxhash.Digest) (*renderEntry, e
 		}
 	}
 	entry.rendered = promoteProcessors(rendered)
+	entry.mapped = toInterface(entry.rendered).(map[string]interface{})
 	return entry, nil
 }
 

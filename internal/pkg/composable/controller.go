@@ -604,7 +604,7 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvide
 	}
 	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders, defaultProvider)
 	vars[0].SetCacheKey(key.String())
-	contextKey := key.Len()
+	contextKeyStr := key.String()
 
 	// add to the vars list for each dynamic providers mappings
 	dynamicNames := make([]string, 0, len(c.dynamicProviderStates))
@@ -633,9 +633,8 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvide
 			key.WriteString(strconv.FormatUint(mappings.generation, 10))
 			v.SetCacheKey(key.String())
 			// reset back to the shared context part of the key
-			keyStr := key.String()[:contextKey]
 			key.Reset()
-			key.WriteString(keyStr)
+			key.WriteString(contextKeyStr)
 			vars = append(vars, v)
 		}
 	}
@@ -710,7 +709,7 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if c.mapping != nil && c.hash == hash {
+	if c.mapping != nil && c.hash == hash && c.mapping.Equal(ast) {
 		// same mapping; no need to update and signal
 		return nil
 	}
