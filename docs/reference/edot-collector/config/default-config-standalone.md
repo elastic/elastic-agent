@@ -134,6 +134,8 @@ With the {{motlp}}, there is no need to configure any Elastic-specific component
 
 ### Forwarding to a self-managed Gateway [forwarding-to-a-self-managed-gateway]
 
+{applies_to}`edot_collector: ga 9.3+`
+
 When the {{motlp}} isn't an option, {{agent}} in Agent mode can forward all signals over OTLP to {{agent}} in Gateway mode instead.
 
 Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic: no Elastic-specific components are required in Agent mode. Data enrichment and the authenticated export to {{es}} happen centrally in Gateway mode. For guidance on when to use Gateway mode, and the components it requires in self-managed environments, refer to [Deployment modes](/reference/edot-collector/modes.md#edot-collector-as-gateway).
@@ -199,7 +201,7 @@ To send data from an upstream OpenTelemetry Collector to {{agent}} in Gateway mo
 When using contrib or upstream OpenTelemetry collectors, the following batching configuration is recommended when sending data to the {{motlp}} or to {{agent}} in Gateway mode:
 
 ```yaml
-otlp/ingest:
+otlp_grpc/ingest:
   endpoint: <ingest endpoint>
   headers:
     Authorization: ApiKey <value>
