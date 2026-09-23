@@ -331,30 +331,55 @@ service:
 ### Agent metadata available to Collector components
 
 When Elastic Agent supervises the Collector, it adds the following attributes to
-`service.telemetry.resource`, including when monitoring is disabled or only custom
-OTel pipelines are configured:
+`service.telemetry.resource.attributes`, including when monitoring is disabled or
+only custom OTel pipelines are configured:
 
 ```yaml
 service:
   telemetry:
     resource:
-      elastic_agent.id: "<agent ID>"
-      elastic_agent.version: "<agent version>"
-      elastic_agent.snapshot: "false"
+      attributes:
+        - name: elastic_agent.id
+          value: "<agent ID>"
+        - name: elastic_agent.version
+          value: "<agent version>"
+        - name: elastic_agent.snapshot
+          value: false
+    logs:
+      disable_zap_resource: true
 ```
 
-Agent supplies the actual values automatically and overrides configured values for
-these three keys. Other resource attributes are preserved. Both the legacy inline
-resource map and the declarative `resource.attributes` list are supported. Snapshot
-is a string (`"true"` or `"false"`) in both formats.
+Agent supplies the actual values automatically and overrides configured entries with
+these three names. Other entries and `schema_url` are preserved. `elastic_agent.snapshot`
+is a boolean.
+
+The Collector rejects configurations that mix the `attributes` list with the
+deprecated inline resource map (`service.telemetry.resource.<name>: <value>`). When a
+configuration uses the inline map and no `attributes` list, Agent adds the three
+attributes to the inline map instead. The inline map only accepts strings, so
+`elastic_agent.snapshot` is `"true"` or `"false"` there, and the Collector logs its
+usual deprecation warning for the inline format on startup.
+
+Agent leaves the resource untouched, and logs a warning, when it cannot merge into it:
+for example when `attributes` is a `${file:...}` or `${env:...}` reference that the
+Collector expands later, or when `resource` is not a map.
+
+The Collector adds its resource attributes to every log line it writes unless
+`service.telemetry.logs.disable_zap_resource` is set. Agent monitoring already attaches
+the Agent identity to Collector logs, so Agent sets `disable_zap_resource: true` when the
+configuration does not set it. Set it to `false` explicitly to keep the resource
+attributes on Collector log lines.
 
 Custom receivers, processors, and connectors can read these attributes from
-`Settings.Resource.Attributes()` in their factories. They also appear on the
-Collector's internal telemetry. They are not automatically added to telemetry
-passing through pipelines: components must explicitly copy the required fields.
-For Elasticsearch `bodymap` documents, copy them into the log body. Stock OTTL
-`resource.attributes` accesses the incoming telemetry's resource, not this shared
-Collector resource.
+`Settings.Resource.Attributes()` in their factories. They are also present on the
+Collector's own internal telemetry as emitted by the OpenTelemetry SDK, for example
+in the diagnostics file exporter and as Prometheus `target_info`. They are not added
+to the monitoring documents Agent indexes in Elasticsearch, which carry the Agent
+identity through the monitoring event template instead, and they are not
+automatically added to telemetry passing through pipelines: components must
+explicitly copy the required fields. For Elasticsearch `bodymap` documents, copy them
+into the log body. Stock OTTL `resource.attributes` accesses the incoming telemetry's
+resource, not this shared Collector resource.
 
 ### Beats receivers delivery guarantees in OTel mode
 

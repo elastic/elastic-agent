@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -1476,7 +1475,7 @@ func newTestLogger() *logger.Logger {
 func TestOTelManager_buildMergedConfig(t *testing.T) {
 	// Common parameters used across all test cases
 	var (
-		commonAgentInfo     = &info.AgentInfo{}
+		commonAgentInfo     = newTestAgentInfo(false)
 		testComp            = testComponent("test-component")
 		invalidLogpLevel    = logp.DebugLevel - 1
 		testOtelConfigLevel = logp.InfoLevel
@@ -1592,9 +1591,11 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 
 			require.NotNil(t, result)
-			assert.Equal(t, commonAgentInfo.AgentID(), result.Get("service::telemetry::resource::elastic_agent.id"))
-			assert.Equal(t, commonAgentInfo.Version(), result.Get("service::telemetry::resource::elastic_agent.version"))
-			assert.Equal(t, strconv.FormatBool(commonAgentInfo.Snapshot()), result.Get("service::telemetry::resource::elastic_agent.snapshot"))
+			agentAttrs := declarativeResourceAttributesOf(t, result)
+			assert.Equal(t, testAgentID, agentAttrs["elastic_agent.id"])
+			assert.Equal(t, testAgentVersion, agentAttrs["elastic_agent.version"])
+			assert.Equal(t, false, agentAttrs["elastic_agent.snapshot"])
+			assert.Equal(t, true, result.Get(telemetryDisableZapResourceKey))
 			for _, key := range tt.expectedKeys {
 				assert.True(t, result.IsSet(key), "Expected key %s to be set", key)
 			}
@@ -2092,7 +2093,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 			t.Fatal("timeout waiting for collector config update")
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
-		assert.NoError(t, injectAgentTelemetryResource(expectedCfg, agentInfo))
+		assert.NoError(t, injectAgentTelemetryResource(expectedCfg, agentInfo, logp.NewNopLogger()))
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
