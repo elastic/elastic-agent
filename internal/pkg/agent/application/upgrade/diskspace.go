@@ -13,10 +13,9 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/cenkalti/backoff/v4"
 
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -24,15 +23,23 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 const (
 	ChecksumSize        = uint64(1024)                   // 1KB
-	ExtraDataSize       = uint64(50 * 1024 * 1024)       // 50MB
+	ExtraInstallSize    = uint64(50 * 1024 * 1024)       // 50MB
+	MarkerSize          = uint64(1024 * 1024)            // 1MB
 	FallbackArchiveSize = uint64(700 * 1024 * 1024)      // 700MB
 	FallbackPayloadSize = uint64(2 * 1024 * 1024 * 1024) // 2GB
 )
+
+func getArchiveReservation(archiveDir string) string {
+	return filepath.Join(archiveDir, ".elastic-agent-artifact.reserved.tmp")
+}
+
+func getInstallReservation() string {
+	return filepath.Join(paths.Data(), ".elastic-agent-install.reserved.tmp")
+}
 
 func formatSize(b uint64) string {
 	const unit = 1024
@@ -47,70 +54,140 @@ func formatSize(b uint64) string {
 	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-type readRangeFunc func(uri string, offset, length int64) ([]byte, error)
-
-// CheckDiskSpaceAvailable returns whether the filesystems at
-// config.TargetDirectory and paths.Data have enough free space for an upgrade.
-func CheckDiskSpaceAvailable(ctx context.Context, config *artifact.Config, upgradeDetails *details.Details, uri string) (bool, error) {
-	archiveFS, err := getVolumeNameAt(config.TargetDirectory)
+func checkSameVolume(pathA, pathB string) bool {
+	// Failures are treated as different filesystems since we only use this for
+	// determining the error message to display.
+	volumeA, err := getVolumeNameAt(pathA)
 	if err != nil {
-		return false, fmt.Errorf("could not determine volume at %s: %w", config.TargetDirectory, err)
+		return false
 	}
-	dataFS, err := getVolumeNameAt(paths.Data())
+	volumeB, err := getVolumeNameAt(pathB)
 	if err != nil {
-		return false, fmt.Errorf("could not determine volume at %s: %w", paths.Data(), err)
+		return false
 	}
-
-	if archiveFS == dataFS {
-		available, err := getAvailableDiskSpaceAt(config.TargetDirectory)
-		if err != nil {
-			return false, fmt.Errorf("could not get available disk space at %s: %w", config.TargetDirectory, err)
-		}
-		archiveSize, decompressedSize, sizeErr := getUpgradeSize(ctx, config, uri, upgradeDetails)
-		if sizeErr != nil {
-			sizeErr = fmt.Errorf("could not get upgrade size: %w", sizeErr)
-		}
-		if available < archiveSize+ChecksumSize+decompressedSize+ExtraDataSize {
-			return false, goerrors.Join(sizeErr,
-				fmt.Errorf("insufficient space at %s (%q): need %s, have %s", config.TargetDirectory, archiveFS, formatSize(archiveSize+decompressedSize+ExtraDataSize), formatSize(available)),
-				upgradeErrors.ErrDiskSpaceLow)
-		}
-		return true, sizeErr
-	}
-
-	archiveFSAvailable, err := getAvailableDiskSpaceAt(config.TargetDirectory)
-	if err != nil {
-		return false, fmt.Errorf("could not get available disk space at %s: %w", config.TargetDirectory, err)
-	}
-	dataFSAvailable, err := getAvailableDiskSpaceAt(paths.Data())
-	if err != nil {
-		return false, fmt.Errorf("could not get available disk space at %s: %w", paths.Data(), err)
-	}
-
-	archiveSize, decompressedSize, err := getUpgradeSize(ctx, config, uri, upgradeDetails)
-	if err != nil {
-		err = fmt.Errorf("could not get upgrade size: %w", err)
-	}
-	hasSpace := true
-	if archiveFSAvailable < archiveSize+ChecksumSize {
-		err = goerrors.Join(err, fmt.Errorf("insufficient space at %s (%q): need %s, have %s", config.TargetDirectory, archiveFS, formatSize(archiveSize), formatSize(archiveFSAvailable)), upgradeErrors.ErrDiskSpaceLow)
-		hasSpace = false
-	}
-	if dataFSAvailable < decompressedSize+ExtraDataSize {
-		err = goerrors.Join(err, fmt.Errorf("insufficient space at %s (%q): need %s, have %s", paths.Data(), dataFS, formatSize(decompressedSize+ExtraDataSize), formatSize(dataFSAvailable)), upgradeErrors.ErrDiskSpaceLow)
-		hasSpace = false
-	}
-
-	return hasSpace, err
+	return volumeA == volumeB
 }
 
-func getUpgradeSize(ctx context.Context, config *artifact.Config, uri string, upgradeDetails *details.Details) (uint64, uint64, error) {
+type readRangeFunc func(uri string, offset, length int64) ([]byte, error)
+
+// ReserveDiskSpace reserves upgrade space at the download archive path and install directory.
+// Pre-existing reservation files are resized to the required size.
+func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (bool, error) {
+	installSize := min(decompressedSize+ExtraInstallSize, math.MaxInt64)
+	artifactsSize := min(archiveSize+ChecksumSize, math.MaxInt64)
+
+	installPath := getInstallReservation()
+	archivePath := getArchiveReservation(archiveDir)
+	onSameVolume := checkSameVolume(paths.Data(), archiveDir)
+
+	var errs []error
+	var spaceReqs []string
+
+	err := reserveDiskSpace(installPath, int64(installSize)) //nolint:gosec // G115: installSize is clamped to MaxInt64
+	if upgradeErrors.IsDiskSpaceFullError(err) {
+		if onSameVolume {
+			// Report both requirements so the user doesn't free up just the install
+			// size and then fail again on the archive reservation
+			return false, upgradeErrors.DiskSpaceLowError{
+				fmt.Sprintf("need %s at %s", formatSize(installSize), paths.Data()),
+				fmt.Sprintf("need %s at %s", formatSize(artifactsSize), archiveDir),
+			}
+		}
+
+		spaceReqs = append(spaceReqs, fmt.Sprintf("need %s at %s", formatSize(installSize), paths.Data()))
+	} else if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = reserveDiskSpace(archivePath, int64(artifactsSize)) //nolint:gosec // G115: artifactsSize is clamped to MaxInt64
+	if upgradeErrors.IsDiskSpaceFullError(err) {
+		if onSameVolume {
+			// Report both requirements here even though the install reservation
+			// succeeded. We remove the reserved install file on upgrade failure, so
+			// only reporting needing X for the archive size will be confusing
+			// for the user as they aren't aware of our internal reservation
+			// mechanics and it would appear as if X is already available
+			errs = append(errs,
+				upgradeErrors.DiskSpaceLowError{
+					fmt.Sprintf("need %s at %s", formatSize(installSize), paths.Data()),
+					fmt.Sprintf("need %s at %s", formatSize(artifactsSize), archiveDir),
+				},
+			)
+			return false, goerrors.Join(errs...)
+		}
+
+		spaceReqs = append(spaceReqs, fmt.Sprintf("need %s at %s", formatSize(artifactsSize), archiveDir))
+	} else if err != nil {
+		errs = append(errs, err)
+	}
+
+	if len(spaceReqs) > 0 {
+		errs = append(errs, upgradeErrors.DiskSpaceLowError(spaceReqs))
+	}
+	if errs == nil {
+		return true, nil
+	}
+
+	return false, goerrors.Join(errs...)
+}
+
+func reserveDiskSpace(path string, size int64) error {
+	_, statErr := os.Stat(path)
+	fresh := goerrors.Is(statErr, os.ErrNotExist)
+
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o660)
+	if err != nil {
+		return err
+	}
+
+	if err := preallocateFile(file, size); err != nil {
+		_ = file.Close()
+		if fresh {
+			_ = os.Remove(path)
+		}
+		return err
+	}
+	if err := file.Truncate(size); err != nil {
+		_ = file.Close()
+		if fresh {
+			_ = os.Remove(path)
+		}
+		return err
+	}
+	if err := file.Close(); err != nil {
+		if fresh {
+			_ = os.Remove(path)
+		}
+		return err
+	}
+	return nil
+}
+
+func shrinkDiskSpaceReservation(path string, delta int64) error {
+	info, err := os.Stat(path)
+	if goerrors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("could not stat upgrade reservation file %s: %w", path, err)
+	}
+	size := max(info.Size()-delta, 0)
+	if size >= info.Size() {
+		return nil
+	}
+	if err := os.Truncate(path, size); err != nil {
+		return fmt.Errorf("could not shrink upgrade reservation file %s: %w", path, err)
+	}
+	return nil
+}
+
+func getUpgradeSize(ctx context.Context, config *artifact.Config, uri string) (uint64, uint64, error) {
 	var archiveSize, decompressedSize uint64
 	var err error
 	if download.IsLocal(uri) {
 		archiveSize, decompressedSize, err = GetLocalUpgradeSize(uri)
 	} else {
-		archiveSize, decompressedSize, err = GetRemoteUpgradeSize(ctx, config, uri, upgradeDetails)
+		archiveSize, decompressedSize, err = GetRemoteUpgradeSize(ctx, config, uri)
 	}
 
 	if err != nil {
@@ -164,7 +241,7 @@ func GetLocalUpgradeSize(uri string) (uint64, uint64, error) {
 	return archiveSize, decompressedSize, nil
 }
 
-func GetRemoteUpgradeSize(ctx context.Context, config *artifact.Config, uri string, upgradeDetails *details.Details) (uint64, uint64, error) {
+func GetRemoteUpgradeSize(ctx context.Context, config *artifact.Config, uri string) (uint64, uint64, error) {
 	decompressedSize := FallbackPayloadSize
 	archiveSize := FallbackArchiveSize
 
@@ -188,53 +265,21 @@ func GetRemoteUpgradeSize(ctx context.Context, config *artifact.Config, uri stri
 		return archiveSize, decompressedSize, err
 	}
 
-	cancelDeadline := time.Now().Add(config.Timeout)
-	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
-	defer cancel()
-
-	upgradeDetails.SetRetryUntil(&cancelDeadline)
-
-	expBo := backoff.NewExponentialBackOff()
-	expBo.InitialInterval = config.RetrySleepInitDuration
-	boCtx := backoff.WithContext(expBo, cancelCtx)
-
-	getArchiveSizeFn := func() error {
-		n, opErr := fetchHTTPArchiveSize(cancelCtx, client, uri)
-		if opErr == nil {
-			if n > 0 { // -1 is unknown size
-				archiveSize = uint64(n)
-			}
-		} else if upgradeErrors.IsPermanentHTTPError(opErr) {
-			return backoff.Permanent(opErr)
-		}
-		return opErr
-	}
-
-	getPayloadSizeFn := func() error {
-		n, opErr := getPayloadSize(uri, archiveSize, func(uri string, offset, length int64) ([]byte, error) {
-			return readRangeHTTP(cancelCtx, client, uri, offset, length)
-		})
-		if opErr == nil {
-			decompressedSize = n
-		} else if upgradeErrors.IsPermanentHTTPError(opErr) {
-			return backoff.Permanent(opErr)
-		}
-		return opErr
-	}
-
-	opFailureNotificationFn := func(err error, _ time.Duration) {
-		upgradeDetails.SetRetryableError(err)
-	}
-
-	if err := backoff.RetryNotify(getArchiveSizeFn, boCtx, opFailureNotificationFn); err != nil {
+	n, err := fetchHTTPArchiveSize(ctx, client, uri)
+	if err != nil {
 		return archiveSize, decompressedSize, err
 	}
-	if err := backoff.RetryNotify(getPayloadSizeFn, boCtx, opFailureNotificationFn); err != nil {
-		return archiveSize, decompressedSize, err
+	if n > 0 { // -1 is unknown size
+		archiveSize = uint64(n)
 	}
 
-	upgradeDetails.SetRetryableError(nil)
-	upgradeDetails.SetRetryUntil(nil)
+	payloadSize, err := getPayloadSize(uri, archiveSize, func(uri string, offset, length int64) ([]byte, error) {
+		return readRangeHTTP(ctx, client, uri, offset, length)
+	})
+	if err != nil {
+		return archiveSize, decompressedSize, err
+	}
+	decompressedSize = payloadSize
 
 	return archiveSize, decompressedSize, nil
 }
@@ -337,15 +382,6 @@ func getZipPayloadSize(uri string, archiveSize uint64, readRange readRangeFunc) 
 }
 
 func fetchHTTPArchiveSize(ctx context.Context, client *http.Client, uri string) (int64, error) {
-	if download.IsLocal(uri) {
-		path := strings.TrimPrefix(uri, "file://")
-		info, err := os.Stat(path)
-		if err != nil {
-			return 0, fmt.Errorf("could not stat %s: %w", path, err)
-		}
-		return info.Size(), nil
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodHead, uri, nil)
 	if err != nil {
 		return 0, err
@@ -367,7 +403,9 @@ func fetchHTTPArchiveSize(ctx context.Context, client *http.Client, uri string) 
 		return 0, err
 	}
 	if resp.ContentLength < 0 {
-		return 0, fmt.Errorf("could not fetch content length for %s: server did not return a content length", uri)
+		return 0, goerrors.Join(
+			fmt.Errorf("could not fetch content length for %s: server did not return a content length", uri),
+			upgradeErrors.ErrPermanentHTTP)
 	}
 
 	return resp.ContentLength, nil

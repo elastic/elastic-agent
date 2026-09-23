@@ -5,6 +5,7 @@
 package download
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -66,27 +67,42 @@ func TestCopy(t *testing.T) {
 			baseDir := t.TempDir()
 			src := filepath.Join(baseDir, "source")
 			dst := filepath.Join(baseDir, "artifact")
-			require.NoError(t, os.WriteFile(src, []byte("fake archive"), 0o666))
+			content := []byte("fake archive")
+			require.NoError(t, os.WriteFile(src, content, 0o666))
 
-			log, _ := loggertest.New(t.Name())
-			err := copyFile(log, src, dst, tc.ops())
+			err := copyFile(src, dst, tc.ops())
 			if tc.wantError == nil {
 				require.NoError(t, err)
-				require.FileExists(t, dst)
+				copied, err := os.ReadFile(dst)
+				require.NoError(t, err)
+				require.Equal(t, content, copied)
 			} else {
 				require.ErrorIs(t, err, tc.wantError)
-				require.NoFileExists(t, dst)
 			}
 		})
 	}
+
+	t.Run("truncates existing file", func(t *testing.T) {
+		baseDir := t.TempDir()
+		src := filepath.Join(baseDir, "source")
+		dst := filepath.Join(baseDir, "artifact")
+		content := []byte("fake archive")
+		require.NoError(t, os.WriteFile(src, content, 0o666))
+		// Extra reserved bytes must be truncated after copying.
+		require.NoError(t, os.WriteFile(dst, bytes.Repeat([]byte("x"), len(content)+10), 0o666))
+
+		require.NoError(t, copyFile(src, dst, defaultFileOps()))
+		copied, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, content, copied)
+	})
 
 	t.Run("source missing", func(t *testing.T) {
 		baseDir := t.TempDir()
 		src := filepath.Join(baseDir, "source")
 		dst := filepath.Join(baseDir, "artifact")
 
-		log, _ := loggertest.New(t.Name())
-		require.ErrorIs(t, copyFile(log, src, dst, defaultFileOps()), os.ErrNotExist)
+		require.ErrorIs(t, copyFile(src, dst, defaultFileOps()), os.ErrNotExist)
 		require.NoFileExists(t, dst)
 	})
 
@@ -96,8 +112,7 @@ func TestCopy(t *testing.T) {
 		content := []byte("fake archive")
 		require.NoError(t, os.WriteFile(path, content, 0o666))
 
-		log, _ := loggertest.New(t.Name())
-		require.NoError(t, copyFile(log, path, path, defaultFileOps()))
+		require.NoError(t, copyFile(path, path, defaultFileOps()))
 		read, err := os.ReadFile(path)
 		require.NoError(t, err)
 		require.Equal(t, content, read)
@@ -106,8 +121,9 @@ func TestCopy(t *testing.T) {
 
 func TestDownload(t *testing.T) {
 	const fileName = "artifact"
+	content := []byte("fake archive")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, err := w.Write([]byte("fake archive"))
+		_, err := w.Write(content)
 		assert.NoError(t, err)
 	}))
 	defer server.Close()
@@ -126,13 +142,27 @@ func TestDownload(t *testing.T) {
 			err := download(context.Background(), log, config, upgradeDetails, nil, src, dst, tc.ops())
 			if tc.wantError == nil {
 				require.NoError(t, err)
-				require.FileExists(t, dst)
+				downloaded, err := os.ReadFile(dst)
+				require.NoError(t, err)
+				require.Equal(t, content, downloaded)
 			} else {
 				require.ErrorIs(t, err, tc.wantError)
-				require.NoFileExists(t, dst)
 			}
 		})
 	}
+
+	t.Run("truncates existing file", func(t *testing.T) {
+		dst := filepath.Join(t.TempDir(), fileName)
+		// Extra reserved bytes must be truncated after downloading.
+		require.NoError(t, os.WriteFile(dst, bytes.Repeat([]byte("x"), len(content)+10), 0o666))
+		log, _ := loggertest.New(t.Name())
+		upgradeDetails := details.NewDetails("1.2.3", details.StateRequested, "")
+
+		require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, src, dst, defaultFileOps()))
+		downloaded, err := os.ReadFile(dst)
+		require.NoError(t, err)
+		require.Equal(t, content, downloaded)
+	})
 }
 
 func TestCopyDiskSpaceError(t *testing.T) {
@@ -144,11 +174,10 @@ func TestCopyDiskSpaceError(t *testing.T) {
 
 	ops := defaultFileOps()
 	ops.CopyFile = func(io.Writer, io.Reader) (int64, error) { return 0, diskSpaceError }
-	log, _ := loggertest.New(t.Name())
 
-	err := copyFile(log, source, target, ops)
+	err := copyFile(source, target, ops)
 	require.ErrorIs(t, err, diskSpaceError)
-	require.NoFileExists(t, target)
+	require.FileExists(t, target)
 }
 
 func TestDownloadDiskSpaceError(t *testing.T) {
@@ -171,7 +200,7 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 	err := download(context.Background(), log, config, upgradeDetails, server.Client(), server.URL, target, ops)
 
 	require.ErrorIs(t, err, diskSpaceError)
-	require.NoFileExists(t, target)
+	require.FileExists(t, target)
 	require.Equal(t, details.StateFailed, upgradeDetails.State)
 	require.Equal(t, upgradeErrors.ErrDiskSpaceFull.Error(), upgradeDetails.Metadata.ErrorMsg)
 }

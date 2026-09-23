@@ -41,24 +41,26 @@ const (
 )
 
 type artifactDownloader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	fleetServerURI string
-	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
-	checkDiskSpace func(context.Context, *artifact.Config, *details.Details, string) (bool, error)
-	retryTimeout   time.Duration
-	totalTimeout   time.Duration
-	fileOps        download.FileOps
+	log              *logger.Logger
+	settings         *artifact.Config
+	fleetServerURI   string
+	getPGPSources    func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
+	getUpgradeSize   func(context.Context, *artifact.Config, string) (uint64, uint64, error)
+	reserveDiskSpace func(string, uint64, uint64) (bool, error)
+	retryTimeout     time.Duration
+	totalTimeout     time.Duration
+	fileOps          download.FileOps
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
 	return &artifactDownloader{
-		log:            log,
-		settings:       settings,
-		getPGPSources:  download.AppendFallbackPGP,
-		checkDiskSpace: CheckDiskSpaceAvailable,
-		retryTimeout:   defaultRetryTimeout,
-		totalTimeout:   totalTimeout,
+		log:              log,
+		settings:         settings,
+		getPGPSources:    download.AppendFallbackPGP,
+		getUpgradeSize:   getUpgradeSize,
+		reserveDiskSpace: ReserveDiskSpace,
+		retryTimeout:     defaultRetryTimeout,
+		totalTimeout:     totalTimeout,
 		fileOps: download.FileOps{
 			CopyFile: io.Copy,
 			OpenFile: os.OpenFile,
@@ -117,6 +119,20 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 		fileName = strings.Replace(fileName, target.Version.String(), target.Version.VersionWithPrerelease(), 1)
 	}
 	targetPath := filepath.Join(settings.TargetDirectory, fileName)
+	archiveReservation := getArchiveReservation(settings.TargetDirectory)
+	defer func() {
+		if err != nil {
+			if removeErr := os.Remove(targetPath); removeErr != nil && !goerrors.Is(removeErr, os.ErrNotExist) {
+				err = goerrors.Join(err, fmt.Errorf("failed to remove download archive %s: %w", targetPath, removeErr))
+			}
+			if removeErr := os.Remove(archiveReservation); removeErr != nil && !goerrors.Is(removeErr, os.ErrNotExist) {
+				err = goerrors.Join(err, fmt.Errorf("failed to remove reserved archive file %s: %w", archiveReservation, removeErr))
+			}
+			if removeErr := os.Remove(download.AddHashExtension(targetPath)); removeErr != nil && !goerrors.Is(removeErr, os.ErrNotExist) {
+				err = goerrors.Join(err, fmt.Errorf("failed to remove download archive sha512 file %s: %w", download.AddHashExtension(targetPath), removeErr))
+			}
+		}
+	}()
 
 	if err := os.MkdirAll(settings.TargetDirectory, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create target directory %s: %w", settings.TargetDirectory, err)
@@ -140,6 +156,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	attempt := 0
 	skip := make([]bool, len(sources))
 	errs := make([]error, len(sources))
+	var lastArchiveSize, lastDecompressedSize uint64
 
 	fetchSources := func() error {
 		for i, src := range sources {
@@ -174,11 +191,18 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				continue
 			}
 
-			hasDiskSpace, err := a.checkDiskSpace(ctx, &settings, upgradeDetails, sourceURI)
+			archiveSize, decompressedSize, sizeErr := a.getUpgradeSize(ctx, &settings, sourceURI)
+			if sizeErr == nil {
+				lastArchiveSize, lastDecompressedSize = archiveSize, decompressedSize
+			} else if lastArchiveSize != 0 {
+				archiveSize, decompressedSize = lastArchiveSize, lastDecompressedSize
+				sizeErr = fmt.Errorf("using previous size: %w", sizeErr)
+			}
+
+			hasDiskSpace, err := a.reserveDiskSpace(settings.TargetDirectory, archiveSize, decompressedSize)
+			err = goerrors.Join(err, sizeErr)
 			if err != nil {
-				// Don't fail on err only as CheckDiskSpaceAvailable can err but
-				// still have hasDiskSpace=true if we failed to get the exact
-				// required size and had to fall back to using an estimate
+				// failed size can still succeed with estimate or previous size so don't fail immediately
 				e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
 				a.log.Debugf("%v", e)
 				errs[i] = e
@@ -188,7 +212,12 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 					// Checking exact required upgrade size failed and an estimated
 					// required size was used. We might have enough diskspace for
 					// the actual upgrade artifact, so check other sources.
+					skip[i] = true
 					continue
+				}
+				var diskSpaceLowErr downloaderrors.DiskSpaceLowError
+				if goerrors.As(err, &diskSpaceLowErr) {
+					return backoff.Permanent(err)
 				}
 				break
 			}
@@ -199,13 +228,13 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				a.log.Infow("Downloading artifact", "source_uri", sourceURI, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
 			}
 
-			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath, a.fileOps); err != nil {
+			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, archiveReservation, a.fileOps); err != nil {
 				if downloaderrors.IsDiskSpaceFullError(err) {
 					return backoff.Permanent(err)
 				}
 				var agentErr errors.Error
 				if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
-					if agentErr.Meta()[errors.MetaKeyPath] == targetPath {
+					if agentErr.Meta()[errors.MetaKeyPath] == archiveReservation {
 						// can't write to target
 						return backoff.Permanent(err)
 					}
@@ -252,7 +281,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 					continue
 				}
 
-				if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
+				if err = download.Verify(ctx, a.log, &settings, release.PGP(), targetPath, sourceURI, archiveReservation, skipDefaultPgp, pgpBytes...); err != nil {
 					e := fmt.Errorf("verification failed for %s: %w", src, err)
 					a.log.Debugf("%v", e)
 					if !errors.IsNetworkError(err) {
@@ -261,6 +290,13 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 					errs[i] = e
 					continue
 				}
+			}
+
+			if err = os.Rename(archiveReservation, targetPath); err != nil {
+				e := fmt.Errorf("could not move archive to target path: %w", err)
+				a.log.Debugf("%v", e)
+				errs[i] = e
+				continue
 			}
 
 			return nil
