@@ -115,6 +115,7 @@ receivers:
     credentials_provider: awscredentialsprovider
     region: us-east-1
     logs:
+      initial_lookback: 1h
       poll_interval: 1m
       groups:
         autodiscover:
