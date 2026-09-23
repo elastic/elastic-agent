@@ -111,7 +111,7 @@ spec:
       labels:
         name: agent-autoops-example
       annotations:
-        checksum/config: e89ad87aab4abdf0b266914a815ddd71744340acbec3678f63b018cfe85334df
+        checksum/config: eab1751e24658605a55df70c811493c831b731d734718ee636226c675d578639
     spec:
       automountServiceAccountToken: true
       containers:
