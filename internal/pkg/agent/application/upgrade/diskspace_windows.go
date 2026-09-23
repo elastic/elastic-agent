@@ -5,51 +5,43 @@
 package upgrade
 
 import (
+	"os"
 	"strings"
-	"syscall"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
-var (
-	modkernel32            = syscall.NewLazyDLL("kernel32.dll")
-	procGetDiskFreeSpaceEx = modkernel32.NewProc("GetDiskFreeSpaceExW")
-	procGetVolumePathName  = modkernel32.NewProc("GetVolumePathNameW")
-)
+func preallocateFile(file *os.File, size int64) error {
+	if size > 0 {
+		fileAllocationInfo := struct {
+			AllocationSize int64
+		}{
+			AllocationSize: size,
+		}
+		buffer := (*byte)(unsafe.Pointer(&fileAllocationInfo))
+		bufferSize := uint32(unsafe.Sizeof(fileAllocationInfo))
 
-func getAvailableDiskSpaceAt(dir string) (uint64, error) {
-	dirPtr, err := syscall.UTF16PtrFromString(dir)
-	if err != nil {
-		return 0, err
+		if err := windows.SetFileInformationByHandle(
+			windows.Handle(file.Fd()),
+			windows.FileAllocationInfo,
+			buffer,
+			bufferSize,
+		); err != nil {
+			return err
+		}
 	}
-	var available, total, totalFree uint64
-	r1, _, err := procGetDiskFreeSpaceEx.Call(
-		uintptr(unsafe.Pointer(dirPtr)),
-		uintptr(unsafe.Pointer(&available)),
-		uintptr(unsafe.Pointer(&total)),
-		uintptr(unsafe.Pointer(&totalFree)),
-	)
-	if r1 == 0 {
-		// Call's err return value always holds the last error and is not
-		// indicative of our call failing. Check return value for
-		// success/failure
-		return 0, err
-	}
-	return available, nil
+	return nil
 }
 
 func getVolumeNameAt(dir string) (string, error) {
-	dirPtr, err := syscall.UTF16PtrFromString(dir)
+	dirPtr, err := windows.UTF16PtrFromString(dir)
 	if err != nil {
 		return "", err
 	}
-	volumePath := make([]uint16, 32768)
-	r1, _, err := procGetVolumePathName.Call(
-		uintptr(unsafe.Pointer(dirPtr)),
-		uintptr(unsafe.Pointer(&volumePath[0])),
-		uintptr(len(volumePath)),
-	)
-	if r1 == 0 {
+	volumePath := make([]uint16, windows.MAX_LONG_PATH)
+	if err := windows.GetVolumePathName(dirPtr, &volumePath[0], uint32(len(volumePath))); err != nil {
 		return "", err
 	}
-	return strings.ToLower(syscall.UTF16ToString(volumePath)), nil
+	return strings.ToLower(windows.UTF16ToString(volumePath)), nil
 }

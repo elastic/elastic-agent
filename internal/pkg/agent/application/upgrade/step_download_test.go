@@ -144,7 +144,7 @@ func TestDownloadArtifact(t *testing.T) {
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "could not fetch artifact sha512")
-				require.FileExists(t, artifactPath)
+				require.NoFileExists(t, artifactPath)
 				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
@@ -159,8 +159,8 @@ func TestDownloadArtifact(t *testing.T) {
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "verification failed")
-				require.FileExists(t, artifactPath)
-				require.FileExists(t, download.AddHashExtension(artifactPath))
+				require.NoFileExists(t, artifactPath)
+				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
 		{
@@ -225,7 +225,7 @@ func TestDownloadArtifact(t *testing.T) {
 				require.ErrorContains(t, err, "could not fetch artifact sha512")
 				require.Equal(t, 1, requestCounts[remotePath])
 				require.Equal(t, 1, requestCounts[remotePath+".sha512"])
-				require.FileExists(t, artifactPath)
+				require.NoFileExists(t, artifactPath)
 				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
@@ -245,8 +245,8 @@ func TestDownloadArtifact(t *testing.T) {
 				require.Equal(t, 1, requestCounts[remotePath])
 				require.Equal(t, 1, requestCounts[remotePath+".sha512"])
 				require.Equal(t, 1, requestCounts[remotePath+".asc"])
-				require.FileExists(t, artifactPath)
-				require.FileExists(t, download.AddHashExtension(artifactPath))
+				require.NoFileExists(t, artifactPath)
+				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
 		{
@@ -328,12 +328,12 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "local-only sourceURI fails when diskspace check fails",
+			name: "local-only sourceURI fails when disk space reservation fails",
 			run: func(t *testing.T, fx *fixture) {
 				dropPath := t.TempDir()
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
-				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
-					return false, goerrors.New("diskspace check failed")
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+					return false, goerrors.New("disk space reservation failed")
 				}
 
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
@@ -343,11 +343,11 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "local-only sourceURI succeeds when diskspace check passes",
+			name: "local-only sourceURI succeeds when disk space reservation succeeds",
 			run: func(t *testing.T, fx *fixture) {
 				dropPath := t.TempDir()
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
-				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 
@@ -358,14 +358,16 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "remote sourceURI fails when diskspace check fails",
+			name: "remote sourceURI fails when disk space reservation fails",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
-				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, uri string) (bool, error) {
-					if download.IsLocal(uri) {
+				reservationCalls := 0
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+					reservationCalls++
+					if reservationCalls == 1 {
 						return true, nil
 					}
-					return false, goerrors.New("diskspace check failed")
+					return false, goerrors.New("disk space reservation failed")
 				}
 
 				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
@@ -380,10 +382,10 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "remote sourceURI succeeds when diskspace check passes",
+			name: "remote sourceURI succeeds when disk space reservation succeeds",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
-				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 
@@ -400,11 +402,14 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "remote sourceURI proceeds when diskspace check uses a fallback estimate",
+			name: "remote sourceURI proceeds when disk space reservation uses a fallback estimate",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
-				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, _ string) (bool, error) {
-					return true, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+					return FallbackArchiveSize, FallbackPayloadSize, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
+				}
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+					return true, nil
 				}
 
 				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
@@ -420,19 +425,23 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "remote sourceURI is tried when drop path size uses an insufficient fallback estimate",
+			name: "remote sourceURI is tried when drop path reservation uses an insufficient fallback estimate",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
 				localURI := "file://" + filepath.ToSlash(filepath.Join(fx.settings.DropPath, fx.target.FileName()))
-				diskSpaceCheckCounts := make(map[string]int)
-				fx.downloader.checkDiskSpace = func(_ context.Context, _ *artifact.Config, _ *details.Details, uri string) (bool, error) {
-					diskSpaceCheckCounts[uri]++
+				diskSpaceReserveCounts := make(map[string]int)
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, uri string) (uint64, uint64, error) {
+					diskSpaceReserveCounts[uri]++
 					if uri == localURI {
-						return false, goerrors.Join(
-							downloaderrors.ErrFetchUpgradeSize,
-							downloaderrors.ErrDiskSpaceLow,
-							os.ErrNotExist,
-						)
+						return FallbackArchiveSize, FallbackPayloadSize, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
+					}
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+				}
+				fx.downloader.reserveDiskSpace = func(archiveDir string, archiveSize, _ uint64) (bool, error) {
+					if archiveSize == FallbackArchiveSize {
+						return false, downloaderrors.DiskSpaceLowError{
+							fmt.Sprintf("need 700.0 MB at %s", archiveDir),
+						}
 					}
 					return true, nil
 				}
@@ -445,8 +454,8 @@ func TestDownloadArtifact(t *testing.T) {
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, true, true, pgpSource)
 				require.NoError(t, err)
-				require.Equal(t, 1, diskSpaceCheckCounts[localURI])
-				require.Equal(t, 1, diskSpaceCheckCounts[serverURL+remotePath])
+				require.Equal(t, 1, diskSpaceReserveCounts[localURI])
+				require.Equal(t, 1, diskSpaceReserveCounts[serverURL+remotePath])
 				require.Equal(t, 1, requestCounts[remotePath])
 				require.FileExists(t, artifactPath)
 			},
@@ -595,7 +604,10 @@ func TestDownloadArtifact(t *testing.T) {
 		{
 			name: "multiple remote sourceURIs retries transient failures only",
 			run: func(t *testing.T, fx *fixture) {
-				fx.downloader.checkDiskSpace = func(context.Context, *artifact.Config, *details.Details, string) (bool, error) {
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+				}
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
@@ -655,7 +667,7 @@ func TestDownloadArtifact(t *testing.T) {
 		{
 			name: "multiple remote sourceURIs times out when every source keeps failing transiently",
 			run: func(t *testing.T, fx *fixture) {
-				fx.downloader.checkDiskSpace = func(context.Context, *artifact.Config, *details.Details, string) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 				fx.downloader.retryTimeout = 200 * time.Millisecond
@@ -689,14 +701,14 @@ func TestDownloadArtifact(t *testing.T) {
 		{
 			name: "multiple remote sourceURIs stops when totalTimeout is exceeded before per-source retries complete",
 			run: func(t *testing.T, fx *fixture) {
-				fx.downloader.checkDiskSpace = func(context.Context, *artifact.Config, *details.Details, string) (bool, error) {
-					return true, nil
-				}
 				// totalTimeout sits between one and two requestDelays so the
 				// first source completes but the second is interrupted mid-download.
 				const requestDelay = 120 * time.Millisecond
 				fx.settings.Timeout = 150 * time.Millisecond
 				fx.downloader.totalTimeout = 180 * time.Millisecond
+				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
 
 				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
 				firstRequests := map[string]int{}
@@ -740,13 +752,14 @@ func TestDownloadArtifact(t *testing.T) {
 					return nil, os.ErrPermission
 				}
 				targetPath := filepath.Join(fx.settings.TargetDirectory, fx.target.FileName())
+				archiveReservation := getArchiveReservation(fx.settings.TargetDirectory)
 
 				upgradeDetails, _, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
 
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
 					[]string{firstURL, secondURL}, upgradeDetails, false, true, pgpSource)
 				require.Error(t, err)
-				require.ErrorContains(t, err, fmt.Sprintf("creating %s failed", targetPath))
+				require.ErrorContains(t, err, fmt.Sprintf("creating %s failed", archiveReservation))
 				require.Equal(t, targetPath, artifactPath)
 
 				require.Equal(t, 1, openAttempts)

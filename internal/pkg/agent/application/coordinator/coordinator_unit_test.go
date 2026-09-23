@@ -2680,72 +2680,97 @@ func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 }
 
 func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
-	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
-
-	mockUpgradeManager := &mockUpgradeManager{
-		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrDiskSpaceFull),
+	diskSpaceLowErr := upgradeErrors.DiskSpaceLowError{
+		"need 1 GB at /data",
+		"need 500 MB at /downloads",
 	}
-
-	initialState := State{
-		CoordinatorState:   agentclient.Healthy,
-		CoordinatorMessage: "Running",
-	}
-
-	coord := &Coordinator{
-		state:              initialState,
-		logger:             log,
-		upgradeMgr:         mockUpgradeManager,
-		stateBroadcaster:   broadcaster.New(initialState, 64, 32),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		upgradeDetailsChan: make(chan *details.Details),
-	}
-
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	overrideStates := []agentclient.State{}
-	go func() {
-		state1 := <-coord.overrideStateChan
-		overrideStates = append(overrideStates, state1.state)
-
-		state2 := <-coord.overrideStateChan
-		if state2 != nil {
-			overrideStates = append(overrideStates, state2.state)
-		}
-
-		wg.Done()
-	}()
-
-	upgradeDetails := []*details.Details{}
-	go func() {
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		wg.Done()
-	}()
-
-	err := coord.Upgrade(t.Context(), "", nil, nil)
-	require.Error(t, err)
-	require.Equal(t, err, upgradeErrors.ErrDiskSpaceFull)
-
-	wg.Wait()
-
-	require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
-
-	require.Equal(t, []*details.Details{
+	testCases := []struct {
+		name        string
+		upgradeErr  error
+		expectedErr error
+	}{
 		{
-			TargetVersion: "",
-			State:         details.StateRequested,
-			ActionID:      "",
+			name:        "disk space full",
+			upgradeErr:  fmt.Errorf("wrapped: %w", upgradeErrors.ErrDiskSpaceFull),
+			expectedErr: upgradeErrors.ErrDiskSpaceFull,
 		},
 		{
-			TargetVersion: "",
-			State:         details.StateFailed,
-			Metadata: details.Metadata{
-				FailedState: details.StateRequested,
-				ErrorMsg:    upgradeErrors.ErrDiskSpaceFull.Error(),
-			},
+			name:        "disk space low",
+			upgradeErr:  fmt.Errorf("wrapped: %w", diskSpaceLowErr),
+			expectedErr: diskSpaceLowErr,
 		},
-	}, upgradeDetails)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
+
+			mockUpgradeManager := &mockUpgradeManager{
+				upgradeErr: tc.upgradeErr,
+			}
+
+			initialState := State{
+				CoordinatorState:   agentclient.Healthy,
+				CoordinatorMessage: "Running",
+			}
+
+			coord := &Coordinator{
+				state:              initialState,
+				logger:             log,
+				upgradeMgr:         mockUpgradeManager,
+				stateBroadcaster:   broadcaster.New(initialState, 64, 32),
+				overrideStateChan:  make(chan *coordinatorOverrideState),
+				upgradeDetailsChan: make(chan *details.Details),
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+
+			overrideStates := []agentclient.State{}
+			go func() {
+				state1 := <-coord.overrideStateChan
+				overrideStates = append(overrideStates, state1.state)
+
+				state2 := <-coord.overrideStateChan
+				if state2 != nil {
+					overrideStates = append(overrideStates, state2.state)
+				}
+
+				wg.Done()
+			}()
+
+			upgradeDetails := []*details.Details{}
+			go func() {
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				wg.Done()
+			}()
+
+			err := coord.Upgrade(t.Context(), "", nil, nil)
+			require.Error(t, err)
+			require.Equal(t, tc.expectedErr, err)
+
+			wg.Wait()
+
+			require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
+
+			require.Equal(t, []*details.Details{
+				{
+					TargetVersion: "",
+					State:         details.StateRequested,
+					ActionID:      "",
+				},
+				{
+					TargetVersion: "",
+					State:         details.StateFailed,
+					Metadata: details.Metadata{
+						FailedState: details.StateRequested,
+						ErrorMsg:    tc.expectedErr.Error(),
+					},
+				},
+			}, upgradeDetails)
+		})
+	}
 }
 
 func TestMaybeOverrideRuntimeForComponent(t *testing.T) {

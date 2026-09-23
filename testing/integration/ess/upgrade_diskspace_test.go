@@ -24,7 +24,7 @@ import (
 const MB = 1024 * 1024
 const GB = 1024 * MB
 
-func TestUpgradeCheckDiskSpaceAvailable(t *testing.T) {
+func TestUpgradeReserveDiskSpace(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Upgrade,
 		Local: true,
@@ -41,7 +41,7 @@ func TestUpgradeCheckDiskSpaceAvailable(t *testing.T) {
 	require.NoError(t, err)
 
 	archiveRequired := archiveSize + upgrade.ChecksumSize
-	dataRequired := decompressedSize + upgrade.ExtraDataSize
+	installRequired := decompressedSize + upgrade.ExtraInstallSize
 
 	// start artifact may not have the same size as the upgrade artifact
 	startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -60,8 +60,8 @@ func TestUpgradeCheckDiskSpaceAvailable(t *testing.T) {
 		{
 			name: "sufficient space on single filesystem",
 			setup: func(t *testing.T) (string, string) {
-				dataFS := makeTestFS(t, startSize+dataRequired+archiveRequired)
-				return dataFS, filepath.Join(dataFS, "downloads")
+				installFS := makeTestFS(t, startSize+installRequired+archiveRequired)
+				return installFS, filepath.Join(installFS, "downloads")
 			},
 			run: func(t *testing.T, err error, _, _ string) {
 				require.NoError(t, err)
@@ -70,9 +70,9 @@ func TestUpgradeCheckDiskSpaceAvailable(t *testing.T) {
 		{
 			name: "sufficient space on split filesystems",
 			setup: func(t *testing.T) (string, string) {
-				dataFS := makeTestFS(t, startSize+dataRequired)
+				installFS := makeTestFS(t, startSize+installRequired)
 				archiveFS := makeTestFS(t, archiveRequired)
-				return dataFS, filepath.Join(archiveFS, "downloads")
+				return installFS, filepath.Join(archiveFS, "downloads")
 			},
 			run: func(t *testing.T, err error, _, _ string) {
 				require.NoError(t, err)
@@ -81,53 +81,53 @@ func TestUpgradeCheckDiskSpaceAvailable(t *testing.T) {
 		{
 			name: "insufficient space on single filesystem",
 			setup: func(t *testing.T) (string, string) {
-				dataFS := makeTestFS(t, startSize)
-				return dataFS, filepath.Join(dataFS, "downloads")
+				installFS := makeTestFS(t, startSize)
+				return installFS, filepath.Join(installFS, "downloads")
 			},
 			run: func(t *testing.T, err error, targetDir, _ string) {
 				require.Error(t, err)
-				require.Equal(t, 1, strings.Count(err.Error(), "insufficient disk space for upgrade"))
+				require.ErrorContains(t, err, "insufficient disk space for upgrade")
 				require.ErrorContains(t, err, targetDir)
 			},
 		},
 		{
-			name: "insufficient space on split filesystems (archive+data)",
+			name: "insufficient space on split filesystems (archive+install)",
 			setup: func(t *testing.T) (string, string) {
-				dataFS := makeTestFS(t, startSize)
+				installFS := makeTestFS(t, startSize)
 				archiveFS := makeTestFS(t, 128*MB)
-				return dataFS, filepath.Join(archiveFS, "downloads")
+				return installFS, filepath.Join(archiveFS, "downloads")
 			},
-			run: func(t *testing.T, err error, targetDir, dataDir string) {
+			run: func(t *testing.T, err error, targetDir, installDir string) {
 				require.Error(t, err)
-				require.Equal(t, 2, strings.Count(err.Error(), "insufficient disk space for upgrade"))
+				require.ErrorContains(t, err, "insufficient disk space for upgrade")
 				require.ErrorContains(t, err, targetDir)
-				require.ErrorContains(t, err, dataDir)
+				require.ErrorContains(t, err, installDir)
 			},
 		},
 		{
 			name: "insufficient space on split filesystems (archive)",
 			setup: func(t *testing.T) (string, string) {
-				dataFS := makeTestFS(t, startSize+dataRequired)
+				installFS := makeTestFS(t, startSize+installRequired)
 				archiveFS := makeTestFS(t, 128*MB)
-				return dataFS, filepath.Join(archiveFS, "downloads")
+				return installFS, filepath.Join(archiveFS, "downloads")
 			},
-			run: func(t *testing.T, err error, targetDir, dataDir string) {
+			run: func(t *testing.T, err error, targetDir, installDir string) {
 				require.Error(t, err)
-				require.Equal(t, 1, strings.Count(err.Error(), "insufficient disk space for upgrade"))
+				require.ErrorContains(t, err, "insufficient disk space for upgrade")
 				require.ErrorContains(t, err, targetDir)
 			},
 		},
 		{
-			name: "insufficient space on split filesystems (data)",
+			name: "insufficient space on split filesystems (install)",
 			setup: func(t *testing.T) (string, string) {
-				dataFS := makeTestFS(t, startSize)
+				installFS := makeTestFS(t, startSize)
 				archiveFS := makeTestFS(t, archiveRequired)
-				return dataFS, filepath.Join(archiveFS, "downloads")
+				return installFS, filepath.Join(archiveFS, "downloads")
 			},
-			run: func(t *testing.T, err error, targetDir, dataDir string) {
+			run: func(t *testing.T, err error, targetDir, installDir string) {
 				require.Error(t, err)
-				require.Equal(t, 1, strings.Count(err.Error(), "insufficient disk space for upgrade"))
-				require.ErrorContains(t, err, dataDir)
+				require.ErrorContains(t, err, "insufficient disk space for upgrade")
+				require.ErrorContains(t, err, installDir)
 			},
 		},
 	}
@@ -137,18 +137,18 @@ func TestUpgradeCheckDiskSpaceAvailable(t *testing.T) {
 			startFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 			require.NoError(t, err)
 
-			dataDir, targetDir := tt.setup(t)
+			installDir, targetDir := tt.setup(t)
 
 			watcherConfig := upgradetest.FastWatcherCfg + fmt.Sprintf("\nagent.download:\n  target_directory: '%s'\n", strings.ReplaceAll(targetDir, "'", "''"))
 
 			err = upgradetest.PerformUpgrade(t.Context(), startFixture, fixture, t,
-				upgradetest.WithBasePath(dataDir),
+				upgradetest.WithBasePath(installDir),
 				upgradetest.WithUnprivileged(false),
 				upgradetest.WithSourceURI("file://"+sourceDir),
 				upgradetest.WithDisableHashCheck(true),
 				upgradetest.WithCustomWatcherConfig(watcherConfig))
 
-			tt.run(t, err, targetDir, dataDir)
+			tt.run(t, err, targetDir, installDir)
 		})
 	}
 }
