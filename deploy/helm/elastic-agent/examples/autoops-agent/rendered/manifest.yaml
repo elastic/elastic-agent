@@ -85,7 +85,6 @@ metadata:
 stringData:
   autoops-token: "REPLACE_ME_TOKEN"
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
-  temp-resource-id: "REPLACE_ME_RESOURCE_ID"
   otel-url: "https://otel.example.com:4318"
   es-api-key: "REPLACE_ME_API_KEY"
   cloud-connected-mode-api-key: "CCM-API-KEY"
