@@ -3653,7 +3653,7 @@ func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, nil)
+	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, nil, nil)
 	require.NoError(t, err)
 
 	// Only the scheduled "browser" stream must become a receiver/monitor; the
@@ -3697,7 +3697,7 @@ func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
 	}
 	comp := &component.Component{InputType: "synthetics/api"}
 
-	inputs, err := getInputsForUnit(unit, &info.AgentInfo{}, "logs", comp)
+	inputs, err := getInputsForUnit(unit, &info.AgentInfo{}, "logs", comp, nil)
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.Equal(t, "api", inputs[0].config["type"])
@@ -4870,7 +4870,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	t.Run("env_set", func(t *testing.T) {
 		t.Setenv(util.EnvHostName, "override-node")
 
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
 
@@ -4885,7 +4885,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
 		t.Setenv(util.EnvHostName, "  override-node  ")
 
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
 
@@ -4899,7 +4899,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 
 	t.Run("env_unset", func(t *testing.T) {
 		t.Setenv(util.EnvHostName, "")
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
 
