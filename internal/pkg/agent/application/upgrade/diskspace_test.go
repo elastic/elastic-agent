@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"encoding/binary"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -24,7 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
-	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
 func makeGzipArtifact(t *testing.T, content string) ([]byte, uint64) {
@@ -88,11 +88,64 @@ func diskspaceTestConfig(t *testing.T) *artifact.Config {
 	}
 }
 
-func TestGetUpgradeSize(t *testing.T) {
-	upgradeDetails := func() *details.Details {
-		return details.NewDetails("9.0.0", details.StateRequested, "")
-	}
+func TestReserveFileSpace(t *testing.T) {
+	t.Run("make new reservation", func(t *testing.T) {
+		const size = int64(1024*1024 + 123)
+		path := filepath.Join(t.TempDir(), "reservation")
 
+		require.NoError(t, reserveDiskSpace(path, size))
+
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.Equal(t, size, info.Size())
+	})
+
+	t.Run("grow pre-existing reservation", func(t *testing.T) {
+		const size = int64(1024 * 1024)
+		path := filepath.Join(t.TempDir(), "reservation")
+
+		require.NoError(t, reserveDiskSpace(path, size))
+		require.NoError(t, reserveDiskSpace(path, 2*size))
+
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.Equal(t, 2*size, info.Size())
+	})
+
+	t.Run("shrink pre-existing reservation", func(t *testing.T) {
+		const size = int64(1024 * 1024)
+		path := filepath.Join(t.TempDir(), "reservation")
+
+		require.NoError(t, reserveDiskSpace(path, 2*size))
+		require.NoError(t, reserveDiskSpace(path, size))
+
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.Equal(t, size, info.Size())
+	})
+
+	t.Run("remove failed reservation", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "reservation")
+
+		require.Error(t, reserveDiskSpace(path, math.MaxInt64))
+
+		require.NoFileExists(t, path)
+	})
+
+	t.Run("keep pre-existing reservation on failed resize", func(t *testing.T) {
+		const size = int64(1024 * 1024)
+		path := filepath.Join(t.TempDir(), "reservation")
+
+		require.NoError(t, reserveDiskSpace(path, size))
+		require.Error(t, reserveDiskSpace(path, math.MaxInt64))
+
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.Equal(t, size, info.Size())
+	})
+}
+
+func TestGetUpgradeSize(t *testing.T) {
 	t.Run("local tar.gz", func(t *testing.T) {
 		archive, payload := makeGzipArtifact(t, "some artifact content")
 		target := filepath.Join(t.TempDir(), "elastic-agent.tar.gz")
@@ -134,7 +187,7 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz")
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
@@ -150,120 +203,101 @@ func TestGetUpgradeSize(t *testing.T) {
 		}))
 		t.Cleanup(server.Close)
 
-		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.zip", upgradeDetails())
+		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.zip")
 		require.NoError(t, err)
 		require.Equal(t, uint64(len(archive)), archiveSize)
 		require.Equal(t, payload, payloadSize)
 	})
 
-	t.Run("http response 404 stops retries", func(t *testing.T) {
-		var requests int
+	t.Run("http error response", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requests++
 			w.WriteHeader(http.StatusNotFound)
 		}))
 		t.Cleanup(server.Close)
 
-		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz")
 		require.Error(t, err)
-		require.True(t, upgradeErrors.IsPermanentHTTPError(err))
-		require.Equal(t, 1, requests)
 	})
 
-	t.Run("http server without range support stops retries", func(t *testing.T) {
+	t.Run("http server without range support", func(t *testing.T) {
 		archive, _ := makeGzipArtifact(t, "some artifact content")
-		var getRequests int
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Length", strconv.Itoa(len(archive)))
 			if r.Method == http.MethodHead {
 				return
 			}
-			getRequests++
 			// servers that don't support Range respond with 200
 			_, _ = w.Write(archive)
 		}))
 		t.Cleanup(server.Close)
 
-		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz")
 		require.ErrorContains(t, err, "does not support range requests")
-		require.True(t, upgradeErrors.IsPermanentHTTPError(err))
-		require.Equal(t, 1, getRequests)
 	})
 
-	t.Run("http 416 Range Not Satisfiable is not retried", func(t *testing.T) {
+	t.Run("http 416 Range Not Satisfiable", func(t *testing.T) {
 		archive, _ := makeGzipArtifact(t, "some artifact content")
-		var getRequests int
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodHead {
 				w.Header().Set("Content-Length", strconv.Itoa(len(archive)))
 				return
 			}
-			getRequests++
 			w.WriteHeader(http.StatusRequestedRangeNotSatisfiable)
 		}))
 		t.Cleanup(server.Close)
 
-		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz")
 		require.ErrorContains(t, err, "out of range")
-		require.True(t, upgradeErrors.IsPermanentHTTPError(err))
-		require.Equal(t, 1, getRequests)
 	})
 
-	t.Run("http transient errors are retried", func(t *testing.T) {
-		archive, payload := makeGzipArtifact(t, "some artifact content")
-		var requests int
+	t.Run("http missing content length", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requests++
-			if requests <= 2 {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			http.ServeContent(w, r, r.URL.Path, time.Time{}, bytes.NewReader(archive))
+			w.(http.Flusher).Flush()
 		}))
 		t.Cleanup(server.Close)
 
-		archiveSize, payloadSize, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz", upgradeDetails())
-		require.NoError(t, err)
-		require.Equal(t, uint64(len(archive)), archiveSize)
-		require.Equal(t, payload, payloadSize)
-		require.GreaterOrEqual(t, requests, 4) // two failed attempts, then HEAD + range GET
+		_, _, err := GetRemoteUpgradeSize(t.Context(), diskspaceTestConfig(t), server.URL+"/elastic-agent.tar.gz")
+		require.ErrorContains(t, err, "did not return a content length")
 	})
 }
 
-func TestCheckDiskSpaceAvailable(t *testing.T) {
+func TestReserveDiskSpace(t *testing.T) {
 	originalTop := paths.Top()
 	paths.SetTop(t.TempDir())
 	t.Cleanup(func() { paths.SetTop(originalTop) })
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
-	upgradeDetails := details.NewDetails("9.0.0", details.StateRequested, "")
+	t.Run("reserves disk space", func(t *testing.T) {
+		archive, payloadSize := makeGzipArtifact(t, "some artifact content")
+		archiveDir := t.TempDir()
 
-	t.Run("diskspace is sufficient", func(t *testing.T) {
-		archive, _ := makeGzipArtifact(t, "some artifact content")
-		target := filepath.Join(t.TempDir(), "elastic-agent.tar.gz")
-		require.NoError(t, os.WriteFile(target, archive, 0o644))
-
-		hasSpace, err := CheckDiskSpaceAvailable(t.Context(), diskspaceTestConfig(t), upgradeDetails, "file://"+target)
+		hasSpace, err := ReserveDiskSpace(archiveDir, uint64(len(archive)), payloadSize)
 		require.NoError(t, err)
 		require.True(t, hasSpace)
+		archiveReservation := getArchiveReservation(archiveDir)
+		require.FileExists(t, archiveReservation)
+		require.FileExists(t, getInstallReservation())
+
+		archiveInfo, err := os.Stat(archiveReservation)
+		require.NoError(t, err)
+		require.Equal(t, int64(len(archive))+int64(ChecksumSize), archiveInfo.Size())
+		installInfo, err := os.Stat(getInstallReservation())
+		require.NoError(t, err)
+		require.EqualValues(t, payloadSize+ExtraInstallSize, installInfo.Size())
 	})
 
-	t.Run("diskspace is insufficient", func(t *testing.T) {
+	t.Run("reports insufficient disk space", func(t *testing.T) {
 		// mock file has 4096 entries of ~4 GiB (~16 TiB of payload content)
 		archive := makeHugeZipArtifact(4096)
 		target := filepath.Join(t.TempDir(), "elastic-agent.zip")
 		require.NoError(t, os.WriteFile(target, archive, 0o644))
+		archiveDir := t.TempDir()
 
-		hasSpace, err := CheckDiskSpaceAvailable(t.Context(), diskspaceTestConfig(t), upgradeDetails, "file://"+target)
+		archiveSize, payloadSize, err := GetLocalUpgradeSize("file://" + target)
+		require.NoError(t, err)
+		hasSpace, err := ReserveDiskSpace(archiveDir, archiveSize, payloadSize)
 		require.False(t, hasSpace)
-		require.ErrorIs(t, err, upgradeErrors.ErrDiskSpaceLow)
+		var diskSpaceErr upgradeErrors.DiskSpaceLowError
+		require.ErrorAs(t, err, &diskSpaceErr)
 	})
-
-	t.Run("required diskspace cannot be determined", func(t *testing.T) {
-		uri := "file://" + filepath.Join(t.TempDir(), "missing.tar.gz")
-
-		_, err := CheckDiskSpaceAvailable(t.Context(), diskspaceTestConfig(t), upgradeDetails, uri)
-		require.ErrorIs(t, err, upgradeErrors.ErrFetchUpgradeSize)
-	})
-
 }
