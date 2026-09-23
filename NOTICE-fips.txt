@@ -8949,11 +8949,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/grpc
-Version: v1.83.2
+Version: v1.84.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.83.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/grpc@v1.84.0/LICENSE:
 
 
                                  Apache License
@@ -11993,11 +11993,11 @@ Contents of probable licence file $GOMODCACHE/github.com/aws/aws-sdk-go-v2/servi
 
 --------------------------------------------------------------------------------
 Dependency : github.com/aws/smithy-go
-Version: v1.28.1
+Version: v1.28.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/aws/smithy-go@v1.28.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/aws/smithy-go@v1.28.2/LICENSE:
 
 
                                  Apache License
@@ -32269,11 +32269,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/api
-Version: v0.297.0
+Version: v0.299.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/api@v0.297.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/api@v0.299.0/LICENSE:
 
 Copyright (c) 2011 Google Inc. All rights reserved.
 
@@ -56051,11 +56051,11 @@ Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googlea
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/genproto/googleapis/rpc
-Version: v0.0.0-20260819154853-08b0e4226688
+Version: v0.0.0-20260921155816-b14227669459
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20260819154853-08b0e4226688/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto/googleapis/rpc@v0.0.0-20260921155816-b14227669459/LICENSE:
 
 
                                  Apache License
@@ -84738,11 +84738,11 @@ Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-202
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/s2a-go
-Version: v0.1.9
+Version: v0.1.10
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/s2a-go@v0.1.9/LICENSE.md:
+Contents of probable licence file $GOMODCACHE/github.com/google/s2a-go@v0.1.10/LICENSE.md:
 
 
                                  Apache License
@@ -84950,11 +84950,11 @@ Contents of probable licence file $GOMODCACHE/github.com/google/s2a-go@v0.1.9/LI
 
 --------------------------------------------------------------------------------
 Dependency : github.com/googleapis/enterprise-certificate-proxy
-Version: v0.3.20
+Version: v0.3.22
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/googleapis/enterprise-certificate-proxy@v0.3.20/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/googleapis/enterprise-certificate-proxy@v0.3.22/LICENSE:
 
 
                                  Apache License
@@ -85162,11 +85162,11 @@ Contents of probable licence file $GOMODCACHE/github.com/googleapis/enterprise-c
 
 --------------------------------------------------------------------------------
 Dependency : github.com/googleapis/gax-go/v2
-Version: v2.24.0
+Version: v2.24.1
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/googleapis/gax-go/v2@v2.24.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/googleapis/gax-go/v2@v2.24.1/LICENSE:
 
 Copyright 2016, Google Inc.
 All rights reserved.
@@ -101938,11 +101938,11 @@ Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentele
 
 --------------------------------------------------------------------------------
 Dependency : github.com/openshift/api
-Version: v0.0.0-20251015095338-264e80a2b6e7
+Version: v0.0.0-20260923043708-9abfa327cff2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20251015095338-264e80a2b6e7/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20260923043708-9abfa327cff2/LICENSE:
 
 
                                  Apache License
@@ -104783,11 +104783,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/spiffe/go-spiffe/v2
-Version: v2.7.0
+Version: v2.8.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/spiffe/go-spiffe/v2@v2.7.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/spiffe/go-spiffe/v2@v2.8.1/LICENSE:
 
                                  Apache License
                            Version 2.0, January 2004

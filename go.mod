@@ -49,7 +49,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.161.0
-	github.com/openshift/api v0.0.0-20251015095338-264e80a2b6e7
+	github.com/openshift/api v0.0.0-20260923043708-9abfa327cff2
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
@@ -84,8 +84,8 @@ require (
 	golang.org/x/term v0.46.0
 	golang.org/x/text v0.42.0
 	golang.org/x/time v0.16.0
-	google.golang.org/api v0.296.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/api v0.299.0
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/yaml.v2 v2.4.0
@@ -202,11 +202,11 @@ require (
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
 	github.com/google/licenseclassifier v0.0.0-20250213175939-b5d1a3369749 // indirect
-	github.com/google/s2a-go v0.1.9 // indirect
+	github.com/google/s2a-go v0.1.10 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.20 // indirect
-	github.com/googleapis/gax-go/v2 v2.24.0 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.22 // indirect
+	github.com/googleapis/gax-go/v2 v2.24.1 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
@@ -378,7 +378,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260921155816-b14227669459 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gotest.tools/gotestsum v1.13.0 // indirect
