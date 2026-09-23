@@ -1243,7 +1243,7 @@ func loadSliceOrArray(val reflect.Value) (Node, error) {
 }
 
 func lookupVal(val reflect.Value) reflect.Value {
-	for (val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface) && !val.IsNil() {
+	for (val.Kind() == reflect.Pointer || val.Kind() == reflect.Interface) && !val.IsNil() {
 		val = val.Elem()
 	}
 	return val
