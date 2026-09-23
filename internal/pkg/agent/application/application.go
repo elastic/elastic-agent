@@ -7,6 +7,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"net"
 	"path/filepath"
 	"reflect"
 	goruntime "runtime"
@@ -68,6 +69,7 @@ func New(
 	cfg *configuration.Configuration,
 	initialUpdateMarker *upgrade.UpdateMarker,
 	availableRollbacksSource ttl.Source,
+	grpcLis net.Listener,
 	modifiers ...component.PlatformModifier,
 ) (*coordinator.Coordinator, coordinator.ConfigManager, composable.Controller, error) {
 
@@ -123,6 +125,10 @@ func New(
 		log,
 	)
 
+	runtimeMgrOpts := []runtime.ManagerOption{}
+	if grpcLis != nil {
+		runtimeMgrOpts = append(runtimeMgrOpts, runtime.WithListener(grpcLis))
+	}
 	runtime, err := runtime.NewManager(
 		log,
 		baseLogger,
@@ -130,6 +136,7 @@ func New(
 		tracer,
 		monitor,
 		cfg.Settings.GRPC,
+		runtimeMgrOpts...,
 	)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to initialize runtime manager: %w", err)

@@ -8,6 +8,7 @@ import (
 	"context"
 	goerrors "errors"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -442,8 +443,15 @@ func runElasticAgent(
 		}()
 	}
 
+	grpcAddr := cfg.Settings.GRPC.String()
+	lis, err := (&net.ListenConfig{}).Listen(ctx, "tcp", grpcAddr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", grpcAddr, err)
+	}
+	defer lis.Close()
+
 	coord, configMgr, _, err := application.New(ctx, l, baseLogger, collectorLogger, logLvl, agentInfo, rex, tracer, testingMode,
-		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, modifiers...)
+		fleetInitTimeout, isBootstrap, configReloader.StartupConfiguration(), cfg, initialUpgradeMarker, availableRollbacksSource, lis, modifiers...)
 	if err != nil {
 		return err
 	}

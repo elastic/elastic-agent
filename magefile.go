@@ -526,7 +526,7 @@ func (Check) LintAll() error {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
+	return sh.RunV("go-licenser", "-d", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats", "-exclude", "internal/edot/opampextension")
 }
 
 // DocsFiles validates that files required by the docs generation script exist.
@@ -616,7 +616,7 @@ func (Format) All() {
 // License applies the right license header.
 func (Format) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
+	return sh.RunV("go-licenser", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats", "-exclude", "internal/edot/opampextension")
 }
 
 // Package packages the Elastic Agent for distribution.
@@ -3786,7 +3786,10 @@ func npcapImageSelector(windowsNpcap bool) devtools.ImageSelectorFunc {
 
 // CrossBuild builds the elastic-otel-collector binary in the golang-crossbuild container.
 func (Otel) CrossBuild(ctx context.Context) error {
-	mg.Deps(EnsureCrossBuildOutputDir)
+	// Otel.Prepare runs PrepareBeats (converts beats/.git to a directory for Docker)
+	// and later restores it via restoreBeatsSubmodule. Ensure Prepare completes before
+	// launching Docker containers so the restore does not race with the build.
+	mg.Deps(Otel.Prepare, EnsureCrossBuildOutputDir)
 
 	cfg := devtools.SettingsFromContext(ctx)
 

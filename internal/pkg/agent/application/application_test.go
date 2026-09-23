@@ -56,6 +56,7 @@ func TestLimitsLog(t *testing.T) {
 		configuration.DefaultConfiguration(),
 		nil,
 		rollbackSrc,
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 
@@ -518,6 +519,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 
@@ -546,6 +548,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 	encBytes2, err := os.ReadFile(paths.AgentConfigFile())
@@ -580,6 +583,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 	encBytes3, err := os.ReadFile(paths.AgentConfigFile())
@@ -616,6 +620,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 }
@@ -696,6 +701,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		cfg,
 		nil,
 		nil,
+		nil, // grpcLis
 	)
 	require.NoError(t, err)
 

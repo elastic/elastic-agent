@@ -460,6 +460,8 @@ github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14 h1:3U8dTgyNBhEQ
 github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14/go.mod h1:Tb7Xxye4LX7cT3i8YLvmPMGCV92IOi4CDZvm/V8ylc0=
 github.com/dougm/pretty v0.0.0-20160325215624-add1dbc86daf h1:A2XbJkAuMMFy/9EftoubSKBUIyiOm6Z8+X5G7QpS6so=
 github.com/dougm/pretty v0.0.0-20160325215624-add1dbc86daf/go.mod h1:7NQ3kWOx2cZOSjtcveTa5nqupVr2s6/83sG+rTlI7uA=
+github.com/dpaasman00/opamp-go v0.0.0-20260901163641-3ad84468cc95 h1:tVJ7HQb+Jy0ZInfiZ6XY5NL0zejUQwweVDdyeEGI6/c=
+github.com/dpaasman00/opamp-go v0.0.0-20260901163641-3ad84468cc95/go.mod h1:p1aUAb8vVqtQ9qD8yDBGiqztuI3AkCSh7XTVqhuyy3I=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
@@ -583,6 +585,8 @@ github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceive
 github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b/go.mod h1:pPlGoG0TbinC1TLZXt3czi2tdetTHya4a5iEa/HIWGE=
 github.com/elastic/opentelemetry-lib v0.47.0 h1:MDInaJYqqOJS5S5n6MT5O+OElZj+mu06qFmkMDeCoT0=
 github.com/elastic/opentelemetry-lib v0.47.0/go.mod h1:GW9juMQXi7irDoVVIY7OJy/OWRwgVsYt3BatW23ZzzQ=
+github.com/elastic/proxy-connect-dialer-go v0.1.1 h1:kmSFbqC+j6yVlxwPixI/7aTpdp+FH16Oaau1bcClpjI=
+github.com/elastic/proxy-connect-dialer-go v0.1.1/go.mod h1:YYlk9leuhkB2h7STwiNOGa1UkZWalY70jnIF8Ec3Sks=
 github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
 github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
 github.com/elastic/tk-btf v0.2.0 h1:8Am3b2mNIoG7RIoD6EVCnhhrdJySuAUUnnkaCU3EGAM=
@@ -1081,8 +1085,6 @@ github.com/mdlayher/socket v0.6.0 h1:ScZPaAGyO1icQnbFrhPM8mnXyMu9qukC1K4ZoM2IQKU
 github.com/mdlayher/socket v0.6.0/go.mod h1:q7vozUAnxSqnjHc12Fik5yUKIzfZ8ITCfMkhOtE9z18=
 github.com/mdlayher/vsock v1.3.0 h1:bqQfZ1OznI03y6YiXp2sze05RVdzLn/zsfjnjd4+ivI=
 github.com/mdlayher/vsock v1.3.0/go.mod h1:WsuksavOvwCnV5UqGHUkvAvCy+Dqy81y4goKQTzxxNY=
-github.com/michel-laterman/proxy-connect-dialer-go v0.1.0 h1:Q8asukpmyrEheocd+R+6YEI4jcm62sHHalgTMG+LoLw=
-github.com/michel-laterman/proxy-connect-dialer-go v0.1.0/go.mod h1:HTlVkRAqzTRPYbWxgAiwMT9HRZMOqP3Mx7+toa3yJjc=
 github.com/microsoft/go-mssqldb v1.11.0 h1:YbDqolEjGH9hBfvKzONTf5/dbl9RKXmizMJE93lVxNs=
 github.com/microsoft/go-mssqldb v1.11.0/go.mod h1:goQLDOPlMN/l1REhnNPElMoY/yX+fUWn1+7UoFJPH9Y=
 github.com/microsoft/wmi v0.44.0 h1:kgUtdKkdd+9pMhVfUItNPCRPUjsxf9dzBDojOl3WP6I=
@@ -1153,8 +1155,6 @@ github.com/onsi/ginkgo/v2 v2.27.4/go.mod h1:ArE1D/XhNXBXCBkKOLkbsb2c81dQHCRcF5zw
 github.com/onsi/gomega v1.4.3/go.mod h1:ex+gbHU/CVuBBDIJjb2X0qEXbFg53c61hWP/1CpauHY=
 github.com/onsi/gomega v1.39.0 h1:y2ROC3hKFmQZJNFeGAMeHZKkjBL65mIZcvrLQBF9k6Q=
 github.com/onsi/gomega v1.39.0/go.mod h1:ZCU1pkQcXDO5Sl9/VVEGlDyp+zm0m1cmeG5TOzLgdh4=
-github.com/open-telemetry/opamp-go v0.23.0 h1:k7h7w/muprut9/DAhUC4anX4v7hIdgO02gIsSjV4uq0=
-github.com/open-telemetry/opamp-go v0.23.0/go.mod h1:DIIVdkLefdqPW5L+4I2twmAicVrTB0Bp5XJAfedZzAM=
 github.com/open-telemetry/opentelemetry-collector-contrib/config/configdbauth v0.161.0 h1:IPtyUPkPAMSPMJBXu4Kppf9NPshty46nCXnZ8U2pqe4=
 github.com/open-telemetry/opentelemetry-collector-contrib/config/configdbauth v0.161.0/go.mod h1:Z3AK0HjplV4HBtHNWbyzDgOSDEo2M1Wej44kc/DT9Pw=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.161.0 h1:Gh+s9gipLvQGCC457VgxZQNt7giekiULD6XRHBsX2rE=
@@ -1209,8 +1209,6 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8s
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.161.0/go.mod h1:GG09WBit6EzbkXtWXZK5SIyR0a8+zEl3gAWNDV3Alxc=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.161.0 h1:WFj9nrrHpdywrdwdjNivDI8ver0ZXRB9pI/KfzFa4ec=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampcustommessages v0.161.0/go.mod h1:4/0aiippB6HsfFw27/4pblNcbkyUkDnkKM/M83u04ww=
-github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.161.0 h1:4dENTX+XO/pbicqzGXV+3fiSfaQNQA3f/ayx5TpZzBU=
-github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.161.0/go.mod h1:PBuiqiBqWU9A9gmOXJCBGNxO/rYx2Dn1oib4Ymp2kPs=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.161.0 h1:acP+A73Cz2CvfLHPTyuLnh7/rV0qbi5vahsQ4kFTwP4=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.161.0/go.mod h1:QN5NaCxVhw4V0fD6dCdBGTwxdFa6dW/mEuXAlD+YaWI=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.161.0 h1:xeYtjlSLk8+8sncBy7rN4AlloQRMMQ/mRYN0tQNd/pw=

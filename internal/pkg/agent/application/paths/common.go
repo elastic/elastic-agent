@@ -36,6 +36,9 @@ const (
 	// Our DiagnosticsExtension will use DiagnosticsExtensionSocketName to listen and serve diagnostic requests.
 	DiagnosticsExtensionSocketName = "edot-diagnostics-extension.sock"
 
+	// OpAMPSocketName is the socket name used by the OpAMP IPC server.
+	OpAMPSocketName = "opamp.sock"
+
 	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
 	WindowsControlSocketInstalledPath = `npipe:///elastic-agent-system`
 
@@ -65,6 +68,7 @@ var (
 	installPath                string
 	controlSocketPath          string
 	diagnosticsExtensionSocket string
+	opampSocket                string
 	unversionedHome            bool
 	tmpCreator                 sync.Once
 	setupFlagsOnce             sync.Once
@@ -80,6 +84,7 @@ func init() {
 	logsPath = topPath
 	controlSocketPath = initialControlSocketPath(topPath)
 	diagnosticsExtensionSocket = SocketFromPath(runtime.GOOS, topPath, DiagnosticsExtensionSocketName)
+	opampSocket = SocketFromPath(runtime.GOOS, topPath, OpAMPSocketName)
 	unversionedHome = false // only versioned by container subcommand
 
 	// these should never change
@@ -403,6 +408,16 @@ func DiagnosticsExtensionSocket() string {
 
 func SetDiagnosticsExtensionSocket(path string) {
 	diagnosticsExtensionSocket = path
+}
+
+// OpAMPSocket returns the IPC address for the OTel manager's OpAMP server.
+func OpAMPSocket() string {
+	return opampSocket
+}
+
+// SetOpAMPSocket overrides the OpAMP socket address.
+func SetOpAMPSocket(path string) {
+	opampSocket = path
 }
 
 func pathSplit(path string) []string {
