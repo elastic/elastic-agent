@@ -40,7 +40,7 @@ func getVolumeNameAt(dir string) (string, error) {
 		return "", err
 	}
 	volumePath := make([]uint16, windows.MAX_LONG_PATH)
-	if err := windows.GetVolumePathName(dirPtr, &volumePath[0], uint32(len(volumePath))); err != nil {
+	if err := windows.GetVolumePathName(dirPtr, &volumePath[0], windows.MAX_LONG_PATH); err != nil {
 		return "", err
 	}
 	return strings.ToLower(windows.UTF16ToString(volumePath)), nil
