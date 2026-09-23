@@ -4,13 +4,21 @@
 
 package errors
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
 var (
 	ErrDiskSpaceFull    = errors.New("out of disk space")
-	ErrDiskSpaceLow     = errors.New("insufficient disk space for upgrade")
-	ErrFetchUpgradeSize = errors.New("failed to fetch upgrade size")
+	ErrFetchUpgradeSize = errors.New("failed to fetch exact upgrade size")
 )
+
+type DiskSpaceLowError []string
+
+func (e DiskSpaceLowError) Error() string {
+	return "insufficient disk space for upgrade: " + strings.Join(e, ", ")
+}
 
 func IsDiskSpaceFullError(err error) bool {
 	// Errors indicating we are currently out of disk space

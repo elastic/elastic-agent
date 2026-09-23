@@ -407,6 +407,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sources, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	cleanupPaths = append(cleanupPaths, getInstallReservation())
 
 	// If the artifactPath is not empty, then the artifact was downloaded.
 	// There may still be an error in the download process, so we need to add
@@ -471,6 +472,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
+	installReservation := getInstallReservation()
+
+	if err := shrinkDiskSpaceReservation(installReservation, int64(MarkerSize)); err != nil {
+		return nil, err
+	}
+
 	// Write the marker before unpacking so newVersionedHome is protected from cleanup during the upgrade.
 	// RollbacksAvailable is nil here: TTL entries are written after the symlink flips, and previous rollbacks were already removed at the start of Upgrade().
 	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det, nil); err != nil {
@@ -489,6 +496,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+
+	if err := os.Remove(installReservation); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("could not remove disk space reservation file %s: %w", installReservation, err)
+	}
+
 	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
 
 	// If VersionedHome is empty then unpack has not started unpacking the
