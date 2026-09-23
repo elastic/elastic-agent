@@ -56,7 +56,6 @@ stringData:
         processors:
         - add_fields:
             fields:
-              temp_resource_id: ${env:AUTOOPS_TEMP_RESOURCE_ID}
               token: ${env:AUTOOPS_TOKEN}
             target: autoops_es
         telemetry_types:
@@ -137,11 +136,6 @@ spec:
           valueFrom:
             secretKeyRef:
               key: autoops-token
-              name: agent-autoops-example-autoops
-        - name: AUTOOPS_TEMP_RESOURCE_ID
-          valueFrom:
-            secretKeyRef:
-              key: temp-resource-id
               name: agent-autoops-example-autoops
         - name: AUTOOPS_OTEL_URL
           valueFrom:
