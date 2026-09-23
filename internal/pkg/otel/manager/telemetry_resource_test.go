@@ -63,7 +63,7 @@ func inlineResourceAttributesOf(t *testing.T, cfg *confmap.Conf) map[string]any 
 	t.Helper()
 	resource, ok := cfg.Get(telemetryResourceKey).(map[string]any)
 	require.True(t, ok, "expected a resource map, got %T", cfg.Get(telemetryResourceKey))
-	for _, key := range []string{"attributes", "attributes_list", "schema_url", "detection/development"} {
+	for _, key := range telemetryResourceSchemaKeys {
 		delete(resource, key)
 	}
 	return resource
@@ -80,7 +80,7 @@ func requireValidCollectorResource(t *testing.T, cfg *confmap.Conf) {
 	require.True(t, ok, "expected a resource map, got %T", cfg.Get(telemetryResourceKey))
 	require.NotContains(t, resource, "attributes_list", "resource::attributes_list is not supported by the collector")
 
-	list, _ := resource["attributes"].([]any)
+	list, _ := resource[telemetryResourceAttributesListKey].([]any)
 	for _, raw := range list {
 		entry, ok := raw.(map[string]any)
 		require.True(t, ok, "attribute entry must be a map, got %T", raw)

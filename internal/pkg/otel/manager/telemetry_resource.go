@@ -6,6 +6,7 @@ package manager
 
 import (
 	"fmt"
+	"slices"
 
 	"go.opentelemetry.io/collector/confmap"
 
@@ -15,10 +16,23 @@ import (
 )
 
 const (
-	telemetryResourceKey           = "service::telemetry::resource"
-	telemetryResourceAttributesKey = telemetryResourceKey + "::attributes"
-	telemetryDisableZapResourceKey = "service::telemetry::logs::disable_zap_resource"
+	telemetryResourceKey = "service::telemetry::resource"
+	// telemetryResourceAttributesListKey is the key of the declarative
+	// attributes list inside the resource map.
+	telemetryResourceAttributesListKey = "attributes"
+	telemetryResourceAttributesKey     = telemetryResourceKey + "::" + telemetryResourceAttributesListKey
+	telemetryDisableZapResourceKey     = "service::telemetry::logs::disable_zap_resource"
 )
+
+// telemetryResourceSchemaKeys are the keys of the declarative resource schema.
+// Any other key in the resource map is an attribute in the deprecated inline
+// map format.
+var telemetryResourceSchemaKeys = []string{
+	telemetryResourceAttributesListKey,
+	"attributes_list",
+	"schema_url",
+	"detection/development",
+}
 
 // agentTelemetryAttribute is a collector telemetry resource attribute owned by
 // Elastic Agent.
@@ -72,7 +86,7 @@ func injectAgentTelemetryResource(cfg *confmap.Conf, agentInfo info.Agent, logge
 	}
 
 	var configured []any
-	switch raw := resource["attributes"].(type) {
+	switch raw := resource[telemetryResourceAttributesListKey].(type) {
 	case nil:
 		// Unset or an explicit null: nothing to preserve.
 	case []any:
@@ -89,7 +103,7 @@ func injectAgentTelemetryResource(cfg *confmap.Conf, agentInfo info.Agent, logge
 	if len(configured) == 0 && hasInlineResourceAttributes(resource) {
 		injected = inlineResourceAttributes(attributes)
 	} else {
-		injected = map[string]any{"attributes": declarativeResourceAttributes(configured, attributes)}
+		injected = map[string]any{telemetryResourceAttributesListKey: declarativeResourceAttributes(configured, attributes)}
 	}
 	if err := cfg.Merge(confmap.NewFromStringMap(map[string]any{telemetryResourceKey: injected})); err != nil {
 		return fmt.Errorf("merging agent attributes into %s: %w", telemetryResourceKey, err)
@@ -104,13 +118,10 @@ func injectAgentTelemetryResource(cfg *confmap.Conf, agentInfo info.Agent, logge
 }
 
 // hasInlineResourceAttributes reports whether resource contains attributes in
-// the deprecated inline map format, that is any key that is not part of the
-// declarative resource schema.
+// the deprecated inline map format.
 func hasInlineResourceAttributes(resource map[string]any) bool {
 	for key := range resource {
-		switch key {
-		case "attributes", "attributes_list", "schema_url", "detection/development":
-		default:
+		if !slices.Contains(telemetryResourceSchemaKeys, key) {
 			return true
 		}
 	}
