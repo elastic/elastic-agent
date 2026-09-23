@@ -16,7 +16,7 @@ The extension accepts the `endpoint` as a sole parameter. The endpoint should be
 - Acts as a registrar and keeps track of common diagnostic hooks.
 - Collects profiles using `runtime/pprof`.
 - Collects internal telemetry exposed by the OTeL Collector.
-- Implements the `extensioncapabilities.ConfigWatcher` interface and stores the latest configuration of the running collector.
+- Implements the `extensioncapabilities.ConfigSnapshotWatcher` interface and stores the latest effective configuration of the running collector.
 - Listens for diagnostic requests and provides diagnostic data. 
 
 ## Design
