@@ -462,8 +462,6 @@ github.com/dougm/pretty v0.0.0-20160325215624-add1dbc86daf h1:A2XbJkAuMMFy/9Efto
 github.com/dougm/pretty v0.0.0-20160325215624-add1dbc86daf/go.mod h1:7NQ3kWOx2cZOSjtcveTa5nqupVr2s6/83sG+rTlI7uA=
 github.com/dpaasman00/opamp-go v0.0.0-20260901163641-3ad84468cc95 h1:tVJ7HQb+Jy0ZInfiZ6XY5NL0zejUQwweVDdyeEGI6/c=
 github.com/dpaasman00/opamp-go v0.0.0-20260901163641-3ad84468cc95/go.mod h1:p1aUAb8vVqtQ9qD8yDBGiqztuI3AkCSh7XTVqhuyy3I=
-github.com/dpaasman00/opentelemetry-collector-contrib/extension/opampextension v0.0.0-20260902163552-7280767449cd h1:3bKUcV0uUKvet0w7+PCaQVV737dNdq/IcwRaUx/UeSg=
-github.com/dpaasman00/opentelemetry-collector-contrib/extension/opampextension v0.0.0-20260902163552-7280767449cd/go.mod h1:zLwLd5W3208phk7kyDkGh3Ih0r4WvUJ3GAw/ZCvt1m8=
 github.com/dustin/go-humanize v1.0.0/go.mod h1:HtrtbFcZ19U5GC7JDqmcUSB87Iq5E25KnS6fMYU6eOk=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
