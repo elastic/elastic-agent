@@ -1905,7 +1905,6 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
-	// the rendered inputs of the previous policy can't be reused
 	c.renderCache.Reset()
 	return nil
 }
