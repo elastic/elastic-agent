@@ -308,9 +308,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	}
 	if h.stateStore != nil {
 		if err := h.stateStore.SaveAction(action); err != nil {
-			// Non-fatal: the policy config is already saved. Fleet re-delivers the action
-			// on the next checkin if needed, so don't block policy application here.
-			h.log.Warnf("failed to persist policy action to state store: %v", err)
+			return fmt.Errorf("failed to persist policy action to state store: %w", err)
 		}
 	}
 
