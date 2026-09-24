@@ -1,0 +1,47 @@
+# Kind can be one of:
+# - breaking-change: a change to previously-documented behavior
+# - deprecation: functionality that is being removed in a later release
+# - bug-fix: fixes a problem in a previous version
+# - enhancement: extends functionality but does not break or fix existing behavior
+# - feature: new functionality
+# - known-issue: problems that we are aware of in a given version
+# - security: impacts on the security of a product or a user’s deployment.
+# - upgrade: important information for someone upgrading from a prior version
+# - other: does not fit into any of the other categories
+kind: breaking-change
+
+# Change summary; a 80ish characters long description of the change.
+summary: The k8s_attributes processor in the EDOT Collector now emits stable Kubernetes semantic convention attribute names
+
+# Long description; in case the summary is not enough to describe the change
+# this field accommodate a description without length limits.
+# NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
+description: |
+  The OTel Collector Contrib `k8s_attributes` processor was promoted to v1.0.0 (stable) in v0.161.0.
+  As part of this, the `processor.k8sattributes.EmitV1K8sConventions` and
+  `processor.k8sattributes.DontEmitV0K8sConventions` feature gates moved from alpha to beta and are
+  enabled by default. The processor now emits stable semantic convention attribute names
+  (e.g. singular `k8s.pod.label.*`, `k8s.pod.annotation.*`, `k8s.node.label.*`, `k8s.namespace.label.*`)
+  and no longer emits the legacy plural forms (e.g. `k8s.pod.labels.*`, `k8s.pod.annotations.*`).
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/k8sattributesprocessor/README.md#semantic-conventions-compatibility
+
+# REQUIRED for breaking-change, deprecation, known-issue
+impact: |
+  Dashboards, alerts, queries, ingest pipelines, or downstream processors that reference the legacy plural
+  attribute names (e.g. `k8s.pod.labels.*`) will stop matching data produced by the `k8s_attributes` processor.
+
+# REQUIRED for breaking-change, deprecation, known-issue
+action: |
+  Migrate to the stable attribute names, or temporarily restore the legacy names by disabling the gates.
+  Dual emission during a migration period is recommended:
+  `--feature-gates=-processor.k8sattributes.DontEmitV0K8sConventions,processor.k8sattributes.EmitV1K8sConventions`.
+  To emit only the legacy names, disable both gates.
+
+# Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
+component: elastic-agent
+
+# PR URL; optional; the PR number that added the changeset.
+# If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
+# NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
+# Please provide it if you are adding a fragment for a different PR.
+pr: https://github.com/elastic/elastic-agent/pull/16745

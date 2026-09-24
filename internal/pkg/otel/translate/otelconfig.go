@@ -43,10 +43,10 @@ const (
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
-	// singleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// SingleReceiverStreamID is the placeholder stream ID used in receiver names for
 	// components with single_receiver: true, so that all receiver names uniformly have
 	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
-	singleReceiverStreamID = "single"
+	SingleReceiverStreamID = "single"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -370,7 +370,7 @@ func getCollectorConfigForComponent(
 // getReceiversConfigForComponent returns the receivers configuration for a component.
 // By default each input stream produces its own receiver. When the component's InputSpec has
 // SingleReceiver set, all streams are merged into one receiver keyed by the component ID with
-// the placeholder singleReceiverStreamID as the stream suffix.
+// the placeholder SingleReceiverStreamID as the stream suffix.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -467,7 +467,7 @@ func getReceiversConfigForComponent(
 		for _, ri := range inputs {
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+singleReceiverStreamID)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+SingleReceiverStreamID)
 		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,

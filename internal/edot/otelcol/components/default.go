@@ -39,6 +39,7 @@ import (
 	k8seventsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8seventsreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
 	kafkametricsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkametricsreceiver"
+	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	memcachedreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/memcachedreceiver"
 	mongodbreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/mongodbreceiver"
@@ -92,6 +93,7 @@ import (
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
+	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
@@ -193,6 +195,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			rabbitmqreceiver.NewFactory(),
 			snmpreceiver.NewFactory(),
 			kafkametricsreceiver.NewFactory(),
+			kafkareceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			statsdreceiver.NewFactory(),
 			vcenterreceiver.NewFactory(),
@@ -249,6 +252,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
+			kafkaexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),

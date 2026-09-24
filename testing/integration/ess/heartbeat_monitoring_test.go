@@ -108,23 +108,20 @@ func (runner *HeartbeatRunner) SetupSuite() {
 	// Create a Synthetics private location backed by the Fleet policy so that
 	// Kibana can push a heartbeat monitor to the agent via Fleet.
 	locationLabel := fmt.Sprintf("test-location-%s", policyUUID)
-	_, err = createSyntheticsPrivateLocation(ctx, runner.info.KibanaClient, locationLabel, policyResp.ID)
+	locationID, err := createSyntheticsPrivateLocation(ctx, runner.info.KibanaClient, locationLabel, policyResp.ID)
 	require.NoError(t, err)
 
-	// Push one HTTP monitor targeting the local test server.
-	monitors := []syntheticsMonitorSchema{
-		{
-			ID:               "heartbeat-http-monitor-" + policyUUID,
-			Type:             "http",
-			Name:             "Test HTTP Monitor",
-			Enabled:          true,
-			Schedule:         1, // 1-minute polling interval
-			PrivateLocations: []string{locationLabel},
-			URLs:             runner.httpServer.URL,
-		},
-	}
-	projectName := fmt.Sprintf("heartbeat-test-%s", policyUUID)
-	require.NoError(t, bulkPushSyntheticsMonitors(ctx, t, runner.info.KibanaClient, projectName, monitors))
+	// Push one HTTP monitor targeting the local test server via the UI API.
+	// The project API (_bulk_update) is only available in certain Kibana
+	// configurations; the UI API works on all stateful deployments.
+	require.NoError(t, createSyntheticsUIMonitor(ctx, runner.info.KibanaClient, map[string]any{
+		"type":              "http",
+		"name":              "heartbeat-http-monitor-" + policyUUID,
+		"enabled":           true,
+		"private_locations": []string{locationID},
+		"schedule":          1,
+		"url":               runner.httpServer.URL,
+	}))
 }
 
 // validateHeartbeatEvents polls Elasticsearch until at least one heartbeat HTTP

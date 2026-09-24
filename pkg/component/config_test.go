@@ -183,7 +183,7 @@ func TestExpectedConfig(t *testing.T) {
 					},
 				},
 			},
-			Err: errors.New("decoding error: decoding failed due to the following error(s):\n\n'meta' expected a map or struct, got \"slice\""),
+			Err: errors.New("decoding error: 'meta' expected a map or struct, got \"slice\""),
 		},
 	}
 
@@ -208,4 +208,42 @@ func TestExpectedConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExpectedConfigFlattenedDataStream(t *testing.T) {
+	cfg := map[string]interface{}{
+		"id":                  "input-1",
+		"type":                "filestream",
+		"data_stream.dataset": "unit.dataset",
+		"data_stream": map[string]interface{}{
+			"namespace": "unit.namespace",
+		},
+		"streams": []interface{}{
+			map[string]interface{}{
+				"id":                    "stream-1",
+				"data_stream.type":      "logs",
+				"data_stream.namespace": "stream.namespace",
+				"data_stream":           map[string]interface{}{"dataset": "stream.dataset"},
+			},
+		},
+	}
+	got, err := ExpectedConfig(cfg)
+	require.NoError(t, err)
+	require.Equal(t, "unit.dataset", got.DataStream.Dataset)
+	require.Equal(t, "unit.namespace", got.DataStream.Namespace)
+	require.Len(t, got.Streams, 1)
+	require.Equal(t, "stream.dataset", got.Streams[0].DataStream.Dataset)
+	require.Equal(t, "logs", got.Streams[0].DataStream.Type)
+	require.Equal(t, "stream.namespace", got.Streams[0].DataStream.Namespace)
+
+	// conflicting nested and flattened values must still be rejected
+	cfg["data_stream"] = map[string]interface{}{"dataset": "other"}
+	_, err = ExpectedConfig(cfg)
+	require.ErrorContains(t, err, "duplicated key 'datastream.dataset'")
+
+	// non-scalar values are rejected, as unpacking them with go-ucfg did
+	cfg["data_stream"] = map[string]interface{}{}
+	cfg["data_stream.dataset"] = []interface{}{"x"}
+	_, err = ExpectedConfig(cfg)
+	require.ErrorContains(t, err, "can not convert '[]interface {}' into 'string' accessing 'data_stream.dataset'")
 }
