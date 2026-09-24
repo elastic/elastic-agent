@@ -132,8 +132,23 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 }
 
 func reserveDiskSpace(path string, size int64) error {
-	_, statErr := os.Stat(path)
+	info, statErr := os.Stat(path)
 	fresh := goerrors.Is(statErr, os.ErrNotExist)
+
+	var reservedSize int64
+	if statErr == nil {
+		reservedSize = info.Size()
+	}
+	if size > reservedSize {
+		if available, err := getAvailableDiskSpaceAt(filepath.Dir(path)); err == nil {
+			needed := uint64(size - reservedSize) //nolint:gosec // G115: size is greater than reservedSize
+			if needed > available {
+				return upgradeErrors.DiskSpaceLowError{
+					fmt.Sprintf("need %s at %s, %s available", formatSize(needed), filepath.Dir(path), formatSize(available)),
+				}
+			}
+		}
+	}
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o660)
 	if err != nil {
