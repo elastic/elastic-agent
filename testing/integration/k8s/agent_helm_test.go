@@ -15,7 +15,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/cli/values"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
