@@ -2690,9 +2690,9 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:        "disk space full",
-			upgradeErr:  fmt.Errorf("wrapped: %w", upgradeErrors.ErrDiskSpaceFull),
-			expectedErr: upgradeErrors.ErrDiskSpaceFull,
+			name:        "disk space low joined with os error",
+			upgradeErr:  fmt.Errorf("wrapped: %w", errors.Join(upgradeErrors.OS_DiskSpaceErrors[0], diskSpaceLowErr)),
+			expectedErr: diskSpaceLowErr,
 		},
 		{
 			name:        "disk space low",
