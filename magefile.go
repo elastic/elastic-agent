@@ -85,8 +85,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"helm.sh/helm/v4/pkg/action"
-	"helm.sh/helm/v4/pkg/chart/loader"
 	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
 	"helm.sh/helm/v4/pkg/cli"
 	"helm.sh/helm/v4/pkg/downloader"
 	"helm.sh/helm/v4/pkg/getter"

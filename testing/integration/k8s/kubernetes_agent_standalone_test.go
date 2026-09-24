@@ -35,8 +35,8 @@ import (
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
 	"helm.sh/helm/v4/pkg/action"
-	"helm.sh/helm/v4/pkg/chart/loader"
 	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
 	"helm.sh/helm/v4/pkg/cli"
 	helmkube "helm.sh/helm/v4/pkg/kube"
 	releasev1 "helm.sh/helm/v4/pkg/release/v1"
