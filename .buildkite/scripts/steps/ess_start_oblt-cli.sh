@@ -14,17 +14,20 @@ if [[ "${FIPS:-false}" == "true" ]]; then
 fi
 export METADATA_PREFIX
 
-ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
+if [[ "${BUILDKITE_RETRY_COUNT:-0}" -gt 0 && "${BUILDKITE_RETRY_TYPE:-}" == "automatic" ]]; then
+  echo "~~~ Automatic retry: reusing the existing ESS stack"
+  ess_load_secrets
+else
+  ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
 
-# Publish the shared cluster name via meta-data so the global cleanup step
-# (ess_down_oblt-cli.sh) can find and destroy it. Per-step retries intentionally
-# don't touch this key - they rely on their own local cluster-info.json for
-# teardown - so this always points at the shared cluster created above.
-CLUSTER_NAME="$(jq -r '.ClusterName' "${PWD}/cluster-info.json")"
-if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
-  echo "Error: Failed to extract ClusterName from cluster-info.json" >&2
-  exit 1
+  # Publish the shared cluster name for the global cleanup step. Per-step
+  # retries must not overwrite it, so cleanup continues to target this stack.
+  CLUSTER_NAME="$(jq -r '.ClusterName' "${PWD}/cluster-info.json")"
+  if [ -z "${CLUSTER_NAME}" ] || [ "${CLUSTER_NAME}" = "null" ]; then
+    echo "Error: Failed to extract ClusterName from cluster-info.json" >&2
+    exit 1
+  fi
+  buildkite-agent meta-data set "${METADATA_PREFIX}cluster-name" "${CLUSTER_NAME}"
 fi
-buildkite-agent meta-data set "${METADATA_PREFIX}cluster-name" "${CLUSTER_NAME}"
 
 preinstall_fleet_packages
