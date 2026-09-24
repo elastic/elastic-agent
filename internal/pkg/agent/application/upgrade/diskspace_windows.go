@@ -45,3 +45,15 @@ func getVolumeNameAt(dir string) (string, error) {
 	}
 	return strings.ToLower(windows.UTF16ToString(volumePath)), nil
 }
+
+func getAvailableDiskSpaceAt(dir string) (uint64, error) {
+	dirPtr, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return 0, err
+	}
+	var available, total, totalFree uint64
+	if err := windows.GetDiskFreeSpaceEx(dirPtr, &available, &total, &totalFree); err != nil {
+		return 0, err
+	}
+	return available, nil
+}
