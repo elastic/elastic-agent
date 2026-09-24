@@ -511,11 +511,16 @@ func (f *Fixture) installDeb(ctx context.Context, installOpts *InstallOpts, shou
 	}
 
 	// sudo apt-get install the deb
-	cmd := exec.CommandContext(ctx, "sudo", "-E", "apt-get", "install", "-y", f.srcPackage) // #nosec G204 -- Need to pass in name of package
+	// Use "sudo env VAR=val apt-get ..." rather than cmd.Env so that sudo's
+	// env_reset (Defaults in /etc/sudoers) does not strip ELASTIC_AGENT_FLAVOR
+	// before the dpkg preinst script reads it.
+	aptArgs := []string{"apt-get", "install", "-y", f.srcPackage}
 	if installOpts.InstallServers {
-		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
+		aptArgs = append([]string{"env", "ELASTIC_AGENT_FLAVOR=servers"}, aptArgs...)
 	}
-	out, err := cmd.CombinedOutput() // #nosec G204 -- Need to pass in name of package
+	f.t.Logf("[test %s] DEB install command: %v", f.t.Name(), aptArgs)
+	cmd := exec.CommandContext(ctx, "sudo", aptArgs...) // #nosec G204 -- Need to pass in name of package
+	out, err := cmd.CombinedOutput()                    // #nosec G204 -- Need to pass in name of package
 	if err != nil {
 		return out, fmt.Errorf("apt install failed: %w output:%s", err, string(out))
 	}
@@ -604,22 +609,25 @@ func (f *Fixture) installRpm(ctx context.Context, installOpts *InstallOpts, shou
 		return nil, fmt.Errorf("failed to prepare: %w", err)
 	}
 
-	installArgs := []string{"-E", "rpm", "-i", "-v"}
+	rpmArgs := []string{"rpm", "-i", "-v"}
 	if installOpts.BasePath != "" {
-		installArgs = append(installArgs, "--prefix", installOpts.BasePath)
+		rpmArgs = append(rpmArgs, "--prefix", installOpts.BasePath)
 		// Make sure that prefix is available to agentFixture so other agent commands can use it
 		if f.installOpts == nil {
 			f.installOpts = &InstallOpts{}
 		}
 		f.installOpts.BasePath = installOpts.BasePath
 	}
-	installArgs = append(installArgs, f.srcPackage)
+	rpmArgs = append(rpmArgs, f.srcPackage)
 	// sudo rpm -iv elastic-agent rpm
-	f.t.Logf("[test %s] RPM install command: %v", f.t.Name(), installArgs)
-	cmd := exec.CommandContext(ctx, "sudo", installArgs...) // #nosec G204 -- Need to pass in name of package
+	// Use "sudo env VAR=val rpm ..." rather than cmd.Env so that sudo's
+	// env_reset (Defaults in /etc/sudoers) does not strip ELASTIC_AGENT_FLAVOR
+	// before the rpm scriptlets read it.
 	if installOpts.InstallServers {
-		cmd.Env = append(cmd.Env, "ELASTIC_AGENT_FLAVOR=servers")
+		rpmArgs = append([]string{"env", "ELASTIC_AGENT_FLAVOR=servers"}, rpmArgs...)
 	}
+	f.t.Logf("[test %s] RPM install command: %v", f.t.Name(), rpmArgs)
+	cmd := exec.CommandContext(ctx, "sudo", rpmArgs...) // #nosec G204 -- Need to pass in name of package
 	installOut, err := cmd.CombinedOutput()
 	if err != nil {
 		return installOut, fmt.Errorf("rpm install failed: %w output:%s", err, string(installOut))
@@ -874,7 +882,7 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 		if d.IsDir() {
 			return nil
 		}
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path is rooted under the walk root; TOCTOU risk is acceptable in test helper code
 		if err != nil {
 			f.t.Logf("failed to add %s to zip, continuing: %s", path, err)
 			return nil
