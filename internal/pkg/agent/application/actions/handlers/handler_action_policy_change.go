@@ -166,7 +166,7 @@ func testFleetConfig(ctx context.Context, log *logger.Logger, clientConfig remot
 				clientConfig.Hosts, clientConfig.Host)))
 	}
 
-	return client.CheckRemote(ctx, fleetClient)
+	return client.CheckRemote(ctx, log, fleetClient)
 }
 
 // updateFleetConfig copies the relevant Fleet client settings from policyConfig on agentConfig. The destination struct is modified in-place
