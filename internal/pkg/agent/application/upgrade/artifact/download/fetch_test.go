@@ -202,7 +202,7 @@ func TestDownloadDiskSpaceError(t *testing.T) {
 	require.ErrorIs(t, err, diskSpaceError)
 	require.FileExists(t, target)
 	require.Equal(t, details.StateFailed, upgradeDetails.State)
-	require.Equal(t, upgradeErrors.ErrDiskSpaceFull.Error(), upgradeDetails.Metadata.ErrorMsg)
+	require.Equal(t, upgradeErrors.DiskSpaceLowError{}.Error(), upgradeDetails.Metadata.ErrorMsg)
 }
 
 func TestDownloadBodyError(t *testing.T) {

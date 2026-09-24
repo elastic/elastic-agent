@@ -14,8 +14,9 @@ import (
 	agentErrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 )
 
-func TestIsDiskSpaceFullError(t *testing.T) {
-	for _, err := range OS_DiskSpaceErrors {
+func TestIsDiskSpaceLowError(t *testing.T) {
+	diskSpaceErrors := append([]error{DiskSpaceLowError{"need 1 GB at /data"}}, OS_DiskSpaceErrors...)
+	for _, err := range diskSpaceErrors {
 		testCases := map[string]struct {
 			err  error
 			want bool
@@ -27,7 +28,7 @@ func TestIsDiskSpaceFullError(t *testing.T) {
 		}
 		for name, tc := range testCases {
 			t.Run(fmt.Sprintf("%s_%s", err.Error(), name), func(t *testing.T) {
-				require.Equal(t, tc.want, IsDiskSpaceFullError(tc.err))
+				require.Equal(t, tc.want, IsDiskSpaceLowError(tc.err))
 			})
 		}
 	}

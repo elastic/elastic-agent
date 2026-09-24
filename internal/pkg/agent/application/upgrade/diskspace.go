@@ -84,7 +84,7 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 	var spaceReqs []string
 
 	err := reserveDiskSpace(installPath, int64(installSize)) //nolint:gosec // G115: installSize is clamped to MaxInt64
-	if upgradeErrors.IsDiskSpaceFullError(err) {
+	if upgradeErrors.IsDiskSpaceLowError(err) {
 		if onSameVolume {
 			// Report both requirements so the user doesn't free up just the install
 			// size and then fail again on the archive reservation
@@ -100,7 +100,7 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 	}
 
 	err = reserveDiskSpace(archivePath, int64(artifactsSize)) //nolint:gosec // G115: artifactsSize is clamped to MaxInt64
-	if upgradeErrors.IsDiskSpaceFullError(err) {
+	if upgradeErrors.IsDiskSpaceLowError(err) {
 		if onSameVolume {
 			// Report both requirements here even though the install reservation
 			// succeeded. We remove the reserved install file on upgrade failure, so
