@@ -433,6 +433,7 @@
 
                 "autoops_token": { "type": "string", "description": "Token to register into AutoOps" },
                 "autoops_otel_url": { "type": "string", "description": "OTel server URL" },
+                "autoops_temp_resource_id": { "type": "string", "description": "Deprecated: no longer used, kept for backwards compatibility" },
 
                 "es_api_key": { "type": "string", "description": "Monitored ES cluster API key" },
                 "es_username": { "type": "string", "description": "Monitored ES cluster username" },
