@@ -4385,6 +4385,7 @@ func (h Helm) handleDependencies(update bool) error {
 		RegistryClient:   registryClient,
 		RepositoryConfig: settings.RepositoryConfig,
 		RepositoryCache:  settings.RepositoryCache,
+		ContentCache:     settings.ContentCache,
 		Debug:            settings.Debug,
 	}
 	if client.Verify {
