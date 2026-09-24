@@ -257,6 +257,7 @@ stringData:
       kubernetes_leaderelection:
         enabled: true
         leader_lease: example-clusterwide
+
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -440,6 +441,7 @@ stringData:
       kubernetes_leaderelection:
         enabled: false
         leader_lease: example-pernode
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -595,6 +597,8 @@ rules:
   resources:
     - volumeattachments
   verbs: ["list", "watch"]
+
+
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -677,6 +681,7 @@ rules:
       - get
       - list
       - watch
+
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -759,6 +764,7 @@ rules:
       - get
       - list
       - watch
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -800,6 +806,7 @@ roleRef:
   kind: ClusterRole
   name: agent-clusterWide-example-default
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -819,6 +826,7 @@ roleRef:
   kind: ClusterRole
   name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
 apiVersion: v1
@@ -847,6 +855,7 @@ spec:
   selector:    
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
+
 ---
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
 apiVersion: apps/v1
@@ -943,6 +952,7 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-pernode-example
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
 apiVersion: apps/v1
@@ -1029,6 +1039,7 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -1110,3 +1121,4 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-clusterwide-example
+
