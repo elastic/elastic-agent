@@ -215,11 +215,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 					skip[i] = true
 					continue
 				}
-				var diskSpaceLowErr downloaderrors.DiskSpaceLowError
-				if goerrors.As(err, &diskSpaceLowErr) {
-					return backoff.Permanent(err)
-				}
-				break
+				return backoff.Permanent(err)
 			}
 
 			if download.IsLocal(sourceURI) {
