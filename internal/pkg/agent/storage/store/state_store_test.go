@@ -339,8 +339,8 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
-				Version:   "1.2.3",
-				SourceURI: "https://example.com",
+				Version: "1.2.3",
+				Sources: []string{"https://example.com"},
 			}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.json")
@@ -379,9 +379,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: ts.Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
-				Version:   "1.2.3",
-				SourceURI: "https://example.com",
-				Retry:     1,
+				Version: "1.2.3",
+				Sources: []string{"https://example.com"},
+				Retry:   1,
 			}},
 			// only the latest upgrade action is kept, however it's not the store
 			// which handled that. Besides upgrade actions are the only
@@ -391,9 +391,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				ActionType:      fleetapi.ActionTypeUpgrade,
 				ActionStartTime: ts.Format(time.RFC3339),
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "1.2.4",
-					SourceURI: "https://example.com",
-					Retry:     1,
+					Version: "1.2.4",
+					Sources: []string{"https://example.com"},
+					Retry:   1,
 				}}}
 
 		storePath := filepath.Join(t.TempDir(), "state.json")
@@ -620,6 +620,29 @@ func runTestStateStore(t *testing.T, ackToken string) {
 			}
 		})
 
+		t.Run("reads legacy source_uri from older state store", func(t *testing.T) {
+			storePath := filepath.Join(t.TempDir(), "state.json")
+			require.NoError(t,
+				os.WriteFile(storePath,
+					[]byte(`{"version":"1","action_queue":[{"id":"testid","type":"UPGRADE","data":{"version":"1.2.3","source_uri":"https://artifacts.elastic.co/downloads"}}]}`),
+					0600),
+				"could not write legacy state store")
+
+			s, err := storage.NewDiskStore(storePath)
+			require.NoError(t, err, "failed creating DiskStore")
+
+			store, err := NewStateStore(log, s)
+			require.NoError(t, err)
+
+			queue := store.Queue()
+			require.Len(t, queue, 1, "action queue should have 1 action")
+			upgradeAction, ok := queue[0].(*fleetapi.ActionUpgrade)
+			require.True(t, ok)
+
+			assert.Equal(t, []string{"https://artifacts.elastic.co/downloads"}, upgradeAction.Data.Sources,
+				"legacy source_uri should be migrated to Sources")
+		})
+
 		t.Run("action queue", func(t *testing.T) {
 			storePath := filepath.Join(t.TempDir(), "state.json")
 			now := time.Now().UTC().Round(time.Second)
@@ -629,9 +652,9 @@ func runTestStateStore(t *testing.T, ackToken string) {
 				ActionStartTime:  now.Format(time.RFC3339),
 				ActionExpiration: now.Add(time.Hour).Format(time.RFC3339),
 				Data: fleetapi.ActionUpgradeData{
-					Version:   "1.2.3",
-					SourceURI: "https://example.com",
-					Retry:     1,
+					Version: "1.2.3",
+					Sources: []string{"https://example.com"},
+					Retry:   1,
 				},
 				Signed: &fleetapi.Signed{
 					Data:      "some data",
