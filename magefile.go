@@ -672,6 +672,13 @@ func Package(ctx context.Context) error {
 		return fmt.Errorf("error loading agent package spec: %w", err)
 	}
 
+	// Inject ironbank resource hashes from the hardening manifest into any
+	// ironbank Docker variant specs, so packages.yml doesn't need to duplicate
+	// values that are authoritative in the manifest template.
+	if err := injectIronbankManifestVars(pkgSpec); err != nil {
+		return fmt.Errorf("injecting ironbank manifest vars: %w", err)
+	}
+
 	// Pass the resolved settings to dependency targets. Without this,
 	// PackageAgentCore would re-load settings from the environment and — not
 	// being a .package-version opt-in target — name the core archive with
@@ -2096,13 +2103,88 @@ func getIronbankContextName(cfg *devtools.Settings) string {
 	return outputDir
 }
 
+// ironbankResource holds the download URL and sha256 hash for a binary
+// resource listed in hardening_manifest.yaml.tmpl.
+type ironbankResource struct {
+	URL    string
+	SHA256 string
+}
+
+// ironbankResourcesFromManifest parses hardening_manifest.yaml.tmpl and
+// returns the resource info keyed by filename. Template expressions ({{ … }})
+// are stripped before parsing so the YAML is well-formed.
+func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankResource, error) {
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Strip Go template expressions so the file parses as plain YAML.
+	stripped := regexp.MustCompile(`\{\{[^}]*\}\}`).ReplaceAll(raw, []byte(`""`))
+
+	var manifest struct {
+		Resources []struct {
+			Filename   string `yaml:"filename"`
+			URL        string `yaml:"url"`
+			Validation struct {
+				Type  string `yaml:"type"`
+				Value string `yaml:"value"`
+			} `yaml:"validation"`
+		} `yaml:"resources"`
+	}
+	if err := yaml.Unmarshal(stripped, &manifest); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", manifestPath, err)
+	}
+
+	resources := make(map[string]ironbankResource, len(manifest.Resources))
+	for _, r := range manifest.Resources {
+		if r.Validation.Type == "sha256" {
+			resources[r.Filename] = ironbankResource{URL: r.URL, SHA256: r.Validation.Value}
+		}
+	}
+	return resources, nil
+}
+
+// injectIronbankManifestVars reads the hardening manifest template and injects
+// tinit_sha256 / jq_sha256 into every ironbank Docker variant spec so that
+// packages.yml does not need to duplicate values that are authoritative in the
+// manifest.
+func injectIronbankManifestVars(specs []devtools.OSPackageArgs) error {
+	manifestPath := filepath.Join("dev-tools", "packaging", "templates", "ironbank", "hardening_manifest.yaml.tmpl")
+	resources, err := ironbankResourcesFromManifest(manifestPath)
+	if err != nil {
+		return err
+	}
+	for i := range specs {
+		if specs[i].Spec.DockerVariant == devtools.Ironbank {
+			specs[i].Spec.ExtraVar("tinit_sha256", resources["tinit"].SHA256)
+			specs[i].Spec.ExtraVar("jq_sha256", resources["jq"].SHA256)
+		}
+	}
+	return nil
+}
+
 func prepareIronbankBuild(cfg *devtools.Settings) error {
 	fmt.Println(">> prepareIronbankBuild: prepare the IronBank container context.")
 	buildDir := filepath.Join("build", getIronbankContextName(cfg))
 	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
 
+	resources, err := ironbankResourcesFromManifest(filepath.Join(templatesDir, "hardening_manifest.yaml.tmpl"))
+	if err != nil {
+		return fmt.Errorf("reading ironbank resource hashes: %w", err)
+	}
+
 	data := map[string]interface{}{
-		"MajorMinor": majorMinor(cfg),
+		"MajorMinor":        majorMinor(cfg),
+		"base_registry":     "registry1.dsop.io",
+		"base_image":        "redhat/ubi/ubi10",
+		"base_tag":          "10.2",
+		"license_source":    "LICENSE",
+		"tinit_source":      "tinit",
+		"tinit_sha256":      resources["tinit"].SHA256,
+		"jq_source":         "jq",
+		"jq_sha256":         resources["jq"].SHA256,
+		"entrypoint_source": "config/docker-entrypoint",
 	}
 
 	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
