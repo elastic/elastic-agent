@@ -426,7 +426,12 @@ steps:
     if: |
       (build.pull_request.id != null && !build.env("GITHUB_PR_LABELS") =~ /skip-it/) ||
       build.env("GITHUB_PR_TRIGGER_COMMENT") =~ /.*extended.*/
-    command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+    # Upload the packaging and the test steps in one go; a second trigger step
+    # in between would cost another agent round trip (~1 minute) before the
+    # packaging steps can start.
+    command: |
+      buildkite-agent pipeline upload .buildkite/integration.pipeline.yml
+      buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml
     plugins:
     - *sparse_checkout_plugin
     env:
@@ -460,7 +465,12 @@ steps:
   # Trigger for branches
   - label: "Triggering Extended tests for branches"
     if: build.pull_request.id == null && build.source != "schedule"
-    command: "buildkite-agent pipeline upload .buildkite/integration.pipeline.yml"
+    # Upload the packaging and the test steps in one go; a second trigger step
+    # in between would cost another agent round trip (~1 minute) before the
+    # packaging steps can start.
+    command: |
+      buildkite-agent pipeline upload .buildkite/integration.pipeline.yml
+      buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml
     plugins:
     - *sparse_checkout_plugin
 
