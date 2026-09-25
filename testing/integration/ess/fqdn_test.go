@@ -91,6 +91,14 @@ func TestFQDN(t *testing.T) {
 		Force:          true,
 	}
 	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, kibClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
+
+	// Capture startedAt before the agent starts so the @timestamp filter in
+	// verifyHostNameInIndices includes the startup monitoring log burst.
+	// InstallAgentWithPolicy waits for Kibana Fleet to confirm the agent is
+	// online (10 s polling), which outlasts the startup burst; capturing the
+	// timestamp afterwards would exclude all non-dropped monitoring log entries.
+	startedAt := time.Now().UTC().Format(time.RFC3339)
+
 	policy, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, agentFixture, kibClient, createPolicyReq)
 	require.NoError(t, err)
 
@@ -110,8 +118,6 @@ func TestFQDN(t *testing.T) {
 		err = setEtcHosts(origEtcHosts)
 		require.NoError(t, err)
 	})
-
-	startedAt := time.Now().UTC().Format(time.RFC3339)
 
 	t.Log("Verify that agent name is short hostname")
 	agent := verifyAgentName(ctx, t, agentID, shortName, info.KibanaClient)
