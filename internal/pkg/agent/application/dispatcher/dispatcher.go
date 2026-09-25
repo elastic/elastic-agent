@@ -52,6 +52,30 @@ type ActionDispatcher struct {
 	lastUpgradeDetails *details.Details
 	// lastUpgradeDetailsIsSet is necessary to differentiate if lastUpgradeDetails is set to nil or is never set
 	lastUpgradeDetailsIsSet bool
+	// uninstallPendingObserver, when set, is notified after each dispatch with the
+	// UNINSTALL action currently held in the queue for its grace period (or nil
+	// when none is pending) so the coordinator can surface an "Uninstall pending"
+	// state that is visible in Fleet.
+	uninstallPendingObserver func(pending *fleetapi.ActionUninstall)
+	// verifyUninstallSignature, when set, verifies an UNINSTALL action's signature
+	// on receipt. An action that fails verification is not scheduled, so it is
+	// dispatched (and rejected by the handler) immediately rather than after its
+	// grace period.
+	verifyUninstallSignature func(action *fleetapi.ActionUninstall) error
+}
+
+// SetUninstallPendingObserver registers a callback that is notified, after every
+// dispatch cycle, of the UNINSTALL action pending in the grace-period queue (or
+// nil when none is pending). It is used to report an "Uninstall pending" state.
+func (ad *ActionDispatcher) SetUninstallPendingObserver(fn func(pending *fleetapi.ActionUninstall)) {
+	ad.uninstallPendingObserver = fn
+}
+
+// SetUninstallSignatureVerifier registers a callback used to verify an UNINSTALL
+// action's signature on receipt, so an action with a missing or invalid signature
+// is rejected immediately instead of waiting out its grace period.
+func (ad *ActionDispatcher) SetUninstallSignatureVerifier(fn func(action *fleetapi.ActionUninstall) error) {
+	ad.verifyUninstallSignature = fn
 }
 
 // New creates a new action dispatcher.
@@ -126,6 +150,11 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 	// remove duplicate upgrade actions from fleetgateway actions and remove all upgrade actions in the queue
 	actions = ad.compactAndRemoveQueuedUpgrades(actions, &upgradeDetailsNeedUpdate)
 
+	// assign a grace-period start time to freshly received UNINSTALL actions so they
+	// are held in the (cancellable, persisted) queue for the delay instead of running
+	// now, dropping any that duplicate an already-pending uninstall
+	actions = ad.scheduleUninstallActions(now, actions)
+
 	// add any scheduled actions to the queue (we don't check the start time here, as we will check it later)
 	// and remove them from the passed actions
 	actions = ad.queueScheduledActions(actions, &upgradeDetailsNeedUpdate)
@@ -144,6 +173,11 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 	if err := ad.queue.Save(); err != nil {
 		ad.log.Errorf("failed to persist action_queue: %v", err)
 	}
+
+	// Surface (or clear) the "Uninstall pending" state based on what remains queued
+	// after the due actions have been dequeued above. Runs every cycle, including
+	// when there are no actions to dispatch, so cancel/expiry/restart stay in sync.
+	ad.reportUninstallPending()
 
 	if len(actions) == 0 {
 		ad.log.Debug("No action to dispatch")
@@ -205,6 +239,127 @@ func detectTypes(actions []fleetapi.Action) []string {
 		str[idx] = reflect.TypeOf(action).String()
 	}
 	return str
+}
+
+// scheduleUninstallActions assigns a grace-period start time to freshly received
+// UNINSTALL actions so they are held in the cancellable, persisted action queue
+// until the delay elapses, rather than executing immediately. This is the
+// agent-local safeguard against accidental (especially bulk/API-driven) uninstalls.
+//
+// It returns the actions to continue processing with: an UNINSTALL action whose
+// id is already pending in the queue (a Fleet redelivery, e.g. after a restart
+// restored the original) is dropped so we never schedule and spawn more than one
+// uninstaller for the same action.
+func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []fleetapi.Action) []fleetapi.Action {
+	actions := make([]fleetapi.Action, 0, len(input))
+	for _, action := range input {
+		ua, ok := action.(*fleetapi.ActionUninstall)
+		if !ok {
+			actions = append(actions, action)
+			continue
+		}
+
+		// Deduplicate against the queue: if an uninstall with this id is already
+		// pending (restored from the persisted queue on restart and redelivered by
+		// Fleet), drop the duplicate so we do not spawn multiple uninstallers.
+		if ad.queueContainsActionID(ua.ID()) {
+			ad.log.Debugf("uninstall action %s is already pending in the queue, dropping duplicate", ua.ID())
+			continue
+		}
+
+		// Keep the action for further processing; it is either scheduled below (and
+		// then moved into the queue by queueScheduledActions) or, when left
+		// unscheduled, dispatched immediately so the handler can reject/ack it.
+		actions = append(actions, action)
+
+		// Verify the signature on receipt regardless of whether a start time is
+		// present, so a missing/invalid signature is rejected immediately and a
+		// tampered delay cannot be scheduled. On success the verifier also replaces
+		// the action data with the signed payload, so the delay used below is the
+		// signed one. An invalid signature is left unscheduled and dispatched now,
+		// where the handler rejects it.
+		if ad.verifyUninstallSignature != nil {
+			if err := ad.verifyUninstallSignature(ua); err != nil {
+				ad.log.Warnf("uninstall action %s failed signature verification on receipt, not scheduling: %v", ua.ID(), err)
+				continue
+			}
+		}
+
+		// A Fleet-provided start time is left as-is; the queue schedules it and the
+		// handler validates it on dispatch.
+		if ua.ActionStartTime != "" {
+			continue
+		}
+
+		// Do not schedule an action that is already expired or carries a malformed
+		// expiration. Leaving its start time empty means it is not queued and is
+		// dispatched immediately, so the handler acknowledges the failure now rather
+		// than the queue silently dropping it once expired
+		// (RFC: "expired when received, or malformed expiration: immediate failure ack, no scheduling").
+		exp, experr := ua.Expiration()
+		hasExpiration := experr == nil
+		switch {
+		case hasExpiration:
+			if now.After(exp) {
+				ad.log.Warnf("uninstall action %s already expired at %s, not scheduling", ua.ID(), exp)
+				continue
+			}
+		case errors.Is(experr, fleetapi.ErrNoExpiration):
+			// No expiration; the action never expires.
+		default:
+			ad.log.Warnf("uninstall action %s has an invalid expiration, not scheduling: %v", ua.ID(), experr)
+			continue
+		}
+
+		delay, err := ua.ResolveDelay()
+		if err != nil {
+			// The delay was set but unparsable; ResolveDelay returned the safe
+			// default, so we still schedule (never uninstall immediately) and log.
+			ad.log.Warnf("uninstall action %s: %v", ua.ID(), err)
+		}
+		executeAt := now.Add(delay)
+
+		// Reject an action whose grace period would end at or after its expiration:
+		// it could never execute before expiring, and the queue would silently drop
+		// it without acking. Mark it failed and leave it unscheduled so it is
+		// dispatched immediately and the handler acknowledges the failure.
+		if hasExpiration && !executeAt.Before(exp) {
+			ua.Err = fmt.Errorf("uninstall grace period (delay %s) ends at %s, at or after the action expiration %s", delay, executeAt.Format(time.RFC3339), exp.Format(time.RFC3339))
+			ad.log.Warnf("uninstall action %s rejected: %v", ua.ID(), ua.Err)
+			continue
+		}
+
+		ua.SetStartTime(executeAt)
+		ad.log.Infof("Scheduling uninstall action %s to execute at %s (grace period %s)", ua.ID(), ua.ActionStartTime, delay)
+	}
+	return actions
+}
+
+// queueContainsActionID reports whether an action with the given id is already in
+// the scheduled-action queue.
+func (ad *ActionDispatcher) queueContainsActionID(id string) bool {
+	for _, a := range ad.queue.Actions() {
+		if a.ID() == id {
+			return true
+		}
+	}
+	return false
+}
+
+// reportUninstallPending notifies the registered observer of the UNINSTALL action
+// currently held in the queue for its grace period, or nil when none is pending.
+func (ad *ActionDispatcher) reportUninstallPending() {
+	if ad.uninstallPendingObserver == nil {
+		return
+	}
+	var pending *fleetapi.ActionUninstall
+	for _, action := range ad.queue.Actions() {
+		if ua, ok := action.(*fleetapi.ActionUninstall); ok {
+			pending = ua
+			break
+		}
+	}
+	ad.uninstallPendingObserver(pending)
 }
 
 // queueScheduledActions will add any action in actions with a valid start time to the queue and return the rest.

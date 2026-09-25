@@ -6,6 +6,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -31,6 +33,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -232,6 +235,46 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 			defer stateWatch.Stop()
 		}
 		return gateway.Run(ctx)
+	})
+
+	// Surface a visible "Uninstall pending" state while an UNINSTALL action waits
+	// out its grace period in the queue, and clear it once the action executes,
+	// is cancelled, or expires. Runs on the single dispatcher goroutine, so the
+	// uninstallPendingSet flag needs no synchronization.
+	uninstallPendingSet := false
+	m.dispatcher.SetUninstallPendingObserver(func(pending *fleetapi.ActionUninstall) {
+		if pending != nil {
+			msg := "Uninstall pending"
+			if st, err := pending.StartTime(); err == nil {
+				msg = fmt.Sprintf("Uninstall pending, executes at %s", st.UTC().Format(time.RFC3339))
+			}
+			m.coord.SetOverrideState(agentclient.Stopping, msg)
+			uninstallPendingSet = true
+			return
+		}
+		// Only clear if we set it, so we don't clobber another override state
+		// (e.g. an in-progress upgrade or the uninstaller's own "Uninstalling").
+		if uninstallPendingSet {
+			m.coord.ClearOverrideState()
+			uninstallPendingSet = false
+		}
+	})
+
+	// Reject an UNINSTALL action with a missing/invalid signature on receipt so it
+	// is never scheduled into the grace-period queue. On success, apply the signed
+	// payload over the action's mutable outer data so the grace-period delay used
+	// for scheduling is the signed one and cannot be tampered with.
+	m.dispatcher.SetUninstallSignatureVerifier(func(a *fleetapi.ActionUninstall) error {
+		signed, err := protection.VerifyActionSignature(a, m.coord.Protection().SignatureValidationKey, m.agentInfo.AgentID())
+		if err != nil {
+			return err
+		}
+		if signed != nil {
+			if err := json.Unmarshal(signed, &a.Data); err != nil {
+				return fmt.Errorf("failed to apply signed uninstall action data: %w", err)
+			}
+		}
+		return nil
 	})
 
 	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, m.actionAcker, dispatchFlushInterval)
@@ -505,6 +548,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionRestart{},
 		handlers.NewRestart(m.log, m.coord, m.stateStore),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionUninstall{},
+		handlers.NewUninstall(m.log, m.agentInfo, m.coord),
 	)
 
 	m.dispatcher.MustRegister(

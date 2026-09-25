@@ -15,6 +15,7 @@ inputs:
       - UNENROLL
       - UPGRADE
       - MIGRATE
+      - UNINSTALL
     runtime:
       preventions:
         - condition: ${runtime.native_arch} != '' and ${runtime.arch} != ${runtime.native_arch}

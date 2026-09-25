@@ -1046,3 +1046,151 @@ func TestGetQueuedUpgradeDetails(t *testing.T) {
 		})
 	}
 }
+
+func newTestDispatcher(t *testing.T, queued ...fleetapi.ScheduledAction) *ActionDispatcher {
+	t.Helper()
+	saver := &mockSaver{}
+	saver.On("SetQueue", mock.Anything).Maybe()
+	saver.On("Save").Return(nil).Maybe()
+	q, err := queue.NewActionQueue(queued, saver)
+	require.NoError(t, err)
+	d, err := New(nil, t.TempDir(), &mockHandler{}, q)
+	require.NoError(t, err)
+	return d
+}
+
+func TestScheduleUninstallActions(t *testing.T) {
+	now := time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+
+	t.Run("delay sets the grace-period start time", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, Data: fleetapi.ActionUninstallData{Delay: "30m"}}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Equal(t, now.Add(30*time.Minute).Format(time.RFC3339), a.ActionStartTime)
+	})
+
+	t.Run("no delay applies the default", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Equal(t, now.Add(fleetapi.DefaultUninstallDelay).Format(time.RFC3339), a.ActionStartTime)
+	})
+
+	t.Run("already scheduled action is left untouched", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		existing := now.Add(-5 * time.Minute).Format(time.RFC3339)
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionStartTime: existing, Data: fleetapi.ActionUninstallData{Delay: "30m"}}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Equal(t, existing, a.ActionStartTime, "restored/pre-scheduled action must keep its start time")
+	})
+
+	t.Run("expired action is not scheduled", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionExpiration: now.Add(-time.Minute).Format(time.RFC3339)}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Empty(t, a.ActionStartTime, "expired action must not be scheduled so the handler acks the failure")
+	})
+
+	t.Run("malformed expiration is not scheduled", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionExpiration: "not-a-time"}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Empty(t, a.ActionStartTime, "malformed-expiration action must not be scheduled")
+	})
+
+	t.Run("delay ending after expiration is rejected, not scheduled", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		// delay 1h but the action expires in 30m: it could never run before expiring.
+		a := &fleetapi.ActionUninstall{
+			ActionID:         "u1",
+			ActionType:       fleetapi.ActionTypeUninstall,
+			ActionExpiration: now.Add(30 * time.Minute).UTC().Format(time.RFC3339),
+			Data:             fleetapi.ActionUninstallData{Delay: "1h"},
+		}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Empty(t, a.ActionStartTime, "action whose grace period ends after expiration must not be scheduled")
+		require.Error(t, a.Err, "action must be marked failed so the handler acks the rejection")
+	})
+
+	t.Run("invalid signature is rejected on receipt and not scheduled", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		d.SetUninstallSignatureVerifier(func(*fleetapi.ActionUninstall) error { return errors.New("bad signature") })
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, Data: fleetapi.ActionUninstallData{Delay: "30m"}}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Empty(t, a.ActionStartTime, "action failing signature verification must not be scheduled (rejected on receipt)")
+	})
+
+	t.Run("valid signature is scheduled", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		d.SetUninstallSignatureVerifier(func(*fleetapi.ActionUninstall) error { return nil })
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, Data: fleetapi.ActionUninstallData{Delay: "30m"}}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Equal(t, now.Add(30*time.Minute).Format(time.RFC3339), a.ActionStartTime)
+	})
+
+	t.Run("verifier-applied signed delay is used for scheduling", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		// The real verifier replaces the outer (mutable) data with the signed
+		// payload; here it overrides a tampered "0s" with the signed "2h".
+		d.SetUninstallSignatureVerifier(func(a *fleetapi.ActionUninstall) error {
+			a.Data.Delay = "2h"
+			return nil
+		})
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, Data: fleetapi.ActionUninstallData{Delay: "0s"}}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Equal(t, now.Add(2*time.Hour).Format(time.RFC3339), a.ActionStartTime,
+			"scheduling must use the verifier-applied (signed) delay, not the tampered outer delay")
+	})
+
+	t.Run("duplicate of an already-queued uninstall is dropped", func(t *testing.T) {
+		queued := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionStartTime: now.Add(time.Hour).UTC().Format(time.RFC3339)}
+		d := newTestDispatcher(t, queued)
+		dup := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, Data: fleetapi.ActionUninstallData{Delay: "30m"}}
+
+		out := d.scheduleUninstallActions(now, []fleetapi.Action{dup})
+		assert.Empty(t, out, "a redelivered uninstall already pending in the queue must be dropped")
+	})
+
+	t.Run("returns non-uninstall and scheduled uninstall actions", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		other := &mockAction{}
+		ua := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, Data: fleetapi.ActionUninstallData{Delay: "30m"}}
+
+		out := d.scheduleUninstallActions(now, []fleetapi.Action{other, ua})
+		assert.Equal(t, []fleetapi.Action{other, ua}, out, "non-duplicate actions must be returned for further processing")
+		assert.Equal(t, now.Add(30*time.Minute).Format(time.RFC3339), ua.ActionStartTime)
+	})
+}
+
+func TestReportUninstallPending(t *testing.T) {
+	t.Run("reports the queued uninstall", func(t *testing.T) {
+		pending := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionStartTime: time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}
+		d := newTestDispatcher(t, pending)
+
+		var got *fleetapi.ActionUninstall
+		called := false
+		d.SetUninstallPendingObserver(func(p *fleetapi.ActionUninstall) { got = p; called = true })
+
+		d.reportUninstallPending()
+		assert.True(t, called)
+		require.NotNil(t, got)
+		assert.Equal(t, "u1", got.ActionID)
+	})
+
+	t.Run("reports nil when nothing is queued", func(t *testing.T) {
+		d := newTestDispatcher(t)
+
+		var got *fleetapi.ActionUninstall
+		called := false
+		d.SetUninstallPendingObserver(func(p *fleetapi.ActionUninstall) { got = p; called = true })
+
+		d.reportUninstallPending()
+		assert.True(t, called)
+		assert.Nil(t, got)
+	})
+
+	t.Run("no observer is a no-op", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		assert.NotPanics(t, func() { d.reportUninstallPending() })
+	})
+}
