@@ -18,6 +18,15 @@ const (
 	// Fleet group of tests. Used for testing Elastic Agent with Fleet.
 	Fleet = "fleet"
 
+	// FleetUpgrade group of tests. Used for testing Fleet-managed upgrades (including
+	// rollbacks and download settings). Split out of Fleet to keep CI groups short.
+	FleetUpgrade = "fleet-upgrade"
+
+	// FleetProxy group of tests. Used for testing Fleet communication through proxies,
+	// check-in behaviour and policy change persistence. Split out of Fleet to keep CI
+	// groups short.
+	FleetProxy = "fleet-proxy"
+
 	// Container group of tests. Used for testing Elastic Agent in container mode.
 	Container = "container"
 
@@ -41,11 +50,19 @@ const (
 	// Upgrade group of tests. Used for testing upgrades.
 	Upgrade = "upgrade"
 
+	// UpgradeRollback group of tests. Used for the long running standalone rollback
+	// tests. Split out of Upgrade to keep CI groups short.
+	UpgradeRollback = "upgrade-rollback"
+
 	// UpgradeFlavor group of tests. Used for testing flavored upgrades.
 	UpgradeFlavor = "upgrade-flavor"
 
-	// StandaloneUpgrade group of tests. Used for TestStandaloneUpgrade.
+	// StandaloneUpgrade group of tests. Used for TestStandaloneUpgrade (privileged).
 	StandaloneUpgrade = "standalone-upgrade"
+
+	// StandaloneUpgradeUnprivileged group of tests. Used for TestStandaloneUpgradeUnprivileged.
+	// Split out of StandaloneUpgrade to keep CI groups short.
+	StandaloneUpgradeUnprivileged = "standalone-upgrade-unprivileged"
 
 	// Deb group of tests. Used for testing .deb packages install & upgrades
 	Deb = "deb"
@@ -58,6 +75,10 @@ const (
 
 	// FleetEndpointSecurity group of tests. Used for the long running fleet-related "TestInstall..." tests.
 	FleetEndpointSecurity = "fleet-endpoint-security"
+
+	// FleetEndpointSecurityMTLS group of tests. Used for TestInstallDefendWithMTLSandEncCertKey,
+	// which alone takes as long as the rest of FleetEndpointSecurity. Split out to keep CI groups short.
+	FleetEndpointSecurityMTLS = "fleet-endpoint-security-mtls"
 
 	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
 	ECHDeployment = "ech-deployment"

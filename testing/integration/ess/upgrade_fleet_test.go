@@ -49,7 +49,7 @@ import (
 // would be redundant.
 func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -794,7 +794,7 @@ func isFIPSCapableVersion(ver *version.ParsedSemVer, os, arch string) bool {
 // TestFleetUpgradeCommandPRBuildWithSource tests upgrading an agent enrolled in fleet using the upgrade command with the --source-uri and --force args
 func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
