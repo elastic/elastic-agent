@@ -30,7 +30,7 @@ import (
 
 func TestFleetScheduledUpgrade(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation

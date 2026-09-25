@@ -45,7 +45,7 @@ import (
 
 func TestProxyURL(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Local: false,
 		Sudo:  true,
 	})
@@ -820,7 +820,7 @@ func createBasicFleetPolicyData(t *testing.T, fleetHost string) (fleetservertest
 //  8. Ensure upgrade succeeds
 func TestFleetDownloadProxyURL(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
@@ -1035,7 +1035,7 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 
 func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,

@@ -38,7 +38,7 @@ import (
 // https://github.com/elastic/kibana/issues/264983
 func TestPolicyChangePersistsWithoutAck(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
