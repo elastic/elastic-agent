@@ -199,6 +199,8 @@ components:
     platforms:
       - *linux-amd64
       - *linux-arm64
+      - *windows-amd64
+      - *windows-arm64
     packageTypes: *all-package-types
 # The shared section contains YAML anchors that are used to
 # define common parts of the package in order to not repeat ourselves.
