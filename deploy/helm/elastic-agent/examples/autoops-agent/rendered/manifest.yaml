@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.6.0
+
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -71,6 +72,7 @@ stringData:
       telemetry:
         logs:
           encoding: json
+
 ---
 # Source: elastic-agent/templates/integrations/_auto_ops/secret.yaml
 apiVersion: v1
@@ -91,6 +93,7 @@ stringData:
   es-api-key: "REPLACE_ME_API_KEY"
   cloud-connected-mode-api-key: "CCM-API-KEY"
   cloud-connected-mode-api-url: "CCM-API-URL"
+
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -192,3 +195,4 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-autoops-example
+

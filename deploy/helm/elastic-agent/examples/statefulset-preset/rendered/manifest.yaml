@@ -61,6 +61,7 @@ stringData:
       kubernetes_leaderelection:
         enabled: false
         leader_lease: example-netflow
+
 ---
 # Source: elastic-agent/templates/agent/service.yaml
 apiVersion: v1
@@ -71,6 +72,7 @@ spec:
   clusterIP: None
   selector:
     name: agent-netflow-example
+
 ---
 # Source: elastic-agent/templates/agent/service.yaml
 apiVersion: v1
@@ -91,6 +93,7 @@ spec:
     - port: 2055
       targetPort: 2055
       protocol: UDP
+
 ---
 # Source: elastic-agent/templates/agent/k8s/statefulset.yaml
 apiVersion: apps/v1
@@ -175,3 +178,4 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-netflow-example
+
