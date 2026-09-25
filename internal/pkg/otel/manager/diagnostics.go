@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 
@@ -139,7 +141,9 @@ func (m *OTelManager) PerformComponentDiagnostics(
 		}
 		for _, compID := range componentIDs {
 			if idx, ok := diagIdxByCompID[compID]; ok {
-				diagnostics[idx].Results = append(diagnostics[idx].Results, extDiag)
+				if result := streamPrefixedDiagnostic(extDiag, streamIDForComponent(extDiag.Name, compID)); result != nil {
+					diagnostics[idx].Results = append(diagnostics[idx].Results, result)
+				}
 			}
 		}
 	}
@@ -169,4 +173,32 @@ func diagnosticComponentIDsFromName(name string, components []component.Componen
 	}
 	slices.Sort(componentIDs)
 	return componentIDs
+}
+
+// streamIDForComponent returns the receiver-name suffix after the component ID.
+func streamIDForComponent(name, compID string) string {
+	_, suffix, found := strings.Cut(name, "/"+translate.OtelNamePrefix)
+	if !found || suffix == "" || suffix == compID {
+		return ""
+	}
+	return strings.TrimPrefix(suffix, compID+"/")
+}
+
+// streamPrefixedDiagnostic returns a copy of res whose Filename is prefixed
+// with streamID. Empty IDs and the single_receiver placeholder are left
+// unprefixed so files stay at components/<compID>/. A policy stream whose ID
+// is also "single" would skip the subdir the same way.
+func streamPrefixedDiagnostic(res *proto.ActionDiagnosticUnitResult, streamID string) *proto.ActionDiagnosticUnitResult {
+	if res == nil || streamID == "" || streamID == translate.SingleReceiverStreamID {
+		return res
+	}
+
+	return &proto.ActionDiagnosticUnitResult{
+		Name:        res.GetName(),
+		Filename:    strings.ReplaceAll(streamID, "/", "-") + "/" + res.GetFilename(),
+		Description: res.GetDescription(),
+		ContentType: res.GetContentType(),
+		Content:     res.GetContent(),
+		Generated:   res.GetGenerated(),
+	}
 }

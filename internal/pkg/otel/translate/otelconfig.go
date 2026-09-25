@@ -45,6 +45,10 @@ const (
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
+	// SingleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// components with single_receiver: true, so that all receiver names uniformly have
+	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
+	SingleReceiverStreamID = "single"
 )
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
