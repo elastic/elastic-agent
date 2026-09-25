@@ -1,0 +1,33 @@
+# Runs the daemon collector as non-root (UID 1000) on OpenShift.
+
+collectors:
+  daemon:
+    # Runs the collector as non-root. GID 0 is required to access the host files that root owns,
+    # for example the pod log files in /var/log/pods (root:root 0640).
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 0
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+    initContainers:
+      # The kubelet creates /var/lib/otelcol as root:root 0755 which only UID 0 can write to.
+      # This init container makes it writable by GID 0, so the collector can save the filelog checkpoints
+      # on the node when running with UID 1000.
+      - name: fix-otelcol-permissions
+        image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+        command:
+          - sh
+          - -c
+          - chmod 0770 /var/lib/otelcol && for f in /var/lib/otelcol/*; do if [ -O "$f" ]; then chmod 0660 "$f"; fi; done
+        securityContext:
+          runAsUser: 0
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+        volumeMounts:
+          # hostPath volume of presets.logsCollection.storeCheckpoints
+          - name: varlibotelcol
+            mountPath: /var/lib/otelcol
