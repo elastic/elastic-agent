@@ -74,10 +74,9 @@ common:
       - "upgrade"
       - "upgrade-flavor"
       - "upgrade-rollback"
-  # Variants/Groups for the Linux AMD64 ITs
-  - linux_deb_variants: &linux_deb_variants
+  # Variants/Groups for the Linux AMD64 ITs (tar.gz package)
+  - linux_variants: &linux_variants
     - container
-    - deb
     - default
     - fleet
     - fleet-airgapped
@@ -96,7 +95,11 @@ common:
     - upgrade-flavor
     - upgrade-rollback
 
-  # Variants/Groups for the Linux AMD64 ITs
+  # Variants/Groups for the Linux AMD64 ITs (deb package)
+  - linux_deb_variants: &linux_deb_variants
+    - deb
+
+  # Variants/Groups for the Linux AMD64 ITs (rpm package)
   - linux_rpm_variants: &linux_rpm_variants
     - rpm
 
@@ -197,14 +200,14 @@ steps:
     depends_on:
       - packaging-containers-amd64
       - packaging-containers-arm64
-      - packaging-amd64
+      - packaging-linux-amd64
     env:
       TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
       FORCE_ESS_CREATE: "true"
       INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud:git-${BUILDKITE_COMMIT:0:12}"
     command: |
       #!/usr/bin/env bash
-      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+      buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-linux-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh ech true
     artifact_paths:
       - build/*
@@ -248,11 +251,11 @@ steps:
     steps:
       - label: "Windows:2022:amd64:sudo"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64*  . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64*  . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/*
@@ -271,11 +274,11 @@ steps:
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 fleet true
         artifact_paths:
           - build/*
@@ -293,11 +296,12 @@ steps:
           - *vault_github_token
 
       - label: "Ubuntu:2404:amd64:sudo"
-        depends_on: packaging-amd64
+        depends_on:
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/leak"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-linux-amd64'
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh fleet true
         artifact_paths:
           - build/*
@@ -325,11 +329,11 @@ steps:
     steps:
       - label: "windows:amd64:tier1:sudo:{{matrix.variant}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -351,11 +355,11 @@ steps:
 
       - label: "windows:amd64:tier1:non-sudo:{{matrix.variant}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
         artifact_paths:
           - build/*
@@ -393,14 +397,14 @@ steps:
     steps:
       - label: "windows:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
           # Disable redaction for Windows 2016 when using OIDC plugin due to some unsupported Windows build system
           # https://buildkite.com/resources/changelog/329-agent-v3-dot-104-oidc-token-requests-now-require-job-api-socket-for-redaction/#main-content
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -424,14 +428,14 @@ steps:
 
       - label: "windows:amd64:tier2:non-sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
           # Disable redaction for Windows 2016 when using OIDC plugin due to some unsupported Windows build system
           # https://buildkite.com/resources/changelog/329-agent-v3-dot-104-oidc-token-requests-now-require-job-api-socket-for-redaction/#main-content
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
         artifact_paths:
           - build/*
@@ -467,14 +471,14 @@ steps:
     steps:
       - label: "windows:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
           # Disable redaction for Windows 2016 when using OIDC plugin due to some unsupported Windows build system
           # https://buildkite.com/resources/changelog/329-agent-v3-dot-104-oidc-token-requests-now-require-job-api-socket-for-redaction/#main-content
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -499,11 +503,11 @@ steps:
 
       - label: "windows:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -530,11 +534,11 @@ steps:
 
       - label: "windows:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/steps/integration_tests_tf.ps1 {{matrix.variant}} false
         artifact_paths:
           - build/*
@@ -627,11 +631,12 @@ steps:
       - integration-ess
     steps:
       - label: "linux:amd64:tier1:non-sudo:{{matrix.variant}}"
-        depends_on: packaging-amd64
+        depends_on:
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-linux-amd64'
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} false
         artifact_paths:
           - build/*
@@ -654,13 +659,39 @@ steps:
 
       - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
         depends_on:
-          - packaging-amd64
-        # due to deb group present in matrix tar.gz and deb packages artifacts are required
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            variant: *linux_variants
+
+      - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
+        depends_on:
+          - packaging-linux-amd64
+          - packaging-linux-amd64-deb-rpm
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-linux-amd64-deb-rpm
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -696,12 +727,12 @@ steps:
       - integration-ess
     steps:
       - label: "linux:amd64:tier2:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        depends_on: packaging-amd64
+        depends_on:
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} false
         artifact_paths:
           - build/*
@@ -726,13 +757,41 @@ steps:
 
       - label: "linux:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
-        # due to deb group present in matrix tar.gz and deb packages artifacts are required
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "{{matrix.os}}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            os:
+              - "${IMAGE_DEBIAN_13}"
+            variant: *linux_variants
+
+      - label: "linux:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
+        depends_on:
+          - packaging-linux-amd64
+          - packaging-linux-amd64-deb-rpm
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-linux-amd64-deb-rpm
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -755,11 +814,12 @@ steps:
             variant: *linux_deb_variants
 
       - label: "linux:amd64:tier2:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
-        depends_on: packaging-amd64
+        depends_on:
+          - packaging-linux-amd64-deb-rpm
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-linux-amd64-deb-rpm
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} {{matrix.sudo}}
         artifact_paths:
           - build/*
@@ -796,12 +856,12 @@ steps:
       - integration-ess
     steps:
       - label: "linux:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        depends_on: packaging-amd64
+        depends_on:
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} false
         artifact_paths:
           - build/*
@@ -830,13 +890,44 @@ steps:
 
       - label: "linux:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
-        # due to deb group present in matrix tar.gz and deb packages artifacts are required
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-amd64
-          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "{{matrix.os}}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+        matrix:
+          setup:
+            os:
+              - "${IMAGE_UBUNTU_2204_X86_64}"
+              - "${IMAGE_UBUNTU_2404_X86_64}"
+              - "${IMAGE_UBUNTU_2604_X86_64}"
+              - "${IMAGE_DEBIAN_11}"
+            variant: *linux_variants
+
+      - label: "linux:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
+        depends_on:
+          - packaging-linux-amd64
+          - packaging-linux-amd64-deb-rpm
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: |
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step packaging-linux-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-amd64.deb* . --step packaging-linux-amd64-deb-rpm
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} true
         artifact_paths:
           - build/*
@@ -863,12 +954,12 @@ steps:
 
       - label: "linux:amd64:tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
-          - packaging-amd64
+          - packaging-linux-amd64-deb-rpm
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-amd64
+          buildkite-agent artifact download build/distributions/elastic-agent-*-x86_64.rpm* . --step packaging-linux-amd64-deb-rpm
           .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.variant}} {{matrix.sudo}}
         artifact_paths:
           - build/*
@@ -1067,11 +1158,11 @@ steps:
     steps:
       - label: "Windows:2022:amd64:sudo"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/*
@@ -1090,11 +1181,11 @@ steps:
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
-          - packaging-amd64
+          - packaging-windows-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-windows-x86_64* . --step 'packaging-windows-amd64'
           .buildkite/scripts/buildkite-integration-tests.ps1 fleet true
         artifact_paths:
           - build/*
@@ -1111,11 +1202,12 @@ steps:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
       - label: "Ubuntu:2404:amd64:sudo"
-        depends_on: packaging-amd64
+        depends_on:
+          - packaging-linux-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/serverless"
         command: |
-          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-amd64'
+          buildkite-agent artifact download build/distributions/elastic-agent-*-linux-x86_64* . --step 'packaging-linux-amd64'
           sudo -E .buildkite/scripts/buildkite-integration-tests.sh fleet true
         artifact_paths:
           - build/*
