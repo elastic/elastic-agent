@@ -1591,6 +1591,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			}
 
 			require.NotNil(t, result)
+			assert.True(t, result.IsSet("processors::"+translate.AgentMetadataProcessorID))
 			for _, key := range tt.expectedKeys {
 				assert.True(t, result.IsSet(key), "Expected key %s to be set", key)
 			}
@@ -2088,6 +2089,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 			t.Fatal("timeout waiting for collector config update")
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
+		assert.NoError(t, injectAgentMetadataProcessor(expectedCfg, agentInfo))
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
