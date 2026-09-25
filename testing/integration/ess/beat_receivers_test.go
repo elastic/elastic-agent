@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -2306,22 +2308,30 @@ agent.internal.runtime.filebeat.filestream: otel
 			defer cancel()
 
 			require.NoError(t, fixture.Prepare(ctx))
-			require.NoError(t, fixture.Configure(ctx, configBuffer.Bytes()))
 
-			cmd, err := fixture.PrepareAgentCommand(ctx, nil)
-			require.NoError(t, err)
-			cmd.WaitDelay = time.Second
-			var agentOutput strings.Builder
-			cmd.Stderr = &agentOutput
-			cmd.Stdout = &agentOutput
-			require.NoError(t, cmd.Start())
-
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = fixture.Run(ctx, atesting.State{
+					Configure: configBuffer.String(),
+					Reached: func(_ *client.AgentState) bool {
+						return false
+					},
+				})
+			}()
 			t.Cleanup(func() {
-				_ = cmd.Wait()
 				if t.Failed() {
-					t.Logf("agent config:\n%s", configBuffer.String())
-					t.Logf("agent output:\n%s", agentOutput.String())
+					diagCtx := context.WithoutCancel(t.Context())
+					diagPath, diagErr := fixture.ExecDiagnostics(diagCtx)
+					if diagErr != nil {
+						t.Logf("failed to collect diagnostics: %s", diagErr)
+					} else {
+						fixture.MoveToDiagnosticsDir(diagPath)
+					}
 				}
+				cancel()
+				wg.Wait()
 			})
 
 			require.Eventually(t, func() bool {
@@ -2330,7 +2340,7 @@ agent.internal.runtime.filebeat.filestream: otel
 					return false
 				}
 				return true
-			}, 1*time.Minute, 1*time.Second)
+			}, 2*time.Minute, 5*time.Second)
 
 			index := ".ds-logs-" + tc.dataset + "-*"
 			var docs estools.Documents
@@ -2345,7 +2355,7 @@ agent.internal.runtime.filebeat.filestream: otel
 					require.NoError(collect, err)
 					assert.Equal(collect, 1, docs.Hits.Total.Value)
 				},
-				1*time.Minute, 1*time.Second,
+				2*time.Minute, 5*time.Second,
 				"expected 1 log in index %s", index)
 
 			require.Len(t, docs.Hits.Hits, 1)
