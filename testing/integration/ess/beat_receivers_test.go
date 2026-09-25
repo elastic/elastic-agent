@@ -170,14 +170,15 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
 		// metrics with metricset.name "stats" (from its event template), not "json" which is
 		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
-		// The component.id includes the stream suffix because each stream has its own receiver.
+		// The component.id is the base component ID (stream suffix stripped) so all streams
+		// of the same receiver aggregate under a single component.
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat_input",
 			onlyCompareKeys: true,
 			query: []map[string]any{
 				{"match_phrase": map[string]any{"metricset.name": "stats"}},
-				{"match_phrase": map[string]any{"component.id": "filestream-monitoring/filestream-monitoring-agent"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
 				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
 			},
 		},
