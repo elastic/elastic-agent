@@ -59,6 +59,22 @@ common:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.2.1:
+  # Upload each job's junit report to Buildkite Test Engine as soon as the job
+  # finishes, instead of a final aggregation step that has to wait for every
+  # test group and adds a few minutes to the end of the build.
+  - vault_analytics_token: &vault_analytics_token
+      elastic/vault-secrets#v0.1.0:
+        path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
+        field: "token"
+        env_var: "BUILDKITE_ANALYTICS_TOKEN"
+  - test_collector_plugin: &test_collector_plugin
+      test-collector#v1.11.0:
+        files: "build/*.xml"
+        format: "junit"
+        debug: true
+        annotation-link: true
+        tags:
+          - "fips=false"
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
       - "default"
@@ -220,6 +236,8 @@ steps:
       machineType: "n2-standard-8"
       image: "${IMAGE_UBUNTU_2404_X86_64}"
     plugins:
+      - *vault_analytics_token
+      - *test_collector_plugin
       - *google_oidc_observability_plugin
       - *oblt_cli_plugin
       - *vault_github_token
@@ -268,6 +286,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -291,6 +311,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -314,6 +336,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -347,6 +371,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -374,6 +400,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -420,6 +448,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -452,6 +482,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -496,6 +528,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -528,6 +562,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -560,6 +596,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -592,6 +630,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -620,6 +660,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -657,6 +699,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -685,6 +729,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -713,6 +759,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -755,6 +803,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -785,6 +835,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -815,6 +867,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -843,6 +897,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -886,6 +942,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -920,6 +978,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -953,6 +1013,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -985,6 +1047,8 @@ steps:
           machineType: "n2-standard-8"
           image: "{{matrix.os}}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -1016,6 +1080,8 @@ steps:
           automatic:
             limit: 1
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -1046,6 +1112,8 @@ steps:
           image: "{{matrix.os}}"
           instanceType: "m6g.xlarge"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -1079,6 +1147,8 @@ steps:
         agents:
           *k8s_test_agent
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -1118,6 +1188,8 @@ steps:
         agents:
           *k8s_test_agent
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -1153,6 +1225,8 @@ steps:
         agents:
           *k8s_test_agent
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
@@ -1188,6 +1262,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2022}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -1211,6 +1287,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_WIN_2025}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -1233,6 +1311,8 @@ steps:
           machineType: "n2-standard-8"
           image: "${IMAGE_UBUNTU_2404_X86_64}"
         plugins:
+          - *vault_analytics_token
+          - *test_collector_plugin
           - *google_oidc_observability_plugin
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
@@ -1259,40 +1339,3 @@ steps:
       - *google_oidc_observability_plugin
       - *oblt_cli_plugin
       - *vault_github_token
-
-  - label: Aggregate test reports
-    # Warning: The key has a hook in pre-command
-    key: aggregate-reports
-    depends_on:
-      - integration-tests-ech
-      - integration-tests-kubernetes-tier-1
-      - integration-tests-kubernetes-tier-2
-      - integration-tests-kubernetes-tier-3
-      - integration-tests-linux-tier-1
-      - integration-tests-linux-tier-2
-      - integration-tests-linux-tier-3
-      - integration-tests-win-tier-1
-      - integration-tests-win-tier-2
-      - integration-tests-win-tier-3
-      - integration-tests-serverless
-    allow_dependency_failure: true
-    command: |
-      buildkite-agent artifact download "build/*.xml" .
-    agents:
-      image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
-      useCustomGlobalHooks: true
-    soft_fail:
-      - exit_status: "*"
-    plugins:
-      - elastic/vault-secrets#v0.1.0:
-          path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
-          field: "token"
-          env_var: "BUILDKITE_ANALYTICS_TOKEN"
-      - test-collector#v1.11.0:
-          files: "build/*.xml"
-          format: "junit"
-          debug: true
-          annotation-link: true
-          tags:
-            - "fips=false"
-      - *google_oidc_observability_plugin
