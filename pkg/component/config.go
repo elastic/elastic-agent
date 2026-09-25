@@ -6,6 +6,7 @@ package component
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -256,7 +257,7 @@ func uint64Field(m map[string]interface{}, name string, prefix string) (uint64, 
 		return u, nil
 	}
 	if f, ok := numberValue(v); ok {
-		if f < 0 || f >= float64(^uint64(0)) {
+		if f < 0 {
 			return 0, fmt.Errorf("cannot parse '%s%s', %v overflows uint", prefix, name, v)
 		}
 		switch t := v.(type) {
@@ -306,12 +307,10 @@ func numberValue(v interface{}) (float64, bool) {
 }
 
 // dataStreamField returns the proto.DataStream of the map: the nested data_stream dictionary,
-// if any, merged with the flattened data_stream.<field> keys (which take precedence).
-// source is the converted form of the map, prefix is only used in error messages.
+// if any, merged with the flattened data_stream.<field> keys. source is the converted form of
+// the map, prefix is only used in error messages.
 func dataStreamField(m map[string]interface{}, source *structpb.Struct, prefix string) (*proto.DataStream, error) {
 	ds := &proto.DataStream{}
-
-	// Read the nested data_stream dict.
 	if key, dsRaw, ok := lookupField(m, "data_stream"); ok && dsRaw != nil {
 		dsMap, ok := dsRaw.(map[string]interface{})
 		if !ok {
@@ -329,33 +328,54 @@ func dataStreamField(m map[string]interface{}, source *structpb.Struct, prefix s
 			return nil, decodeError(err)
 		}
 	}
+	ds, err := deDotDataStream(ds, m)
+	if err != nil {
+		return nil, fmt.Errorf("could not dedot '%sdata_stream': %w", prefix, err)
+	}
+	return ds, nil
+}
 
-	// Apply flattened data_stream.* keys; they take precedence over the nested dict.
-	// Return an error if both specify the same field with conflicting values.
-	for _, f := range []struct {
-		key    string
-		errKey string
-		dest   *string
-	}{
-		{"data_stream.dataset", "datastream.dataset", &ds.Dataset},
-		{"data_stream.type", "datastream.type", &ds.Type},
-		{"data_stream.namespace", "datastream.namespace", &ds.Namespace},
+// dataStreamFields holds the data_stream values found in a source map, both from a nested
+// `data_stream` dictionary and from flattened `data_stream.<field>` keys.
+type dataStreamFields struct {
+	DataStream struct {
+		Dataset   string
+		Type      string
+		Namespace string
+	}
+}
+
+// dataStreamFromSource extracts the data_stream fields directly from the source map without
+// going through go-ucfg. Flattened keys (`data_stream.dataset`) take precedence over the nested
+// dictionary, mirroring how go-ucfg merges them.
+func dataStreamFromSource(source map[string]interface{}) (dataStreamFields, error) {
+	var tmp dataStreamFields
+	var err error
+	if nested, ok := source["data_stream"].(map[string]interface{}); ok {
+		if tmp.DataStream.Dataset, err = flattenedValue(nested["dataset"], "data_stream.dataset"); err != nil {
+			return tmp, err
+		}
+		if tmp.DataStream.Type, err = flattenedValue(nested["type"], "data_stream.type"); err != nil {
+			return tmp, err
+		}
+		if tmp.DataStream.Namespace, err = flattenedValue(nested["namespace"], "data_stream.namespace"); err != nil {
+			return tmp, err
+		}
+	}
+	for key, field := range map[string]*string{
+		"data_stream.dataset":   &tmp.DataStream.Dataset,
+		"data_stream.type":      &tmp.DataStream.Type,
+		"data_stream.namespace": &tmp.DataStream.Namespace,
 	} {
-		v, ok := m[f.key]
+		_, v, ok := lookupField(source, key)
 		if !ok {
 			continue
 		}
-		val, err := flattenedValue(v, f.key)
-		if err != nil {
-			return nil, fmt.Errorf("could not dedot '%sdata_stream': %w", prefix, err)
+		if *field, err = flattenedValue(v, key); err != nil {
+			return tmp, err
 		}
-		if *f.dest != "" && *f.dest != val {
-			return nil, fmt.Errorf("could not dedot '%sdata_stream': duplicated key '%s'", prefix, f.errKey)
-		}
-		*f.dest = val
 	}
-
-	return ds, nil
+	return tmp, nil
 }
 
 // flattenedValue converts a data_stream value into a string, rejecting non-scalar values the way
@@ -366,4 +386,44 @@ func flattenedValue(v interface{}, key string) (string, error) {
 		return "", fmt.Errorf("can not convert '%T' into 'string' accessing '%s'", v, key)
 	}
 	return s, nil
+}
+
+func deDotDataStream(ds *proto.DataStream, source map[string]interface{}) (*proto.DataStream, error) {
+	if ds == nil {
+		ds = &proto.DataStream{}
+	}
+
+	tmp, err := dataStreamFromSource(source)
+	if err != nil {
+		return nil, err
+	}
+
+	if (ds.Dataset != tmp.DataStream.Dataset) && (ds.Dataset != "" && tmp.DataStream.Dataset != "") {
+		return nil, errors.New("duplicated key 'datastream.dataset'")
+	}
+
+	if (ds.Type != tmp.DataStream.Type) && (ds.Type != "" && tmp.DataStream.Type != "") {
+		return nil, errors.New("duplicated key 'datastream.type'")
+	}
+
+	if (ds.Namespace != tmp.DataStream.Namespace) && (ds.Namespace != "" && tmp.DataStream.Namespace != "") {
+		return nil, errors.New("duplicated key 'datastream.namespace'")
+	}
+
+	ret := &proto.DataStream{
+		Dataset:   valueOrDefault(tmp.DataStream.Dataset, ds.Dataset),
+		Type:      valueOrDefault(tmp.DataStream.Type, ds.Type),
+		Namespace: valueOrDefault(tmp.DataStream.Namespace, ds.Namespace),
+		Source:    ds.GetSource(),
+	}
+
+	return ret, nil
+}
+
+// valueOrDefault returns b if a is an empty string
+func valueOrDefault(a, b string) string {
+	if a == "" {
+		return b
+	}
+	return a
 }

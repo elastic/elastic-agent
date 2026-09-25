@@ -754,7 +754,6 @@ func (r *RuntimeSpecs) ToComponents(
 	for _, opt := range opts {
 		opt(&options)
 	}
-	defer options.cache.Sweep()
 
 	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers, dynamicInputs, opts...)
 	if err != nil {
@@ -792,6 +791,10 @@ func (r *RuntimeSpecs) ToComponents(
 			components = append(components, monitoringComps...)
 		}
 	}
+
+	// every unit configuration of the model has been generated (or reused); drop the cached
+	// ones that are no longer part of it
+	options.cache.Sweep()
 
 	return components, nil
 }
@@ -1143,7 +1146,8 @@ func toIntermediate(
 		if !ok {
 			return nil, fmt.Errorf("invalid 'outputs.%s', expected a map not a %T", name, outputRaw)
 		}
-		// copy so the policy handed to us is left untouched
+		// ParseOutput removes and injects keys; work on a copy so the policy handed to us is
+		// left untouched
 		output = maps.Clone(output)
 		parsedOutput, err := ParseOutput(name, output, ll, headers)
 		if err != nil {
@@ -1168,7 +1172,8 @@ func toIntermediate(
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d', expected a map not a %T", idx, inputRaw)
 		}
-		// copy so the policy handed to us is left untouched
+		// the keys consumed below are removed from the input before it becomes a unit
+		// configuration; work on a copy so the policy handed to us is left untouched
 		input = maps.Clone(input)
 		typeRaw, ok := input[typeKey]
 		if !ok {

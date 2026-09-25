@@ -5,14 +5,18 @@
 package composable
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/cespare/xxhash/v2"
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -26,6 +30,22 @@ const (
 	defaultRetryInterval   = 30 * time.Second
 	defaultDefaultProvider = "env"
 )
+
+// mappingGeneration is incremented every time the mapping of a provider changes. The generation
+// of every mapping that makes up a set of vars identifies the content of the vars set across
+// renders, see transpiler.Vars.SetCacheKey.
+var mappingGeneration atomic.Uint64
+
+func nextMappingGeneration() uint64 {
+	return mappingGeneration.Add(1)
+}
+
+// astHash returns a hash of the content of the AST.
+func astHash(ast *transpiler.AST) uint64 {
+	h := xxhash.New()
+	_ = ast.Hash64With(h)
+	return h.Sum64()
+}
 
 // Controller manages the state of the providers current context.
 type Controller interface {
@@ -552,16 +572,48 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvide
 	// of the currently processed variables
 	fetchContextProviders = fetchContextProviders.Clone()
 
-	// build the vars list of mappings
+	// the cache key of a vars set is built from the generation of every mapping in it; the
+	// context part is shared by every vars set
+	var key strings.Builder
+	key.WriteString("default=")
+	key.WriteString(defaultProvider)
+	fetchNames := make([]string, 0, len(fetchContextProviders))
+	for name := range fetchContextProviders {
+		fetchNames = append(fetchNames, name)
+	}
+	sort.Strings(fetchNames)
+	key.WriteString(";fetch=")
+	key.WriteString(strings.Join(fetchNames, ","))
+
+	// build the vars list of mappings; providers are added in a stable order so the
+	// cache key is stable
+	contextNames := make([]string, 0, len(c.contextProviderStates))
+	for name := range c.contextProviderStates {
+		contextNames = append(contextNames, name)
+	}
+	sort.Strings(contextNames)
 	vars := make([]*transpiler.Vars, 1)
 	mapping, _ := transpiler.NewAST(map[string]any{})
-	for name, state := range c.contextProviderStates {
-		_ = mapping.Insert(state.Current(), name)
+	for _, name := range contextNames {
+		current, generation := c.contextProviderStates[name].Current()
+		_ = mapping.Insert(current, name)
+		key.WriteString(";")
+		key.WriteString(name)
+		key.WriteString("=")
+		key.WriteString(strconv.FormatUint(generation, 10))
 	}
 	vars[0] = transpiler.NewVarsFromAst("", mapping, fetchContextProviders, defaultProvider)
+	vars[0].SetCacheKey(key.String())
+	contextKeyStr := key.String()
 
 	// add to the vars list for each dynamic providers mappings
-	for name, state := range c.dynamicProviderStates {
+	dynamicNames := make([]string, 0, len(c.dynamicProviderStates))
+	for name := range c.dynamicProviderStates {
+		dynamicNames = append(dynamicNames, name)
+	}
+	sort.Strings(dynamicNames)
+	for _, name := range dynamicNames {
+		state := c.dynamicProviderStates[name]
 		for _, mappings := range state.Mappings() {
 			local := mapping.ShallowClone()
 			_ = local.Insert(mappings.mapping, name)
@@ -575,6 +627,14 @@ func (c *controller) generateVars(fetchContextProviders mapstr.M, defaultProvide
 				defaultProvider,
 				name,
 			)
+			key.WriteString(";")
+			key.WriteString(id)
+			key.WriteString("=")
+			key.WriteString(strconv.FormatUint(mappings.generation, 10))
+			v.SetCacheKey(key.String())
+			// reset back to the shared context part of the key
+			key.Reset()
+			key.WriteString(contextKeyStr)
 			vars = append(vars, v)
 		}
 	}
@@ -612,7 +672,11 @@ type contextProviderState struct {
 
 	lock    sync.RWMutex
 	mapping *transpiler.AST
-	signal  chan bool
+	// hash is the hash of mapping, used to detect that a new mapping is the same.
+	hash uint64
+	// generation identifies the current mapping across renders, see mappingGeneration.
+	generation uint64
+	signal     chan bool
 
 	logger    *logger.Logger
 	canceller context.CancelFunc
@@ -640,24 +704,27 @@ func (c *contextProviderState) Set(mapping map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
+	hash := astHash(ast)
 
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if c.mapping != nil && c.mapping.Equal(ast) {
+	if c.mapping != nil && c.hash == hash && c.mapping.Equal(ast) {
 		// same mapping; no need to update and signal
 		return nil
 	}
 	c.mapping = ast
+	c.hash = hash
+	c.generation = nextMappingGeneration()
 	c.Signal()
 	return nil
 }
 
-// Current returns the current mapping.
-func (c *contextProviderState) Current() *transpiler.AST {
+// Current returns the current mapping and its generation.
+func (c *contextProviderState) Current() (*transpiler.AST, uint64) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.mapping
+	return c.mapping, c.generation
 }
 
 type dynamicProviderMapping struct {
@@ -665,6 +732,12 @@ type dynamicProviderMapping struct {
 	priority   int
 	mapping    *transpiler.AST
 	processors transpiler.Processors
+	// hash is the hash of mapping and processorsJSON the JSON form of processors, both are used
+	// to detect that an update carries the same content.
+	hash           uint64
+	processorsJSON []byte
+	// generation identifies the current content across renders, see mappingGeneration.
+	generation uint64
 }
 
 type dynamicProviderState struct {
@@ -684,27 +757,36 @@ type dynamicProviderState struct {
 // for the processor. Lower priority mappings will always be sorted before higher priority mappings
 // to ensure that matching of variables occurs on the lower priority mappings first.
 func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
-	var err error
-	processors, err = cloneMapArray(processors)
+	// the JSON form is both the comparison key and the source of the stored copy, so the
+	// processors are only decoded when they actually changed
+	processorsJSON, err := json.Marshal(processors)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to clone: %w", err)
 	}
 	ast, err := transpiler.NewAST(mapping)
 	if err != nil {
 		return err
 	}
+	hash := astHash(ast)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	curr, ok := c.mappings[id]
-	if ok && curr.mapping.Equal(ast) && reflect.DeepEqual(curr.processors, processors) {
+	if ok && curr.hash == hash && bytes.Equal(curr.processorsJSON, processorsJSON) {
 		// same mapping; no need to update and signal
 		return nil
 	}
+	processors, err = cloneMapArray(processors, processorsJSON)
+	if err != nil {
+		return err
+	}
 	c.mappings[id] = dynamicProviderMapping{
-		id:         id,
-		priority:   priority,
-		mapping:    ast,
-		processors: processors,
+		id:             id,
+		priority:       priority,
+		mapping:        ast,
+		processors:     processors,
+		hash:           hash,
+		processorsJSON: processorsJSON,
+		generation:     nextMappingGeneration(),
 	}
 
 	select {
@@ -761,16 +843,13 @@ func (c *dynamicProviderState) Mappings() []dynamicProviderMapping {
 	return mappings
 }
 
-func cloneMapArray(source []map[string]interface{}) ([]map[string]interface{}, error) {
+// cloneMapArray returns a copy of source decoded from its JSON form.
+func cloneMapArray(source []map[string]interface{}, sourceJSON []byte) ([]map[string]interface{}, error) {
 	if source == nil {
 		return nil, nil
 	}
-	bytes, err := json.Marshal(source)
-	if err != nil {
-		return nil, fmt.Errorf("failed to clone: %w", err)
-	}
 	var dest []map[string]interface{}
-	err = json.Unmarshal(bytes, &dest)
+	err := json.Unmarshal(sourceJSON, &dest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to clone: %w", err)
 	}
