@@ -328,6 +328,63 @@ service:
                 - metricbeatreceiver
 ```
 
+### Agent metadata in resource attributes
+
+When Elastic Agent supervises EDOT, it supplies `resource/agent_metadata`,
+including when Agent monitoring is disabled. Integrations opt in by referencing
+it in their pipelines. Agent generates the following definition with the local
+Agent ID and version:
+
+```yaml
+processors:
+  resource/agent_metadata:
+    attributes:
+      - key: agent.id
+        value: "<Agent ID>"
+        action: upsert
+      - key: agent.version
+        value: "<Agent version>"
+        action: upsert
+```
+
+The ID is reserved for Elastic Agent: do not define it in the policy. Agent
+rejects conflicting definitions and does not automatically add the processor to
+any pipeline. The processor upserts only `agent.id` and `agent.version` on the
+resources of telemetry passing through the selected pipeline. Other resource
+attributes, log bodies, and log attributes are preserved. It does not change the
+Collector's internal telemetry resource.
+
+For Elasticsearch `bodymap` documents, the integration can copy these resource
+attributes into the body using its own transform processor. Place
+`resource/agent_metadata` before that transform:
+
+```yaml
+processors:
+  transform/agent_to_body:
+    log_statements:
+      - context: log
+        conditions:
+          - IsMap(body)
+        statements:
+          - 'set(body["agent"], {}) where not IsMap(body["agent"])'
+          - 'set(body["agent"]["id"], resource.attributes["agent.id"])'
+          - 'set(body["agent"]["version"], resource.attributes["agent.version"])'
+service:
+  pipelines:
+    logs:
+      receivers: [your_receiver]
+      processors: [resource/agent_metadata, transform/agent_to_body]
+      exporters: [your_elasticsearch_exporter]
+```
+
+Keep any other processors your pipeline needs. Select only pipelines whose
+telemetry should identify this Agent, because upsert replaces existing Agent
+identity attributes.
+
+The generated definition is available only for Agent-supervised EDOT. When
+running `elastic-agent otel` directly, supply your own resource processor
+definition or remove the reference from the pipeline.
+
 ### Beats receivers delivery guarantees in OTel mode
 
 When Beat receivers are used in OTel mode, event delivery guarantees depend on the configuration of the OpenTelemetry Collector `sending_queue` and retry settings.

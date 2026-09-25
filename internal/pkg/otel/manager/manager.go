@@ -500,6 +500,10 @@ func (m *OTelManager) buildMergedConfig(
 		}
 	}
 
+	if err := injectAgentMetadataProcessor(mergedOtelCfg, agentInfo); err != nil {
+		return nil, fmt.Errorf("failed to inject agent metadata processor: %w", err)
+	}
+
 	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
@@ -537,6 +541,19 @@ func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
+}
+
+// injectAgentMetadataProcessor makes Agent identity available for explicit use
+// in pipelines, including when Agent monitoring is disabled. It does not
+// change pipeline membership or the collector's own telemetry resource.
+func injectAgentMetadataProcessor(config *confmap.Conf, agentInfo info.Agent) error {
+	key := "processors::" + translate.AgentMetadataProcessorID
+	if config.IsSet(key) {
+		return fmt.Errorf("%s is reserved for Elastic Agent; reference it in a pipeline without defining it", translate.AgentMetadataProcessorID)
+	}
+	return config.Merge(confmap.NewFromStringMap(map[string]any{
+		key: translate.AgentMetadataProcessorConfig(agentInfo),
+	}))
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
