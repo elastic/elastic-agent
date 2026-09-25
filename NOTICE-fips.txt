@@ -787,11 +787,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20260923223909-91491e762494
+Version: v7.0.0-alpha2.0.20260924203839-31aa92fdd19a
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20260923223909-91491e762494/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20260924203839-31aa92fdd19a/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -15498,11 +15498,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/auto
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/go-autorest/autorest/to
-Version: v0.4.0
+Version: v0.4.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/autorest/to@v0.4.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/autorest/to@v0.4.1/LICENSE:
 
 
                                  Apache License
@@ -15699,11 +15699,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/auto
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/go-autorest/autorest/validation
-Version: v0.3.1
+Version: v0.3.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/autorest/validation@v0.3.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/autorest/validation@v0.3.2/LICENSE:
 
 
                                  Apache License
@@ -15900,11 +15900,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/auto
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/go-autorest/logger
-Version: v0.2.1
+Version: v0.2.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/logger@v0.2.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/logger@v0.2.2/LICENSE:
 
 
                                  Apache License
@@ -16101,11 +16101,11 @@ Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/logg
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/go-autorest/tracing
-Version: v0.6.0
+Version: v0.6.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/tracing@v0.6.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/go-autorest/tracing@v0.6.1/LICENSE:
 
 
                                  Apache License

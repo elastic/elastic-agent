@@ -14,7 +14,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260923223909-91491e762494
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260924203839-31aa92fdd19a
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.47.0
@@ -161,10 +161,10 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.30 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.24 // indirect
 	github.com/Azure/go-autorest/autorest/date v0.3.1 // indirect
-	github.com/Azure/go-autorest/autorest/to v0.4.0 // indirect
-	github.com/Azure/go-autorest/autorest/validation v0.3.1 // indirect
-	github.com/Azure/go-autorest/logger v0.2.1 // indirect
-	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
+	github.com/Azure/go-autorest/autorest/to v0.4.1 // indirect
+	github.com/Azure/go-autorest/autorest/validation v0.3.2 // indirect
+	github.com/Azure/go-autorest/logger v0.2.2 // indirect
+	github.com/Azure/go-autorest/tracing v0.6.1 // indirect
 	github.com/Azure/go-ntlmssp v0.1.1 // indirect
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.8.0 // indirect
 	github.com/BurntSushi/toml v1.6.0 // indirect
