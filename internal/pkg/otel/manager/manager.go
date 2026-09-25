@@ -38,7 +38,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -745,12 +744,23 @@ func injectMonitoringReceiver(
 			"receivers": []string{connectorID},
 			"exporters": []string{exporterID},
 		}
-		if features.DefaultProcessors() {
-			// This pipeline forwards Agent's own internal telemetry in beats format,
-			// not a specific beat's data, so it always gets the standard default
-			// processors.
+
+		// Find the monitoring output component so per-output default_processors
+		// config is respected alongside the global flags.
+		var monitoringComp *component.Component
+		for i := range components {
+			if components[i].OutputName == componentmonitoring.MonitoringOutput {
+				monitoringComp = &components[i]
+				break
+			}
+		}
+		defaultProcessors, err := translate.EffectiveDefaultProcessors(monitoringComp)
+		if err != nil {
+			return fmt.Errorf("could not get effective default processors for monitoring: %w", err)
+		}
+		if len(defaultProcessors) > 0 {
 			collectorCfg["processors"].(map[string]any)[processorID] = map[string]any{
-				"processors": translate.GetDefaultProcessors(""),
+				"processors": defaultProcessors,
 			}
 			logsPipelineCfg["processors"] = []string{processorID}
 		}

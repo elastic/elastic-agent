@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -2188,4 +2190,183 @@ func componentVersionInfoNameForRuntime(runtime component.RuntimeManager) string
 		componentVersionInfoName = componentVersionInfoNameForRuntime(component.DefaultRuntimeManager)
 	}
 	return componentVersionInfoName
+}
+
+// TestDefaultProcessorFeatureFlags verifies that the default beat metadata processors
+// injected by the beats receiver pipeline can be disabled both per-output (via
+// default_processors in the output config) and globally (via
+// agent.features.default_processors). A baseline sub-test confirms host.architecture
+// is present by default; the remaining sub-tests confirm disabling removes it.
+func TestDefaultProcessorFeatureFlags(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+
+	type configOptions struct {
+		InputPath        string
+		Dataset          string
+		ESEndpoint       string
+		ESApiKey         string
+		DisablePerOutput bool
+		DisableGlobal    bool
+	}
+
+	const configTemplate = `
+inputs:
+  - type: filestream
+    id: filestream-dp-test
+    use_output: default
+    streams:
+      - id: dp-test
+        data_stream:
+          dataset: {{.Dataset}}
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: latency
+    ssl.enabled: true
+    ssl.verification_mode: full{{if .DisablePerOutput}}
+    default_processors:
+      add_host_metadata: false{{end}}
+agent:{{if .DisableGlobal}}
+  features:
+    default_processors:
+      add_host_metadata: false{{end}}
+  monitoring:
+    metrics: false
+    logs: false
+agent.internal.runtime.filebeat.filestream: otel
+`
+
+	cases := []struct {
+		name             string
+		dataset          string
+		disablePerOutput bool
+		disableGlobal    bool
+		wantHostArch     bool
+	}{
+		{
+			name:         "add_host_metadata_present_by_default",
+			dataset:      "dp.default",
+			wantHostArch: true,
+		},
+		{
+			name:             "per_output_add_host_metadata_disabled",
+			dataset:          "dp.peroutput",
+			disablePerOutput: true,
+			wantHostArch:     false,
+		},
+		{
+			name:          "agent_features_add_host_metadata_disabled",
+			dataset:       "dp.agentfeatures",
+			disableGlobal: true,
+			wantHostArch:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			inputFilePath := filepath.Join(tmpDir, "input.log")
+			require.NoError(t, os.WriteFile(inputFilePath, []byte("test line\n"), 0o600))
+
+			var configBuffer bytes.Buffer
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+					configOptions{
+						InputPath:        inputFilePath,
+						Dataset:          tc.dataset,
+						ESEndpoint:       esEndpoint,
+						ESApiKey:         decodedApiKey,
+						DisablePerOutput: tc.disablePerOutput,
+						DisableGlobal:    tc.disableGlobal,
+					}))
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithTimeout(t, t.Context(), 5*time.Minute)
+			defer cancel()
+
+			require.NoError(t, fixture.Prepare(ctx))
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = fixture.Run(ctx, atesting.State{
+					Configure: configBuffer.String(),
+					Reached: func(_ *client.AgentState) bool {
+						return false
+					},
+				})
+			}()
+			t.Cleanup(func() {
+				if t.Failed() {
+					diagCtx := context.WithoutCancel(t.Context())
+					diagPath, diagErr := fixture.ExecDiagnostics(diagCtx)
+					if diagErr != nil {
+						t.Logf("failed to collect diagnostics: %s", diagErr)
+					} else {
+						fixture.MoveToDiagnosticsDir(diagPath)
+					}
+				}
+				cancel()
+				wg.Wait()
+			})
+
+			require.Eventually(t, func() bool {
+				if err := fixture.IsHealthy(ctx); err != nil {
+					t.Logf("waiting for agent healthy: %s", err)
+					return false
+				}
+				return true
+			}, 2*time.Minute, 5*time.Second)
+
+			index := ".ds-logs-" + tc.dataset + "-*"
+			var docs estools.Documents
+			require.EventuallyWithT(t,
+				func(collect *assert.CollectT) {
+					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+					defer findCancel()
+
+					docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]any{
+						"log.file.path": inputFilePath,
+					})
+					require.NoError(collect, err)
+					assert.Equal(collect, 1, docs.Hits.Total.Value)
+				},
+				2*time.Minute, 5*time.Second,
+				"expected 1 log in index %s", index)
+
+			require.Len(t, docs.Hits.Hits, 1)
+			doc := mapstr.M(docs.Hits.Hits[0].Source)
+
+			_, archErr := doc.GetValue("host.architecture")
+			if tc.wantHostArch {
+				require.NoError(t, archErr, "host.architecture should be present when add_host_metadata is enabled by default")
+			} else {
+				require.Error(t, archErr, "host.architecture should be absent when add_host_metadata is disabled")
+			}
+		})
+	}
 }
