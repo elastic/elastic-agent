@@ -34,11 +34,12 @@ if [[ "${FIPS:-false}" == "true" ]]; then
 fi
 export METADATA_PREFIX
 
-# If the step is retried, we start the stack again.
-# BUILDKITE_RETRY_COUNT == "0" for the first run
-# BUILDKITE_RETRY_COUNT > 0 for the retries
-if [[ "${BUILDKITE_RETRY_COUNT}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
-  echo "~~~ The steps is retried, starting the ESS stack again"
+# Automatic retries reuse the deployment created by the original attempt.
+# Manual retries continue to get a fresh stack.
+if [[ "${BUILDKITE_RETRY_COUNT:-0}" -gt 0 && "${BUILDKITE_RETRY_TYPE:-}" == "automatic" ]]; then
+  echo "~~~ Automatic retry: reusing the existing ESS stack"
+elif [[ "${BUILDKITE_RETRY_COUNT:-0}" -gt 0 || "${FORCE_ESS_CREATE:-false}" == "true" ]]; then
+  echo "~~~ The step is retried, starting the ESS stack again"
   trap 'ess_down' EXIT
   ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
 fi

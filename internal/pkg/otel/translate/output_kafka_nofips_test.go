@@ -20,8 +20,6 @@ func TestKafkaOAuth2Translation(t *testing.T) {
 	input := `
 hosts: ["kafka1:9092"]
 topic: static-topic
-username: elastic
-password: changeme
 sasl.mechanism: OAUTHBEARER
 auth:
   oauth2client:

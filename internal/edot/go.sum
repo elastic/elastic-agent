@@ -1,5 +1,7 @@
 aqwari.net/xml v0.0.0-20210331023308-d9421b293817 h1:+3Rh5EaTzNLnzWx3/uy/mAaH/dGI7svJ6e0oOIDcPuE=
 aqwari.net/xml v0.0.0-20210331023308-d9421b293817/go.mod h1:c7kkWzc7HS/t8Q2DcVY8P2d1dyWNEhEVT5pL0ZHO11c=
+cel.dev/cel-go v0.32.0 h1:irvpFKr5EuGPyxeME03ERh0rii1TX+BDAnB9eL3IvNk=
+cel.dev/cel-go v0.32.0/go.mod h1:DnVip7tpJSsgZymwfT+m1tnEVy3ivAjSMXPx12YrMkU=
 cel.dev/expr v0.25.2 h1:K6j46C81hXtZQfuX60cVWQFBJahKSE2gfRbNuvr5bFs=
 cel.dev/expr v0.25.2/go.mod h1:hrXvqGP6G6gyx8UAHSHJ5RGk//1Oj5nXQ2NI02Nrsg4=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
@@ -545,8 +547,8 @@ github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab h1:p33sNyLrsWoI
 github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab/go.mod h1:t8v3y03G3KubyWgYqe+Jcxj/jDddnkp70743iSYrQiU=
 github.com/elastic/lunes v0.2.2 h1:dZFEaebNg9l+mzvOQN6Nd/c9y6y8rUe3tBWsTgvM08U=
 github.com/elastic/lunes v0.2.2/go.mod h1:u3W/BdONWTrh0JjNZ21C907dDc+cUZttZrGa625nf2k=
-github.com/elastic/mito v1.27.0 h1:FM01Ql1OMx6uL3ogW0LoI8Ruc0O6gzmwLNBV8Zk13Yw=
-github.com/elastic/mito v1.27.0/go.mod h1:zFVE48AlN/iW7fryFDDPBh3yp1A4KWnkNuwxZt6HQ6A=
+github.com/elastic/mito v1.28.0 h1:iYDoOA9oLiUt2RvQ8K1Q1YHElZi4iEF77Kc7KqhbDzs=
+github.com/elastic/mito v1.28.0/go.mod h1:/NBrZUMHUaji05+tjCRD2Jt/nmbZP3/s9dJpgcxF2YY=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb h1:/c+ogW0DBBDchutsS6+GZBpCIwtVdJvr2l7tvI9CHdU=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.74.0 h1:tI2DBcRCyvg+rH5O3zy+DfqCJpnSUR6xBcuGooGD1dg=
@@ -792,8 +794,6 @@ github.com/gomodule/redigo v1.9.3 h1:dNPSXeXv6HCq2jdyWfjgmhBdqnR6PRO3m/G05nvpPC8
 github.com/gomodule/redigo v1.9.3/go.mod h1:KsU3hiK/Ay8U42qpaJk+kuNa3C+spxapWpM+ywhcgtw=
 github.com/google/btree v1.1.3 h1:CVpQJjYgC4VbzxeGVHfvZrv1ctoYCAI8vbl07Fcxlyg=
 github.com/google/btree v1.1.3/go.mod h1:qOPhT0dTNdNzV6Z/lhRX0YXUafgPLFUh+gZMl761Gm4=
-github.com/google/cel-go v0.29.2 h1:ZtDxkeiMmz0mxbKDYiNkE5Lk7V5edMRcaaDf2jX002k=
-github.com/google/cel-go v0.29.2/go.mod h1:X0bD6iVNR8pkROSOoHVdgTkzmRcosof7WQqCD6wcMc8=
 github.com/google/flatbuffers v25.2.10+incompatible h1:F3vclr7C3HpB1k9mxCGRMXq6FdUalZ6H/pNX4FP1v0Q=
 github.com/google/flatbuffers v25.2.10+incompatible/go.mod h1:1AeVuKshWv4vARoZatz6mlQ0JxURH0Kv5+zNeJKJCa8=
 github.com/google/gnostic-models v0.7.1 h1:SisTfuFKJSKM5CPZkffwi6coztzzeYUhc3v4yxLWH8c=
