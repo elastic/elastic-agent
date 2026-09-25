@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 )
 
 // TODO: is there an upper limit for this timeout?
