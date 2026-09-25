@@ -116,6 +116,17 @@ $ helm upgrade --install --namespace opentelemetry-operator-system \
     --version 0.16.0
 ```
 
+By default, the daemon collector runs as root (UID 0) to read the host files. The [`./openshift/rootless-values.yaml`](./openshift/rootless-values.yaml) file runs the daemon collector as non-root. An init container changes the permissions of `/var/lib/otelcol` on the node, so the collector can save the filelog checkpoints. To run the daemon collector as non-root, apply the file after the OpenShift values file:
+
+```shell
+$ helm upgrade --install --namespace opentelemetry-operator-system \
+  opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+    --values ./values.yaml \
+    --values ./openshift/values.yaml \
+    --values ./openshift/rootless-values.yaml \
+    --version 0.16.0
+```
+
 ### Compatibility
 
 Each OpenTelemetry Operator version supports a specific range of Kubernetes versions and each Helm Chart version installs a specific Operator version. Use a chart version that matches the Kubernetes version of your cluster:
