@@ -2349,7 +2349,7 @@ agent.internal.runtime.filebeat.filestream: otel
 					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
 					defer findCancel()
 
-					docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]any{}{
+					docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]any{
 						"log.file.path": inputFilePath,
 					})
 					require.NoError(collect, err)
