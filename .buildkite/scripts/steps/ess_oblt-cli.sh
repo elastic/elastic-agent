@@ -16,13 +16,7 @@ function ess_up() {
     --output-file="${PWD}/cluster-info.json"
     --wait 20
     --parameter "StackVersion=$STACK_VERSION"
-<<<<<<< HEAD
-    --parameter "ExpireInHours=2"
-    --parameter "ElasticTeam=elastic-agent-control-plane"
-    --parameter "ElasticProject=elastic-agent-ci"
-=======
     --parameter "ExpireInHours=4"
->>>>>>> 27a1cda (Reuse ECH deployments on automatic retries (#16818))
   )
 
   # Snapshot stacks need explicit image tags. Released stacks can be created
