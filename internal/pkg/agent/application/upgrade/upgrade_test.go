@@ -1319,7 +1319,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 						hash:     "abc123",
 					},
 				}
-				upgrader.writeUpgradeMarker = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details, availableRollbacks map[string]ttl.TTLMarker) error {
+				upgrader.writeUpgradeMarker = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, previousAgent agentInstall, action *fleetapi.ActionUpgrade, upgradeDetails *details.Details) error {
 					return testError
 				}
 			},
@@ -1553,7 +1553,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	upgrader.copyActionStore = func(_ *logger.Logger, _ string) error { return nil }
 	upgrader.copyRunDirectory = func(_ *logger.Logger, _, _ string) error { return nil }
 	upgrader.changeSymlink = func(_ *logger.Logger, _, _, _ string) error { return nil }
-	upgrader.markUpgrade = func(_ *logger.Logger, _ string, _ time.Time, _, _ agentInstall, _ *fleetapi.ActionUpgrade, _ *details.Details, _ map[string]ttl.TTLMarker) error {
+	upgrader.markUpgrade = func(_ *logger.Logger, _ string, _ time.Time, _, _ agentInstall, _ *fleetapi.ActionUpgrade, _ *details.Details) error {
 		return nil
 	}
 
@@ -1628,8 +1628,8 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 	// assertion below can confirm the restore is meaningful (not a no-op).
 	var activeCommitDuringUpgrade string
 	realMarkUpgrade := upgrader.markUpgrade
-	upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, prev agentInstall, action *fleetapi.ActionUpgrade, det *details.Details, rollbacks map[string]ttl.TTLMarker) error {
-		err := realMarkUpgrade(log, dataDirPath, updatedOn, agent, prev, action, det, rollbacks)
+	upgrader.markUpgrade = func(log *logger.Logger, dataDirPath string, updatedOn time.Time, agent, prev agentInstall, action *fleetapi.ActionUpgrade, det *details.Details) error {
+		err := realMarkUpgrade(log, dataDirPath, updatedOn, agent, prev, action, det)
 		if err == nil {
 			got, _ := os.ReadFile(activeCommitPath)
 			activeCommitDuringUpgrade = string(got)
