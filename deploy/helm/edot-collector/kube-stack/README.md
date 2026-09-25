@@ -38,8 +38,8 @@ The OpenTelemetry components deployed within the `Gateway` Deployment collectors
 
 Exporters:
 
-- **Metrics** (`metrics` pipeline): exported via the [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) to Elasticsearch's native OTLP endpoint (`<elastic_endpoint>/_otlp`).
-- **Logs, Traces, and aggregated APM metrics**: exported via the [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md).
+- **Metrics** (`metrics` and `metrics/aggregated-otel-metrics` pipelines): exported via the [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) to Elasticsearch's native OTLP endpoint (`<elastic_endpoint>/_otlp`).
+- **Logs and Traces**: exported via the [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md).
 
 ### Auto-instrumentation
 
