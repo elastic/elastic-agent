@@ -36,7 +36,6 @@ receivers:
       - add_fields:
           target: autoops_es
           fields:
-            temp_resource_id: ${env:AUTOOPS_TEMP_RESOURCE_ID}
             token: ${env:AUTOOPS_TOKEN}
     output:
       otelconsumer:
@@ -68,12 +67,6 @@ extraEnvs:
       secretKeyRef:
         name: {{ $agentName }}-autoops
         key: autoops-token
-
-  - name: AUTOOPS_TEMP_RESOURCE_ID
-    valueFrom:
-      secretKeyRef:
-        name: {{ $agentName }}-autoops
-        key: temp-resource-id
 
   - name: AUTOOPS_OTEL_URL
     valueFrom:

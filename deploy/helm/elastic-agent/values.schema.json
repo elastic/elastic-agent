@@ -433,7 +433,7 @@
 
                 "autoops_token": { "type": "string", "description": "Token to register into AutoOps" },
                 "autoops_otel_url": { "type": "string", "description": "OTel server URL" },
-                "autoops_temp_resource_id": { "type": "string", "description": "Temporary resource ID" },
+                "autoops_temp_resource_id": { "type": "string", "description": "Deprecated: no longer used, kept for backwards compatibility" },
 
                 "es_api_key": { "type": "string", "description": "Monitored ES cluster API key" },
                 "es_username": { "type": "string", "description": "Monitored ES cluster username" },
@@ -450,13 +450,12 @@
                 "required": ["enabled"]
             },
             "then": {
-                "required": ["autoops_token", "autoops_otel_url", "autoops_temp_resource_id"],
+                "required": ["autoops_token", "autoops_otel_url"],
                 "allOf": [
                     {
                         "properties": {
                             "autoops_token": { "type": "string", "minLength": 1 },
                             "autoops_otel_url": { "type": "string", "minLength": 1 },
-                            "autoops_temp_resource_id": { "type": "string", "minLength": 1 },
                             "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" }
                         }
                     }
