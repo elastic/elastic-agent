@@ -16,7 +16,7 @@ function ess_up() {
     --output-file="${PWD}/cluster-info.json"
     --wait 20
     --parameter "StackVersion=$STACK_VERSION"
-    --parameter "ExpireInHours=2"
+    --parameter "ExpireInHours=4"
   )
 
   # Snapshot stacks need explicit image tags. Released stacks can be created

@@ -198,8 +198,10 @@ function Get-Ess-Stack {
       [string]$StackBuildId
   )
 
-  if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
-      Write-Output "The step is retried, starting the ESS stack again"
+  if ($Env:BUILDKITE_RETRY_COUNT -gt 0 -and $Env:BUILDKITE_RETRY_TYPE -eq "automatic") {
+      Write-Output "Automatic retry: reusing the existing ESS stack"
+  } elseif ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
+      Write-Output "The step is manually retried, starting the ESS stack again"
       ess_up $StackVersion $StackBuildId
   }
 }
