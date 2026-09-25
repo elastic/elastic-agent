@@ -16,6 +16,7 @@ scms:
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       force: false
       submodules: false
+      singleBranch: true
 
 actions:
   elastic-agent:
