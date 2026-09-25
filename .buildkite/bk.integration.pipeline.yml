@@ -443,7 +443,7 @@ steps:
     key: integration-tests-win-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
-    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler" || build.env("TEST_TIER3") == "true"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 3"
@@ -773,7 +773,7 @@ steps:
     key: integration-tests-linux-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
-    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler" || build.env("TEST_TIER3") == "true"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Linux - tier 3"
@@ -1014,7 +1014,7 @@ steps:
     key: integration-tests-kubernetes-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
-    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler" || build.env("TEST_TIER3") == "true"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Kubernetes - tier 3"
