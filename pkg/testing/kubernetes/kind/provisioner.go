@@ -41,6 +41,10 @@ const (
 	getCommandTimeout    = 1 * time.Minute
 )
 
+// clusterCfg configures the kind cluster so that kube-scheduler and
+// kube-controller-manager bind to 0.0.0.0 instead of the default 127.0.0.1.
+// This is required for the integration tests that scrape scheduler/controller-manager
+// metrics via the pod IP (https://${kubernetes.pod.ip}:10259 / :10257).
 const clusterCfg string = `
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
@@ -122,10 +126,9 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 		if !exists {
 			p.logger.Logf("Provisioning kind cluster %s", instanceName)
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
-			clusterConfig := strings.NewReader(clusterCfg)
 
 			createCtx, createCancel := context.WithTimeout(ctx, createClusterTimeout)
-			ret, err := p.kindCmd(createCtx, clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
+			ret, err := p.kindCmd(createCtx, strings.NewReader(clusterCfg), "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
 			createCancel()
 			if err != nil {
 				return nil, fmt.Errorf("kind: failed to create cluster %s: %s", instanceName, ret.stderr)
