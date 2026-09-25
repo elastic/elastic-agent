@@ -26,6 +26,31 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# When AGENT_ARTIFACT_STEP is set the step does not depend on the packaging
+# step in the pipeline; instead the setup above runs while packaging is still
+# in progress and we only wait for the artifacts right before the tests.
+if ($env:AGENT_ARTIFACT_STEP) {
+    & "$PWD\.buildkite\scripts\steps\wait-for-step.ps1" -StepKey $env:AGENT_ARTIFACT_STEP
+    if ($LASTEXITCODE -ne 0) {
+        Write-Output "^^^ +++"
+        Write-Output "Step $env:AGENT_ARTIFACT_STEP did not succeed"
+        exit 1
+    }
+    if (-not $env:AGENT_ARTIFACT_GLOBS) {
+        Write-Error "AGENT_ARTIFACT_GLOBS must be set together with AGENT_ARTIFACT_STEP"
+        exit 1
+    }
+    Write-Output "~~~ Downloading agent packages from step $env:AGENT_ARTIFACT_STEP"
+    foreach ($glob in ($env:AGENT_ARTIFACT_GLOBS -split ' ')) {
+        & buildkite-agent artifact download $glob . --step $env:AGENT_ARTIFACT_STEP
+        if ($LASTEXITCODE -ne 0) {
+            Write-Output "^^^ +++"
+            Write-Output "Failed to download $glob from step $env:AGENT_ARTIFACT_STEP"
+            exit 1
+        }
+    }
+}
+
 $TestsExitCode = 0
 try {
     Write-Output "~~~ Running integration tests"

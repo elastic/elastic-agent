@@ -57,6 +57,17 @@ else
   echo "~~~ Building test binaries"
   mage build:integrationTestBinaries
 
+  # When AGENT_ARTIFACT_STEP is set the step does not depend on the packaging
+  # step in the pipeline; instead the setup above runs while packaging is still
+  # in progress and we only wait for the artifacts right before the tests.
+  if [[ -n "${AGENT_ARTIFACT_STEP:-}" ]]; then
+    .buildkite/scripts/steps/wait-for-step.sh "${AGENT_ARTIFACT_STEP}"
+    echo "~~~ Downloading agent packages from step ${AGENT_ARTIFACT_STEP}"
+    for glob in ${AGENT_ARTIFACT_GLOBS:?"AGENT_ARTIFACT_GLOBS must be set together with AGENT_ARTIFACT_STEP"}; do
+      buildkite-agent artifact download "${glob}" . --step "${AGENT_ARTIFACT_STEP}"
+    done
+  fi
+
   if [ "$TEST_SUDO" == "true" ]; then
     sudo -E .buildkite/scripts/buildkite-integration-tests.sh "$@"
   else
