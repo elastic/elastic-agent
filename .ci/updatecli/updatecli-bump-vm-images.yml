@@ -15,6 +15,11 @@ scms:
       commitusingapi: true
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       force: false
+<<<<<<< HEAD
+=======
+      submodules: false
+      singleBranch: true
+>>>>>>> 3152ee2 (ci: enable single-branch Updatecli checkouts (#16833))
 
 actions:
   elastic-agent:

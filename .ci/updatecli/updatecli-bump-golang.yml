@@ -12,7 +12,14 @@ scms:
       repository: '{{ .scm.repository }}'
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
+<<<<<<< HEAD
       branch: main
+=======
+      branch: '{{ .scm.branch }}'
+      force: false
+      submodules: false
+      singleBranch: true
+>>>>>>> 3152ee2 (ci: enable single-branch Updatecli checkouts (#16833))
 
 actions:
   elastic-agent:
