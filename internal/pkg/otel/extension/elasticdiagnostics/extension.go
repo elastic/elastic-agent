@@ -18,6 +18,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
+	"go.opentelemetry.io/collector/extension/extensioncapabilities"
 	"go.uber.org/zap"
 	"go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -31,6 +32,10 @@ import (
 
 var (
 	_ component.Component = (*diagnosticsExtension)(nil)
+
+	// The collector notifies the extension of its effective configuration
+	// through this interface, which is stored to be included in diagnostics.
+	_ extensioncapabilities.ConfigSnapshotWatcher = (*diagnosticsExtension)(nil)
 
 	// The elasticdiagnostics extension also implements the otelmanager.DiagnosticExtension interface.
 	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
@@ -161,10 +166,17 @@ func (d *diagnosticsExtension) registerGlobalDiagnostics() {
 	}
 }
 
-func (d *diagnosticsExtension) NotifyConfig(ctx context.Context, conf *confmap.Conf) error {
+// NotifyConfigSnapshot implements extensioncapabilities.ConfigSnapshotWatcher.
+// It stores the collector's effective configuration so it can be included in
+// diagnostics as edot/otel-merged-actual.yaml.
+func (d *diagnosticsExtension) NotifyConfigSnapshot(_ context.Context, snapshot extensioncapabilities.ConfigSnapshot) error {
 	d.configMtx.Lock()
 	defer d.configMtx.Unlock()
-	d.collectorConfig = conf
+	if snapshot == nil {
+		d.collectorConfig = nil
+		return nil
+	}
+	d.collectorConfig = snapshot.Effective()
 	return nil
 }
 
