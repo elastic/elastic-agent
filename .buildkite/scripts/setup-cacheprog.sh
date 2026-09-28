@@ -75,9 +75,13 @@ setup_cacheprog() {
   # AUTOMEMLIMIT=off stops cacheprog from trying to derive GOMEMLIMIT from
   # cgroups, which logs errors where there are none (macOS, Windows). It's
   # set only for cacheprog: EDOT components under test use the same library.
+  # GODEBUG is cleared because the FIPS unit tests run `go test` with
+  # GODEBUG=fips140=only, which cacheprog inherits, and it then can't compute
+  # the MD5 sums S3 requires. cacheprog is CI tooling, not the product under
+  # test, so running it outside FIPS mode is fine.
   local log="${dir}/cacheprog.log"
   local wrapper="${dir}/cacheprog-wrapper"
-  printf '#!/bin/sh\nAUTOMEMLIMIT=off exec "%s" "$@" 2>>"%s"\n' "${bin}" "${log}" >"${wrapper}"
+  printf '#!/bin/sh\nunset GODEBUG\nAUTOMEMLIMIT=off exec "%s" "$@" 2>>"%s"\n' "${bin}" "${log}" >"${wrapper}"
   chmod +x "${wrapper}"
 
   export GOCACHEPROG="${wrapper}"

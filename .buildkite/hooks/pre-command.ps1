@@ -32,16 +32,21 @@ if ($env:BUILDKITE_PLUGINS -like "*oblt-aws-auth*") {
 
     # Anything cacheprog writes to stderr ends up in the output of every `go`
     # command, which breaks tests that inspect `go test` output. The wrapper
-    # sends it to a file instead (--log-output is broken in v1.3.0, it still
-    # logs to stderr), and disables automemlimit, which logs an error when
-    # there are no cgroups to derive GOMEMLIMIT from. AUTOMEMLIMIT is set only
-    # for cacheprog because EDOT components under test use the same library.
-    $log = Join-Path $dir "cacheprog.log"
+    # discards it (--log-output is broken in v1.3.0, it still logs to stderr).
+    # It can't go to a shared file: cmd.exe opens redirect targets without
+    # write sharing, so concurrent `go` processes fail to start cacheprog.
+    # The wrapper also disables automemlimit, which logs an error when there
+    # are no cgroups to derive GOMEMLIMIT from, and clears GODEBUG, because
+    # the FIPS unit tests set GODEBUG=fips140=only, under which cacheprog
+    # can't compute the MD5 sums S3 requires. Both are set only for cacheprog:
+    # EDOT components under test use the same memlimit library, and cacheprog
+    # is CI tooling, not the product under test.
     $wrapper = Join-Path $dir "cacheprog-wrapper.cmd"
     Set-Content -ErrorAction Stop -Encoding ascii -Path $wrapper -Value @(
       "@echo off",
       "set AUTOMEMLIMIT=off",
-      "`"$bin`" %* 2>>`"$log`""
+      "set GODEBUG=",
+      "`"$bin`" %* 2>nul"
     )
 
     $env:GOCACHEPROG = $wrapper
