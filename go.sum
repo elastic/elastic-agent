@@ -1017,8 +1017,8 @@ kernel.org/pub/linux/libs/security/libcap/cap v1.2.78 h1:jgqg4gyu2BaYW9L6uzEtGLf
 kernel.org/pub/linux/libs/security/libcap/cap v1.2.78/go.mod h1:VjuVda6m2qGkpCVfrFkpTGyvkdlZ2N5/yfo89tujlg8=
 kernel.org/pub/linux/libs/security/libcap/psx v1.2.78 h1:PC3yNs51cX5LZ7U57a7xielBcoXB3xnV+rXD8V0H0DQ=
 kernel.org/pub/linux/libs/security/libcap/psx v1.2.78/go.mod h1:+l6Ee2F59XiJ2I6WR5ObpC1utCQJZ/VLsEbQCD8RG24=
-oras.land/oras-go/v2 v2.6.0 h1:X4ELRsiGkrbeox69+9tzTu492FMUu7zJQW6eJU+I2oc=
-oras.land/oras-go/v2 v2.6.0/go.mod h1:magiQDfG6H1O9APp+rOsvCPcW1GD2MM7vgnKY0Y+u1o=
+oras.land/oras-go/v2 v2.6.2 h1:N04RXngAp1LJKTG6ifz3xHPipasEkWr+hFmInja5YKo=
+oras.land/oras-go/v2 v2.6.2/go.mod h1:PlTtg4JTDJkDe8yVHpM2wz7/YDc00GVas+i4jAW2TZ4=
 pgregory.net/rapid v1.2.0 h1:keKAYRcjm+e1F0oAuU5F5+YPAWcyxNNRK2wud503Gnk=
 pgregory.net/rapid v1.2.0/go.mod h1:PY5XlDGj0+V1FCq0o192FdRhpKHGTRIWBgqjDBTrq04=
 sigs.k8s.io/controller-runtime v0.23.3 h1:VjB/vhoPoA9l1kEKZHBMnQF33tdCLQKJtydy4iqwZ80=
