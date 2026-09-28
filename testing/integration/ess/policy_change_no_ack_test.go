@@ -78,6 +78,7 @@ func TestPolicyChangePersistsWithoutAck(t *testing.T) {
 	t.Logf("created policy %s, enrolled agent %s", policy.ID, agentID)
 
 	t.Cleanup(func() {
+		//nolint:forbidigo // t.Cleanup runs after the test ends so t.Context() is already cancelled; a fresh context is required
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
 		assert.NoError(t, fleettools.UnEnrollAgent(cleanupCtx, info.KibanaClient, agentID))
