@@ -59,8 +59,18 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
+	echVersions, err := statefulProv.AvailableVersions()
+	require.NoError(t, err)
+
 	startVersions = filterVersionsForECH(t, startVersions, statefulProv)
 	startVersions = filterVersionsForSameReleaseType(t, startVersions, endVersion)
+	// ECH's upgrade path check (ElasticsearchVersionCompatibility) strips the SNAPSHOT tag from
+	// the source version and checks whether the bare version number appears in the target's
+	// rolling_upgrade_compatible_versions list — which only contains GA-released versions.
+	// A SNAPSHOT source whose GA equivalent (e.g. 9.4.8 for 9.4.8-SNAPSHOT) has not yet been
+	// released will be rejected. Filter those out so only SNAPSHOTs with a matching released GA
+	// in ECH are used as upgrade sources.
+	startVersions = filterSnapshotVersionsWithoutReleasedGA(startVersions, echVersions)
 
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
@@ -89,7 +99,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 					t.Logf("Cleaning up ECH deployment [%s] in region [%s]", deployment.ID, echRegion)
 				}
 
-				err = prov.Delete(context.Background(), deployment)
+				err = prov.Delete(context.Background(), deployment) //nolint:forbidigo // t.Context() is cancelled before cleanup runs, so a fresh Background context is required here
 				require.NoError(t, err, "failed to delete deployment after test")
 			})
 
@@ -156,6 +166,7 @@ func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*
 }
 
 func filterVersionsForSameReleaseType(t *testing.T, versions []*version.ParsedSemVer, endVersion string) []*version.ParsedSemVer {
+	t.Helper()
 	endVersionParsed, err := version.ParseVersion(endVersion)
 	require.NoError(t, err)
 	isEndVersionSnapshot := endVersionParsed.IsSnapshot()
@@ -168,6 +179,24 @@ func filterVersionsForSameReleaseType(t *testing.T, versions []*version.ParsedSe
 			filteredVersions = append(filteredVersions, ver)
 		}
 	}
+	return filteredVersions
+}
 
+// filterSnapshotVersionsWithoutReleasedGA removes SNAPSHOT versions whose GA equivalent is not
+// present in ECH's available versions list. ECH's upgrade path check (ElasticsearchVersionCompatibility)
+// strips SNAPSHOT tags from the source version before looking it up in the target's
+// rolling_upgrade_compatible_versions list, which only contains GA-released versions. A SNAPSHOT
+// source only forms a valid upgrade path when its corresponding GA has already been released.
+func filterSnapshotVersionsWithoutReleasedGA(versions []*version.ParsedSemVer, echVersions []*version.ParsedSemVer) []*version.ParsedSemVer {
+	filteredVersions := make([]*version.ParsedSemVer, 0)
+	for _, ver := range versions {
+		if ver.IsSnapshot() {
+			gaEquivalent := version.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "", "")
+			if !isVersionInList(gaEquivalent, echVersions) {
+				continue
+			}
+		}
+		filteredVersions = append(filteredVersions, ver)
+	}
 	return filteredVersions
 }
