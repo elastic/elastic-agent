@@ -4,5 +4,5 @@
 
 package version
 
-const defaultBeatVersion = "8.19.22"
+const defaultBeatVersion = "8.19.23"
 const Agent = defaultBeatVersion
