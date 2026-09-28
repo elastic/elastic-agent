@@ -107,6 +107,10 @@ exporters:
       sizer: bytes
       queue_size: 50000000 # 50MB uncompressed
       block_on_overflow: true
+      batch:
+        flush_timeout: 1s
+        min_size: 1000000 # 1MB uncompressed
+        max_size: 4000000 # 4MB uncompressed
     timeout: 15s
 
 service:
