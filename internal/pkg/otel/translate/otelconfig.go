@@ -441,6 +441,9 @@ func getReceiversConfigForComponent(
 	if comp.OutputType == "kafka" || comp.OutputType == "logstash" {
 		sharedConfig["include_metadata"] = true
 	}
+	if beatName == "heartbeat" && comp.OutputType == "elasticsearch" {
+		sharedConfig["elasticsearch_auth"] = getElasticsearchAuthExtensionID(comp.OutputName).String()
+	}
 	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
 	}

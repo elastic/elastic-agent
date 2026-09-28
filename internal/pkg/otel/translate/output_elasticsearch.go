@@ -24,6 +24,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 )
 
+const elasticsearchAuthExtensionType = "elasticsearchauth"
+
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
@@ -435,6 +437,13 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 	}
 
 	return hosts, nil
+}
+
+// getElasticsearchAuthExtensionID returns the output-scoped ID for the
+// elasticsearchauth extension.
+func getElasticsearchAuthExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(elasticsearchAuthExtensionType), extensionName)
 }
 
 // getBeatsAuthExtensionID returns the id for beatsauth extension
