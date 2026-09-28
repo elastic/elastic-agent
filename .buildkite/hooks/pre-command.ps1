@@ -30,16 +30,27 @@ if ($env:BUILDKITE_PLUGINS -like "*oblt-aws-auth*") {
       Remove-Item $archive
     }
 
-    $env:GOCACHEPROG = $bin
+    # Anything cacheprog writes to stderr ends up in the output of every `go`
+    # command, which breaks tests that inspect `go test` output. The wrapper
+    # sends it to a file instead (--log-output is broken in v1.3.0, it still
+    # logs to stderr), and disables automemlimit, which logs an error when
+    # there are no cgroups to derive GOMEMLIMIT from. AUTOMEMLIMIT is set only
+    # for cacheprog because EDOT components under test use the same library.
+    $log = Join-Path $dir "cacheprog.log"
+    $wrapper = Join-Path $dir "cacheprog-wrapper.cmd"
+    Set-Content -ErrorAction Stop -Encoding ascii -Path $wrapper -Value @(
+      "@echo off",
+      "set AUTOMEMLIMIT=off",
+      "`"$bin`" %* 2>>`"$log`""
+    )
+
+    $env:GOCACHEPROG = $wrapper
     $env:CACHEPROG_REMOTE_STORAGE_TYPE = "s3"
     $env:CACHEPROG_S3_BUCKET = "elastic-agent-ci-go-cache"
     $env:CACHEPROG_S3_REGION = "us-east-1"
     $env:CACHEPROG_S3_PREFIX = "cacheprog-poc"
     $env:CACHEPROG_S3_EXPIRATION = "24h"
     $env:CACHEPROG_ROOT_DIRECTORY = Join-Path $dir "disk"
-    # INFO logs on stderr would clutter every `go` command's output
-    # (--log-output is broken in v1.3.0, it still logs to stderr).
-    $env:CACHEPROG_LOG_LEVEL = "WARN"
     Write-Host "GOCACHEPROG=$env:GOCACHEPROG"
   } catch {
     Write-Host "cacheprog: setup failed ($_), falling back to the local GOCACHE"

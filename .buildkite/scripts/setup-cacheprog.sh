@@ -72,9 +72,12 @@ setup_cacheprog() {
   # to a file; the pre-exit hook prints a summary of the statistics.
   # --log-output can't be used for this: in v1.3.0 it opens the file but
   # still logs to stderr.
+  # AUTOMEMLIMIT=off stops cacheprog from trying to derive GOMEMLIMIT from
+  # cgroups, which logs errors where there are none (macOS, Windows). It's
+  # set only for cacheprog: EDOT components under test use the same library.
   local log="${dir}/cacheprog.log"
   local wrapper="${dir}/cacheprog-wrapper"
-  printf '#!/bin/sh\nexec "%s" "$@" 2>>"%s"\n' "${bin}" "${log}" >"${wrapper}"
+  printf '#!/bin/sh\nAUTOMEMLIMIT=off exec "%s" "$@" 2>>"%s"\n' "${bin}" "${log}" >"${wrapper}"
   chmod +x "${wrapper}"
 
   export GOCACHEPROG="${wrapper}"
