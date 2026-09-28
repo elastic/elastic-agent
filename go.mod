@@ -37,7 +37,7 @@ require (
 	github.com/google/go-containerregistry v0.22.1
 	github.com/google/pprof v0.0.0-20260906184651-6331bc6350fe
 	github.com/gorilla/mux v1.8.1
-	github.com/jaypipes/ghw v0.25.0
+	github.com/jaypipes/ghw v0.26.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/josephspurrier/goversioninfo v1.7.0
 	github.com/kardianos/service v1.3.0
@@ -49,7 +49,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.161.0
-	github.com/openshift/api v0.0.0-20260923043708-9abfa327cff2
+	github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
