@@ -9140,11 +9140,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/api
-Version: v0.35.4
+Version: v0.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.35.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.37.0/LICENSE:
 
 
                                  Apache License
@@ -9352,11 +9352,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/api@v0.35.4/LICENSE:
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/apimachinery
-Version: v0.35.4
+Version: v0.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.35.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.37.0/LICENSE:
 
 
                                  Apache License
@@ -9564,11 +9564,11 @@ Contents of probable licence file $GOMODCACHE/k8s.io/apimachinery@v0.35.4/LICENS
 
 --------------------------------------------------------------------------------
 Dependency : k8s.io/client-go
-Version: v0.35.4
+Version: v0.37.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.35.4/LICENSE:
+Contents of probable licence file $GOMODCACHE/k8s.io/client-go@v0.37.0/LICENSE:
 
 
                                  Apache License
