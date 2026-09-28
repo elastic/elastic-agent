@@ -229,7 +229,7 @@ func setupInstallPath(topPath string, ownership utils.FileOwner) error {
 
 func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error) {
 	manifestFilePath := filepath.Join(extractedPackageDir, v1.ManifestFileName)
-	manifestFile, err := os.Open(manifestFilePath)
+	manifestFile, err := os.Open(manifestFilePath) //nolint:gosec // G703: manifestFilePath is joined from the agent package directory, which is resolved by findDirectory() or supplied by a trusted test operator — not external user input.
 	if err != nil {
 		return nil, fmt.Errorf("failed to open package manifest file (%s): %w", manifestFilePath, err)
 	}
