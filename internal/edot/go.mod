@@ -104,7 +104,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.89.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.56.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.56.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/signin v1.10.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.10.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/brunoscheufler/aws-ecs-metadata-go v0.0.0-20221221133751-67e37ae746cd // indirect
@@ -332,14 +332,14 @@ require (
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-lambda-go v1.55.0 // indirect
 	github.com/aws/aws-msk-iam-sasl-signer-go v1.0.4 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.47.0
+	github.com/aws/aws-sdk-go-v2 v1.47.1
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
-	github.com/aws/aws-sdk-go-v2/config v1.33.5
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.5
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.3 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.33.6
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.6
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.1 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigateway v1.47.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/apigatewayv2 v1.42.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.72.0 // indirect
@@ -348,10 +348,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.334.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.63.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/health v1.45.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/iam v1.64.0
+	github.com/aws/aws-sdk-go-v2/service/iam v1.64.1
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lightsail v1.58.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.60.0 // indirect
@@ -360,9 +360,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/servicediscovery v1.48.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.52.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.38.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.51.0
+	github.com/aws/aws-sdk-go-v2/service/sso v1.38.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.51.1
 	github.com/aws/smithy-go v1.28.2
 	github.com/axiomhq/hyperloglog v0.2.6 // indirect
 	github.com/bboreham/go-loser v0.0.0-20230920113527-fcc2c21820a3 // indirect
@@ -620,7 +620,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/deltatocumulativeprocessor v0.161.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
-	github.com/openshift/api v0.0.0-20260923043708-9abfa327cff2 // indirect
+	github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0 // indirect
 	github.com/openshift/client-go v0.0.0-20251015124057-db0dee36e235 // indirect
 	github.com/openzipkin/zipkin-go v0.4.3 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
