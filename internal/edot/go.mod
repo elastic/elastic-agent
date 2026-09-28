@@ -14,7 +14,7 @@ require (
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20260925152453-16bc9648fc3e
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.47.0
-	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
+	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.74.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.74.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.74.0
