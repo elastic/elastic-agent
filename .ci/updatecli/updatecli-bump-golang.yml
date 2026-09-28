@@ -12,7 +12,9 @@ scms:
       repository: '{{ .scm.repository }}'
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       commitusingapi: true
-      branch: main
+      branch: '{{ .scm.branch }}'
+      submodules: false
+      singleBranch: true
 
 actions:
   elastic-agent:
