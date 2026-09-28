@@ -128,8 +128,8 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 				t.Skipf("test requires a stack but failed to create a valid client to elasticsearch: %s", err)
 				return nil
 			}
-			// non-local test and stack was required
-			panic(err)
+			t.Fatalf("test requires a stack but failed to create a valid client to elasticsearch: %s", err)
+			return nil
 		}
 		info.KibanaClient, err = getKibanaClient()
 		if err != nil {
@@ -137,8 +137,8 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 				t.Skipf("test requires a stack but failed to create a valid client to kibana: %s", err)
 				return nil
 			}
-			// non-local test and stack was required
-			panic(err)
+			t.Fatalf("test requires a stack but failed to create a valid client to kibana: %s", err)
+			return nil
 		}
 	}
 	return info

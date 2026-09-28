@@ -43,10 +43,10 @@ const (
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
-	// singleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// SingleReceiverStreamID is the placeholder stream ID used in receiver names for
 	// components with single_receiver: true, so that all receiver names uniformly have
 	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
-	singleReceiverStreamID = "single"
+	SingleReceiverStreamID = "single"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -370,7 +370,7 @@ func getCollectorConfigForComponent(
 // getReceiversConfigForComponent returns the receivers configuration for a component.
 // By default each input stream produces its own receiver. When the component's InputSpec has
 // SingleReceiver set, all streams are merged into one receiver keyed by the component ID with
-// the placeholder singleReceiverStreamID as the stream suffix.
+// the placeholder SingleReceiverStreamID as the stream suffix.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
@@ -467,7 +467,7 @@ func getReceiversConfigForComponent(
 		for _, ri := range inputs {
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+singleReceiverStreamID)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+SingleReceiverStreamID)
 		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,
@@ -604,7 +604,8 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	exporterCfg map[string]any,
 	queueCfg map[string]any,
 	extensionCfg map[string]any,
-	processors map[string]any, err error) {
+	processors map[string]any, err error,
+) {
 	outputUnit, ok := comp.OutputUnit()
 	if !ok {
 		return nil, nil, nil, nil, nil
@@ -660,7 +661,8 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	exportersCfg map[string]any,
 	queueSettings map[string]any,
 	extensionCfg map[string]any,
-	processorCfg map[string]any, err error) {
+	processorCfg map[string]any, err error,
+) {
 	if unit.Type == client.UnitTypeInput {
 		return nil, nil, nil, nil, fmt.Errorf("unit type is an input, expected output: %v", unit)
 	}
@@ -934,6 +936,28 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 		result[0] = resultStream
 		break
 	}
+
+	// Mirror osquerybeatCfgFromStreams: propagate unit-level namespace to each stream's
+	// data_stream.namespace when not already set.
+	ns := unit.Config.GetDataStream().GetNamespace()
+	if ns == "" {
+		ns = "default"
+	}
+	for i, ri := range result {
+		ds, ok := ri.config["data_stream"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, hasNS := ds["namespace"]; hasNS {
+			continue
+		}
+		cloned := maps.Clone(ri.config)
+		clonedDS := maps.Clone(ds)
+		clonedDS["namespace"] = ns
+		cloned["data_stream"] = clonedDS
+		result[i].config = cloned
+	}
+
 	return result
 }
 

@@ -24,7 +24,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/cli/values"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,10 +34,12 @@ import (
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	helmkube "helm.sh/helm/v4/pkg/kube"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -1472,12 +1474,11 @@ func k8sStepHelmUninstall(releaseName string) k8sTestStep {
 		settings.SetNamespace(namespace)
 		actionConfig := &action.Configuration{}
 
-		err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		uninstallAction := action.NewUninstall(actionConfig)
-		uninstallAction.Wait = true
+		uninstallAction.WaitStrategy = helmkube.LegacyStrategy
 		_, err = uninstallAction.Run(releaseName)
 		require.NoError(t, err, "failed to uninstall helm chart")
 	}
@@ -1493,8 +1494,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		helmChart, err := loader.Load(chartPath)
 		require.NoError(t, err, "failed to load helm chart")
 
-		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		t.Cleanup(func() {
@@ -1503,7 +1503,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 			}
 
 			uninstallAction := action.NewUninstall(actionConfig)
-			uninstallAction.Wait = true
+			uninstallAction.WaitStrategy = helmkube.LegacyStrategy
 			_, _ = uninstallAction.Run(releaseName)
 		})
 
@@ -1513,7 +1513,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.UseReleaseName = true
 		installAction.ReleaseName = releaseName
 		installAction.Timeout = 2 * time.Minute
-		installAction.Wait = true
+		installAction.WaitStrategy = helmkube.LegacyStrategy
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
@@ -1531,33 +1531,33 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 		helmChart, err := loader.Load(chartPath)
 		require.NoError(t, err, "failed to load helm chart")
 
-		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		installAction := action.NewInstall(actionConfig)
 		installAction.Namespace = namespace
 		installAction.ReleaseName = releaseName
 		installAction.UseReleaseName = true
-		// DryRun to create the manifest without installing the chart
-		installAction.DryRun = true
+		// DryRunClient to create the manifest without installing the chart
+		installAction.DryRunStrategy = action.DryRunClient
 		installAction.Replace = true
-		installAction.ClientOnly = true
 		installAction.IncludeCRDs = true
 		installAction.DisableHooks = false
 
-		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+		installAction.KubeVersion = &helmchartcommon.KubeVersion{Version: "1.27.0"}
 
-		release, err := installAction.Run(helmChart, values)
+		relResult, err := installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to render helm chart")
+		rel, ok := relResult.(*releasev1.Release)
+		require.True(t, ok, "unexpected release type: %T", relResult)
 
 		manifestFile, err := os.CreateTemp("", "helm-template-*.yaml")
 		require.NoError(t, err, "failed to create temp manifest file")
 		manifestPath := manifestFile.Name()
-		_, err = manifestFile.WriteString(release.Manifest)
+		_, err = manifestFile.WriteString(rel.Manifest)
 		require.NoError(t, err, "failed to write manifest")
-		for _, hook := range release.Hooks {
-			// Hooks are not included in the release.Manifest, so we need to add them manually
+		for _, hook := range rel.Hooks {
+			// Hooks are not included in the rel.Manifest, so we need to add them manually
 			// to match `helm template` output.
 			_, err = manifestFile.WriteString("\n---\n")
 			require.NoError(t, err, "failed to write hook manifest")
@@ -1728,8 +1728,7 @@ func k8sStepHelmUpgrade(chartPath string, releaseName string, values values.Opti
 		helmChart, err := loader.Load(chartPath)
 		require.NoError(t, err, "failed to load helm chart")
 
-		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		t.Cleanup(func() {
@@ -1738,14 +1737,14 @@ func k8sStepHelmUpgrade(chartPath string, releaseName string, values values.Opti
 			}
 
 			uninstallAction := action.NewUninstall(actionConfig)
-			uninstallAction.Wait = true
+			uninstallAction.WaitStrategy = helmkube.LegacyStrategy
 			_, _ = uninstallAction.Run(releaseName)
 		})
 
 		upgradeAction := action.NewUpgrade(actionConfig)
 		upgradeAction.Namespace = namespace
 		upgradeAction.Timeout = 2 * time.Minute
-		upgradeAction.Wait = true
+		upgradeAction.WaitStrategy = helmkube.LegacyStrategy
 		upgradeAction.WaitForJobs = true
 		_, err = upgradeAction.Run(
 			releaseName, helmChart, mergeValues(t, namespace, values))

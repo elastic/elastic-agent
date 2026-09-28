@@ -1,7 +1,7 @@
-# For installation and configuration options, refer to the [installation instructions](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md)
+# For installation and configuration options, refer to the [installation instructions](https://www.elastic.co/docs/solutions/observability/get-started/opentelemetry/quickstart/serverless/k8s#manual-installation)
 
-# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
-# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.3.9
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/opentelemetry-kube-stack-0.16.0/charts/opentelemetry-kube-stack/values.yaml)
+# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.16.0
 opentelemetry-operator:
   manager:
     extraArgs:
@@ -87,6 +87,15 @@ collectors:
           timeout: 2s
           override: true
           aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/openshift:
+          # Detects resources from OpenShift. Does nothing on other distributions.
+          detectors: [openshift]
+          timeout: 2s
+          override: true
+          openshift:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
@@ -212,6 +221,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
               - resource/cloud
             exporters:
