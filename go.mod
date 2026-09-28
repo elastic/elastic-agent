@@ -35,8 +35,8 @@ require (
 	github.com/gofrs/flock v0.13.1
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/go-cmp v0.7.0
-	github.com/google/go-containerregistry v0.21.9
-	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3
+	github.com/google/go-containerregistry v0.22.1
+	github.com/google/pprof v0.0.0-20260926063103-aaccee046517
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.26.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
@@ -44,8 +44,8 @@ require (
 	github.com/kardianos/service v1.3.0
 	github.com/knadh/koanf/maps v0.1.3
 	github.com/magefile/mage v1.17.2
-	github.com/moby/moby/api v1.55.0
-	github.com/moby/moby/client v0.5.1
+	github.com/moby/moby/api v1.56.0
+	github.com/moby/moby/client v0.6.0
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.161.0
