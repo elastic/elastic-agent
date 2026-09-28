@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,6 +29,7 @@ import (
 
 	"go.elastic.co/apm/v2"
 	"go.opentelemetry.io/collector/confmap"
+	gproto "google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -442,6 +442,10 @@ type Coordinator struct {
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
 
+	// expectedConfigCache reuses the unit configurations of the previous refresh for the
+	// units whose configuration did not change.
+	expectedConfigCache *component.ExpectedConfigCache
+
 	// The final component model generated from ast and vars (this is the same
 	// value that is sent to the runtime manager).
 	componentModel []component.Component
@@ -604,6 +608,8 @@ func New(
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
 		canReExec:        reexec.CanReExec,
+
+		expectedConfigCache: component.NewExpectedConfigCache(),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -781,7 +787,7 @@ func (c *Coordinator) Migrate(
 	}
 
 	// Target is checked prior to enroll
-	if err := fleetapiClient.CheckRemote(ctx, newFleetClient); err != nil {
+	if err := fleetapiClient.CheckRemote(ctx, c.logger, newFleetClient); err != nil {
 		return err
 	}
 
@@ -2110,7 +2116,10 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", model.Components).Debug("Updating running component model")
+	if c.logger.IsDebug() {
+		// With encodes the components eagerly, so only pay for it when it can be logged
+		c.logger.With("components", model.Components).Debug("Updating running component model")
+	}
 	c.updateManagersWithConfig(model)
 	return nil
 }
@@ -2460,6 +2469,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		c.agentInfo,
 		existingCompState,
 		dynamicInputs,
+		component.WithExpectedConfigCache(c.expectedConfigCache),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
@@ -2665,7 +2675,7 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 		if oldUnit, ok := oldMap[id]; ok {
 			diff.inLast = true
 			if newUnits.Config != nil && oldUnit.Config != nil && newUnits.Config.GetSource() != nil && oldUnit.Config.GetSource() != nil {
-				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+				diff.updated = !gproto.Equal(newUnits.Config.GetSource(), oldUnit.Config.GetSource())
 			}
 			delete(oldMap, id)
 		}

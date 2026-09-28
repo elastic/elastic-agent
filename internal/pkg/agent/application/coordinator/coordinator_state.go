@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -249,8 +250,13 @@ func (c *Coordinator) generateReportableState() (s State) {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
 	} else if c.actionsErr != nil {
-		s.State = agentclient.Failed
-		s.Message = fmt.Sprintf("Actions: %s", c.actionsErr.Error())
+		if errors.IsRecoverable(c.actionsErr) {
+			s.State = agentclient.Degraded
+			s.Message = fmt.Sprintf("Actions degraded: %s", c.actionsErr.Error())
+		} else {
+			s.State = agentclient.Failed
+			s.Message = fmt.Sprintf("Actions failed: %s", c.actionsErr.Error())
+		}
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())

@@ -84,14 +84,15 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/downloader"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/action"
+	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/downloader"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/registry"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const (
@@ -4072,8 +4073,7 @@ func (h Helm) RenderExamples() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4119,16 +4119,17 @@ func (h Helm) RenderExamples() error {
 		installAction := action.NewInstall(actionConfig)
 		installAction.Namespace = "default"
 		installAction.ReleaseName = "example"
-		installAction.CreateNamespace = true
 		installAction.UseReleaseName = true
-		installAction.CreateNamespace = false
-		installAction.DryRun = true
+		installAction.DryRunStrategy = action.DryRunClient
 		installAction.Replace = true
-		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
-		installAction.ClientOnly = true
-		release, err := installAction.Run(helmChart, helmValues)
+		installAction.KubeVersion = &helmchartcommon.KubeVersion{Version: "1.27.0"}
+		relResult, err := installAction.Run(helmChart, helmValues)
 		if err != nil {
 			return fmt.Errorf("failed to install helm chart: %w", err)
+		}
+		rel, ok := relResult.(*releasev1.Release)
+		if !ok {
+			return fmt.Errorf("unexpected release type: %T", relResult)
 		}
 
 		renderedFolder := filepath.Join(exampleFullPath, "rendered")
@@ -4138,7 +4139,7 @@ func (h Helm) RenderExamples() error {
 		}
 
 		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
-		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
+		err = os.WriteFile(renderedManifestPath, []byte(rel.Manifest), 0o644)
 		if err != nil {
 			return fmt.Errorf("failed to write rendered manifest %q: %w", renderedManifestPath, err)
 		}
@@ -4213,8 +4214,7 @@ func (h Helm) Lint() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4357,8 +4357,7 @@ func (h Helm) handleDependencies(update bool) error {
 		}
 	}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-		func(format string, v ...interface{}) {})
+	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4386,6 +4385,7 @@ func (h Helm) handleDependencies(update bool) error {
 		RegistryClient:   registryClient,
 		RepositoryConfig: settings.RepositoryConfig,
 		RepositoryCache:  settings.RepositoryCache,
+		ContentCache:     settings.ContentCache,
 		Debug:            settings.Debug,
 	}
 	if client.Verify {
@@ -4501,8 +4501,7 @@ func (h Helm) Package(ctx context.Context) error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}

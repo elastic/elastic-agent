@@ -16,10 +16,11 @@ changelog/fragments/
 /.buildkite/pipeline.tests-qa.yaml @elastic/ingest-managed-jobs
 /.buildkite/pipeline.tests-staging.yaml @elastic/ingest-managed-jobs
 /.buildkite/scripts/steps/validate-agentless-docker-image.sh @elastic/ingest-managed-jobs
+/.buildkite/scripts/steps/ecp-internal-release.sh @elastic/elastic-agent-control-plane
 /.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
-/.ci/scripts/ecp-internal-release.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
+/.ci/scripts/update-beats.sh @elastic/elastic-agent-control-plane
 /.github @elastic/elastic-agent-control-plane @elastic/observablt-ci
 /.github/CODEOWNERS @elastic/ingest-tech-leads
 /.github/workflows/release-notes.yml @elastic/ski-docs @elastic/elastic-agent-control-plane
@@ -32,7 +33,7 @@ changelog/fragments/
 /.github/workflows/update-docs.yml @elastic/ski-docs @elastic/docs-engineering
 /.github/workflows/validate-docs-structure.yml @elastic/ski-docs @elastic/docs-engineering
 /docs/reference/edot-collector @elastic/ski-docs
-/docs/scripts/update-docs @elastic/ski-docs
+/docs/scripts/update-docs @elastic/ski-docs @elastic/docs-engineering
 /internal/edot/samples @elastic/obs-signals-team @elastic/ski-docs
 /internal/edot/components.yml @elastic/ingest-otel-leads
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
