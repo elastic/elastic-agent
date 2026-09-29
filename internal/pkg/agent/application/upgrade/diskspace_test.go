@@ -82,6 +82,7 @@ func diskspaceTestConfig(t *testing.T) *artifact.Config {
 	return &artifact.Config{
 		TargetDirectory:        t.TempDir(),
 		RetrySleepInitDuration: time.Millisecond,
+		ReserveDiskSpace:       true,
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			Timeout: time.Second,
 		},

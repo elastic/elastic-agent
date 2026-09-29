@@ -139,7 +139,7 @@ func TestUpgradeReserveDiskSpace(t *testing.T) {
 
 			installDir, targetDir := tt.setup(t)
 
-			watcherConfig := upgradetest.FastWatcherCfg + fmt.Sprintf("\nagent.download:\n  target_directory: '%s'\n", strings.ReplaceAll(targetDir, "'", "''"))
+			watcherConfig := upgradetest.FastWatcherCfg + fmt.Sprintf("\nagent.download:\n  reserve_diskspace: true\n  target_directory: '%s'\n", strings.ReplaceAll(targetDir, "'", "''"))
 
 			err = upgradetest.PerformUpgrade(t.Context(), startFixture, fixture, t,
 				upgradetest.WithBasePath(installDir),
