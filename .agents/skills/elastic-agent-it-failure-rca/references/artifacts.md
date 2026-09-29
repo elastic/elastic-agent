@@ -72,6 +72,13 @@ jq -j --arg t "$TEST" 'select(.Action=="output" and (.Test==$t or ((.Test // "")
 grep -v -e '>> running binary with: \[.* status' -e 'agent status: {' test.log > test.filtered.log   # drop polling noise
 ```
 
+- Polling tests repeat the same `t.Log` line hundreds of times (often with a full status dump). Collapse consecutive lines by call site to get the test's story in a dozen lines:
+  ```bash
+  awk 'match($0, /[A-Za-z0-9_]+\.go:[0-9]+:/) { k = substr($0, RSTART, RLENGTH)
+      if (k != last) { if (last != "") printf "%s .. %s  x%-4d %s\n", first, prev, n, sample; last = k; n = 0; first = $1; sample = substr($0, RSTART, 160) }
+      n++; prev = $1 }
+    END { if (last != "") printf "%s .. %s  x%-4d %s\n", first, prev, n, sample }' test.log
+  ```
 - The failure time is the `Time` of the `{"Action":"fail","Test":"<name>"}` event: `jq -r --arg t "$TEST" 'select(.Action=="fail" and .Test==$t) | .Time' …`. Use it to pick the right diagnostics bundle and to bound the log window in the bundle.
 - Which other tests failed in the same job (and when): `jq -r 'select(.Action=="fail" and .Test) | "\(.Time) \(.Test)"' …`. Several unrelated tests failing within the same minute points at the environment.
 - Tests in a job run one after another on the same VM, in shuffled order (`-test.shuffle on`), so the tests that ran just before the failure tell you what state the VM was in.

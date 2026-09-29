@@ -64,6 +64,8 @@ logs/
     elastic-agent-watcher-<YYYYMMDD>[-N].ndjson    # upgrade watcher log
     elastic-agent-metrics.ndjson                   # periodic agent metrics
     components/                                    # per-component log files, when present
+  services/
+    endpoint-*.log                                 # Elastic Endpoint's own log (ECS JSON, nested fields) — when Endpoint is installed
 ```
 
 A new file starts on rotation or process restart: the un-suffixed file is the **oldest** of the day, then `-1`, `-2`, … — the highest `N` is the newest. Concatenate and sort by `@timestamp` rather than relying on names.
@@ -97,6 +99,8 @@ components/
   http-metrics-monitoring/
     ...
 ```
+
+When Elastic Endpoint is installed, `components/endpoint/` holds Endpoint's own diagnostics instead: `policy_response.json`, `elastic-endpoint.yaml`, `metrics.json`, `version.txt`, `system_info.txt` (or `error.txt` if Endpoint didn't answer within 20 s). See [runtimes.md](runtimes.md).
 
 `beat_metrics.json` top-level keys: `libbeat.pipeline.events`, `libbeat.output`, `libbeat.config`, `system.cpu`, `system.load`.
 

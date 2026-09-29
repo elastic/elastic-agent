@@ -18,7 +18,7 @@ Maps to `cproto.State` (`pkg/control/v2/cproto/control_v2.pb.go`).
 | 7 | UPGRADING | An upgrade is in progress |
 | 8 | ROLLBACK | An upgrade is being rolled back |
 
-The `fleet_state` field uses the same enum. When `fleet_state != 2` (HEALTHY), Fleet Server connectivity is broken.
+The `fleet_state` field uses the same enum. When `fleet_state != 2` (HEALTHY), Fleet Server connectivity is broken. The converse doesn't hold: after an unenroll the Fleet gateway is stopped and `fleet_state` / `fleet_message` stay frozen at their last values (often `2` / `Connected`).
 
 ## Component state (`state.yaml: components[].state.state`)
 

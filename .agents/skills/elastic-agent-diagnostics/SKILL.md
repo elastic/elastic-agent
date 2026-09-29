@@ -29,9 +29,10 @@ Tools: `jq` for NDJSON logs and JSON; `yq` for YAML. The recipes assume kislyuk'
 ## How to use this skill
 
 1. **Quick triage first** — [references/playbooks.md](references/playbooks.md) §1. Version, agent and Fleet state, per-component state, expected-vs-actual drift, per-file error/warning counts. If everything is healthy and there are no errors, say so and stop — don't manufacture issues.
-2. Skim [references/bundle-layout.md](references/bundle-layout.md) for what each file holds.
-3. Decode state integers with [references/state-enums.md](references/state-enums.md).
-4. Go deeper with the relevant playbook section:
+2. **Establish each component's runtime** — OTel receiver, beat process, or OS service (Elastic Endpoint) — with [references/runtimes.md](references/runtimes.md). Logs, health reporting, and failure modes differ per runtime, and Endpoint has its own lifecycle, logs, and diagnostics.
+3. Skim [references/bundle-layout.md](references/bundle-layout.md) for what each file holds.
+4. Decode state integers with [references/state-enums.md](references/state-enums.md).
+5. Go deeper with the relevant playbook section:
    - **Log analysis** — errors/warnings, partitioning by management layer (L1–L4), cross-layer timeline, state transitions.
    - **Component & policy inspection** — what's expected vs running, what each component does.
    - **pprof analysis** — CPU, memory, goroutine, mutex, block profiles.
@@ -51,7 +52,7 @@ Tools: `jq` for NDJSON logs and JSON; `yq` for YAML. The recipes assume kislyuk'
 
 Default to a short structured summary:
 - **Agent**: version, mode (managed/standalone), Fleet status, overall state
-- **Components**: count, any not HEALTHY (with their messages)
+- **Components**: count, runtime of each (otel / process / service), any not HEALTHY (with their messages)
 - **Notable log activity**: error/warning counts, top distinct messages
 - **Pprof red flags** (only if performance is the question)
 - **Hypothesis / next step**

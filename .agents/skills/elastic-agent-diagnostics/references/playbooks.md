@@ -14,9 +14,12 @@ echo "=== state (top-level) ==="
 yq '{state, message, fleet_state, fleet_message, log_level, "collector.status": .collector.status}' "$BUNDLE_DIR/state.yaml"
 
 echo "=== components ==="
-yq '.components[] | {id, state: .state.state, message: .state.message, pid: .state.pid}' "$BUNDLE_DIR/state.yaml"
+yq '.components[] | {id, runtime: .state.version_info.name, state: .state.state, message: .state.message, pid: .state.pid}' "$BUNDLE_DIR/state.yaml"
+# runtime: beats-receiver = otel, beat-v2-client = process, Endpoint = service (see runtimes.md)
 
-diff -q "$BUNDLE_DIR/components-expected.yaml" "$BUNDLE_DIR/components-actual.yaml" \
+# compare sorted by id — the two files can list the same components in different order
+diff <(yq -S '.components | sort_by(.id)' "$BUNDLE_DIR/components-expected.yaml") \
+     <(yq -S '.components | sort_by(.id)' "$BUNDLE_DIR/components-actual.yaml") >/dev/null \
   && echo "expected == actual" || echo "DRIFT: expected != actual (in-flight or stuck transition)"
 
 echo "=== log error/warn counts ==="
@@ -28,6 +31,8 @@ done
 ```
 
 `yq` syntax assumed: kislyuk Python `yq` (a jq-wrapper that accepts pure jq filters). Mike Farah's Go `yq` uses different syntax — if you see `error: yq: error parsing filter`, you're hitting the Go variant; use `yq -o=json '.' <file> | jq '<filter>'`, or `python3 -c 'import yaml,sys,json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)' < <file> | jq '<filter>'`.
+
+**If an `endpoint` component is present**, the error counts are inflated: the agent logs every line of Endpoint's installer output at `error` (`log.logger: component.runtime.endpoint.service_runtime`). Exclude lines with `context: "command output"` when counting or summarizing errors (recipes in [runtimes.md](runtimes.md) §"Elastic Endpoint"), and look at Endpoint's own log in `logs/services/` separately.
 
 If everything is in state 2 / StatusOK and no errors → stop and tell the user the bundle looks healthy. Don't manufacture issues.
 
@@ -41,7 +46,7 @@ Component ids appear in two encodings: supervisor lines nest them (`.component.i
 
 ### Partitioning logs by management layer
 
-In hybrid mode (the common case), the agent has **four distinct management layers**, all visible in the bundle's logs:
+For components in the **otel** runtime (the common case for beat inputs), there are **four distinct management layers**, all visible in the bundle's logs. Process-mode beats have only L1 and the beat process (L4, no collector in between); Elastic Endpoint has L1 and the Endpoint service, whose own log is in `logs/services/` — see [runtimes.md](runtimes.md).
 
 ```
 1. elastic-agent supervisor (control plane)
@@ -173,7 +178,7 @@ jq -r 'select(.["log.level"]=="error") | .message[:200]' "$BUNDLE_DIR"/logs/*/*.
 **Not every root cause is logged at `error`.** When the collector crash-loops (supervisor: `collector exited with error` / `collector recovery restarting`), its pipeline-construction failure can be logged below error level (seen at `debug`). Search for it at any level:
 
 ```bash
-jq -r 'select(.message | test("failed to build pipelines|error found during service initialization"))
+jq -r 'select((.message // "") | test("failed to build pipelines|error found during service initialization"))
   | "\(.["@timestamp"]) \(.["log.level"]) \(.message[:300])"' "$BUNDLE_DIR"/logs/*/*.ndjson | sort | head -20
 ```
 
@@ -189,7 +194,7 @@ jq -r 'select(.["log.level"]=="error") |
 
 ```bash
 jq -c --arg cid "filestream-monitoring" \
-  'select(((.component.id? // .["component.id"]) == $cid) or (.message | contains($cid)))' \
+  'select(((.component.id? // .["component.id"]) == $cid) or ((.message // "") | contains($cid)))' \
   "$BUNDLE_DIR"/logs/*/*.ndjson
 ```
 
@@ -201,10 +206,18 @@ jq -c --arg start "2026-04-10T14:27:00Z" --arg end "2026-04-10T14:28:30Z" \
   "$BUNDLE_DIR"/logs/*/*.ndjson
 ```
 
+### Policy changes
+
+The agent doesn't log the policy revision number at info level. Each applied policy change logs `Policy change done, setting agent log level to …` (`handler_action_policy_change.go`), so count and time those lines as a proxy — e.g. to see whether revisions kept moving while a test waited for a specific one:
+
+```bash
+jq -r 'select((.message // "") | startswith("Policy change done")) | .["@timestamp"]' "$BUNDLE_DIR"/logs/*/elastic-agent-*.ndjson | sort
+```
+
 ### Sequence of state transitions
 
 ```bash
-jq -c 'select(.message | test("state changed|Component state changed|Unit state changed"; "i"))' \
+jq -c 'select((.message // "") | test("state changed|Component state changed|Unit state changed"; "i"))' \
   "$BUNDLE_DIR"/logs/*/*.ndjson
 ```
 
@@ -333,10 +346,10 @@ If `version.txt:version` ≠ `package.version`, an upgrade is in progress.
 
 ```bash
 # Watcher logs
-cat "$BUNDLE_DIR"/logs/*/elastic-agent-watcher-*.ndjson | jq -c 'select(.["log.level"]!="info" or (.message | test("rollback|upgrade|grace"; "i")))'
+cat "$BUNDLE_DIR"/logs/*/elastic-agent-watcher-*.ndjson | jq -c 'select(.["log.level"]!="info" or ((.message // "") | test("rollback|upgrade|grace"; "i")))'
 
 # Upgrade-related agent logs
-jq -c 'select(.message | test("upgrade|rollback|watcher|grace"; "i"))' \
+jq -c 'select((.message // "") | test("upgrade|rollback|watcher|grace"; "i"))' \
   "$BUNDLE_DIR"/logs/*/elastic-agent-*.ndjson
 ```
 

@@ -68,7 +68,7 @@ Record: pipeline slug, build number, `build.id` and `pipeline.id` (UUIDs from th
   gcloud storage cp "$P/build/*.xml" "$P/build/*.json" "$RCA_DIR/build/"
   gcloud storage cp -r "$P/build/diagnostics" "$RCA_DIR/build/"    # only if listed
   ```
-  Use a scratch directory for `$RCA_DIR`. Quote every glob meant for the remote side or for a tool (`"gs://…/*.xml"`, `--include='*.go'`) — zsh fails on unmatched globs before the command runs. An empty listing for a job that uploaded artifacts means they expired.
+  Use a scratch directory for `$RCA_DIR`. Quote every glob meant for the remote side or for a tool (`"gs://…/*.xml"`, `--include='*.go'`) — zsh fails on unmatched globs before the command runs. zsh also expands a word starting with `=` (`echo ====` fails), so quote those too. An empty listing for a job that uploaded artifacts means they expired.
 - **Validate before trusting anything**: `file` on each download and `unzip -tq` on zips. An HTML file, or a size that differs from the listing, is not the artifact. See [references/artifacts.md](references/artifacts.md).
 
 ## 4. Read the test output → confirm the failure mode
@@ -82,7 +82,11 @@ File naming and `jq`/Python recipes: [references/artifacts.md](references/artifa
 
 ## 5. Classify the failure surface — which management layer?
 
-Now that you know the failing assertion, form a hypothesis about *which layer* the bug lives in and confirm it with the user. The agent has up to **four management layers**, partitionable by log fields:
+Now that you know the failing assertion, form a hypothesis about *which layer* the bug lives in and confirm it with the user.
+
+**First, which runtime?** Not every component runs in the EDOT collector. Beat inputs run either as receivers in the collector (**otel**) or as separate beat subprocesses (**process**) — the migration to otel is ongoing, defaults differ by version, and some tests deliberately switch between the two. Elastic Endpoint (Elastic Defend) runs as an OS **service** with its own install/upgrade/uninstall lifecycle and its own logs. How to tell them apart, and each runtime's failure signatures: the diagnostics skill's [references/runtimes.md](../elastic-agent-diagnostics/references/runtimes.md). Without a bundle, the test name, group, and the policy it builds usually tell you.
+
+For **otel** components the agent has **four management layers**, partitionable by log fields:
 
 ```
 L1. elastic-agent supervisor (control plane)
@@ -93,6 +97,8 @@ L3. OTel pipeline components (receivers, processors, extensions)
     ↓ (for beat-based receivers) hosts
 L4. embedded beat internals (filebeat, metricbeat, heartbeat, … code)
 ```
+
+For **process** components the layers collapse to L1 ↔ the beat process (L4); for **Endpoint**, to L1 ↔ the Endpoint service.
 
 Discrepancies between *adjacent* layers are some of the strongest signals — the supervisor told the collector to stop and the collector never logged shutting down; the collector started a receiver but the embedded beat never logged its startup; etc. See the diagnostics skill's playbook §"Discrepancy patterns to hunt" and §"Partitioning logs by management layer".
 
@@ -108,6 +114,10 @@ Discrepancies between *adjacent* layers are some of the strongest signals — th
 | Component stuck in `STOPPING` — like issue #14049 | **investigate L1↔L2 and L2↔L3 boundaries** |
 | Missing DLL / shared library / driver / system package, on one platform only | **not a layer** — platform support or packaging; check `SkipOS` precedents in sibling tests |
 | Fails on both attempts, every time, on one platform | deterministic platform problem, not a flake — compare with the platforms where it passes |
+| Test name or subtest mentions `otel`/`process`/`compare`, or logs show `Deferring … until … instances stop` | **runtime switch** (L1) — the old instance must stop before the new one starts; check the transition, then each runtime separately |
+| Endpoint / Elastic Defend / tamper protection / uninstall token; group `fleet-endpoint-security`; `endpoint` component | **L1 ↔ Endpoint service** — install/uninstall/upgrade lifecycle, check-ins, proxied actions; Endpoint's own log and diagnostics |
+| A process-mode beat exits, or misses check-ins (`Failed: pid '…' exited with code …`) | **L1 ↔ beat process** |
+| `Condition never satisfied` on a Fleet/Kibana-side gate (`IsPolicyRevision`, agent document, Fleet status) rather than on agent behaviour | **probably the test** — check the gate against the flake taxonomy (step 6e) before blaming the agent |
 
 **Skip this step** when the failure is clearly outside the agent — e.g. the install command itself failed, the VM or package manager misbehaved, ESS/Fleet provisioning failed, or a runtime dependency is missing on the platform. Say so and go to step 6 with the no-bundle path.
 
@@ -116,10 +126,13 @@ Otherwise, **ask the user**: state your hypothesis (one sentence) and use `AskUs
 - **L1 — supervisor** — agent control plane only.
 - **L2 — OTel collector core** — collector framework lifecycle, config delivery, shutdown sequence.
 - **L3 — pipeline component** — a specific receiver / processor / extension.
-- **L4 — embedded beat** — beat code running inside a receiver.
+- **L4 — beat** — beat code, embedded in a receiver or running as its own process.
+- **Endpoint service** — Elastic Endpoint's lifecycle as driven by the agent, plus Endpoint's own log.
 - **All / unknown** — partition all layers, hunt cross-layer discrepancies. Default for ambiguous symptoms.
 
-Capture the choice as `$RCA_LAYERS` ∈ `{L1, L2, L3, L4, all}`. If the user picks a single layer but a cross-layer discrepancy turns out to be the more likely explanation, surface that and ask whether to broaden. If you can't ask (e.g. you are running as a subagent), state the hypothesis and use `all`.
+`AskUserQuestion` takes at most four options: offer the three most plausible layers for the runtimes involved (no L2/L3 for a process-mode beat; Endpoint service only when Endpoint is installed) plus **All / unknown**.
+
+Capture the choice as `$RCA_LAYERS` ∈ `{L1, L2, L3, L4, endpoint, all}`. If the user picks a single layer but a cross-layer discrepancy turns out to be the more likely explanation, surface that and ask whether to broaden. If you can't ask (e.g. you are running as a subagent), state the hypothesis and use `all`.
 
 ## 6. Analyze
 
@@ -140,17 +153,20 @@ Hand the bundle to the `elastic-agent-diagnostics` skill via the Skill tool:
 
 Partition the bundle's logs by layer and check each against its own expected behaviour, scoped by `$RCA_LAYERS`. The diagnostics skill's playbook §"Partitioning logs by management layer" has the classification `jq`; the per-component checklist and discrepancy table are in [references/rca-playbook.md](references/rca-playbook.md).
 
-For every component id in `state.yaml` *or* the logs:
+For every component id in `state.yaml` *or* the logs, note its runtime, then:
 1. **L1**: did the supervisor start/stop/remove it, and log the state transitions?
-2. **L3**: did the receiver log its own startup and shutdown?
-3. **L4**: did the beat reach `Beat ID:` / `Home path:`? Did it log its own shutdown?
-4. **Cross-layer**: for each transition the supervisor logged, does the next layer react within seconds?
+2. **L3** (otel only): did the receiver log its own startup and shutdown?
+3. **L4**: did the beat reach `Beat ID:` / `Home path:`? Did it log its own shutdown? For a process-mode beat, did the process exit, and with what code?
+4. **Endpoint** (service only): did install/verify succeed, did it check in, and on removal did `uninstall endpoint service` reach `Stopped: endpoint service runtime`? What does Endpoint's own log say at the same moment?
+5. **Cross-layer**: for each transition the supervisor logged, does the next layer react within seconds? (Endpoint's check-in period is 30 s and its timeouts are 600 s, so allow for that.)
 
 When you find a discrepancy between adjacent layers, that pattern plus the log-line citations *is* the evidence chain.
 
 ### 6c. Test source → understand intent
 
 The job name and the JUnit file name tell you the test group (see [references/test-framework.md](references/test-framework.md)); the Go package in the Test Engine `test_name` tells you the directory. Find the test with `grep -rn "func <TestName>" testing/integration/`.
+
+**Read the code the build actually ran.** Take `commit` and `branch` from the build JSON; release branches (`9.5`, `8.19`, …) can differ substantially from your checkout. Use `git show "${commit}:<path>"` (after `git fetch origin <branch>` if the commit isn't local — that only updates remote-tracking refs, which is fine) rather than reading `HEAD` — in zsh, write `${commit}:` with braces, or `:t…` after a bare `$commit` is parsed as a modifier.
 
 Read the test top-to-bottom: setup (policy, integration, install args), the failing assertion (match it to the JUnit message), timing assumptions (`Eventually`, `Wait`, sleep durations).
 
@@ -160,7 +176,8 @@ Read the code the evidence points at — the diagnostics triage, the failing fix
 
 ### 6e. History → is it new, and what changed?
 
-- **Git**: `git log --since='6 weeks ago' --oneline -- <files>` for the test file and the implicated source; `git log --grep='<keyword>'`.
+- **Known flake patterns**: the `integration-test-review` skill's [flake taxonomy](../integration-test-review/references/flake-taxonomy.md) lists the anti-patterns behind past flakes with the fixing commits (e.g. exact `IsPolicyRevision` equality on a shared stack, #14911). A match there is strong evidence for a test bug, and the cited fix is the template.
+- **Git**: `git log --since='6 weeks ago' --oneline -- <files>` for the test file and the implicated source; `git log --grep='<keyword>'`; `git log -S '<identifier>'` to find when a helper or fix was introduced.
 - **CI**: is this failure chronic or new? Which branches, platforms, VM images? Does it fail on first attempt and pass on retry? See [references/locating-the-failure.md](references/locating-the-failure.md) §"Finding other occurrences". Cross-reference dates with the issue's occurrences and with commits.
 
 ## 7. Produce the RCA report

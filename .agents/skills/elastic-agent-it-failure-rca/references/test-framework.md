@@ -14,6 +14,10 @@ Integration tests live in Go packages under `testing/integration/`. The package 
 
 The test suite name (`TestNetworkTraffic`, `TestUpgradeFleetManagedElasticAgent`, etc.) maps directly to the Go `testing.T` top-level test function. Subtests (`/otel`, `/process`, `/compare`) are `/`-separated suffixes.
 
+Two families need runtime-specific reading (see the diagnostics skill's `references/runtimes.md`):
+- **Runtime comparison / switch tests** — subtests named `otel`, `process`, `compare` (`TestBeatsMetrics` runners in `*_monitoring_test.go`), and `beat_receivers_test.go` (`TestMonitoringNoDuplicates`, `TestComponentWorkDir`, `TestBeatsReceiverProcessRuntimeFallback`, …). They switch components between the otel and process runtimes via policy (`agent.internal.runtime.*`).
+- **Elastic Endpoint tests** — `endpoint_security_test.go` and `monitoring_endpoint_test.go`, group `fleet-endpoint-security` (the DEB/RPM tamper-protected upgrade tests run in `deb`/`rpm`). Protected and unprotected variants differ by tamper protection and uninstall tokens.
+
 ## Finding a test by name
 
 ```bash

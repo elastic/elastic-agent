@@ -66,6 +66,8 @@ coordinator: Component state changed ... state=Stopped
 
 Flag if: supervisor logs a stop but the component never reaches Stopped; or the component appears in `components-expected.yaml` but never appears in any L1 log.
 
+The steps below are written for the **otel** runtime. For a **process**-mode beat, skip Step 2 (there is no receiver shell; the beat's own lines are in the agent log with `log.source: <component id>`) and read Step 3 as the beat process. For **Endpoint**, use Step 1 plus §"Endpoint lifecycle" below. How to tell which runtime a component used: the diagnostics skill's `references/runtimes.md`.
+
 ### Step 2 — L3 receiver/process view
 
 ```bash
@@ -123,7 +125,34 @@ These cross-layer patterns are the most reliable indicators of where a bug lives
 | L3 receiver configured in `otel-merged.yaml` → no L4 "Beat ID:" | Receiver bridge broken; beat never initialised. Could be a config translation error or a missing receiver factory registration |
 | L4 beat logs clean "Exiting: bye" → L1 component still in STOPPING | Supervisor state-propagation bug; beat exited but the agent's runtime manager didn't detect it |
 | Component in `components-expected.yaml` → absent from `components-actual.yaml` AND absent from `otel-merged.yaml` | Config translation failure upstream; check `GetOtelConfig` / `buildMergedConfig` error path |
-| `otel.yaml` shows "no active OTel configuration" | The OTel config provider never received a valid config; check `StdinGobProvider` and the `Update` → `buildMergedConfig` path |
+| `otel-merged.yaml` has no receiver for a component that `components-expected.yaml` lists and that should be in the otel runtime | The merged config was never built or delivered for it; check the `Update` → `buildMergedConfig` path (`internal/pkg/otel/manager/`). (`otel.yaml` saying "no active OTel configuration" is normal — it only holds user-supplied OTel config.) |
+| Coordinator logs `Deferring … until … instances stop` → never `All … transitioning components have stopped …`, then `Runtime transition timeout exceeded, force-applying …` | Runtime switch: the old instance didn't stop within ~33 s; both runtimes may have run at once (duplicates) or neither (gaps) |
+| Process-mode beat: `Failed: pid '<n>' exited with code '<c>'` or `missed 3 check-ins and will be killed` | The beat process crashed or hung — its last lines before the exit (agent log, `log.source: <id>`) carry the reason |
+
+## Endpoint lifecycle
+
+Endpoint (Elastic Defend) is an OS service the agent installs and supervises; its code is not in this repo. Check the agent's view (logger `component.runtime.endpoint.service_runtime`) against Endpoint's own log (`logs/services/endpoint-*.log`) and diagnostics (`components/endpoint/`). Remember that the service-runtime logger emits the installer's output at `error` level regardless of content.
+
+| Pattern | Likely cause |
+|---|---|
+| `endpoint` stuck in `Starting: endpoint service runtime`; repeated `failed to start endpoint service, err: …, restarting after waiting for 30s` | Install/verify failing — the component is *not* marked FAILED; the installer's last stderr line is in the error |
+| Endpoint healthy, then `Degraded: endpoint service missed N check-ins` | Endpoint stopped checking in (hung, crashed, or restarting) — read Endpoint's log around that time; FAILED only follows after ~20 misses (~10 min) |
+| Endpoint removed from policy / unenrolled → `uninstall endpoint service` but no `Stopped: endpoint service runtime` | Uninstall hanging or failing (timeout 600 s) — `failed endpoint service uninstall, err: …`; tamper protection (wrong/missing token) is the usual suspect |
+| Test waits for "all components removed" after unenroll, but `endpoint` is still in `state.yaml` | First check whether the uninstall finished (`Stopped: endpoint service runtime`). If not, the removal is still waiting on it (up to 600 s — longer than many test budgets). If it did and `endpoint` came back (`Spawned new component endpoint` seconds later), a policy with Endpoint was re-applied after the unenroll — see §"After unenroll" |
+| Upgrade fails with `pre-symlink callback failed: failed to notify units of proxied action` | The signed UPGRADE action couldn't be delivered to Endpoint (tamper-protected agents) |
+| Upgrade rolled back: `agent reported failed component(s) state` naming `endpoint` | Endpoint reported FAILED during the watcher grace period after the new agent re-ran `install --upgrade` |
+| `components/endpoint/error.txt`: `diagnostic action timed out, deadline is 20s` | Endpoint didn't answer the diagnostics request — itself a sign it was stuck at collection time |
+
+When Endpoint's own log shows the failure originating inside Endpoint, report that and stop: that's for the Endpoint team, and there's no source here to trace.
+
+## After unenroll
+
+What the agent does on UNENROLL (`handler_action_unenroll.go`): with tamper protection, forward the signed action to Endpoint; apply an **empty policy** (removing every component, Endpoint via uninstall) and ack; then **stop the Fleet gateway**. Consequences to expect in the bundle, none of them a bug by themselves:
+
+- Fleet invalidates the agent's API keys, so anything still running gets `401 Unauthorized` (outputs, Endpoint's artifact downloads, Endpoint units reporting `Unable to connect to output server`).
+- `fleet_state` / `fleet_message` in `state.yaml` stay frozen at their pre-unenroll values, and the agent log goes quiet — nothing is checking in any more.
+
+The suspicious pattern is components that should be gone still running — or coming back — after the empty policy was applied: check for `Policy change done` lines and a non-empty `components-expected.yaml` / `computed-config.yaml` after the unenroll time. Actions already fetched from Fleet can still be dispatched after the gateway stops (the dispatcher runs on the parent context in `managed_mode.go`).
 
 ## Partitioning logs by management layer
 
@@ -166,4 +195,6 @@ Normal when the failure happened before the agent was installed (install command
 - **"IsHealthy returned true" does not mean all components are running.** The agent reports HEALTHY based on the components it is tracking. A component that never enters the OTel pipeline is never tracked, so it does not affect the health status. Always cross-check `components-actual.yaml` against `components-expected.yaml`.
 - **An empty `otel.yaml` is normal** when the agent is not in OTel runtime mode. The merged config in `otel-merged.yaml` (or `edot/otel-merged-actual.yaml`) is the running config.
 - **A `collector.status: 2` (HEALTHY) in `state.yaml` means the collector process is healthy**, not that all expected receivers are running. A collector with only monitoring receivers can be HEALTHY while the data receiver is absent.
+- **`DeadlineExceeded` from the test's status polls isn't necessarily a hung agent.** Check which context the poll uses: if it's the test's own `context.WithTimeout`, the budget simply ran out while the `Eventually` kept polling.
+- **The test's own gate can be the bug.** Many tests wait on Fleet-side state (`IsPolicyRevision`, agent documents, Fleet status) before checking agent behaviour. A `Condition never satisfied` there, with a healthy bundle, usually points at the gate — e.g. exact revision equality while other writers on the shared stack keep bumping revisions. See the `integration-test-review` skill's `references/flake-taxonomy.md`.
 - **Multiple bundles at similar timestamps**: if a test creates two agents (e.g. fleet-server + agent under test), both produce diagnostics at roughly the same time. The bundle without fleet-server paths in its config is the agent under test.
