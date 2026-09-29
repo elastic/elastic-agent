@@ -19,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
-
 func TestUnprivilegedUser(t *testing.T) {
 	testCases := []struct {
 		username         string
