@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"os"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
@@ -17,7 +19,33 @@ const (
 	FallbackPayloadSize = uint64(1280 * 1024 * 1024)
 )
 
-func disableCompression(*os.File) {}
+func preallocateFile(file *os.File, size int64) error {
+	if size <= 0 {
+		return nil
+	}
+
+	var st unix.Stat_t
+	if err := unix.Fstat(int(file.Fd()), &st); err != nil {
+		return err
+	}
+	allocated := st.Blocks * 512
+	if allocated >= size {
+		return nil
+	}
+
+	store := unix.Fstore_t{
+		Flags:   unix.F_ALLOCATECONTIG | unix.F_ALLOCATEALL,
+		Posmode: unix.F_PEOFPOSMODE,
+		Length:  size - allocated,
+	}
+	if err := unix.FcntlFstore(file.Fd(), unix.F_PREALLOCATE, &store); err != nil {
+		store.Flags = unix.F_ALLOCATEALL
+		if err := unix.FcntlFstore(file.Fd(), unix.F_PREALLOCATE, &store); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func getVolumeNameAt(dir string) (string, error) {
 	info, err := os.Stat(dir)

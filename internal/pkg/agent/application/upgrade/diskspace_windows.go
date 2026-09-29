@@ -15,23 +15,28 @@ import (
 const (
 	FallbackArchiveSize = uint64(350 * 1024 * 1024)
 	FallbackPayloadSize = uint64(1024 * 1024 * 1024)
-
-	compressionFormatNone uint16 = 0
 )
 
-func disableCompression(file *os.File) {
-	format := compressionFormatNone
-	var returned uint32
-	_ = windows.DeviceIoControl(
-		windows.Handle(file.Fd()),
-		windows.FSCTL_SET_COMPRESSION,
-		(*byte)(unsafe.Pointer(&format)),
-		uint32(unsafe.Sizeof(format)),
-		nil,
-		0,
-		&returned,
-		nil,
-	)
+func preallocateFile(file *os.File, size int64) error {
+	if size > 0 {
+		fileAllocationInfo := struct {
+			AllocationSize int64
+		}{
+			AllocationSize: size,
+		}
+		buffer := (*byte)(unsafe.Pointer(&fileAllocationInfo))
+		bufferSize := uint32(unsafe.Sizeof(fileAllocationInfo))
+
+		if err := windows.SetFileInformationByHandle(
+			windows.Handle(file.Fd()),
+			windows.FileAllocationInfo,
+			buffer,
+			bufferSize,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func getVolumeNameAt(dir string) (string, error) {

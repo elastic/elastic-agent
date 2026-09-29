@@ -29,9 +29,6 @@ const (
 	ChecksumSize     = uint64(1024)             // 1KB
 	ExtraInstallSize = uint64(50 * 1024 * 1024) // 50MB
 	MarkerSize       = uint64(1024 * 1024)      // 1MB
-
-	reservationFillByte  = 0xFF
-	reservationFillChunk = 1024 * 1024
 )
 
 func getArchiveReservation(archiveDir string) string {
@@ -156,7 +153,7 @@ func reserveDiskSpace(path string, size int64) error {
 		return err
 	}
 
-	if err := fillReservation(file, size); err != nil {
+	if err := preallocateFile(file, size); err != nil {
 		_ = file.Close()
 		if fresh {
 			_ = os.Remove(path)
@@ -177,32 +174,6 @@ func reserveDiskSpace(path string, size int64) error {
 		return err
 	}
 	return nil
-}
-
-func fillReservation(file *os.File, size int64) error {
-	info, err := file.Stat()
-	if err != nil {
-		return err
-	}
-	if info.Size() >= size {
-		return nil
-	}
-	if info.Size() == 0 {
-		disableCompression(file)
-	}
-
-	buf := make([]byte, reservationFillChunk)
-	for i := range buf {
-		buf[i] = reservationFillByte
-	}
-	for offset := info.Size(); offset < size; {
-		n := min(int64(len(buf)), size-offset)
-		if _, err := file.WriteAt(buf[:n], offset); err != nil {
-			return err
-		}
-		offset += n
-	}
-	return file.Sync()
 }
 
 func shrinkDiskSpaceReservation(path string, delta int64) error {
