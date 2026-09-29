@@ -10,6 +10,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+<<<<<<< HEAD
+=======
+	"runtime"
+	"slices"
+>>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 	"sort"
 	"testing"
 	"time"
@@ -58,7 +63,14 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
+<<<<<<< HEAD
 	startVersions = filterVersionsForECH(t, startVersions, statefulProv)
+=======
+	echVersions, err := statefulProv.AvailableVersions()
+	require.NoError(t, err)
+
+	startVersions = filterStartVersionsForECH(t, startVersions, echVersions, endVersion)
+>>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
@@ -87,7 +99,7 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 					t.Logf("Cleaning up ECH deployment [%s] in region [%s]", deployment.ID, echRegion)
 				}
 
-				err = prov.Delete(context.Background(), deployment)
+				err = prov.Delete(context.Background(), deployment) //nolint:forbidigo // t.Context() is cancelled before cleanup runs, so a fresh Background context is required here
 				require.NoError(t, err, "failed to delete deployment after test")
 			})
 
@@ -115,21 +127,25 @@ func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
+<<<<<<< HEAD
 	filteredVersions := make([]*version.ParsedSemVer, 0)
 	for _, ver := range versions {
 		// Filter out versions that are not FIPS-capable
 		if !isFIPSCapableVersion(ver) {
 			continue
 		}
+=======
+	versions = slices.DeleteFunc(versions, func(ver *version.ParsedSemVer) bool {
+		return !isFIPSCapableVersion(ver, os, arch)
+	})
+>>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 
-		filteredVersions = append(filteredVersions, ver)
-	}
-
-	sortedVers := version.SortableParsedVersions(filteredVersions)
+	sortedVers := version.SortableParsedVersions(versions)
 	sort.Sort(sortedVers)
 	return sortedVers
 }
 
+<<<<<<< HEAD
 func filterVersionsForECH(t *testing.T, versions []*version.ParsedSemVer, echProv *ess.StatefulProvisioner) []*version.ParsedSemVer {
 	echVersions, err := echProv.AvailableVersions()
 	require.NoError(t, err)
@@ -151,4 +167,29 @@ func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*
 		}
 	}
 	return false
+=======
+// filterStartVersionsForECH keeps only versions that ECH can deploy and then upgrade to endVersion.
+func filterStartVersionsForECH(t *testing.T, versions, echVersions []*version.ParsedSemVer, endVersion string) []*version.ParsedSemVer {
+	t.Helper()
+	endVersionParsed, err := version.ParseVersion(endVersion)
+	require.NoError(t, err)
+
+	isAvailableInECH := func(ver *version.ParsedSemVer) bool {
+		return slices.ContainsFunc(echVersions, func(echVer *version.ParsedSemVer) bool {
+			return echVer.Equal(*ver)
+		})
+	}
+
+	return slices.DeleteFunc(slices.Clone(versions), func(ver *version.ParsedSemVer) bool {
+		if !isAvailableInECH(ver) || ver.IsSnapshot() != endVersionParsed.IsSnapshot() {
+			return true
+		}
+		// ECH's upgrade path check (ElasticsearchVersionCompatibility) strips the SNAPSHOT tag from
+		// the source version and checks whether the bare version number appears in the target's
+		// rolling_upgrade_compatible_versions list, which only contains GA-released versions.
+		// A SNAPSHOT source whose GA equivalent (e.g. 9.4.8 for 9.4.8-SNAPSHOT) has not been
+		// released yet is rejected.
+		return ver.IsSnapshot() && !isAvailableInECH(version.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "", ""))
+	})
+>>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 }
