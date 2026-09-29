@@ -421,7 +421,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.2 // indirect
-	github.com/elastic/mito v1.25.1 // indirect
+	github.com/elastic/mito v1.27.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.74.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.47.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
@@ -465,7 +465,7 @@ require (
 	github.com/goccy/go-json v0.10.6 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
-	github.com/godror/godror v0.49.4 // indirect
+	github.com/godror/godror v0.51.4 // indirect
 	github.com/godror/knownpb v0.3.0 // indirect
 	github.com/gofrs/flock v0.13.1 // indirect
 	github.com/gogo/googleapis v1.4.1 // indirect
@@ -673,7 +673,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
-	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.6 // indirect
+	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.12 // indirect
 	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
 	go.elastic.co/apm/v2 v2.7.12 // indirect
