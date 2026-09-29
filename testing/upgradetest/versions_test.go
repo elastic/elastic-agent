@@ -688,6 +688,18 @@ func TestPreviousMinor(t *testing.T) {
 			upgradeableVersions: previousMinorVersions,
 			expected:            noPreviousMinorResult,
 		},
+		// IAR (independent artifact release) versions have build metadata matching ^build\d{12}.
+		// previousMinor must accept them, consistent with findRequiredVersions, because the
+		// automation that generates .upgrade-test-agent-versions.yml treats them as GA releases.
+		"Nth major Nth patch - only IAR previous minor versions": {
+			currentVersion: "9.2.15",
+			upgradeableVersions: []string{
+				"9.1.15+build202609161310",
+				"9.1.1+build202609161310",
+				"9.1.0+build202609161310",
+			},
+			expected: allSameResult("9.1.15+build202609161310", ""),
+		},
 		"Empty version range": {
 			currentVersion:      "9.2.15",
 			upgradeableVersions: []string{},
