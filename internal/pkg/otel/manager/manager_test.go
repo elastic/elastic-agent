@@ -2297,6 +2297,84 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	}
 }
 
+// TestOTelManager_RestartOnProfilesPipelineAdd verifies that adding a profiles pipeline to a
+// running collector triggers a subprocess restart. The service.profilesSupport feature gate is a
+// launch argument and cannot be applied via a live config push, so the manager must restart the
+// subprocess when a profiles pipeline is introduced for the first time.
+func TestOTelManager_RestartOnProfilesPipelineAdd(t *testing.T) {
+	testLogger, _ := loggertest.New("test")
+	collectorStarted := make(chan struct{}, 5)
+
+	execution := &mockExecution{
+		collectorStarted: collectorStarted,
+	}
+
+	mockFactory := func(string, string, int) (collectorExecution, error) {
+		return execution, nil
+	}
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
+	require.NoError(t, err)
+	mgr.recoveryTimer = newRestarterNoop()
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+
+	go func() {
+		err := mgr.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled)
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-mgr.WatchCollector():
+			case <-mgr.WatchComponents():
+			case <-mgr.Errors():
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Start the collector with a config that has no profiles pipeline.
+	mgr.Update(confmap.NewFromStringMap(testConfigNoLogLevel), nil, logp.InfoLevel, nil)
+
+	select {
+	case <-collectorStarted:
+	case <-ctx.Done():
+		t.Fatal("timeout waiting for initial collector start")
+	}
+
+	// Send a config that introduces a profiles pipeline. The running subprocess was
+	// not launched with --feature-gates=service.profilesSupport, so the manager must
+	// restart it rather than pushing the config live.
+	cfgWithProfiles := map[string]interface{}{
+		"receivers": map[string]interface{}{
+			"profiling": map[string]interface{}{},
+		},
+		"exporters": map[string]interface{}{
+			"nop": map[string]interface{}{},
+		},
+		"service": map[string]interface{}{
+			"pipelines": map[string]interface{}{
+				"profiles": map[string]interface{}{
+					"receivers": []string{"profiling"},
+					"exporters": []string{"nop"},
+				},
+			},
+		},
+	}
+	mgr.Update(confmap.NewFromStringMap(cfgWithProfiles), nil, logp.InfoLevel, nil)
+
+	select {
+	case <-collectorStarted:
+		// Collector was restarted so that the profiles feature gate is applied.
+		assert.True(t, mgr.collectorProfilesGateEnabled, "collectorProfilesGateEnabled should be true after restart with profiles pipeline")
+	case <-time.After(5 * time.Second):
+		t.Fatal("expected collector to be restarted after profiles pipeline was added, but it was not")
+	}
+}
+
 // TestOTelManager_CollectorRunErrWithNilConfig verifies that the manager does not panic when a
 // non-nil error arrives on collectorRunErr while mergedCollectorCfg is nil. This can happen when
 // the collector process reports an error after its configuration has been cleared.

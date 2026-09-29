@@ -142,6 +142,12 @@ type OTelManager struct {
 
 	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
+
+	// collectorProfilesGateEnabled tracks whether the currently running collector
+	// subprocess was launched with the service.profilesSupport feature gate (see
+	// hasProfilesPipeline). It is only set when the subprocess is (re)started,
+	// since the gate can only be applied as a launch argument.
+	collectorProfilesGateEnabled bool
 }
 
 // NewOTelManager returns a OTelManager.
@@ -429,6 +435,7 @@ func (m *OTelManager) startCollector(ctx context.Context,
 	} else {
 		// all good at the moment (possible that it will fail)
 		m.proc = proc
+		m.collectorProfilesGateEnabled = hasProfilesPipeline(m.mergedCollectorCfg)
 	}
 	return err
 }
@@ -794,7 +801,14 @@ func (m *OTelManager) applyMergedConfig(
 
 	// If we changed the log level, we need to restart the collector, as our loggers read directly from the collector's
 	// stdout and stderr.
-	if m.proc.LogLevel() != m.collectorLogLevel {
+	//
+	// We also need to restart if the merged config now has a profiles pipeline that the running collector
+	// wasn't launched with: the service.profilesSupport feature gate can only be applied as a subprocess
+	// launch argument (see hasProfilesPipeline), so a live config push to an already-running collector can
+	// never enable it and the collector would otherwise fatally exit on the new profiles pipeline.
+	needsRestart := m.proc.LogLevel() != m.collectorLogLevel ||
+		(hasProfilesPipeline(m.mergedCollectorCfg) && !m.collectorProfilesGateEnabled)
+	if needsRestart {
 		m.stopCollector()
 		err := m.startCollector(ctx, collectorStatusCh, collectorRunErr, forceFetchStatusCh)
 		if err != nil {
