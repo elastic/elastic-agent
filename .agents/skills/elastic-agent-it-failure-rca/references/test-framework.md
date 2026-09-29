@@ -2,13 +2,15 @@
 
 ## Test organisation
 
-Integration tests live under `testing/integration/`. The subdirectory reflects the test group name used in artifact filenames:
+Integration tests live in Go packages under `testing/integration/`. The package is the Test Engine *scope* (e.g. `github.com/elastic/elastic-agent/testing/integration/ess`); the *group* each test runs in is declared in its `define.Require(... Group: integration.<X>)` (values in `testing/integration/groups.go`), and the group is what shows up in CI job names and JUnit file names.
 
-| Directory | Group name | Typical focus |
-|---|---|---|
-| `testing/integration/ess/` | varies by suite | ESS (Elastic Cloud) scenarios — fleet-managed, network traffic, monitoring |
-| `testing/integration/` (root) | varies | Standalone and mixed scenarios |
-| `pkg/testing/` | — | Shared test helpers (fixtures, assertions, fleet client) |
+| Directory | Typical focus |
+|---|---|
+| `testing/integration/ess/` | ESS (Elastic Cloud) scenarios — fleet-managed, upgrades, packages (rpm/deb), monitoring, network traffic |
+| `testing/integration/k8s/` | Kubernetes (kind) — Helm charts, kustomize, container images |
+| `testing/integration/serverless/` | Serverless projects |
+| `testing/integration/beats/`, `leak/` | Beats-specific and resource-leak tests |
+| `pkg/testing/` | Shared test framework: fixtures, install/upgrade helpers, Fleet/ES clients, `define` |
 
 The test suite name (`TestNetworkTraffic`, `TestUpgradeFleetManagedElasticAgent`, etc.) maps directly to the Go `testing.T` top-level test function. Subtests (`/otel`, `/process`, `/compare`) are `/`-separated suffixes.
 
@@ -18,10 +20,12 @@ The test suite name (`TestNetworkTraffic`, `TestUpgradeFleetManagedElasticAgent`
 grep -rn "func TestNetworkTraffic" testing/integration/ pkg/testing/
 ```
 
-For group runner tests (where the suite is defined with `define.Run`):
+For subtests (`t.Run` names, or suite methods run via testify `suite.Run`), search for the subtest name without the parent:
 ```bash
 grep -rn "TestBeatsMetrics\|func.*BeatsMetrics" testing/integration/
 ```
+
+Subtest names in CI replace spaces with `_` — `Upgrade_RPM_from_9.0` is `t.Run("Upgrade RPM from 9.0", …)` or a formatted variant of it.
 
 ## Diagnostics bundle naming
 
@@ -34,54 +38,17 @@ Each agent that calls `diagnostics collect` during a test writes a zip file name
 Subtests use `/` replaced with `-`:
 - Test `TestNetworkTraffic/TestBeatsMetrics/otel` → `TestNetworkTraffic-TestBeatsMetrics-otel-2026-05-20T14-30-06Z-diagnostics.zip`
 
-When a test runs multiple agents (e.g. fleet-server + agent under test), each produces its own zip at roughly the same timestamp. Both will match the sanitized test-name prefix — match them in step 5 and use both for cross-agent analysis.
+The prefix is fixed the first time a fixture asks for it (`Fixture.FileNamePrefix` in `pkg/testing/fixture.go`), so the test-name part is the test that *created* the fixture — for suite-style tests that can be the parent rather than the failing subtest. List candidates with `ls "$RCA_DIR"/build/diagnostics/<TopLevelTest>-*`.
 
-```bash
-<ITRCA> match "$RCA_DIR" "TestNetworkTraffic/TestBeatsMetrics/otel"
-```
+When a test runs multiple agents (e.g. fleet-server + agent under test), each produces its own zip at roughly the same timestamp. Use both for cross-agent analysis.
 
-If multiple bundles match, pick the one whose timestamp is closest to the JUnit failure `timestamp` attribute. The fleet-server bundle and the agent-under-test bundle serve different purposes:
+If multiple bundles match, pick the one closest to the test's failure time — the `Time` of its gotestsum `fail` event (JUnit testcases carry no timestamp; see [artifacts.md](artifacts.md)). The fleet-server bundle and the agent-under-test bundle serve different purposes:
 - **Agent bundle**: component states, agent logs, OTel merged config — primary diagnostic.
 - **Fleet-server bundle**: enrollment/checkin logs — useful when the failure is in policy delivery or agent check-in.
 
-## JUnit XML structure
+## Test results
 
-File: `build/TEST-<SuiteName>.integration.xml`
-
-Key attributes on `<testcase>`:
-- `classname` — usually the Go package path
-- `name` — full test name including subtests, e.g. `TestNetworkTraffic/TestBeatsMetrics/otel`
-- `time` — elapsed seconds
-- `timestamp` — RFC3339 start time of that test case
-
-The `<failure>` child element contains the assertion message (first ~25 lines shown by `<ITRCA> junit`). The message typically includes:
-- The `require.*` or `assert.*` call that failed
-- The `t.Logf` output emitted during the test
-- A Go stacktrace pointing at the failing assertion
-
-```bash
-<ITRCA> junit "$RCA_DIR"                          # all failures, 25 lines each
-<ITRCA> junit "$RCA_DIR" TestNetworkTraffic       # filter to one suite
-```
-
-## gotestsum NDJSON output
-
-File: `build/TEST-<SuiteName>.integration.out.json`
-
-Each line is a JSON object:
-```json
-{"Test": "TestNetworkTraffic/TestBeatsMetrics/otel", "Action": "output", "Output": "    network_traffic_monitoring_test.go:123: waiting for agent healthy\n", "Time": "2026-05-20T14:22:31.5Z"}
-```
-
-Actions: `run`, `output`, `pass`, `fail`, `skip`.
-
-The `output` lines include everything written to `t.Log` / `t.Logf`, which is where tests emit progress messages like "waiting for agent healthy after otel switch: ..." and "could not fetch events for network_traffic: ...".
-
-```bash
-<ITRCA> testlog "$RCA_DIR" "TestNetworkTraffic/TestBeatsMetrics/otel"
-```
-
-This streams all `output` lines for the named test in order, making it easy to see the polling loop progress and where it got stuck.
+JUnit XML and gotestsum NDJSON file names, structure, and extraction recipes are in [artifacts.md](artifacts.md) §"Reading test output". In short: JUnit `<failure>` has the assertion; gotestsum `output` events carry every `t.Log` line with a timestamp, which is where tests emit progress messages like "waiting for agent healthy after otel switch: ..." — the place to see a polling loop get stuck.
 
 ## Key test helpers
 
@@ -93,11 +60,6 @@ This streams all `output` lines for the named test in order, making it easy to s
 | `require.Eventually` | testify | Polls a condition with timeout + interval |
 | `triggerFreshTLSConnection` | test file | Dials the ES HTTPS endpoint to produce a network_traffic event |
 
-## TEST_INTEG_CLEAN_ON_EXIT
+## Reproducing
 
-When set to `false`, the test framework does not remove the agent installation and test VM after a test failure. This preserves:
-- The agent's data directory and logs
-- Any diagnostics not yet collected
-- The running agent process for interactive inspection
-
-Useful for re-running locally: `TEST_INTEG_CLEAN_ON_EXIT=false TEST_PLATFORMS="linux/amd64" AGENT_VERSION="9.5.0-SNAPSHOT" TEST_PACKAGES="tar.gz" mage integration:single TestNetworkTraffic`
+To re-run a single test, see [docs/test-framework-dev-guide.md](../../../../docs/test-framework-dev-guide.md) — e.g. `mage integration:single TestNetworkTraffic` with `TEST_PLATFORMS`, `AGENT_VERSION`, and `TEST_PACKAGES` set. `TEST_INTEG_CLEAN_ON_EXIT=false` (the local default) keeps mage artifacts and `.integration-cache` after the run.

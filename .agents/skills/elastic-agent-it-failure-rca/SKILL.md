@@ -1,87 +1,88 @@
 ---
 name: elastic-agent-it-failure-rca
-description: Root-cause an elastic-agent integration test failure. Use when the user provides a flaky-test issue from elastic/elastic-agent (e.g. "look at #14049"), a Buildkite build URL with a job UUID, or a local artifacts directory, and wants a structured RCA report.
+description: Root-cause an elastic-agent integration test failure from CI. Use when the user provides a flaky-test issue from elastic/elastic-agent (e.g. "look at #14049"), a Buildkite build or job URL, or a local artifacts directory, and wants a structured RCA report.
 ---
 
 # Elastic Agent integration-test failure RCA
 
-End-to-end root-cause analysis for an elastic-agent integration test failure. Pulls artifacts from Buildkite, hands the diagnostics bundle to `elastic-agent-diagnostics`, reads the test source and recent history, and produces a structured RCA report.
+End-to-end root-cause analysis for an elastic-agent integration test failure in CI. The evidence chain is:
+
+```
+GitHub issue ─► Buildkite Test Engine run ─► Buildkite build + job ─► job log + artifacts (in GCS)
+            ─► JUnit / gotestsum output / diagnostics bundle ─► test + agent source, git and CI history ─► report
+```
+
+Each hop needs a different kind of access. Most of the practical difficulty is in the plumbing, not the diagnosis, so do step 1 properly before anything else.
 
 ## Inputs accepted
 
-One of:
-1. **GitHub issue reference** — `#14049`, `elastic/elastic-agent#14049`, or full URL. **Preferred** — the issue carries the test name + build URL + OS in the standard `[Flaky Test]` template.
-2. **Buildkite build URL with job UUID** — `https://buildkite.com/elastic/elastic-agent/builds/38654/table?jid=<uuid>`. Use when there is no issue yet.
-3. **Local artifacts directory** — if the user already downloaded artifacts (or has a diagnostics zip), skip to step 5.
+1. **GitHub issue** — `#14049`, `elastic/elastic-agent#14049`, or a URL. Preferred: it names the test and links the failing run(s).
+2. **Buildkite build URL**, with or without `?jid=<job-uuid>`.
+3. **Local artifacts** — a directory the user already downloaded, or a diagnostics `.zip`. Skip to step 4.
 
-If unclear, ask which of the three the user has.
+If it's unclear which one the user has, ask.
 
-## Use the helper scripts as the primary tools
+## 1. Access preflight — find out what you have, then ask once for what's missing
 
-This skill ships `bin/itrca` and pairs with the diagnostics skill's `bin/diag`. **Prefer them over raw `gh`/`bk`/`curl`/`jq`** — each call is a single named binary, so one approval covers all uses of that subcommand.
+| Capability | Needed for | Any of these works |
+|---|---|---|
+| **GitHub read** | the issue body + comments | GitHub MCP tools · `gh` · unauthenticated `curl` to api.github.com (public repo) |
+| **Buildkite API** | Test Engine runs, builds, jobs, job logs, artifact metadata | Buildkite MCP tools · `bk api` · `BUILDKITE_API_TOKEN` + `curl` |
+| **GCS read** | artifact *contents* (JUnit, gotestsum JSON, diagnostics zips) | `gcloud storage` — **nothing else works**, see below |
 
-**Path requirement.** Always invoke each helper with its **absolute path**. Construct the paths from each skill's base directory — the absolute path printed when the Skill tool launched the skill (look for `Base directory for this skill: <abs-path>`). Assigning the absolute path to a variable for re-use is fine; **do not** use `~` (the permission parser can't statically resolve tilde, which forces a prompt).
+Rules:
+- **Use whatever is already there.** Check which MCP tools are loaded, which CLIs are on `PATH`, and whether the relevant env vars are *set* (never print their values). Don't insist on one particular provider.
+- **Probe with the real operation**, not an auth-status command: fetch the issue, fetch the build, list the job's objects in GCS. Status commands give both false positives and false negatives here.
+- **Buildkite-mediated artifact downloads are a trap.** `download_url` redirects to `storage.cloud.google.com`, which needs a browser session. `curl -L`, `bk artifacts download`, and anything else following that redirect **save a Google sign-in HTML page under the artifact's name and report success**. Always fetch artifact bytes with `gcloud storage cp` from `gs://buildkite-elastic-agent/…`, and validate every file (step 3).
+- **Collect every gap before stopping**, then send one message listing what's missing, the exact command to fix each (e.g. `! gcloud auth login` — the `!` prefix runs it in the user's session, needed for interactive logins), and what you can still do without it.
 
-For brevity below, `<ITRCA>` = `<this-skill-base-dir>/bin/itrca` and `<DIAG>` = `<diagnostics-skill-base-dir>/bin/diag`.
+Provider-specific commands, probes, known failure modes, and the degraded modes available with partial access: [references/access.md](references/access.md).
 
-```bash
-<ITRCA> authcheck                                  # verify auth
-<ITRCA> issue <number>                             # parse a flaky-test issue
-<ITRCA> parse-build-url <url>                      # pipeline/build/jid
-<ITRCA> download <org/pipeline> <build> <jid>      # fetch artifacts
-<ITRCA> match <rca-dir> <test-name>                # find diagnostics zips
-<ITRCA> junit <rca-dir>                            # failed test cases
-<ITRCA> testlog <rca-dir> <test-name>              # gotestsum output
-<DIAG>  triage <bundle>                            # bundle triage
-<DIAG>  layers <bundle> [<component>]              # cross-layer logs
-# ...see `<DIAG> help` and `<ITRCA> help` for more
-```
+## 2. Resolve the failure to a build and a job
 
-Drop to raw shell commands only when the question is genuinely ad-hoc and no subcommand fits.
+Read the issue **including comments** — teammates often have already narrowed it down, and Analytics bots post newer occurrences as comments. Bot comments repeat full stacktraces, so extract the Run/Time pairs rather than reading everything (recipe in the reference).
 
-## Workflow
+There are two issue formats; details and recipes in [references/locating-the-failure.md](references/locating-the-failure.md):
 
-### 1. Verify auth, fail fast
+- **Human-filed** (`### Build` section): the URL usually carries `?jid=`. That's the job.
+- **Buildkite Analytics auto-filed** (`* **Test Name:**` bullets, `**Run:** https://api.buildkite.com/v2/analytics/...` links):
+  1. For each Run URL, call `…/runs/<run-id>/failed_executions` and select the execution whose `test_name` ends with the failing test. `tags["build.url"]` is the exact build.
+  2. **Ignore `tags["build.job_id"]`** — it is the "Aggregate test reports" job, not the one that ran the test.
+  3. Find the real job: script jobs in the build with `state == "failed"` or `retried == true` (fetch with `?include_retried_jobs=true`), whose name fits the test's group/platform. Confirm by grepping the job log for `--- FAIL: <TestName>`.
+- **No Run links at all** (the issue only has `Latest Occurrence`): scan Test Engine runs created in the few hours before that timestamp — see the reference.
 
-Run `<ITRCA> authcheck`. It enforces:
+**Artifacts expire after ~14 days**, but the Buildkite API keeps listing them. If the occurrence is older, check GCS before planning around it; if it's gone, look for a more recent failure of the same test (same reference, §"Finding other occurrences") and tell the user which occurrence you are analyzing.
 
-- `gh` is installed and `gh api user` returns the authenticated user (the actual API probe — `gh auth status` is unreliable when stale accounts are configured alongside a working `GH_TOKEN`).
-- Either `bk` is authenticated, or `BUILDKITE_API_TOKEN` is set in the environment.
+With several occurrences, group them by (pipeline, branch, platform) and analyze the largest group; mention outliers in one line each unless they contradict your hypothesis.
 
-```bash
-<ITRCA> authcheck
-```
+Record: pipeline slug, build number, `build.id` and `pipeline.id` (UUIDs from the build JSON — needed for GCS paths), job id, job name, attempt (first run vs retry), full test name including subtests.
 
-If it aborts, **stop and report exactly what the error message says**. Do not search the filesystem, env, dotfiles, or keychains for credentials — the script's checks are the complete list of acceptable sources.
+## 3. Fetch the job log and artifacts
 
-Common remediations:
-- `gh` not installed → "Install GitHub CLI: https://cli.github.com/"
-- `gh api user` failed → "Run `! gh auth login -h github.com`, then ask me to retry."
-- No Buildkite auth → "Either run `! bk auth login`, or set `BUILDKITE_API_TOKEN` (from https://buildkite.com/user/api-access-tokens). The token needs the `read_artifacts` scope."
+- **Job log** — via the Buildkite API (`bk job log <job-id> -p <pipeline> -b <build>`, or `…/jobs/<job-id>/log.txt`). Save it to a file, strip the escape sequences ([references/artifacts.md](references/artifacts.md) §"Job log"), and grep it; don't read it whole. It shows VM image, setup steps, and failures that happen before any test artifact exists.
+- **Artifacts** — list the job's objects in GCS, then download the test results and diagnostics (skip `build/distributions/**` if present — packages, large and irrelevant):
+  ```bash
+  P="gs://buildkite-elastic-agent/<pipeline.id>/<build.id>/<job-id>"
+  gcloud storage ls -l "$P/**"                                     # what exists, with sizes
+  mkdir -p "$RCA_DIR/build"
+  gcloud storage cp "$P/build/*.xml" "$P/build/*.json" "$RCA_DIR/build/"
+  gcloud storage cp -r "$P/build/diagnostics" "$RCA_DIR/build/"    # only if listed
+  ```
+  Use a scratch directory for `$RCA_DIR`. Quote every glob meant for the remote side or for a tool (`"gs://…/*.xml"`, `--include='*.go'`) — zsh fails on unmatched globs before the command runs. An empty listing for a job that uploaded artifacts means they expired.
+- **Validate before trusting anything**: `file` on each download and `unzip -tq` on zips. An HTML file, or a size that differs from the listing, is not the artifact. See [references/artifacts.md](references/artifacts.md).
 
-The `!` prefix tells Claude Code to run the command in the user's session — required for the interactive OAuth/device-code flows of `gh auth login` and `bk auth login`.
+## 4. Read the test output → confirm the failure mode
 
-### 2. Parse the input
+- **JUnit XML** (`build/*.xml`) — the `<failure>` text of the failing `<testcase>`, i.e. the assertion.
+- **gotestsum JSON** (`build/*.out.json`) — the full `t.Log` stream for the test, in order, with timestamps.
+- **Job log** — everything outside the test binary.
+- **Sibling tests in the same job** — did other tests fail at the same time with the same error? That points at the environment, not the test.
 
-For an issue:
+File naming and `jq`/Python recipes: [references/artifacts.md](references/artifacts.md) §"Reading test output"; test layout: [references/test-framework.md](references/test-framework.md).
 
-```bash
-<ITRCA> issue <number-or-url>
-```
+## 5. Classify the failure surface — which management layer?
 
-That prints test name, build URL, build/jid, OS, and any inline notes from the "Stacktrace and notes" section. Format details in [references/issue-format.md](references/issue-format.md).
-
-For a bare build URL:
-
-```bash
-<ITRCA> parse-build-url <url>
-```
-
-**Inline state.yaml / log fragments in the issue are often the smoking gun the reporter already noticed** — read them carefully before downloading anything.
-
-### 3. Classify the failure surface — which management layer?
-
-Before downloading artifacts, form a hypothesis about *which layer* the bug lives in and confirm it with the user. The agent has up to **four management layers** that log to the same NDJSON file but are partition-able by tag fields:
+Now that you know the failing assertion, form a hypothesis about *which layer* the bug lives in and confirm it with the user. The agent has up to **four management layers**, partitionable by log fields:
 
 ```
 L1. elastic-agent supervisor (control plane)
@@ -90,148 +91,94 @@ L2. OTel collector core framework
     ↓ runs
 L3. OTel pipeline components (receivers, processors, extensions)
     ↓ (for beat-based receivers) hosts
-L4. embedded beat internals (filebeat, metricbeat code)
+L4. embedded beat internals (filebeat, metricbeat, heartbeat, … code)
 ```
 
-Discrepancies between *adjacent* layers are some of the strongest signals — supervisor told the collector to stop and the collector never logged shutting down; collector started a receiver but the embedded beat never logged its startup; etc. See the diagnostics skill's playbook §"Discrepancy patterns to hunt" for the canonical list and the §"Partitioning logs by management layer" filter rules.
-
-**Form a hypothesis from what you already know:**
+Discrepancies between *adjacent* layers are some of the strongest signals — the supervisor told the collector to stop and the collector never logged shutting down; the collector started a receiver but the embedded beat never logged its startup; etc. See the diagnostics skill's playbook §"Discrepancy patterns to hunt" and §"Partitioning logs by management layer".
 
 | Clue | Likely layer |
 |---|---|
 | Test asserts on agent state, fleet status, upgrade flow | **L1 supervisor** |
-| Inline notes mention coordinator, runtime manager, `internal/pkg/agent/` | **L1 supervisor** |
+| Failure mentions coordinator, runtime manager, `internal/pkg/agent/` | **L1 supervisor** |
 | Symptom is "config not applied", "collector stuck stopping" | **L1↔L2** boundary |
-| Inline notes mention `internal/pkg/otel/manager/`, `otelcol`, EDOT collector lifecycle | **L2 collector core** |
+| Failure mentions `internal/pkg/otel/manager/`, `otelcol`, EDOT collector lifecycle | **L2 collector core** |
 | Symptom is "receiver didn't start" / "receiver kept running after stop" | **L2↔L3** boundary |
-| Inline notes mention specific receiver (`filebeatreceiver`, `metricbeatreceiver`), pipeline configuration | **L3 OTel component** |
-| Symptom is "beat-side input/output errors", registry corruption, harvester not picking up files | **L4 embedded beat** |
+| Failure mentions a specific receiver (`filebeatreceiver`, `metricbeatreceiver`), pipeline configuration | **L3 OTel component** |
+| Symptom is beat-side input/output errors, registry corruption, harvester not picking up files | **L4 embedded beat** |
 | Component stuck in `STOPPING` — like issue #14049 | **investigate L1↔L2 and L2↔L3 boundaries** |
+| Missing DLL / shared library / driver / system package, on one platform only | **not a layer** — platform support or packaging; check `SkipOS` precedents in sibling tests |
+| Fails on both attempts, every time, on one platform | deterministic platform problem, not a flake — compare with the platforms where it passes |
 
-**Ask the user.** State your hypothesis (one sentence) and use `AskUserQuestion` with these options:
+**Skip this step** when the failure is clearly outside the agent — e.g. the install command itself failed, the VM or package manager misbehaved, ESS/Fleet provisioning failed, or a runtime dependency is missing on the platform. Say so and go to step 6 with the no-bundle path.
+
+Otherwise, **ask the user**: state your hypothesis (one sentence) and use `AskUserQuestion` with these options:
 
 - **L1 — supervisor** — agent control plane only.
 - **L2 — OTel collector core** — collector framework lifecycle, config delivery, shutdown sequence.
 - **L3 — pipeline component** — a specific receiver / processor / extension.
-- **L4 — embedded beat** — filebeat / metricbeat code running inside a receiver.
+- **L4 — embedded beat** — beat code running inside a receiver.
 - **All / unknown** — partition all layers, hunt cross-layer discrepancies. Default for ambiguous symptoms.
 
-**Capture the choice** as `$RCA_LAYERS` ∈ `{L1, L2, L3, L4, all}`. Step 6 uses it to scope log slicing and source reading order. If the user picks a single layer but cross-layer discrepancy turns out to be the more likely explanation, surface that and ask whether to broaden.
+Capture the choice as `$RCA_LAYERS` ∈ `{L1, L2, L3, L4, all}`. If the user picks a single layer but a cross-layer discrepancy turns out to be the more likely explanation, surface that and ask whether to broaden. If you can't ask (e.g. you are running as a subagent), state the hypothesis and use `all`.
 
-### 4. Download artifacts
+## 6. Analyze
 
-```bash
-<ITRCA> download <org/pipeline> <build> <jid>
-```
+### 6a. Diagnostics bundle → invoke the diagnostics skill
 
-This filters to JUnit XMLs (`build/*.integration.xml`), gotestsum JSON (`build/*.integration.out.json`), diagnostics zips (`build/diagnostics/*.zip`), and `build/TEST-report.html`, and writes them under `$TMPDIR/it-rca/<build>-<jid>/build/...` preserving the artifact paths.
+Bundles are `build/diagnostics/<TestName with / → ->-<RFC3339 with : → ->-diagnostics.zip`. If several match, pick the one closest to the JUnit failure timestamp; tests with two agents (e.g. fleet-server + agent under test) legitimately produce two.
 
-Capture the destination as `$RCA_DIR` for later steps. The script prints it on the last line of output.
-
-Implementation notes (in [references/buildkite-artifacts.md](references/buildkite-artifacts.md)):
-- Prefers the REST API when `BUILDKITE_API_TOKEN` is set (the `bk` download path needs GraphQL scope which most read-only tokens don't have).
-- The pipeline-slug is parsed from the URL — usually `elastic/elastic-agent` for PR-triggered runs, `elastic/elastic-agent-extended-testing` for the IT matrix.
-
-### 5. Map the failing test to its diagnostics
-
-```bash
-<ITRCA> match "$RCA_DIR" "<full-test-name-with-subtest>"
-```
-
-Sanitization (test-name `/` → `-`) and matching are done by the script. If multiple bundles match, pick the one with timestamp closest to the failure timestamp from the JUnit XML. Per-file naming details in [references/test-framework.md](references/test-framework.md).
-
-### 6. Analyze, layer by layer
-
-#### 6a. Test report → confirm the failure mode
-
-```bash
-<ITRCA> junit "$RCA_DIR"                             # all failed test cases with first 25 lines of stack
-<ITRCA> testlog "$RCA_DIR" "<full-test-name>"        # gotestsum stdout/stderr for one test
-```
-
-The JUnit `<failure>` text gives you the assertion message; the gotestsum stream gives `t.Log` output and the printed stacktrace. Both are usually needed.
-
-#### 6b. Diagnostics bundle → invoke the diagnostics skill
-
-Hand the bundle path to the `elastic-agent-diagnostics` skill via the Skill tool:
+Hand the bundle to the `elastic-agent-diagnostics` skill via the Skill tool:
 
 > Skill: elastic-agent-diagnostics
-> args: Apply the skill to the bundle at $RCA_DIR/build/diagnostics/<file>.zip. Produce the full triage summary.
+> args: Apply the skill to the bundle at <path>.zip. Produce the full triage summary.
 
-That skill leads with `<DIAG> triage` (and other `<DIAG>` subcommands) so the actual analysis runs as named-binary invocations. **Do not duplicate its work** — let it produce the structured triage and use the result as primary evidence.
+**Don't duplicate its work** — use its triage as primary evidence.
 
-#### 6c. Per-layer log analysis — verify each layer independently and hunt cross-layer discrepancies
+**No bundle?** That's expected when the test failed before the agent was installed, or before the fixture collected diagnostics — it is not a sign the URL is wrong. Work from the job log, the test output, sibling-test failures in the same job, and the test fixture code (`pkg/testing/`) instead.
 
-The diagnostics skill produces an overall triage. This step **partitions the logs by management layer** so each can be checked against its own expected behavior, and so cross-layer discrepancies surface. Drive scope from `$RCA_LAYERS` set in step 3:
+### 6b. Per-layer log analysis
 
-| `$RCA_LAYERS` | What to slice and check |
-|---|---|
-| `L1` | `<DIAG> layer <bundle> L1 [<component>]` — supervisor only |
-| `L2` | `<DIAG> layer <bundle> L2 [<component>]` — collector core only |
-| `L3` | `<DIAG> layer <bundle> L3 [<component>]` — pipeline component (receiver/processor/extension) |
-| `L4` | `<DIAG> layer <bundle> L4 [<component>]` — embedded beat |
-| `all` | `<DIAG> layers <bundle> [<component>]` — cross-layer interleaved with `L1/L2/L3/L4` tags. **Default for ambiguous symptoms.** |
+Partition the bundle's logs by layer and check each against its own expected behaviour, scoped by `$RCA_LAYERS`. The diagnostics skill's playbook §"Partitioning logs by management layer" has the classification `jq`; the per-component checklist and discrepancy table are in [references/rca-playbook.md](references/rca-playbook.md).
 
-**Per-component layer-by-layer health check.** For every component-id seen in state.yaml *or* the logs:
+For every component id in `state.yaml` *or* the logs:
+1. **L1**: did the supervisor start/stop/remove it, and log the state transitions?
+2. **L3**: did the receiver log its own startup and shutdown?
+3. **L4**: did the beat reach `Beat ID:` / `Home path:`? Did it log its own shutdown?
+4. **Cross-layer**: for each transition the supervisor logged, does the next layer react within seconds?
 
-1. **L1 view of the component:** did the supervisor try to start/stop/remove it? Were the state transitions logged?
-2. **L3 view (receiver shell):** did the receiver log its own startup and shutdown for that component-id?
-3. **L4 view (embedded beat, if applicable):** did the beat get to "Beat ID:" / "Home path:" startup? Did it log its own shutdown?
-4. **Cross-layer:** for each transition the supervisor logged, does the next layer down show the corresponding reaction within seconds?
+When you find a discrepancy between adjacent layers, that pattern plus the log-line citations *is* the evidence chain.
 
-The full per-component verification queries — including the cross-layer interleaved timeline — live in [references/rca-playbook.md](references/rca-playbook.md) §"Per-component log verification". The canonical layer filters are in the diagnostics skill's playbook §"Partitioning logs by management layer".
+### 6c. Test source → understand intent
 
-**Discrepancies between adjacent layers are often the smoking gun:**
+The job name and the JUnit file name tell you the test group (see [references/test-framework.md](references/test-framework.md)); the Go package in the Test Engine `test_name` tells you the directory. Find the test with `grep -rn "func <TestName>" testing/integration/`.
 
-- L1 says "Stopping component" → L2 never logs `Starting shutdown...` → supervisor failed to deliver the signal.
-- L2 logs `Starting shutdown...` → L3 receiver keeps logging activity → receiver ignored shutdown.
-- L3 receiver shell configured → L4 embedded beat never logged `Beat ID:` → receiver bridge broken.
-- L4 beat logs clean shutdown → L1 still shows component in `STOPPING` state → supervisor state-propagation bug.
+Read the test top-to-bottom: setup (policy, integration, install args), the failing assertion (match it to the JUnit message), timing assumptions (`Eventually`, `Wait`, sleep durations).
 
-When you find such a discrepancy, that pattern + line citations *are* the evidence chain. Copy them straight into the report.
+### 6d. Implementation source → trace the failure surface
 
-#### 6d. Test source → understand intent
+Read the code the evidence points at — the diagnostics triage, the failing fixture call, or the component whose logs diverged. If the failure is "X is still present after removal", trace the removal codepath.
 
-The test framework's group name (from the artifact filename) tells you which test directory. For `fleet-endpoint-security`, the test lives under `testing/integration/ess/`. Find the test:
+### 6e. History → is it new, and what changed?
 
-```bash
-grep -rn "func <test-name>" testing/integration/ pkg/testing/
-```
+- **Git**: `git log --since='6 weeks ago' --oneline -- <files>` for the test file and the implicated source; `git log --grep='<keyword>'`.
+- **CI**: is this failure chronic or new? Which branches, platforms, VM images? Does it fail on first attempt and pass on retry? See [references/locating-the-failure.md](references/locating-the-failure.md) §"Finding other occurrences". Cross-reference dates with the issue's occurrences and with commits.
 
-Read the test top-to-bottom. Note:
-- What it sets up (policy, integration, agent install args).
-- Where the failing assertion is — match it against the JUnit failure message.
-- Timing assumptions (`Eventually`, `Wait`, sleep durations).
+## 7. Produce the RCA report
 
-#### 6e. Implementation source → trace the failure surface
+Structure (details in [references/rca-playbook.md](references/rca-playbook.md)):
+- **Failure mode** — one sentence: what assertion failed and the symptom.
+- **Evidence chain** — bullets, each citing a file + finding: `state.yaml: filestream-monitoring state=5 (STOPPING)`, `logs/…/elastic-agent-20260506.ndjson:42: timeout waiting for collector to stop`, `job log 15:28:34: rpm lock contention`.
+- **Suspected cause** — agent bug vs test bug vs infra/environment, and why.
+- **Confidence** — high / medium / low, and what would raise it.
+- **Next investigation step** — one concrete action. Stop here — do not propose code changes.
 
-The diagnostics skill will have pointed at specific Go files (e.g. `internal/pkg/otel/manager/`). Read those. If the failure is "X is still present after removal", trace the removal codepath.
-
-#### 6f. Recent history → find the suspect commit
-
-```bash
-# Files the diagnostics skill flagged + the test file itself
-git log --since='6 weeks ago' --oneline -- <files>
-git log --since='6 weeks ago' --grep='<keyword>' --oneline
-```
-
-Cross-reference dates with the issue's "Failed runs" table if present.
-
-### 7. Produce the RCA report
-
-Use the structure in [references/rca-playbook.md](references/rca-playbook.md):
-- **Failure mode** — one sentence stating what assertion failed and the symptom.
-- **Evidence chain** — bullet list, each citing a file path + finding (`state.yaml: filestream-monitoring state=5 (STOPPING)`, `logs/...20260506.ndjson:42: timeout waiting for collector to stop`, etc).
-- **Suspected cause** — your best hypothesis, distinguishing test bug vs agent bug vs infra/environment.
-- **Confidence** — high / medium / low, with what would raise it.
-- **Next investigation step** — one concrete action (read X, reproduce locally with Y, check git log for Z). Stop here — do not propose code changes.
-
-Cite buildkite job, issue, source files, and bundle paths the same way you'd cite source code: `<file>:<line>` so the user can click through.
+Cite the Buildkite build and job URLs, the issue, source files (`<file>:<line>`), and bundle paths so the user can click through. Mention which occurrence you analyzed if it isn't the one in the issue.
 
 ## House rules
 
-- **Never invent build numbers, job IDs, or artifact paths.** If `bk artifacts list` returns nothing matching, say so and ask the user to verify the URL — don't synthesize an answer.
+- **Validate every download.** A file with the right name is not the right file until it parses.
+- **Never invent build numbers, job IDs, or artifact paths.** If an artifact is missing, say so and explain the likely reason (expired, never uploaded, failure before upload).
+- **"Listed" ≠ available.** The Buildkite API lists artifacts whose GCS objects have expired.
 - **Don't re-implement the diagnostics skill's triage.** Invoke it; cite its findings.
-- **Distinguish test flakiness from agent bugs.** A timing-sensitive `Eventually` with too-short timeout is a test bug. A consistent state-machine deadlock is an agent bug. Say which you think it is.
-- **Multiple bundles per failure are normal.** A test with two agents (e.g. fleet-server + agent) produces two bundles. Match by sanitized test-name prefix and timestamp.
-- **Stop at root-cause + next step.** Do not write code or open PRs. The user will follow up explicitly if they want a fix.
+- **Distinguish test flakiness from agent bugs from infra.** A timing-sensitive `Eventually` with too-short timeout is a test bug. A consistent state-machine deadlock is an agent bug. A package-manager lock or cloud quota error is infra. Say which you think it is.
+- **Stop at root cause + next step.** Do not write code or open PRs. The user will follow up if they want a fix.

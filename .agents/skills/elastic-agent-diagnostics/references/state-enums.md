@@ -1,6 +1,6 @@
 # State Enumerations
 
-Decoded reference for the integer state values that appear throughout `state.yaml` and the agent logs. `diag state <bundle>` and `diag triage <bundle>` decode these automatically; use this file when reading raw YAML/JSON.
+Decoded reference for the integer state values that appear throughout `state.yaml` and the agent logs. Use this file when reading raw YAML/JSON — `state.yaml` stores these as integers.
 
 ## Agent top-level state (`state.yaml: state`)
 

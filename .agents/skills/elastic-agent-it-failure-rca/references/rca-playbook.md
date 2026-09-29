@@ -42,10 +42,14 @@ One concrete action. Stop here — do not propose code changes in the RCA.
 
 For each component ID seen in `state.yaml` or the logs, run these queries in order. The goal is to confirm each layer either behaved correctly or identify the layer where behaviour diverged.
 
+The queries use the `cid`/`layer` definitions from the diagnostics skill's playbook §"Partitioning logs by management layer" — write them to `$WORK/layers.jq` first. `BUNDLE_DIR` is the extracted bundle; `WORK` a scratch dir.
+
 ### Step 1 — L1 supervisor view
 
 ```bash
-<DIAG> layer <bundle> L1 <component-id>
+jq -r -L "$WORK" --arg l L1 --arg c <component-id> 'include "layers";
+  select(layer == $l and (cid == $c or ((.["otelcol.component.id"] // "") | contains($c)) or .["log.source"] == $c))
+  | [.["@timestamp"], .["log.level"], .message[:160]] | @tsv' "$BUNDLE_DIR"/logs/*/*.ndjson | sort
 ```
 
 Expected sequence for a healthy start:
@@ -65,7 +69,9 @@ Flag if: supervisor logs a stop but the component never reaches Stopped; or the 
 ### Step 2 — L3 receiver/process view
 
 ```bash
-<DIAG> layer <bundle> L3 <component-id>
+jq -r -L "$WORK" --arg l L3 --arg c <component-id> 'include "layers";
+  select(layer == $l and (cid == $c or ((.["otelcol.component.id"] // "") | contains($c)) or .["log.source"] == $c))
+  | [.["@timestamp"], .["log.level"], .message[:160]] | @tsv' "$BUNDLE_DIR"/logs/*/*.ndjson | sort
 ```
 
 For OTel-mode components (binary_name: elastic-otel-collector), the receiver shell logs come from the OTel collector process. Look for:
@@ -77,7 +83,9 @@ For process-mode components (binary_name: filebeat/metricbeat/packetbeat), look 
 ### Step 3 — L4 embedded beat view (when applicable)
 
 ```bash
-<DIAG> layer <bundle> L4 <component-id>
+jq -r -L "$WORK" --arg l L4 --arg c <component-id> 'include "layers";
+  select(layer == $l and (cid == $c or ((.["otelcol.component.id"] // "") | contains($c)) or .["log.source"] == $c))
+  | [.["@timestamp"], .["log.level"], .message[:160]] | @tsv' "$BUNDLE_DIR"/logs/*/*.ndjson | sort
 ```
 
 A successfully started beat logs these early lines:
@@ -97,7 +105,9 @@ If L3 shows the receiver started but L4 has no "Beat ID:" line, the beat never i
 ### Step 4 — Cross-layer interleaved timeline
 
 ```bash
-<DIAG> layers <bundle> <component-id>
+jq -r -L "$WORK" --arg c <component-id> 'include "layers";
+  select(cid == $c or ((.["otelcol.component.id"] // "") | contains($c)) or .["log.source"] == $c)
+  | [.["@timestamp"], layer, .["log.level"], .message[:140]] | @tsv' "$BUNDLE_DIR"/logs/*/*.ndjson | sort
 ```
 
 This interleaves L1/L2/L3/L4 lines tagged with their layer. Look for the time gap between a supervisor action (L1) and the corresponding reaction in L2/L3. A gap > ~5 seconds is suspicious; no reaction at all is the smoking gun.
@@ -117,28 +127,39 @@ These cross-layer patterns are the most reliable indicators of where a bug lives
 
 ## Partitioning logs by management layer
 
-The agent and OTel collector write to the same NDJSON log file. Layer is identified by structured tag fields — apply top-down, first match wins (see the diagnostics skill's playbooks.md for the full classification ladder with rationale):
+Layer is identified by structured fields — apply top-down, first match wins. The diagnostics skill's playbook §"Partitioning logs by management layer" has the full ladder with rationale and the reusable `jq` definitions.
 
-| Layer | Filter field | Value |
-|---|---|---|
-| L1 — supervisor | `log.source` | `== "elastic-agent"` — or `log.logger` starts with `"component.runtime."` (supervisor-bridge lines) |
-| L4 — embedded beat | `service.name` | `== "filebeat"` or `"metricbeat"` (checked before L2 to distinguish from OTel core) |
-| L3 — OTel pipeline component | `otelcol.component.id` | not null (e.g. `"filebeatreceiver/_agent-component/filestream-monitoring"`) |
-| L2 — OTel collector core | _(else)_ | no `log.source`, no `service.name`, no `otelcol.component.id` |
+| Layer | Filter |
+|---|---|
+| L1 — supervisor | `log.source == "elastic-agent"`, or `log.logger` starts with `"component.runtime."` (supervisor-bridge lines) |
+| L4 — beat | `service.name` is a beat (`filebeat`, `metricbeat`, `heartbeat`, …); checked before L3 because embedded-beat lines also carry `otelcol.component.id` |
+| L3 — OTel pipeline component | `otelcol.component.id` set (e.g. `"filebeatreceiver/_agent-component/filestream-monitoring"`) |
+| L2 — OTel collector core | else (`service.name == "elastic-otel-collector"`, no `otelcol.component.id`) |
 
-The `<DIAG> layer` subcommand applies these filters automatically. When doing manual `jq`, use these field checks directly — do not match on the `log.logger` package name alone, as it is not a reliable layer discriminator across all code paths.
+Don't match on the `log.logger` package name alone — it is not a reliable layer discriminator across code paths.
 
 ## Timing the failure
 
-Always note the test's `captureStart` timestamp (from the gotestsum output or the test source) and the failure timestamp (from the JUnit XML). The window between them is the observation period. Anything in the agent logs after `captureStart` and before the failure timestamp is in scope; log lines before `captureStart` are setup noise.
+Note the test's observation window: from the moment it starts waiting for the condition it later asserts on (`captureStart`, "waiting for …" `t.Log` lines, or the setup step in the test source) to the failure. Log lines in the bundle inside that window are in scope; earlier lines are setup.
 
 ```bash
-# Extract failure timestamp from JUnit
-<ITRCA> junit "$RCA_DIR" | grep 'timestamp='
+# Failure time: the gotestsum "fail" event (JUnit testcases have no timestamp)
+jq -r --arg t "TestName/subtest" 'select(.Action=="fail" and .Test==$t) | .Time' "$RCA_DIR"/build/*.out.json
 
-# Get captureStart from gotestsum output
-<ITRCA> testlog "$RCA_DIR" "TestName/subtest" | grep -i "captureStart\|capture start\|starting capture"
+# Start of the window, from the test's own log lines
+jq -j --arg t "TestName/subtest" 'select(.Action=="output" and .Test==$t) | "\(.Time[11:23]) \(.Output)"' \
+  "$RCA_DIR"/build/*.out.json | grep -i -e "captureStart" -e "capture start" -e "starting capture" -e "waiting for"
 ```
+
+## When there is no diagnostics bundle
+
+Normal when the failure happened before the agent was installed (install command failed, package manager error, ESS/Fleet provisioning failed) or before the fixture collected diagnostics. Then:
+
+- **Job log** — setup steps from `.buildkite/scripts/`, VM image name, agent version, the failing command's full output.
+- **Sibling tests in the same job** — list every `fail` event with its time. Unrelated tests failing within the same window, with the same error, is an environment problem.
+- **Retry vs first attempt** — a fresh VM passing on retry points at transient environment state; failing again points at something persistent (image, branch, test).
+- **Fixture code** — `pkg/testing/fixture_install.go` and friends: does the failing step retry, wait, or fail on first error?
+- **History** — the same job name across recent builds and branches ([locating-the-failure.md](locating-the-failure.md) §"Finding other occurrences").
 
 ## Common false trails
 

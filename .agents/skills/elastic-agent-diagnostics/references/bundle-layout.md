@@ -1,13 +1,16 @@
 # Diagnostics Bundle Layout
 
-The bundle is a `.zip` produced by `elastic-agent diagnostics`. All paths below are relative to the bundle root (the top-level directory inside the zip).
+The bundle is a `.zip` produced by `elastic-agent diagnostics`. Files sit at the zip root; all paths below are relative to it. Which files are present varies by agent version and mode — treat a missing file as information (see the end of this page), not as a broken bundle.
 
 ## Top-level files
 
 | File | Contents |
 |---|---|
-| `version.txt` | Agent binary version string (e.g. `9.5.0-SNAPSHOT`) |
-| `package.version` | Installed package version; differs from `version.txt` during an upgrade-in-progress |
+| `version.txt` | Agent binary version, as YAML: `version`, `commit`, `build_time`, `snapshot`, `fips` |
+| `package.version` | Installed package version (plain string); differs from `version.txt`'s `version` during an upgrade-in-progress |
+| `agent-info.yaml` | Agent identity and log levels (`log_level`, `log_level_policy`, `log_level_override`), plus `metadata` (host, build, `upgradeable`, …) |
+| `local-config.yaml`, `pre-config.yaml` | The on-disk agent config, and the policy before variable substitution |
+| `environment.yaml` | The agent process's environment variables (sensitive values redacted) |
 | `state.yaml` | **Primary diagnostic file.** Current agent state snapshot: top-level status, per-component states, per-unit states and payloads, OTel collector status. See below. |
 | `components-expected.yaml` | The component model the coordinator has compiled from the latest policy — what it *wants* to run. |
 | `components-actual.yaml` | The component model the coordinator has actually applied — what is *running*. Usually byte-identical to `components-expected.yaml` once converged. A diff between them signals an in-flight or stuck reconfiguration. |
@@ -15,8 +18,9 @@ The bundle is a `.zip` produced by `elastic-agent diagnostics`. All paths below 
 | `otel.yaml` | The OTel config delivered via policy / user override. "no active OTel configuration" when none has been applied. |
 | `otel-merged.yaml` | The merged running OTel collector config (agent-managed components + user-provided otel.yaml). This is what the collector is *actually running*. Use this to check which receivers/exporters/pipelines are active. |
 | `variables.yaml` | Fleet-provided dynamic variable values (host metadata, cloud provider info, etc.) |
-| `fleet-policy.yaml` | The raw Fleet policy as received from Fleet Server before compilation. |
-| `acl.txt` | (Linux) File ACL for the agent data directory. |
+| `fleet-policy.yaml` | (when present) The raw Fleet policy as received from Fleet Server before compilation. |
+| `acl.txt` | (when present) File ACL for the agent data directory. |
+| `*.pprof.gz` | Agent process profiles at the root: `goroutine`, `heap`, `allocs`, `block`, `mutex`, `threadcreate`; `cpu.pprof` only with `--cpu-profile` |
 
 ## `state.yaml` structure
 
@@ -54,12 +58,15 @@ components:
 
 ```
 logs/
-  elastic-agent-<version>-<build>/
-    elastic-agent-<YYYYMMDD>-<N>.ndjson   # main agent + OTel collector log (NDJSON, one JSON object per line)
-    elastic-agent-watcher-<YYYYMMDD>-<N>.ndjson  # upgrade watcher process log (only during upgrades)
+  elastic-agent-<version>-<hash>/
+    elastic-agent-<YYYYMMDD>[-N].ndjson            # agent (supervisor) log, plus captured output of process-mode components
+    elastic-otel-collector-<YYYYMMDD>[-N].ndjson   # EDOT collector log, when the collector runs as its own process
+    elastic-agent-watcher-<YYYYMMDD>[-N].ndjson    # upgrade watcher log
+    elastic-agent-metrics.ndjson                   # periodic agent metrics
+    components/                                    # per-component log files, when present
 ```
 
-Each `.ndjson` file uses log rotation: `N=1` is the most recent. Prior days may have multiple numbered files.
+A new file starts on rotation or process restart: the un-suffixed file is the **oldest** of the day, then `-1`, `-2`, … — the highest `N` is the newest. Concatenate and sort by `@timestamp` rather than relying on names.
 
 **Key fields per log line:**
 
@@ -68,26 +75,26 @@ Each `.ndjson` file uses log rotation: `N=1` is the most recent. Prior days may 
 | `@timestamp` | RFC3339 UTC timestamp |
 | `log.level` | `debug`, `info`, `warn`, `error` |
 | `message` | Human-readable message |
-| `log.source` | `"elastic-agent"` for L1 supervisor lines; absent for OTel collector lines |
+| `log.source` | `"elastic-agent"` for L1 supervisor lines; the component id (e.g. `"synthetics/http-default"`) for captured output of a process-mode component; absent for OTel collector lines |
 | `log.logger` | Package-level logger name (e.g. `"coordinator"`, `"component.runtime.supervisor"`, `"component.runtime.endpoint.service_runtime"`). Supervisor-bridge lines have names starting with `"component.runtime."`. |
-| `component.id` | Component ID the line relates to (when applicable) |
+| `component.id` | Component ID the line relates to. Nested (`.component.id`) on supervisor lines, a flat key (`.["component.id"]`) on captured process-mode output — query both |
 | `component.state` | State string at the time of log (when applicable) |
-| `service.name` | `"filebeat"` or `"metricbeat"` for embedded beat lines (L4) |
+| `service.name` | the beat (`"filebeat"`, `"metricbeat"`, `"heartbeat"`, …) for beat lines (L4); `"elastic-otel-collector"` for collector core and pipeline-component lines |
 | `otelcol.component.id` | OTel component ID for pipeline component lines (L3), e.g. `"filebeatreceiver/_agent-component/filestream-monitoring"` |
 | `otelcol.component.kind` | `"receiver"`, `"processor"`, `"exporter"`, `"extension"` (L3) |
 
 ## `components/` directory
 
-Per-component subdirectories, keyed by component ID:
+Per-component subdirectories, named by component id with `/` replaced by `-` (e.g. `http/metrics-monitoring` → `http-metrics-monitoring`), then per unit:
 
 ```
 components/
   filestream-monitoring/
-    beat_metrics.json     # libbeat pipeline and output statistics
-    <unit-id>/
-      input_metrics.json  # per-input metrics
-      registry.tar.gz     # filebeat registry (omitted if > 20 MB)
-  endpoint/
+    filestream-monitoring-agent/     # unit id
+      beat_metrics.json              # libbeat pipeline and output statistics
+      input_metrics.json             # per-input metrics
+      registry.tar.gz                # filebeat registry (omitted if > 20 MB); extracts to registry/filebeat/{log,meta}.json
+  http-metrics-monitoring/
     ...
 ```
 
@@ -100,6 +107,7 @@ Present when the agent is running in OTel runtime mode.
 ```
 edot/
   otel-merged-actual.yaml   # The config the EDOT collector process is actually running (may differ from top-level otel-merged.yaml during a transition)
+  environment.yaml          # the collector process's environment
   goroutine.profile.gz      # pprof goroutine profile for the collector process
   heap.profile.gz           # pprof heap profile
   allocs.profile.gz
@@ -108,20 +116,9 @@ edot/
   threadcreate.profile.gz
 ```
 
-## `pprof/` directory (agent process profiles)
+## Profiles
 
-```
-pprof/
-  goroutine.pprof.gz
-  heap.pprof.gz
-  allocs.pprof.gz
-  block.pprof.gz
-  mutex.pprof.gz
-  threadcreate.pprof.gz
-  cpu.pprof            # only present when --cpu-profile flag was used
-```
-
-All files are readable directly by `go tool pprof`. `.gz` files are decompressed automatically.
+Agent-process profiles are at the bundle root (`goroutine.pprof.gz`, `heap.pprof.gz`, …); EDOT collector profiles are in `edot/*.profile.gz`. All are readable directly by `go tool pprof`; `.gz` files are decompressed automatically.
 
 ## Notable absences and what they mean
 

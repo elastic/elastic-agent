@@ -1,23 +1,13 @@
 # Diagnostics playbooks
 
-Task-specific recipes. All commands assume `BUNDLE_DIR` is set to the extracted bundle root.
+Task-specific recipes. All commands assume `BUNDLE_DIR` is the extracted bundle root and `WORK` a scratch directory (see SKILL.md §Setup). Each Bash call starts a fresh shell, so set them in every command that uses them.
 
 ## 1. Quick triage (always run first)
 
 Goal: in under a minute, know agent version, fleet status, all component states, and whether logs contain notable errors.
 
-**Preferred — single command** (with `<DIAG>` = `<skill-base-dir>/bin/diag`, absolute path; never `~`):
-
 ```bash
-<DIAG> triage <bundle>
-```
-
-That produces version, identity, fleet config, decoded top-level state, decoded per-component state, expected-vs-actual drift, and per-file log error/warn counts. Accepts either a `.zip` or an extracted directory.
-
-**Manual equivalent (only if the helper is unavailable):**
-
-```bash
-echo "=== version ===" && cat "$BUNDLE_DIR/version.txt"
+echo "=== version ===" && cat "$BUNDLE_DIR/version.txt"      # YAML: version, commit, build_time, snapshot, fips
 echo "=== package ===" && cat "$BUNDLE_DIR/package.version"
 
 echo "=== state (top-level) ==="
@@ -37,7 +27,7 @@ for f in "$BUNDLE_DIR"/logs/*/*.ndjson; do
 done
 ```
 
-`yq` syntax assumed: kislyuk Python `yq` (a jq-wrapper that accepts pure jq filters). Mike Farah's Go `yq` uses different syntax — if you see `error: yq: error parsing filter`, you're hitting the Go variant; rewrite using its native `yq eval` form, or pipe through `python3 -c 'import yaml,sys,json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)'` and use `jq`.
+`yq` syntax assumed: kislyuk Python `yq` (a jq-wrapper that accepts pure jq filters). Mike Farah's Go `yq` uses different syntax — if you see `error: yq: error parsing filter`, you're hitting the Go variant; use `yq -o=json '.' <file> | jq '<filter>'`, or `python3 -c 'import yaml,sys,json; json.dump(yaml.safe_load(sys.stdin), sys.stdout)' < <file> | jq '<filter>'`.
 
 If everything is in state 2 / StatusOK and no errors → stop and tell the user the bundle looks healthy. Don't manufacture issues.
 
@@ -45,22 +35,13 @@ If everything is in state 2 / StatusOK and no errors → stop and tell the user 
 
 NDJSON logs are line-oriented JSON. Use `jq`, never `cat`.
 
-**Preferred — `diag` subcommands** (with `<DIAG>` = `<skill-base-dir>/bin/diag`):
+`logs/<agent-version-dir>/` holds the agent log (`elastic-agent-<YYYYMMDD>[-N].ndjson`), the EDOT collector log when the collector runs as its own process (`elastic-otel-collector-<YYYYMMDD>[-N].ndjson`), the watcher log, and `elastic-agent-metrics.ndjson`. `"$BUNDLE_DIR"/logs/*/*.ndjson` covers them all; narrow the glob when a question is about one process.
 
-```bash
-<DIAG> layer  <bundle> L1|L2|L3|L4 [<component>]
-<DIAG> layers <bundle> [<component>]
-<DIAG> logs   <bundle> [<component>] [--level error|warn] [--since T] [--until T]
-<DIAG> errors <bundle> [--top N]
-<DIAG> warnings <bundle> [--top N]
-<DIAG> transitions <bundle> [<component>]
-```
-
-The raw `jq` recipes below show *what each subcommand does internally* and are useful when you need a query the helper doesn't expose.
+Component ids appear in two encodings: supervisor lines nest them (`.component.id`), lines captured from a subprocess component's stdout use a flat key (`.["component.id"]`). Handle both — the `cid` helper below does.
 
 ### Partitioning logs by management layer
 
-In hybrid mode (the common case), the agent has **four distinct management layers** that all log to the same NDJSON file:
+In hybrid mode (the common case), the agent has **four distinct management layers**, all visible in the bundle's logs:
 
 ```
 1. elastic-agent supervisor (control plane)
@@ -74,28 +55,49 @@ In hybrid mode (the common case), the agent has **four distinct management layer
 
 Each adjacent pair of layers is a control boundary, and **discrepancies between adjacent layers are some of the strongest RCA signals.** A bug typically shows up as one layer thinking something happened that the next layer never observed.
 
-**The layer-classification ladder.** Apply rules top-down — the first match wins. Note: filter priority does not follow layer order (L1→L4) because embedded beats (L4) must be matched before OTel core (L2) — they share the absence of `log.source` and `otelcol.component.id` but are distinguished by `service.name`.
+**The layer-classification ladder.** Apply rules top-down — the first match wins. Priority does not follow layer order (L1→L4): embedded-beat lines (L4) also carry `otelcol.component.id`, so they must be matched by `service.name` before the L3 rule.
 
 | Priority | Layer (L#) | Filter | Examples |
 |---|---|---|---|
-| 1 | **L1 — Supervisor** | `.["log.source"] == "elastic-agent"` | "Spawned new component endpoint", "Component state changed (HEALTHY→STOPPED)", "Performance preset 'balanced' overrides..." |
-| 2 | **L4 — Embedded beat** | `.["service.name"] in ("filebeat", "metricbeat")` | "Home path: ...", "Beat ID: ...", harvester/registrar lines |
-| 3 | **L3 — OTel pipeline component** | `.["otelcol.component.id"] != null` | "Configured Beat processor", "registry bridge discovered initial stats metrics" |
-| 4 | **L2 — OTel collector core** | else (no `log.source`, no `service.name`, no `otelcol.component.id`) | "Starting extensions...", "Everything is ready. Begin running and processing data.", "Config updated, restart service", "Starting shutdown..." |
+| 1 | **L1 — Supervisor** | `.["log.source"] == "elastic-agent"`, or `log.logger` starts with `component.runtime.` | "Spawned new component endpoint", "Component state changed (HEALTHY→STOPPED)", "Performance preset 'balanced' overrides..." |
+| 2 | **L4 — Beat** | `.["service.name"]` is set and is a beat (`filebeat`, `metricbeat`, `heartbeat`, …) — i.e. not `elastic-otel-collector` / `elastic-agent` | "Home path: ...", "Beat ID: ...", harvester/registrar lines |
+| 3 | **L3 — OTel pipeline component** | `.["otelcol.component.id"]` is set | "Configured Beat processor", "registry bridge discovered initial stats metrics" |
+| 4 | **L2 — OTel collector core** | else (in current versions: `service.name == "elastic-otel-collector"`, no `otelcol.component.id`) | "Starting extensions...", "Everything is ready. Begin running and processing data.", "Config updated, restart service", "Starting shutdown..." |
 
-Within layer 3, sub-divide by `otelcol.component.kind`: `receiver`, `processor`, `extension`. Within layer 4, look at `log.logger` — `edot.api` is the EDOT diagnostics endpoint; unset means the OTel collector framework itself.
+Within layer 3, sub-divide by `otelcol.component.kind`: `receiver`, `processor`, `extension`.
 
-**Caveat — supervisor-bridge logs.** A few supervisor packages emit lines without `log.source`. Most notably `log.logger == "component.runtime.endpoint.service_runtime"` (398 lines in the sample) is supervisor code (`pkg/component/runtime/service.go`) that captures and forwards stdout/stderr from the standalone endpoint service process. These will misclassify as layer 4 by the rules above. If `log.logger` starts with `component.runtime.`, treat it as layer 1.
+Within layer 4, distinguish **embedded** beats (inside an OTel receiver: `otelcol.component.id` like `filebeatreceiver/_agent-component/<id>`) from **process-mode** beats (a separate process whose stdout the supervisor captures: `log.source` is the component id, e.g. `synthetics/http-default`, plus flat `component.id` / `component.binary`).
+
+**Caveat — supervisor-bridge logs.** Some supervisor packages emit lines without `log.source: elastic-agent` — notably `log.logger == "component.runtime.endpoint.service_runtime"`, supervisor code (`pkg/component/runtime/service.go`) that forwards stdout/stderr from the standalone endpoint service. Rule 1's `component.runtime.` prefix check keeps them in L1.
+
+**Reusable definitions.** Write these once to a scratch file and `include` them from any `jq` call:
+
+```bash
+cat > "$WORK/layers.jq" <<'EOF'
+def cid: .component.id? // .["component.id"] // "";
+def layer:
+  if .["log.source"] == "elastic-agent"
+     or ((.["log.logger"] // "") | startswith("component.runtime.")) then "L1"
+  elif .["service.name"] and (.["service.name"] | IN("elastic-otel-collector", "elastic-agent") | not) then "L4"
+  elif .["otelcol.component.id"] then "L3"
+  else "L2" end;
+EOF
+
+# One layer, optionally one component:
+jq -c -L "$WORK" --arg l L1 --arg c filestream-monitoring 'include "layers";
+  select(layer == $l and ($c == "" or cid == $c or ((.["otelcol.component.id"] // "") | contains($c))))
+  | {ts: .["@timestamp"], lvl: .["log.level"], cid: cid, msg: .message[:160]}' "$BUNDLE_DIR"/logs/*/*.ndjson
+```
 
 ### Per-component view
 
 A given **component-id** (e.g. `filestream-monitoring`, `endpoint`) appears in multiple layers:
 
-| Layer | What you'll see for `component.id == X` |
+| Layer | What you'll see for component id `X` |
 |---|---|
-| 1 (supervisor) | `log.source == "elastic-agent"` lines tagged `.component.id == X` — the supervisor's view of X (state changes, spawn, stop). |
-| 3 (receiver) | `otelcol.component.id` matching a name like `filebeatreceiver/_agent-component/X` — the receiver shell's startup/shutdown for X. |
-| 4 (embedded beat) | `service.name == "filebeat"/"metricbeat"` *and* `.component.id == X` — the beat itself running inside the receiver. |
+| 1 (supervisor) | `log.source == "elastic-agent"` lines with `cid == X` — the supervisor's view of X (state changes, spawn, stop). |
+| 3 (receiver) | `otelcol.component.id` matching a name like `filebeatreceiver/_agent-component/X`, `service.name == "elastic-otel-collector"` — the receiver shell's startup/shutdown for X. |
+| 4 (beat) | `service.name` = the beat, with `otelcol.component.id` containing X (embedded) or `log.source == X` (process mode) — the beat itself. |
 
 That's three views of the same component, each from one layer up. Pull them all to triangulate.
 
@@ -112,27 +114,18 @@ These are the high-value findings. A bug typically shows up as one layer thinkin
 | L3 → L4 | Receiver shell: configured → Embedded beat: never logs `Beat ID: ...` | Receiver bridge broken; beat never got initialized. |
 | L3 → L4 | Receiver: shutdown → Embedded beat: still emitting harvester/output lines | Beat ignored shutdown — possible deadlock in beat-side code. |
 | L1 ↔ state.yaml | Supervisor: logs "FATAL"/panic for X → state.yaml: shows X HEALTHY | State is stale; supervisor hasn't observed the failure yet. |
+| none | Every layer agrees: the lowest layer fails, and each layer above reports it faithfully (e.g. beat can't load a library → collector can't build pipelines → supervisor restarts the collector and reports FAILED) | No propagation bug — the cause is at the lowest layer or in the environment. Stop hunting for cross-layer discrepancies. |
 
 These are *sequence* mismatches — verify them by reading the cross-layer interleaved timeline (next section), not by reading any one layer in isolation.
 
 ### Cross-layer interleaved timeline
 
-To hunt discrepancies, look at all four layers in time order with explicit layer tags:
+To hunt discrepancies, look at all four layers in time order with explicit layer tags (uses `layers.jq` from above). The agent and collector logs are separate files, so sort by timestamp:
 
 ```bash
-jq -c '. | {
-  ts: .["@timestamp"],
-  lvl: .["log.level"],
-  layer: (
-    if .["log.source"]=="elastic-agent"
-       or ((.["log.logger"]//"") | startswith("component.runtime.")) then "L1-supervisor"
-    elif .["service.name"] == "filebeat" or .["service.name"] == "metricbeat" then "L4-beat"
-    elif .["otelcol.component.id"] then "L3-otel-component"
-    else "L2-otel-core" end),
-  cid: (.component.id // ""),
-  otel: (.["otelcol.component.id"] // ""),
-  msg: (.message[:120])
-}' "$BUNDLE_DIR"/logs/*/*.ndjson
+jq -r -L "$WORK" 'include "layers";
+  [.["@timestamp"], layer, .["log.level"], cid, (.["otelcol.component.id"] // ""), .message[:120]] | @tsv' \
+  "$BUNDLE_DIR"/logs/*/*.ndjson | sort
 ```
 
 Filter to a window and a specific component to chase a specific transition:
@@ -140,15 +133,10 @@ Filter to a window and a specific component to chase a specific transition:
 ```bash
 CID=filestream-monitoring
 START="2026-04-10T14:23:00Z"; END="2026-04-10T14:23:30Z"
-jq -c --arg cid "$CID" --arg s "$START" --arg e "$END" '
+jq -r -L "$WORK" --arg cid "$CID" --arg s "$START" --arg e "$END" 'include "layers";
   select(.["@timestamp"] >= $s and .["@timestamp"] <= $e) |
-  select(.component.id == $cid or (.["otelcol.component.id"] // "") | contains($cid)) |
-  {ts: .["@timestamp"], lvl: .["log.level"],
-   layer: (
-     if .["log.source"]=="elastic-agent" then "L1"
-     elif .["service.name"]=="filebeat" or .["service.name"]=="metricbeat" then "L4"
-     elif .["otelcol.component.id"] then "L3" else "L2" end),
-   msg: .message[:120]}' "$BUNDLE_DIR"/logs/*/*.ndjson
+  select(cid == $cid or ((.["otelcol.component.id"] // "") | contains($cid)) or .["log.source"] == $cid) |
+  [.["@timestamp"], layer, .["log.level"], .message[:120]] | @tsv' "$BUNDLE_DIR"/logs/*/*.ndjson | sort
 ```
 
 Read the output top-to-bottom: each transition should produce activity in the layer being driven (L1 emits, L2/L3/L4 react). Silence in the next layer after a directive is the signal.
@@ -178,8 +166,15 @@ jq -r --arg cid "$CID" 'select(.component.id==$cid and .component.state) |
 ### Top distinct error messages
 
 ```bash
-jq -r 'select(.["log.level"]=="error") | .message' "$BUNDLE_DIR"/logs/*/*.ndjson \
+jq -r 'select(.["log.level"]=="error") | .message[:200]' "$BUNDLE_DIR"/logs/*/*.ndjson \
   | sort | uniq -c | sort -rn | head -20
+```
+
+**Not every root cause is logged at `error`.** When the collector crash-loops (supervisor: `collector exited with error` / `collector recovery restarting`), its pipeline-construction failure can be logged below error level (seen at `debug`). Search for it at any level:
+
+```bash
+jq -r 'select(.message | test("failed to build pipelines|error found during service initialization"))
+  | "\(.["@timestamp"]) \(.["log.level"]) \(.message[:300])"' "$BUNDLE_DIR"/logs/*/*.ndjson | sort | head -20
 ```
 
 ### Errors with timestamps and origin (best for triage)
@@ -194,7 +189,7 @@ jq -r 'select(.["log.level"]=="error") |
 
 ```bash
 jq -c --arg cid "filestream-monitoring" \
-  'select((.["component.id"]==$cid) or (.message | contains($cid)))' \
+  'select(((.component.id? // .["component.id"]) == $cid) or (.message | contains($cid)))' \
   "$BUNDLE_DIR"/logs/*/*.ndjson
 ```
 
@@ -214,8 +209,6 @@ jq -c 'select(.message | test("state changed|Component state changed|Unit state 
 ```
 
 ## 3. Component & policy inspection
-
-**Preferred:** `<DIAG> components <bundle>`, `<DIAG> policy <bundle>`, `<DIAG> drift <bundle>`, `<DIAG> streams <bundle>` (with `<DIAG>` = `<skill-base-dir>/bin/diag`). Raw queries below for ad-hoc cases.
 
 ### What does the policy compile into?
 
@@ -282,7 +275,7 @@ yq '[.components[] | .id as $cid |
 
 All pprof files (including `.gz`) work directly with `go tool pprof`.
 
-**Preferred:** `<DIAG> pprof <bundle> <profile> [--edot] [pprof-args...]` (with `<DIAG>` = `<skill-base-dir>/bin/diag`). Profile is one of `heap|allocs|goroutine|cpu|block|mutex|threadcreate`. With no extra args defaults to `-top -nodecount 20`. Add `--edot` to point at the EDOT collector's profile in `<bundle>/edot/`. The raw recipes below are still useful when you need flag combinations the helper doesn't pass through.
+Agent profiles are at the bundle root (`goroutine.pprof.gz`, `heap.pprof.gz`, …); the EDOT collector's are in `edot/*.profile.gz`.
 
 ### Goroutine leaks
 
@@ -354,14 +347,17 @@ Look for: "Upgrade Watcher invoked" → "Watcher detected unhealthy" → "Rollba
 For beat-based components (filestream, metricbeat, etc.):
 
 ```bash
+# <dir> is the component id with / replaced by - (e.g. http-metrics-monitoring); <unit> is the unit id
+ls "$BUNDLE_DIR"/components/*/
+
 # Pipeline health
-jq '.libbeat.pipeline.events' "$BUNDLE_DIR/components/<id>/beat_metrics.json"
+jq '.libbeat.pipeline.events' "$BUNDLE_DIR/components/<dir>/<unit>/beat_metrics.json"
 
 # Output stats
-jq '.libbeat.output' "$BUNDLE_DIR/components/<id>/beat_metrics.json"
+jq '.libbeat.output' "$BUNDLE_DIR/components/<dir>/<unit>/beat_metrics.json"
 
 # Per-input metrics (filebeat-like)
-jq '.' "$BUNDLE_DIR/components/<id>/<unit-id>/input_metrics.json"
+jq '.' "$BUNDLE_DIR/components/<dir>/<unit>/input_metrics.json"
 ```
 
 Key signals:
@@ -374,12 +370,12 @@ Key signals:
 If a filebeat-based component has `registry.tar.gz`:
 
 ```bash
-mkdir -p "$BUNDLE_DIR/_registry-extracted"
-tar -xzf "$BUNDLE_DIR/components/<id>/<unit-id>/registry.tar.gz" -C "$BUNDLE_DIR/_registry-extracted"
-ls "$BUNDLE_DIR/_registry-extracted"
+mkdir -p "$WORK/_registry-extracted"
+tar -xzf "$BUNDLE_DIR/components/<dir>/<unit>/registry.tar.gz" -C "$WORK/_registry-extracted"
+ls "$WORK/_registry-extracted"
 
 # Most recent state for a file
-jq 'select(.k | test("filestream::"))' "$BUNDLE_DIR/_registry-extracted/filebeat/log.json"
+jq -c 'select((.k // "") | test("filestream::"))' "$WORK/_registry-extracted/registry/filebeat/log.json"
 ```
 
 A registry larger than 20MB will be missing — the agent skips it and logs a warning. Look in the agent log for `"registry too large"`-style messages.
