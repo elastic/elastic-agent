@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	FallbackArchiveSize = uint64(700 * 1024 * 1024)
+	FallbackArchiveSize = uint64(600 * 1024 * 1024)
 	FallbackPayloadSize = uint64(2 * 1024 * 1024 * 1024)
 )
 
