@@ -14,6 +14,11 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const (
+	FallbackArchiveSize = uint64(450 * 1024 * 1024)
+	FallbackPayloadSize = uint64(1280 * 1024 * 1024)
+)
+
 func preallocateFile(file *os.File, size int64) error {
 	if size <= 0 {
 		return nil
