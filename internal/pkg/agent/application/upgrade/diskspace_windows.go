@@ -12,6 +12,11 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const (
+	FallbackArchiveSize = uint64(350 * 1024 * 1024)
+	FallbackPayloadSize = uint64(1024 * 1024 * 1024)
+)
+
 func preallocateFile(file *os.File, size int64) error {
 	if size > 0 {
 		fileAllocationInfo := struct {
