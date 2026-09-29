@@ -141,7 +141,7 @@ func filterStartVersionsForECH(t *testing.T, versions, echVersions []*version.Pa
 		})
 	}
 
-	return slices.DeleteFunc(versions, func(ver *version.ParsedSemVer) bool {
+	return slices.DeleteFunc(slices.Clone(versions), func(ver *version.ParsedSemVer) bool {
 		if !isAvailableInECH(ver) || ver.IsSnapshot() != endVersionParsed.IsSnapshot() {
 			return true
 		}
