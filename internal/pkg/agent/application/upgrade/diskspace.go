@@ -26,11 +26,9 @@ import (
 )
 
 const (
-	ChecksumSize        = uint64(1024)                   // 1KB
-	ExtraInstallSize    = uint64(50 * 1024 * 1024)       // 50MB
-	MarkerSize          = uint64(1024 * 1024)            // 1MB
-	FallbackArchiveSize = uint64(700 * 1024 * 1024)      // 700MB
-	FallbackPayloadSize = uint64(2 * 1024 * 1024 * 1024) // 2GB
+	ChecksumSize     = uint64(1024)             // 1KB
+	ExtraInstallSize = uint64(50 * 1024 * 1024) // 50MB
+	MarkerSize       = uint64(1024 * 1024)      // 1MB
 )
 
 func getArchiveReservation(archiveDir string) string {
