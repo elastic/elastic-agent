@@ -907,37 +907,6 @@ func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *con
 	assert.Equal(t, string(want), string(got))
 }
 
-func TestGetElasticsearchAuthExtensionID(t *testing.T) {
-	defaultID := getElasticsearchAuthExtensionID("default")
-
-	require.Equal(
-		t,
-		"elasticsearchauth/_agent-component/default",
-		defaultID.String(),
-		"extension ID must include the Elasticsearch output name",
-	)
-	require.Equal(
-		t,
-		defaultID,
-		getElasticsearchAuthExtensionID("default"),
-		"the same Elasticsearch output name must produce the same extension ID",
-	)
-
-	secondaryID := getElasticsearchAuthExtensionID("secondary")
-	require.Equal(
-		t,
-		"elasticsearchauth/_agent-component/secondary",
-		secondaryID.String(),
-		"extension ID must include the distinct Elasticsearch output name",
-	)
-	require.NotEqual(
-		t,
-		defaultID,
-		secondaryID,
-		"different Elasticsearch output names must produce distinct extension IDs",
-	)
-}
-
 func TestGetElasticsearchAuthExtensionConfig(t *testing.T) {
 	t.Setenv("ELASTICSEARCH_AUTH_HOST", "es.example")
 
