@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,6 +100,60 @@ func TestOtelKubeStackHelm(t *testing.T) {
 					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
 					k8sStepCheckNamespaceDatastreamHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
 				},
+			},
+		},
+		{
+			name: "managed helm kube-stack operator standalone agent openshift rootless",
+			steps: []k8sTestStep{
+				k8sStepRequireOpenShift(),
+				k8sStepCreateNamespace(),
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
+						values.Options{
+							ValueFiles: []string{
+								"../../../deploy/helm/edot-collector/kube-stack/values.yaml",
+								"../../../deploy/helm/edot-collector/kube-stack/openshift/values.yaml",
+								"../../../deploy/helm/edot-collector/kube-stack/openshift/rootless-values.yaml",
+							},
+							Values: []string{
+								fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
+								fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
+								"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
+								// store the filelog checkpoints of each run in a new directory
+								// of the hostPath, so earlier runs do not leave offsets in them
+								fmt.Sprintf("collectors.daemon.config.extensions.file_storage.directory=/var/lib/otelcol/%s", namespace),
+								"collectors.daemon.config.extensions.file_storage.create_directory=true",
+							},
+							JSONValues: []string{
+								fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+								fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
+							},
+						},
+					)(t, ctx, kCtx, namespace)
+				},
+				// - An OpenTelemetry Operator Deployment (1 pod per
+				// cluster)
+				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
+				// - A Daemonset to collect K8s node's metrics and logs
+				// (1 EDOT collector pod per node)
+				// - A Cluster wide Deployment to collect K8s metrics and
+				// events (1 EDOT collector pod per cluster)
+				// - Two Gateway pods to collect, aggregate and forward
+				// telemetry.
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+				// validate the daemon collector runs as non-root
+				k8sStepCheckPodsRunAs("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container", 1000, 0),
+				// validate k8s metrics are being pushed
+				k8sStepCheckNamespaceDatastreamHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				// validates pod logs are being pushed
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
+					k8sStepCheckNamespaceFilelogDatastreamHits(info, "logs", "generic.otel", "default")(t, ctx, kCtx, namespace)
+				},
+				// validate filelog checkpoints are persisted across restarts
+				k8sStepRestartPods("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container"),
+				k8sStepCheckPodsLogContains("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container",
+					"Resuming from previously known offset(s)"),
 			},
 		},
 		{
@@ -195,6 +251,14 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				step(t, ctx, kCtx, testNamespace)
 			}
 		})
+	}
+}
+
+func k8sStepRequireOpenShift() k8sTestStep {
+	return func(t *testing.T, _ context.Context, kCtx k8sContext, _ string) {
+		if !kCtx.openshift {
+			t.Skip("only supported on OpenShift")
+		}
 	}
 }
 
@@ -337,6 +401,56 @@ func k8sStepCreateOpenShiftInfrastructure() k8sTestStep {
 	}
 }
 
+// k8sStepCheckPodsRunAs checks the user and group of the container inside the pods returned by the selector
+func k8sStepCheckPodsRunAs(podLabelSelector string, containerName string, uid, gid int64) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		pods := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = podLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector %q", podLabelSelector)
+		require.NotEmptyf(t, pods.Items, "no pod found for label selector %q", podLabelSelector)
+
+		checkedContainers := 0
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				if container.Name != containerName {
+					continue
+				}
+
+				sc := container.SecurityContext
+				require.NotNilf(t, sc, "securityContext of container %q in pod %s", containerName, pod.Name)
+				assert.Equalf(t, new(uid), sc.RunAsUser, "runAsUser of container %q in pod %s", containerName, pod.Name)
+				assert.Equalf(t, new(gid), sc.RunAsGroup, "runAsGroup of container %q in pod %s", containerName, pod.Name)
+				checkedContainers++
+			}
+		}
+
+		require.Equalf(t, len(pods.Items), checkedContainers,
+			"every pod with selector %q should have a container with name %q", podLabelSelector, containerName)
+	}
+}
+
+// k8sStepCheckPodsLogContains checks the logs of the container inside the pods returned by the selector contain the expected text
+func k8sStepCheckPodsLogContains(podLabelSelector string, containerName string, expected string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		pods := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = podLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector %q", podLabelSelector)
+		require.NotEmptyf(t, pods.Items, "no pod found for label selector %q", podLabelSelector)
+
+		for _, pod := range pods.Items {
+			require.EventuallyWithTf(t, func(collectT *assert.CollectT) {
+				lines, err := k8sReadPodLogLines(ctx, kCtx.clientSet, namespace, pod.Name, &corev1.PodLogOptions{Container: containerName}, 0)
+				require.NoError(collectT, err, "failed to read logs of pod %s", pod.Name)
+				require.True(collectT, slices.ContainsFunc(lines, func(line string) bool { return strings.Contains(line, expected) }))
+			}, 2*time.Minute, 5*time.Second, "logs of container %q in pod %s should contain %q", containerName, pod.Name, expected)
+		}
+	}
+}
+
 func k8sStepDeployJavaApp() k8sTestStep {
 	return k8sStepDeployApp("java_app.yaml")
 }
@@ -360,6 +474,13 @@ func k8sStepCheckNamespaceDatastreamHits(info *define.Info, dsType, dataset, dat
 	}
 }
 
+func k8sStepCheckNamespaceFilelogDatastreamHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		k8sCheckDatastreamHits(t, ctx, info, dsType, dataset, datastreamNamespace, "k8s.namespace.name", namespace,
+			map[string]any{"exists": map[string]any{"field": "attributes.log.file.path"}})
+	}
+}
+
 func k8sStepCheckClusterNameDatastreamHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, _ string) {
 		if !kCtx.openshift {
@@ -373,13 +494,55 @@ func k8sStepCheckClusterNameDatastreamHits(info *define.Info, dsType, dataset, d
 	}
 }
 
+func k8sStepRestartPods(podLabelSelector string, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		listOpts := func(opt *metav1.ListOptions) { opt.LabelSelector = podLabelSelector }
+
+		oldPods := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, oldPods, listOpts)
+		require.NoError(t, err, "failed to list pods with selector %q", podLabelSelector)
+		require.NotEmptyf(t, oldPods.Items, "no pod found for label selector %q", podLabelSelector)
+
+		oldNames := make(map[string]struct{}, len(oldPods.Items))
+		for _, pod := range oldPods.Items {
+			oldNames[pod.Name] = struct{}{}
+			require.NoError(t, kCtx.client.Resources(namespace).Delete(ctx, &pod), "failed to delete pod %q", pod.Name)
+		}
+
+		require.EventuallyWithTf(t, func(collectT *assert.CollectT) {
+			pods := &corev1.PodList{}
+			err := kCtx.client.Resources(namespace).List(ctx, pods, listOpts)
+			require.NoError(collectT, err, "failed to list pods with selector %q", podLabelSelector)
+
+			readyContainers := 0
+			for _, pod := range pods.Items {
+				_, old := oldNames[pod.Name]
+				require.Falsef(collectT, old, "pod %s is not deleted yet", pod.Name)
+
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name != containerName {
+						continue
+					}
+
+					if container.Ready {
+						readyContainers++
+					}
+				}
+			}
+
+			require.GreaterOrEqualf(collectT, readyContainers, len(oldPods.Items),
+				"at least %d containers with name %q should be ready", len(oldPods.Items), containerName)
+		}, 5*time.Minute, 10*time.Second, "pods with selector %q should be replaced", podLabelSelector)
+	}
+}
+
 // k8sCheckDatastreamHits waits until the datastream has at least one document carrying the given resource attribute.
-func k8sCheckDatastreamHits(t *testing.T, ctx context.Context, info *define.Info, dsType, dataset, datastreamNamespace, attribute, value string) {
+func k8sCheckDatastreamHits(t *testing.T, ctx context.Context, info *define.Info, dsType, dataset, datastreamNamespace, attribute, value string, filters ...any) {
 	dsName := fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)
 	// Check errors against the CollectT so a transient query failure is
 	// retried on the next tick instead of aborting the test.
 	require.EventuallyWithT(t, func(collectT *assert.CollectT) {
-		query := queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value)
+		query := queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value, filters...)
 		docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
 		require.NoError(collectT, err, "failed to get %s datastream documents", dsName)
 		require.Greater(collectT, docs.Hits.Total.Value, 0)
