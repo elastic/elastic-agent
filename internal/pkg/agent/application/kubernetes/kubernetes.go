@@ -48,10 +48,6 @@ const (
 type containerLogConfidence int
 
 const (
-	// certainConfidence is assigned when Fleet's immutable meta.package.name
-	// field identifies the Kubernetes integration. No further signals are needed.
-	certainConfidence containerLogConfidence = 100
-
 	// highConfidence is the minimum score required to rewrite an input without
 	// any user-visible log message. Combinations of a kubelet log path and a
 	// per-container kubernetes variable in the path each contribute enough to
@@ -61,6 +57,14 @@ const (
 	// suspectedConfidence is the minimum score at which the input is still
 	// rewritten, but a warning is emitted so operators can verify the decision.
 	suspectedConfidence containerLogConfidence = 40
+
+	// packageSignalScore is added when meta.package.name == "kubernetes" is
+	// present. It is a strong signal but not sufficient on its own: an
+	// audit-log stream (score 0 from path/dataset/id signals) still falls
+	// below suspectedConfidence (0 + 30 < 40), while a canonical container-log
+	// stream (kubelet path + container var = 70) is pushed well past
+	// highConfidence (70 + 30 = 100).
+	packageSignalScore containerLogConfidence = 30
 )
 
 // k8sVarPattern matches elastic-agent variable references scoped to the
@@ -156,7 +160,6 @@ func RewriteContainerLogInputs(m map[string]interface{}, globInput bool, log *lo
 // (which lives at the input level, not the stream level) can be checked once.
 //
 // Score thresholds:
-//   - certainConfidence  (100): Fleet-managed; meta.package.name == "kubernetes"
 //   - highConfidence      (70): multiple strong path/id signals; apply silently
 //   - suspectedConfidence (40): some signals; apply but emit a warning
 //   - below suspectedConfidence: do not apply
@@ -164,9 +167,13 @@ func containerLogStreamConfidence(input, stream map[string]interface{}) (contain
 	var signals []string
 	score := containerLogConfidence(0)
 
-	// Fleet signal: meta.package.name is set by Fleet and is immutable.
+	// Fleet signal: meta.package.name is set by Fleet and is immutable, but it
+	// identifies the package, not the stream type. An input in the kubernetes
+	// package can carry non-container streams (e.g. audit logs), so this signal
+	// contributes a bonus rather than short-circuiting to certainty.
 	if pkg, ok := nestedString(input, "meta", "package", "name"); ok && pkg == fleetPackageName {
-		return certainConfidence, []string{"meta.package.name=kubernetes (Fleet-managed)"}
+		score += packageSignalScore
+		signals = append(signals, "meta.package.name=kubernetes (Fleet-managed)")
 	}
 
 	// Path signals — check every path in the stream.

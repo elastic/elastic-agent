@@ -420,7 +420,11 @@ func TestContainerLogStreamConfidence(t *testing.T) {
 		wantMax   containerLogConfidence
 	}{
 		{
-			name: "Fleet meta.package.name=kubernetes → certain",
+			// meta.package.name contributes a bonus but does not short-circuit
+			// to certainty. A stream with a container-log id pattern and a
+			// kubernetes variable in the id lands between suspectedConfidence
+			// and highConfidence (score=55: +30 package, +15 id pattern, +10 k8s var).
+			name: "Fleet meta.package.name=kubernetes with non-standard path → suspected",
 			inputYAML: `
 meta:
   package:
@@ -433,8 +437,27 @@ streams:
     paths:
       - /custom/path/*.log
 `,
-			wantMin: certainConfidence,
-			wantMax: certainConfidence,
+			wantMin: suspectedConfidence,
+			wantMax: highConfidence - 1,
+		},
+		{
+			// An audit-log stream co-located in a kubernetes-package input must
+			// NOT reach suspectedConfidence: its path and dataset produce no
+			// signals, so the package bonus (30) leaves it below the threshold (40).
+			name: "Fleet meta.package.name=kubernetes with audit-log stream → below threshold",
+			inputYAML: `
+meta:
+  package:
+    name: kubernetes
+    version: 1.52.0
+streams:
+  - data_stream:
+      dataset: kubernetes.audit_logs
+    paths:
+      - /var/log/kubernetes/kube-apiserver-audit.log
+`,
+			wantMin: 0,
+			wantMax: suspectedConfidence - 1,
 		},
 		{
 			name: "kubelet path + container.id var → high confidence",
@@ -649,6 +672,33 @@ func TestMarkContainerLogTakeOver_StaticID(t *testing.T) {
 	stream := input["streams"].([]interface{})[0].(map[string]interface{})
 	_, hasTakeOver := stream[takeOverField]
 	assert.False(t, hasTakeOver, "static id must not get a take_over annotation")
+}
+
+// TestRewriteContainerLogInputs_LeavesNonContainerLogKubernetesInputAlone
+// verifies that an input from the kubernetes Fleet package whose streams are
+// not container logs (e.g. audit logs) is left completely unchanged. The
+// package signal alone (score=30) does not reach suspectedConfidence (40), so
+// the input must not be rewritten at all.
+func TestRewriteContainerLogInputs_LeavesNonContainerLogKubernetesInputAlone(t *testing.T) {
+	policy := `
+inputs:
+  - id: audit-log
+    type: filestream
+    meta:
+      package:
+        name: kubernetes
+        version: 1.52.0
+    streams:
+      - data_stream:
+          dataset: kubernetes.audit_logs
+          type: logs
+        paths:
+          - /var/log/kubernetes/kube-apiserver-audit.log
+`
+	before := mustConfig(t, policy)
+	after := mustConfig(t, policy)
+	RewriteContainerLogInputs(after, true, nil)
+	assert.Equal(t, before, after, "non-container-log kubernetes input must not be rewritten")
 }
 
 // TestRewriteStreamPaths_NonStringPath covers the branch where a path list
