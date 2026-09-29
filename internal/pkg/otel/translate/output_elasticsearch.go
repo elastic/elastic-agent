@@ -16,6 +16,7 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	otelcomponent "go.opentelemetry.io/collector/component"
 
+	"github.com/elastic/beats/v7/libbeat/cloudid"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
@@ -240,7 +241,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		return nil, nil, nil, err
 	}
 
-	hosts, err := getURL(escfg, output)
+	hosts, err := getURL(escfg.ElasticsearchConfig, output)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
@@ -403,7 +404,7 @@ func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	return retryCfg
 }
 
-func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
+func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string, error) {
 	// Create url using host name, protocol and path
 	outputHosts, err := outputs.ReadHostList(output)
 	if err != nil {
@@ -422,21 +423,127 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 	}
 
 	if len(escfg.Params) != 0 {
-		// convert params to map[string][]string
-		params := make(map[string][]string, 0)
-		for key, value := range escfg.Params {
-			params[key] = []string{value}
-		}
-
-		decodedParam := url.Values(params)
-		// It is enough to add params as encoded query to any one host
-		// Elasticsearch exporter will make sure to add these for every outgoing request
+		// Each endpoint may be selected independently, so every URL needs the output parameters.
 		for i := range hosts {
-			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+			hostURL, err := url.Parse(hosts[i])
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse generated Elasticsearch URL %q: %w", hosts[i], err)
+			}
+			query := hostURL.Query()
+			for key, value := range escfg.Params {
+				query.Set(key, value)
+			}
+			hostURL.RawQuery = query.Encode()
+			hosts[i] = hostURL.String()
 		}
 	}
 
 	return hosts, nil
+}
+
+// getElasticsearchAuthExtensionConfig translates the endpoint, destination
+// headers, and credentials used by Heartbeat's Elasticsearch state loader.
+// Transport settings are delegated to the output-scoped beatsauth extension.
+func getElasticsearchAuthExtensionConfig(output *config.C, outputName string) (map[string]any, error) {
+	resolvedOutput, err := resolveElasticsearchOutputCloudConfig(output)
+	if err != nil {
+		return nil, err
+	}
+
+	esConfig := elasticsearch.DefaultConfig()
+	if err := resolvedOutput.Unpack(&esConfig); err != nil {
+		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
+	}
+	if err := esConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
+	}
+
+	endpoints, err := getURL(esConfig, resolvedOutput)
+	if err != nil {
+		return nil, fmt.Errorf("error creating elasticsearchauth endpoints: %w", err)
+	}
+
+	extensionConfig := map[string]any{
+		"endpoints": endpoints,
+		"auth": map[string]any{
+			"authenticator": getBeatsAuthExtensionID(outputName).String(),
+		},
+	}
+
+	if esConfig.Username != "" || esConfig.Password != "" {
+		if esConfig.Username == "" || esConfig.Password == "" {
+			return nil, errors.New("username and password must be configured together for the elasticsearchauth extension")
+		}
+		extensionConfig["user"] = esConfig.Username
+		extensionConfig["password"] = esConfig.Password
+	}
+	if esConfig.APIKey != "" {
+		extensionConfig["api_key"] = esConfig.APIKey
+	}
+	setIfNotNil(extensionConfig, "headers", esConfig.Headers)
+
+	return extensionConfig, nil
+}
+
+// resolveElasticsearchOutputCloudConfig returns an independently owned,
+// environment-resolved output config and applies output-scoped Cloud ID fields
+// without changing the policy-derived source map.
+func resolveElasticsearchOutputCloudConfig(output *config.C) (*config.C, error) {
+	var resolvedMap map[string]any
+	if err := output.Unpack(&resolvedMap); err != nil {
+		return nil, fmt.Errorf("failed resolving Elasticsearch output config: %w", err)
+	}
+	resolvedOutput, err := config.NewConfigFrom(resolvedMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed copying Elasticsearch output config: %w", err)
+	}
+
+	cloudID, err := firstConfiguredString(resolvedOutput, "cloud_id", "cloud.id")
+	if err != nil {
+		return nil, err
+	}
+	cloudAuth, err := firstConfiguredString(resolvedOutput, "cloud_auth", "cloud.auth")
+	if err != nil {
+		return nil, err
+	}
+	if cloudID == "" {
+		if cloudAuth != "" {
+			return nil, errors.New("cloud_auth is configured but cloud_id is empty")
+		}
+		return resolvedOutput, nil
+	}
+
+	cloudConfig, err := cloudid.NewCloudID(cloudID, cloudAuth)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cloud_id: %w", err)
+	}
+	resolvedMap["hosts"] = []string{cloudConfig.ElasticsearchURL()}
+	if cloudAuth != "" {
+		resolvedMap["username"] = cloudConfig.Username()
+		resolvedMap["password"] = cloudConfig.Password()
+	}
+
+	resolvedOutput, err = config.NewConfigFrom(resolvedMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed applying cloud_id to Elasticsearch output config: %w", err)
+	}
+	return resolvedOutput, nil
+}
+
+func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
+	for _, field := range fields {
+		if !cfg.HasField(field) {
+			continue
+		}
+		value, err := cfg.String(field, -1)
+		if err != nil {
+			return "", fmt.Errorf("%s must be a string: %w", field, err)
+		}
+		if value != "" {
+			return value, nil
+		}
+	}
+	return "", nil
 }
 
 // getElasticsearchAuthExtensionID returns the output-scoped ID for the

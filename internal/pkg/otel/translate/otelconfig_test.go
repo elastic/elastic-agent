@@ -441,6 +441,17 @@ func TestGetOtelConfig(t *testing.T) {
 		return finalOutput
 	}
 
+	expectedElasticsearchAuthExtensionConfig := func() map[string]any {
+		return map[string]any{
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			},
+			"endpoints": []string{"http://localhost:9200"},
+			"password":  "password",
+			"user":      "elastic",
+		}
+	}
+
 	expectedESConfig := func(outputName string) map[string]any {
 		return map[string]any{
 			"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
@@ -2056,13 +2067,17 @@ func TestGetOtelConfig(t *testing.T) {
 					"elasticsearch/_agent-component/default": expectedESConfig("default"),
 				},
 				"extensions": map[string]any{
-					"beatsauth/_agent-component/default": expectedExtensionConfig(),
+					"beatsauth/_agent-component/default":         expectedExtensionConfig(),
+					"elasticsearchauth/_agent-component/default": expectedElasticsearchAuthExtensionConfig(),
 				},
 				"receivers": map[string]any{
 					"heartbeatreceiver/_agent-component/heartbeat-default/test-1": expectedHeartbeatReceiverConfig("heartbeat-default"),
 				},
 				"service": map[string]any{
-					"extensions": []any{"beatsauth/_agent-component/default"},
+					"extensions": []any{
+						"beatsauth/_agent-component/default",
+						"elasticsearchauth/_agent-component/default",
+					},
 					"pipelines": map[string]any{
 						"logs/_agent-component/heartbeat-default": map[string][]string{
 							"exporters": {"elasticsearch/_agent-component/default"},

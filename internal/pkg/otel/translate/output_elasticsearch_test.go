@@ -14,12 +14,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestGetRetryConfig(t *testing.T) {
@@ -920,19 +923,203 @@ func TestGetElasticsearchAuthExtensionID(t *testing.T) {
 		"the same Elasticsearch output name must produce the same extension ID",
 	)
 
-	monitoringID := getElasticsearchAuthExtensionID("monitoring")
+	secondaryID := getElasticsearchAuthExtensionID("secondary")
 	require.Equal(
 		t,
-		"elasticsearchauth/_agent-component/monitoring",
-		monitoringID.String(),
+		"elasticsearchauth/_agent-component/secondary",
+		secondaryID.String(),
 		"extension ID must include the distinct Elasticsearch output name",
 	)
 	require.NotEqual(
 		t,
 		defaultID,
-		monitoringID,
+		secondaryID,
 		"different Elasticsearch output names must produce distinct extension IDs",
 	)
+}
+
+func TestGetElasticsearchAuthExtensionConfig(t *testing.T) {
+	t.Setenv("ELASTICSEARCH_AUTH_HOST", "es.example")
+
+	source := map[string]any{
+		"hosts": []any{
+			"${ELASTICSEARCH_AUTH_HOST}:9200",
+			"es-secondary.example:9201",
+		},
+		"protocol":                    "https",
+		"path":                        "/elastic",
+		"parameters":                  map[string]any{"routing": "state loader"},
+		"username":                    "heartbeat",
+		"password":                    "secret",
+		"headers":                     map[string]any{"X-State-Loader": "true"},
+		"proxy_url":                   "http://proxy.example:8080",
+		"idle_connection_timeout":     "17s",
+		"ssl.certificate_authorities": "testdata/certs/rootCA.crt",
+		"ssl.certificate":             "testdata/certs/client.crt",
+		"ssl.key":                     "testdata/certs/client.key",
+		"ssl.key_passphrase":          "changeme",
+		"ssl.verification_mode":       "strict",
+		"bulk_max_size":               123,
+		"compression_level":           9,
+		"index":                       "exporter-only",
+		"pipeline":                    "exporter-only",
+		"timeout":                     "42s",
+	}
+
+	cfg, err := config.NewConfigFrom(source)
+	require.NoError(t, err, "source output config must be valid")
+
+	got, err := getElasticsearchAuthExtensionConfig(cfg, "default")
+	require.NoError(t, err, "Heartbeat Elasticsearch auth config must translate")
+
+	assert.Equal(
+		t,
+		map[string]any{
+			"auth": map[string]any{
+				"authenticator": "beatsauth/_agent-component/default",
+			},
+			"endpoints": []string{
+				"https://es.example:9200/elastic?routing=state+loader",
+				"https://es-secondary.example:9201/elastic?routing=state+loader",
+			},
+			"headers":  map[string]string{"X-State-Loader": "true"},
+			"password": "secret",
+			"user":     "heartbeat",
+		},
+		got,
+		"elasticsearchauth config must contain only endpoint, destination-auth, header, and delegated-auth fields",
+	)
+
+	assert.Equal(
+		t,
+		[]string{
+			"https://es.example:9200/elastic?routing=state+loader",
+			"https://es-secondary.example:9201/elastic?routing=state+loader",
+		},
+		got["endpoints"],
+		"all endpoints must retain their own host and resolved path and query",
+	)
+
+	assert.Equal(t, "heartbeat", got["user"], "basic-auth username must be translated")
+	assert.Equal(t, "secret", got["password"], "basic-auth password must be translated")
+
+	assert.Equal(
+		t,
+		map[string]string{"X-State-Loader": "true"},
+		got["headers"],
+		"output headers must be translated",
+	)
+
+	for _, excludedField := range []string{
+		"bulk_max_size",
+		"buffer",
+		"compression",
+		"compression_level",
+		"force_attempt_http2",
+		"idle_conn_timeout",
+		"index",
+		"keepalive",
+		"pipeline",
+		"proxy_disable",
+		"proxy_headers",
+		"proxy_url",
+		"retry",
+		"sending_queue",
+		"timeout",
+		"tls",
+	} {
+		assert.NotContains(
+			t,
+			got,
+			excludedField,
+			"elasticsearchauth config must exclude transport/exporter field %q",
+			excludedField,
+		)
+	}
+}
+func TestGetElasticsearchAuthExtensionConfigCloudID(t *testing.T) {
+	const encodedCloudID = "cloudidtest:ZXhhbXBsZS50ZXN0JGVsYXN0aWNzZWFyY2gka2liYW5h"
+	t.Setenv("ELASTICSEARCH_AUTH_CLOUD_ID", encodedCloudID)
+
+	cfg := config.MustNewConfigFrom(map[string]any{
+		"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
+		"cloud_auth": "cloud-user:cloud-password",
+	})
+	got, err := getElasticsearchAuthExtensionConfig(cfg, "default")
+	require.NoError(t, err, "Cloud ID output config must translate")
+
+	assert.Equal(
+		t,
+		[]string{"https://elasticsearch.example.test:443"},
+		got["endpoints"],
+		"Cloud ID must expand to the Elasticsearch endpoint",
+	)
+	assert.Equal(t, "cloud-user", got["user"], "Cloud auth username must be translated")
+	assert.Equal(t, "cloud-password", got["password"], "Cloud auth password must be translated")
+}
+
+func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
+	const (
+		outputName         = "default"
+		trustedFingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		caSHA256           = "GkPh2Lqh6eDoIatcr5AlZTAIKcIz/AWC61lrWgRwwe8="
+	)
+	output := map[string]any{
+		"hosts":                      []any{"localhost:9200"},
+		"preset":                     "throughput",
+		"proxy_disable":              true,
+		"proxy_headers":              map[string]any{"X-Proxy": "value"},
+		"ssl.ca_sha256":              []any{caSHA256},
+		"ssl.ca_trusted_fingerprint": trustedFingerprint,
+		"ssl.verification_mode":      "certificate",
+	}
+	comp := &component.Component{
+		ID:         "heartbeat-default",
+		InputType:  "synthetics/http",
+		OutputType: "elasticsearch",
+		OutputName: outputName,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{Args: []string{"heartbeat"}},
+			},
+		},
+		Units: []component.Unit{{
+			ID:     "heartbeat-default",
+			Type:   client.UnitTypeOutput,
+			Config: component.MustExpectedConfig(output),
+		}},
+	}
+
+	_, _, extensions, _, err := getExporterConfigForComponent(
+		comp,
+		otelcomponent.MustNewType("elasticsearch"),
+		logp.NewNopLogger(),
+	)
+	require.NoError(t, err, "Heartbeat translation must accept transport and TLS settings")
+
+	elasticsearchAuthID := getElasticsearchAuthExtensionID(outputName).String()
+	elasticsearchAuth, ok := extensions[elasticsearchAuthID].(map[string]any)
+	require.True(t, ok, "Heartbeat translation must generate an output-scoped elasticsearchauth extension")
+	assert.Equal(t, map[string]any{
+		"auth": map[string]any{
+			"authenticator": getBeatsAuthExtensionID(outputName).String(),
+		},
+		"endpoints": []string{"http://localhost:9200"},
+	}, elasticsearchAuth, "elasticsearchauth must contain no transport settings")
+
+	beatsAuthID := getBeatsAuthExtensionID(outputName).String()
+	beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
+	require.True(t, ok, "Heartbeat translation must preserve the output-scoped beatsauth extension")
+	assert.Equal(t, "15s", beatsAuth["idle_connection_timeout"], "beatsauth must retain the effective throughput-preset idle timeout")
+	assert.Equal(t, true, beatsAuth["proxy_disable"], "beatsauth must retain proxy_disable")
+	assert.Equal(t, map[string]any{"X-Proxy": "value"}, beatsAuth["proxy_headers"], "beatsauth must retain proxy_headers")
+
+	tlsConfig, ok := beatsAuth["ssl"].(map[string]any)
+	require.True(t, ok, "beatsauth must retain TLS settings")
+	assert.Equal(t, trustedFingerprint, tlsConfig["ca_trusted_fingerprint"], "beatsauth must retain the trusted CA fingerprint")
+	assert.Equal(t, []any{caSHA256}, tlsConfig["ca_sha256"], "beatsauth must retain CA SHA-256 pins")
+	assert.Equal(t, uint64(2), tlsConfig["verification_mode"], "beatsauth must retain certificate verification mode")
 }
 
 func TestGetBeatsAuthExtensionConfig(t *testing.T) {

@@ -613,7 +613,41 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	if !ok {
 		return nil, nil, nil, nil, nil
 	}
-	return unitToExporterConfig(outputUnit, comp.OutputName, exporterType, logger)
+
+	exporterCfg, queueCfg, extensionCfg, processors, err = unitToExporterConfig(
+		outputUnit,
+		comp.OutputName,
+		exporterType,
+		logger,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	if comp.BeatName() == "heartbeat" && comp.OutputType == "elasticsearch" {
+		outputConfig, err := config.NewConfigFrom(outputUnit.Config.GetSource().AsMap())
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf(
+				"error copying config for Heartbeat Elasticsearch output %s: %w",
+				comp.OutputName,
+				err,
+			)
+		}
+		elasticsearchAuthConfig, err := getElasticsearchAuthExtensionConfig(outputConfig, comp.OutputName)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf(
+				"error translating elasticsearchauth config for Heartbeat output %s: %w",
+				comp.OutputName,
+				err,
+			)
+		}
+		if extensionCfg == nil {
+			extensionCfg = map[string]any{}
+		}
+		extensionCfg[getElasticsearchAuthExtensionID(comp.OutputName).String()] = elasticsearchAuthConfig
+	}
+
+	return exporterCfg, queueCfg, extensionCfg, processors, nil
 }
 
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
