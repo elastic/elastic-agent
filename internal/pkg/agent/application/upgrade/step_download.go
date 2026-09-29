@@ -139,6 +139,9 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	}
 
 	a.log.Infow("Getting upgrade artifact", "filename", fileName, "version", target.Version, "drop_path", settings.DropPath, "target_path", targetPath, "install_path", settings.InstallPath)
+	if !settings.ReserveDiskSpace {
+		a.log.Warn("Upgrade disk space reservation is disabled by agent.download.reserve_diskspace")
+	}
 
 	ctx, cancel := context.WithTimeout(ctx, a.totalTimeout)
 	defer cancel()
@@ -191,31 +194,33 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				continue
 			}
 
-			archiveSize, decompressedSize, sizeErr := a.getUpgradeSize(ctx, &settings, sourceURI)
-			if sizeErr == nil {
-				lastArchiveSize, lastDecompressedSize = archiveSize, decompressedSize
-			} else if lastArchiveSize != 0 {
-				archiveSize, decompressedSize = lastArchiveSize, lastDecompressedSize
-				sizeErr = fmt.Errorf("using previous size: %w", sizeErr)
-			}
-
-			hasDiskSpace, err := a.reserveDiskSpace(settings.TargetDirectory, archiveSize, decompressedSize)
-			err = goerrors.Join(err, sizeErr)
-			if err != nil {
-				// failed size can still succeed with estimate or previous size so don't fail immediately
-				e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
-				a.log.Debugf("%v", e)
-				errs[i] = e
-			}
-			if !hasDiskSpace {
-				if goerrors.Is(err, downloaderrors.ErrFetchUpgradeSize) {
-					// Checking exact required upgrade size failed and an estimated
-					// required size was used. We might have enough diskspace for
-					// the actual upgrade artifact, so check other sources.
-					skip[i] = true
-					continue
+			if settings.ReserveDiskSpace {
+				archiveSize, decompressedSize, sizeErr := a.getUpgradeSize(ctx, &settings, sourceURI)
+				if sizeErr == nil {
+					lastArchiveSize, lastDecompressedSize = archiveSize, decompressedSize
+				} else if lastArchiveSize != 0 {
+					archiveSize, decompressedSize = lastArchiveSize, lastDecompressedSize
+					sizeErr = fmt.Errorf("using previous size: %w", sizeErr)
 				}
-				return backoff.Permanent(err)
+
+				hasDiskSpace, err := a.reserveDiskSpace(settings.TargetDirectory, archiveSize, decompressedSize)
+				err = goerrors.Join(err, sizeErr)
+				if err != nil {
+					// failed size can still succeed with estimate or previous size so don't fail immediately
+					e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
+					a.log.Debugf("%v", e)
+					errs[i] = e
+				}
+				if !hasDiskSpace {
+					if goerrors.Is(err, downloaderrors.ErrFetchUpgradeSize) {
+						// Checking exact required upgrade size failed and an estimated
+						// required size was used. We might have enough diskspace for
+						// the actual upgrade artifact, so check other sources.
+						skip[i] = true
+						continue
+					}
+					return backoff.Permanent(err)
+				}
 			}
 
 			if download.IsLocal(sourceURI) {
