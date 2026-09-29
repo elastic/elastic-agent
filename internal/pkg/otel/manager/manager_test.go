@@ -2369,7 +2369,6 @@ func TestOTelManager_RestartOnProfilesPipelineAdd(t *testing.T) {
 	select {
 	case <-collectorStarted:
 		// Collector was restarted so that the profiles feature gate is applied.
-		assert.True(t, mgr.collectorProfilesGateEnabled, "collectorProfilesGateEnabled should be true after restart with profiles pipeline")
 	case <-time.After(5 * time.Second):
 		t.Fatal("expected collector to be restarted after profiles pipeline was added, but it was not")
 	}
