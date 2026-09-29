@@ -94,9 +94,16 @@ setup_cacheprog() {
   # a bucket lifecycle rule; the Expires header alone doesn't delete anything.
   export CACHEPROG_S3_PREFIX="cacheprog-poc"
   export CACHEPROG_S3_EXPIRATION="24h"
-  # Shared by every `go` invocation in the job, so each object is fetched from
-  # S3 at most once per job instead of once per `go` process.
-  export CACHEPROG_ROOT_DIRECTORY="${dir}/disk"
+  # Use a persistent sibling of GOCACHE so objects survive across builds on the
+  # same agent. Separate from GOCACHE itself to avoid interfering with Go's own
+  # cache GC (cacheprog has no pruning; the agent recycle bounds disk growth).
+  # Falls back to a job-scoped temp dir if GOCACHE is unset or off.
+  local gocache_dir="${GOCACHE:-$(go env GOCACHE 2>/dev/null)}"
+  if [[ -n "${gocache_dir}" && "${gocache_dir}" != "off" ]]; then
+    export CACHEPROG_ROOT_DIRECTORY="${gocache_dir}-cacheprog"
+  else
+    export CACHEPROG_ROOT_DIRECTORY="${dir}/disk"
+  fi
 
   echo "GOCACHEPROG=${GOCACHEPROG}"
 }
