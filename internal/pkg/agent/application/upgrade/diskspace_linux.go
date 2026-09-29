@@ -17,63 +17,18 @@ import (
 const (
 	FallbackArchiveSize = uint64(700 * 1024 * 1024)
 	FallbackPayloadSize = uint64(2 * 1024 * 1024 * 1024)
+
+	fsNoCompFl = 0x00000400
+	fsNoCowFl  = 0x00800000
 )
 
-func preallocateFile(file *os.File, size int64) error {
-	if size > 0 {
-		var err error
-		for {
-			err = unix.Fallocate(int(file.Fd()), 0, 0, size)
-			if err != unix.EINTR {
-				break
-			}
-		}
-		if err == unix.EOPNOTSUPP || err == unix.ENOSYS {
-			return preallocateFileFallback(file, size)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Fallback method for when Fallocate isn't supported.
-// Modelled after the glibc implementation.
-func preallocateFileFallback(file *os.File, size int64) error {
-	info, err := file.Stat()
+func disableCompression(file *os.File) {
+	fd := int(file.Fd())
+	flags, err := unix.IoctlGetInt(fd, unix.FS_IOC_GETFLAGS)
 	if err != nil {
-		return err
+		return
 	}
-	var stat unix.Statfs_t
-	if err := unix.Fstatfs(int(file.Fd()), &stat); err != nil {
-		return err
-	}
-	blockSize := stat.Bsize
-	if blockSize <= 0 {
-		blockSize = 512
-	}
-	// cap as block size on network filesystems can be misleading
-	blockSize = min(blockSize, 4096)
-
-	// touch one byte per block
-	var b [1]byte
-	for offset := int64(0); offset < size; {
-		offset += min(blockSize, size-offset)
-		b[0] = 0
-		if offset <= info.Size() {
-			if _, err := file.ReadAt(b[:], offset-1); err != nil {
-				return err
-			}
-			if b[0] != 0 {
-				continue
-			}
-		}
-		if _, err := file.WriteAt(b[:], offset-1); err != nil {
-			return err
-		}
-	}
-	return file.Sync()
+	_ = unix.IoctlSetPointerInt(fd, unix.FS_IOC_SETFLAGS, flags|fsNoCompFl|fsNoCowFl)
 }
 
 func getVolumeNameAt(dir string) (string, error) {
