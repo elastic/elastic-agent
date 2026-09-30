@@ -10,11 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-<<<<<<< HEAD
-=======
-	"runtime"
 	"slices"
->>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 	"sort"
 	"testing"
 	"time"
@@ -123,18 +119,9 @@ func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
-<<<<<<< HEAD
-	filteredVersions := make([]*version.ParsedSemVer, 0)
-	for _, ver := range versions {
-		// Filter out versions that are not FIPS-capable
-		if !isFIPSCapableVersion(ver) {
-			continue
-		}
-=======
 	versions = slices.DeleteFunc(versions, func(ver *version.ParsedSemVer) bool {
-		return !isFIPSCapableVersion(ver, os, arch)
+		return !isFIPSCapableVersion(ver)
 	})
->>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 
 	sortedVers := version.SortableParsedVersions(versions)
 	sort.Sort(sortedVers)
