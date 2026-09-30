@@ -5,6 +5,15 @@
 # upgrade integration tests.
 
 testVersions:
+<<<<<<< HEAD
   - 8.18.8
   - 8.17.10
+=======
+  - 9.5.4+build202609161310
+  - 9.5.4-SNAPSHOT
+  - 9.4.7+build202609161309
+  - 9.4.7-SNAPSHOT
+  - 8.19.22-SNAPSHOT
+  - 8.19.21+build202609151720
+>>>>>>> 8452d99 ([fix] Address mismatch between version file generation and `PreviousMinor` filter (#16901))
   - 7.17.29

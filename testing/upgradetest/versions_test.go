@@ -273,9 +273,481 @@ func TestPreviousMinor(t *testing.T) {
 		return
 	}
 
+<<<<<<< HEAD
 	assert.Truef(t, currentParsed.Major() == v.Major() && currentParsed.Minor() > v.Minor(), "%s is not previous minor for %s", v, bversion.Agent)
 	assert.Empty(t, v.Prerelease())
 	assert.Empty(t, v.BuildMetadata())
+=======
+	versions9_0_0 := []string{
+		"9.0.0",
+		"9.0.0+metadata",
+		"9.0.0-SNAPSHOT",
+		"9.0.0-SNAPSHOT+metadata",
+	}
+	versions9_0_1 := []string{
+		"9.0.1",
+		"9.0.1+metadata",
+		"9.0.1-SNAPSHOT",
+		"9.0.1-SNAPSHOT+metadata",
+	}
+	versions9_0_15 := []string{
+		"9.0.15",
+		"9.0.15+metadata",
+		"9.0.15-SNAPSHOT",
+		"9.0.15-SNAPSHOT+metadata",
+	}
+	versions9_1_0 := []string{
+		"9.1.0",
+		"9.1.0+metadata",
+		"9.1.0-SNAPSHOT",
+		"9.1.0-SNAPSHOT+metadata",
+	}
+	versions9_1_1 := []string{
+		"9.1.1",
+		"9.1.1+metadata",
+		"9.1.1-SNAPSHOT",
+		"9.1.1-SNAPSHOT+metadata",
+	}
+	versions9_1_15 := []string{
+		"9.1.15",
+		"9.1.15+metadata",
+		"9.1.15-SNAPSHOT",
+		"9.1.15-SNAPSHOT+metadata",
+	}
+	versions9_2_0 := []string{
+		"9.2.0",
+		"9.2.0+metadata",
+		"9.2.0-SNAPSHOT",
+		"9.2.0-SNAPSHOT+metadata",
+	}
+	versions9_2_1 := []string{
+		"9.2.1",
+		"9.2.1+metadata",
+		"9.2.1-SNAPSHOT",
+		"9.2.1-SNAPSHOT+metadata",
+	}
+	versions9_2_15 := []string{
+		"9.2.15",
+		"9.2.15+metadata",
+		"9.2.15-SNAPSHOT",
+		"9.2.15-SNAPSHOT+metadata",
+	}
+	versions9_3_0 := []string{
+		"9.3.0",
+		"9.3.0+metadata",
+		"9.3.0-SNAPSHOT",
+		"9.3.0-SNAPSHOT+metadata",
+	}
+
+	var (
+		release          = ""
+		snapshot         = "-SNAPSHOT"
+		metadata         = "+metadata"
+		snapshotMetadata = snapshot + metadata
+	)
+
+	type releaseTypes struct {
+		expected string
+		err      string
+	}
+
+	allSameResult := func(expected, err string) map[string]releaseTypes {
+		return map[string]releaseTypes{
+			release:          {expected: expected, err: err},
+			snapshot:         {expected: expected, err: err},
+			metadata:         {expected: expected, err: err},
+			snapshotMetadata: {expected: expected, err: err},
+		}
+	}
+
+	noPreviousMinorResult := allSameResult("", ErrNoPreviousMinor.Error())
+
+	type testCase struct {
+		currentVersion      string
+		upgradeableVersions []string
+		expected            map[string]releaseTypes
+	}
+
+	type testCases map[string]testCase
+
+	tests := testCases{
+		"First major version - only previous major versions": {
+			currentVersion:      "9.0.0",
+			upgradeableVersions: previousMinorVersions,
+			expected:            allSameResult("8.19.15", ""),
+		},
+		"First major version - only newer major versions": {
+			currentVersion:      "9.0.0",
+			upgradeableVersions: combineSlices(versions9_2_0, versions9_1_0),
+			expected:            noPreviousMinorResult,
+		},
+		"First major version - only current major version": {
+			currentVersion:      "9.0.0",
+			upgradeableVersions: versions9_0_0,
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
+				},
+				snapshot: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
+				},
+				metadata: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
+				},
+			},
+		},
+		"First major version - current major, newer versions and older versions": {
+			currentVersion: "9.0.0",
+			upgradeableVersions: combineSlices(
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
+				},
+				snapshot: {
+					expected: "8.19.15",
+					err:      "",
+				},
+				metadata: {
+					expected: "9.0.0-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "8.19.15",
+					err:      "",
+				},
+			},
+		},
+		"First patch release of a new version - only previous major versions": {
+			currentVersion:      "9.0.1",
+			upgradeableVersions: previousMinorVersions,
+			expected:            allSameResult("8.19.15", ""),
+		},
+		"First patch release of a new version - only newer major versions": {
+			currentVersion: "9.0.1",
+			upgradeableVersions: combineSlices(
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"First patch release of a new version - only current major versions": {
+			currentVersion:      "9.0.1",
+			upgradeableVersions: versions9_0_1,
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshot: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
+				},
+				metadata: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "",
+					err:      ErrNoPreviousMinor.Error(),
+				},
+			},
+		},
+		"First patch release of a new version - current major, newer versions and older versions": {
+			currentVersion: "9.0.1",
+			upgradeableVersions: combineSlices(
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: map[string]releaseTypes{
+				release: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshot: {
+					expected: "9.0.0",
+					err:      "",
+				},
+				metadata: {
+					expected: "9.0.1-SNAPSHOT",
+					err:      "",
+				},
+				snapshotMetadata: {
+					expected: "9.0.0",
+					err:      "",
+				},
+			},
+		},
+		"First minor release - previous minor from the same major and previous major versions": {
+			currentVersion: "9.1.0",
+			upgradeableVersions: combineSlices(
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: allSameResult("9.0.15", ""),
+		},
+		"First minor release - only current major or higher versions": {
+			currentVersion: "9.1.0",
+			upgradeableVersions: combineSlices(
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"First minor release - only previous major versions": {
+			currentVersion:      "9.1.0",
+			upgradeableVersions: previousMinorVersions,
+			expected:            noPreviousMinorResult,
+		},
+		"First patch of first minor - previous minor from the same major and previous major versions": {
+			currentVersion: "9.1.1",
+			upgradeableVersions: combineSlices(
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: allSameResult("9.0.15", ""),
+		},
+		"First patch of first minor - only current major or higher versions": {
+			currentVersion: "9.1.1",
+			upgradeableVersions: combineSlices(
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"First patch of first minor - only previous major versions": {
+			currentVersion:      "9.1.1",
+			upgradeableVersions: previousMinorVersions,
+			expected:            noPreviousMinorResult,
+		},
+		"Nth patch of first minor - previous minor from the same major and previous major versions": {
+			currentVersion: "9.1.15",
+			upgradeableVersions: combineSlices(
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				previousMinorVersions,
+			),
+			expected: allSameResult("9.0.15", ""),
+		},
+		"Nth patch of first minor - only current major or higher versions": {
+			currentVersion: "9.1.15",
+			upgradeableVersions: combineSlices(
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"Nth patch of first minor - only previous major versions": {
+			currentVersion:      "9.1.15",
+			upgradeableVersions: previousMinorVersions,
+			expected:            noPreviousMinorResult,
+		},
+		"Nth major - previous minor from the same major and previous major versions": {
+			currentVersion: "9.2.0",
+			upgradeableVersions: combineSlices(
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: allSameResult("9.1.15", ""),
+		},
+		"Nth major - only current major or higher versions": {
+			currentVersion: "9.2.0",
+			upgradeableVersions: combineSlices(
+				versions9_3_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"Nth major - only previous major versions": {
+			currentVersion:      "9.2.0",
+			upgradeableVersions: previousMinorVersions,
+			expected:            noPreviousMinorResult,
+		},
+		"Nth major first patch - previous minor from the same major and previous major versions": {
+			currentVersion: "9.2.1",
+			upgradeableVersions: combineSlices(
+				versions9_2_1,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: allSameResult("9.1.15", ""),
+		},
+		"Nth major first patch - only current major or higher versions": {
+			currentVersion: "9.2.1",
+			upgradeableVersions: combineSlices(
+				versions9_3_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"Nth major first patch - only previous major versions": {
+			currentVersion:      "9.2.1",
+			upgradeableVersions: previousMinorVersions,
+			expected:            noPreviousMinorResult,
+		},
+		"Nth major Nth patch - previous minor from the same major and previous major versions": {
+			currentVersion: "9.2.15",
+			upgradeableVersions: combineSlices(
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
+				versions9_1_15,
+				versions9_1_1,
+				versions9_1_0,
+				versions9_0_15,
+				versions9_0_1,
+				versions9_0_0,
+				previousMinorVersions,
+			),
+			expected: allSameResult("9.1.15", ""),
+		},
+		"Nth major Nth patch - only current major or higher versions": {
+			currentVersion: "9.2.15",
+			upgradeableVersions: combineSlices(
+				versions9_3_0,
+				versions9_2_15,
+				versions9_2_1,
+				versions9_2_0,
+			),
+			expected: noPreviousMinorResult,
+		},
+		"Nth major Nth patch - only previous major versions": {
+			currentVersion:      "9.2.15",
+			upgradeableVersions: previousMinorVersions,
+			expected:            noPreviousMinorResult,
+		},
+		// IAR (independent artifact release) versions have build metadata matching ^build\d{12}.
+		// previousMinor must accept them, consistent with findRequiredVersions, because the
+		// automation that generates .upgrade-test-agent-versions.yml treats them as GA releases.
+		"Nth major Nth patch - only IAR previous minor versions": {
+			currentVersion: "9.2.15",
+			upgradeableVersions: []string{
+				"9.1.15+build202609161310",
+				"9.1.1+build202609161310",
+				"9.1.0+build202609161310",
+			},
+			expected: allSameResult("9.1.15+build202609161310", ""),
+		},
+		// Mix of IAR, plain GA, snapshots, and non-IAR build metadata versions.
+		// Mirrors the real shape of .upgrade-test-agent-versions.yml: IAR releases sit
+		// alongside snapshots and occasional plain GA entries. The highest version that is
+		// either a plain GA or an IAR should win; non-IAR build metadata and snapshots must
+		// be skipped.
+		"Nth major Nth patch - mixed IAR, plain GA, snapshot, and non-IAR metadata previous minor versions": {
+			currentVersion: "9.6.0",
+			upgradeableVersions: []string{
+				"9.5.4+build202609161310", // IAR — should be selected (highest eligible)
+				"9.5.4-SNAPSHOT",          // snapshot — skip
+				"9.5.4+arbitrarymeta",     // non-IAR build metadata — skip
+				"9.4.7",                   // plain GA — eligible but lower than IAR above
+				"9.4.7-SNAPSHOT",          // snapshot — skip
+				"8.19.22-SNAPSHOT",        // snapshot, wrong major — skip
+				"7.17.29",                 // plain GA, wrong major — skip
+			},
+			expected: allSameResult("9.5.4+build202609161310", ""),
+		},
+		"Empty version range": {
+			currentVersion:      "9.2.15",
+			upgradeableVersions: []string{},
+			expected:            noPreviousMinorResult,
+		},
+		"Unparsable current version": {
+			currentVersion:      "invalid version",
+			upgradeableVersions: previousMinorVersions,
+			expected:            allSameResult("", "failed to parse the current version"),
+		},
+	}
+
+	for name, testCase := range tests {
+		versions := []*version.ParsedSemVer{}
+		for _, v := range testCase.upgradeableVersions {
+			parsed, err := version.ParseVersion(v)
+			require.NoError(t, err)
+			versions = append(versions, parsed)
+		}
+
+		for versionType, vcase := range testCase.expected {
+			testVersion := testCase.currentVersion
+			if versionType != "" {
+				testVersion = testCase.currentVersion + versionType
+			}
+			t.Run(name+" "+versionType, func(t *testing.T) {
+				result, err := previousMinor(testVersion, versions)
+				if vcase.err != "" {
+					require.Error(t, err, func() string {
+						if result != nil {
+							return fmt.Sprintf("expected: %s, got: %s", vcase.expected, result.Original())
+						}
+						return fmt.Sprintf("expected: %s, got: <nil>", vcase.expected)
+					}())
+
+					require.Contains(t, err.Error(), vcase.err)
+					return
+				}
+
+				require.NoError(t, err)
+				expected, err := version.ParseVersion(vcase.expected)
+				require.NoError(t, err)
+				require.Equal(t, expected, result)
+			})
+		}
+	}
+>>>>>>> 8452d99 ([fix] Address mismatch between version file generation and `PreviousMinor` filter (#16901))
 }
 
 func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {

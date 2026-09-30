@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "version": "8.19.23-SNAPSHOT",
   "build_id": "8.19.23-b7f6814d",
   "manifest_url": "https://snapshots.elastic.co/8.19.23-b7f6814d/manifest-8.19.23-SNAPSHOT.json",
@@ -6,4 +7,13 @@
   "core_version": "8.19.23",
   "stack_version": "8.19.23-SNAPSHOT",
   "stack_build_id": "8.19.23-b7f6814d-SNAPSHOT"
+=======
+  "version": "9.6.0-SNAPSHOT",
+  "build_id": "9.6.0-dc9dee5d",
+  "manifest_url": "https://snapshots.elastic.co/9.6.0-dc9dee5d/manifest-9.6.0-SNAPSHOT.json",
+  "summary_url": "https://snapshots.elastic.co/9.6.0-dc9dee5d/summary-9.6.0-SNAPSHOT.html",
+  "core_version": "9.6.0",
+  "stack_version": "9.6.0-SNAPSHOT",
+  "stack_build_id": "9.6.0-dc9dee5d-SNAPSHOT"
+>>>>>>> 8452d99 ([fix] Address mismatch between version file generation and `PreviousMinor` filter (#16901))
 }
