@@ -232,7 +232,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				// Run the installer before opening the connection-info server. Opening
 				// the server first lets a still-running old service (e.g. the previous
 				// Endpoint version) reconnect, be adopted as HEALTHY, and receive a
-				// policy update that can overwrite its sealed upgrade config (SDH-854).
+				// policy update that interferes with the upgrade.
 				err = s.start(ctx)
 				if err != nil {
 					var exitErr *exec.ExitError
