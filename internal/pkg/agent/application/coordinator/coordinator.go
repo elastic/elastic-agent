@@ -2057,6 +2057,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		// Nothing to process yet
 		return nil
 	}
+	c.state.PolicyApplied = true
 
 	defer func() {
 		// Update componentModelErr with the results.
@@ -2096,6 +2097,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		Components: c.componentModel,
 		Signed:     signed,
 	}
+	c.state.PolicyConfiguredActionTypes = policyConfiguredActionTypes(c.componentModel)
 
 	c.logger.Info("Updating running component model")
 	if c.logger.IsDebug() {
@@ -2636,6 +2638,22 @@ func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
 		unitMap[c.ID] = c
 	}
 	return unitMap
+}
+
+// policyConfiguredActionTypes returns a map from action type to the IDs of components
+// in comps that handle it. Derived from the component spec rather than runtime state,
+// so it includes components that have not yet started.
+func policyConfiguredActionTypes(comps []component.Component) map[string][]string {
+	result := make(map[string][]string)
+	for _, comp := range comps {
+		if comp.InputSpec == nil {
+			continue
+		}
+		for _, typ := range comp.InputSpec.Spec.ProxiedActions {
+			result[typ] = append(result[typ], comp.ID)
+		}
+	}
+	return result
 }
 
 func convertComponentListToMap(compList []component.Component) map[string]component.Component {
