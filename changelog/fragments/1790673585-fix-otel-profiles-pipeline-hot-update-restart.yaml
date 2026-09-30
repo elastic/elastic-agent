@@ -9,11 +9,11 @@
 # - security: impacts on the security of a product or a user's deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
-kind: bug-fix
+kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Restart OTel collector subprocess when a profiles pipeline is added via hot policy update
+summary: Enable service.profilesSupport feature gate for all executions
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
@@ -23,9 +23,9 @@ description: |
   launch argument. When `profiling_otel` was added to a policy for an already-running
   fleet-managed agent, the manager was pushing the new config as a live update to the
   existing collector process, which had not been launched with the gate and would
-  fatally reject the profiles pipeline. The fix tracks whether the running subprocess
-  was launched with the gate and forces a full restart when a profiles pipeline is
-  introduced for the first time.
+  fatally reject the profiles pipeline. The gate is now enabled unconditionally at
+  collector subprocess startup, so it no longer depends on the config present at
+  launch time.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
