@@ -2721,7 +2721,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		component          *component.Component
 		outputQueueConfig  map[string]any
 		expectedError      string
-		expectedReceiverID string // full receiver ID, empty for no-inputs case
+		expectedReceiverID string // full receiver ID; must be non-empty unless expectedError is set
 		expectedBeatName   string
 		verifyBeatConfig   func(t *testing.T, beatConfig map[string]any)
 	}{
@@ -2883,10 +2883,10 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				},
 			},
 			outputQueueConfig: nil,
-			// No expectedReceiverID - no inputs means no receivers
+			expectedError:     "component no-inputs-test-id has no enabled streams",
 		},
 		{
-			name: "input unit with nil config is skipped without panic",
+			name: "input unit with nil config is treated as unsupported",
 			component: &component.Component{
 				ID:        "nil-config-test-id",
 				InputType: "filestream",
@@ -2915,7 +2915,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 				},
 			},
 			outputQueueConfig: nil,
-			// No expectedReceiverID - nil config input is skipped
+			expectedError:     "component nil-config-test-id has no enabled streams",
 		},
 		{
 			name: "unsupported component type",
@@ -2945,12 +2945,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.NotNil(t, result)
-
-			// Component with no inputs produces no receivers
-			if tt.expectedReceiverID == "" {
-				assert.Empty(t, result)
-				return
-			}
 
 			// Verify the receiver ID is present
 			assert.Contains(t, result, tt.expectedReceiverID)
@@ -3328,7 +3322,9 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
 		{
-			name: "input unit with nil config does not panic",
+			// A unit with nil Config contributes no inputs. When all input units have nil
+			// Config the component produces no receivers and must be treated as unsupported.
+			name: "input unit with nil config is treated as unsupported",
 			component: &component.Component{
 				ID:         "nil-config-comp",
 				InputType:  "filestream",
@@ -3358,6 +3354,53 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 					},
 				},
 			},
+			expectedError: "unsupported configuration for nil-config-comp: component nil-config-comp has no enabled streams: unsupported operation",
+		},
+		{
+			// Fleet produces streams: [] when input.enabled=true but all streams are disabled.
+			// This state can exist in ECE clusters upgraded from pre-8.15 Fleet (before the
+			// alignInputsAndStreams guard was added) and is never retroactively corrected.
+			// A component with no enabled streams must be treated as unsupported so it is
+			// routed to the process runtime rather than passed to the OTel collector with an
+			// empty receivers list, which would crash the entire collector process and take
+			// down all other OTel-based components.
+			name: "all streams disabled produces no inputs - treated as unsupported",
+			component: &component.Component{
+				ID:         "linux-metrics-default",
+				InputType:  "linux/metrics",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"metricbeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						// Empty streams list: Fleet compiled streams: [] because all streams
+						// had enabled: false but input.enabled was still true.
+						ID:   "linux-metrics-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"id":      "linux/metrics-linux-metrics-default",
+							"type":    "linux/metrics",
+							"streams": []any{},
+						}),
+					},
+					{
+						ID:   "linux-metrics-output",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+			expectedError: "unsupported configuration for linux-metrics-default: component linux-metrics-default has no enabled streams: unsupported operation",
 		},
 	}
 
@@ -3366,7 +3409,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			err := VerifyComponentIsOtelSupported(tt.component)
 			if tt.expectedError != "" {
 				require.Error(t, err)
-				assert.Equal(t, err.Error(), tt.expectedError)
+				assert.Equal(t, tt.expectedError, err.Error())
 			} else {
 				require.NoError(t, err)
 			}

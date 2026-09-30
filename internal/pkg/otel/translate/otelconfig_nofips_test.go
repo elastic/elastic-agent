@@ -59,7 +59,6 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 					"enable_krb5_fast": false,
 					"service_name":     "",
 					"keytab":           "",
-					"krb5_conf":        "",
 				},
 				"proxy_disable": false,
 			},
