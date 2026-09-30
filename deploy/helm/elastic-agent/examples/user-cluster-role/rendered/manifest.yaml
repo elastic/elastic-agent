@@ -13,6 +13,7 @@ metadata:
   annotations:
     elastic-agent.k8s.elastic.co/preset: nginx
     elastic-agent.k8s.elastic.co/sa: nginx
+
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -70,6 +71,7 @@ stringData:
       kubernetes_leaderelection:
         enabled: false
         leader_lease: example-nginx
+
 ---
 # Source: elastic-agent/templates/agent/cluster-role-binding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -91,6 +93,7 @@ roleRef:
   kind: ClusterRole
   name: user-cr
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -153,3 +156,4 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-nginx-example
+
