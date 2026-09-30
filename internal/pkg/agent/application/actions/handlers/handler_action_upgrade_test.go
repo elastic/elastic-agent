@@ -424,40 +424,16 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCoordinator := newMockUpgradeCoordinator(t)
 
-			var coordState coordinator.State
-			if tc.shouldProxyToEndpoint {
-				coordState.Components = []runtime.ComponentComponentState{
-					{
-						Component: component.Component{
-							InputSpec: &component.InputRuntimeSpec{
-								Spec: component.InputSpec{
-									ProxiedActions: []string{fleetapi.ActionTypeUpgrade},
-								},
-							},
-							InputType: "endpoint",
-							Units: []component.Unit{
-								{
-									Type: client.UnitTypeInput,
-									Config: &proto.UnitExpectedConfig{
-										Type: "endpoint",
-									},
-								},
-							},
-						},
-					},
-				}
-
-				mockCoordinator.EXPECT().State().Return(coordState)
-			}
-
 			upgradeCalledChan := make(chan struct{})
 			if tc.shouldProxyToEndpoint {
+				// Tamper protection on → Upgrade receives rollback opt + pre-upgrade callback opt.
 				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.Sources, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt"), mock.AnythingOfType("coordinator.UpgradeOpt")).
 					RunAndReturn(func(ctx context.Context, v string, s []string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
 						upgradeCalledChan <- struct{}{}
 						return tc.coordUpgradeErr
 					})
 			} else {
+				// Tamper protection off → Upgrade receives rollback opt only.
 				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.Sources, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt")).
 					RunAndReturn(func(ctx context.Context, v string, s []string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
 						upgradeCalledChan <- struct{}{}
@@ -512,6 +488,165 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 			}, 10*time.Second, 100*time.Millisecond)
 		})
 	}
+}
+
+// TestNotifyEndpointOfUpgrade verifies that notifyEndpointOfUpgrade waits for
+// the endpoint component to appear in the coordinator state before dispatching
+// the action. This covers the startup race where an upgrade action fires before
+// the policy has been applied and Endpoint is not yet present in State().Components.
+func TestNotifyEndpointOfUpgrade(t *testing.T) {
+	const endpointComponentID = "endpoint-default"
+
+	endpointState := coordinator.State{
+		PolicyApplied: true,
+		PolicyConfiguredActionTypes: map[string][]string{
+			fleetapi.ActionTypeUpgrade: {endpointComponentID},
+		},
+		Components: []runtime.ComponentComponentState{
+			{
+				Component: component.Component{
+					ID: endpointComponentID,
+					InputSpec: &component.InputRuntimeSpec{
+						Spec: component.InputSpec{
+							ProxiedActions: []string{fleetapi.ActionTypeUpgrade},
+						},
+					},
+					InputType: "endpoint",
+					Units: []component.Unit{
+						{
+							Type: client.UnitTypeInput,
+							Config: &proto.UnitExpectedConfig{
+								Type: "endpoint",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// policyAppliedNoUnits simulates the window where the policy has been processed
+	// but Endpoint has not yet emitted its first runtime state update (Components is
+	// empty). PolicyConfiguredActionTypes is set from the policy model so the handler
+	// knows to wait rather than skip.
+	policyAppliedNoUnits := coordinator.State{
+		PolicyApplied: true,
+		PolicyConfiguredActionTypes: map[string][]string{
+			fleetapi.ActionTypeUpgrade: {endpointComponentID},
+		},
+	}
+
+	for _, tc := range []struct {
+		name          string
+		stateSequence []coordinator.State // successive State() calls return these in order
+		wantNotified  bool
+	}{
+		{
+			name: "endpoint already connected — notified on first poll",
+			stateSequence: []coordinator.State{
+				endpointState,
+			},
+			wantNotified: true,
+		},
+		{
+			name: "upgrade fires before policy applied — notified once policy and units appear",
+			stateSequence: []coordinator.State{
+				{}, // policy not applied yet
+				{}, // still empty
+				endpointState,
+			},
+			wantNotified: true,
+		},
+		{
+			name: "policy applied but endpoint not yet in Components — notified once units appear",
+			stateSequence: []coordinator.State{
+				policyAppliedNoUnits, // endpoint in policy, but no runtime state yet
+				policyAppliedNoUnits, // still no units
+				endpointState,
+			},
+			wantNotified: true,
+		},
+		{
+			name: "endpoint not in policy — skipped immediately once policy applied",
+			stateSequence: []coordinator.State{
+				{},                    // policy not applied yet
+				{PolicyApplied: true}, // policy applied, endpoint not in PolicyConfiguredActionTypes
+			},
+			wantNotified: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCoord := newMockUpgradeCoordinator(t)
+
+			callIdx := 0
+			mockCoord.EXPECT().State().RunAndReturn(func() coordinator.State {
+				idx := callIdx
+				if idx >= len(tc.stateSequence) {
+					idx = len(tc.stateSequence) - 1
+				}
+				callIdx++
+				return tc.stateSequence[idx]
+			}).Times(len(tc.stateSequence))
+
+			if tc.wantNotified {
+				mockCoord.EXPECT().PerformAction(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, nil).Maybe()
+			}
+
+			log, _ := logger.New("", false)
+			u := NewUpgrade(log, mockCoord)
+			u.endpointWaitTimeout = 5 * time.Second
+			u.endpointPollInterval = 1 * time.Millisecond
+
+			notified := atomic.Bool{}
+			u.notifyUnitsOfProxiedActionFn = func(_ context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
+				notified.Store(true)
+				return nil
+			}
+
+			action := &fleetapi.ActionUpgrade{
+				ActionType: fleetapi.ActionTypeUpgrade,
+				Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
+			}
+
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			defer cancel()
+
+			err := u.notifyEndpointOfUpgrade(ctx, log, action)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantNotified, notified.Load())
+		})
+	}
+
+	t.Run("parent context cancelled — error propagated, no dispatch", func(t *testing.T) {
+		mockCoord := newMockUpgradeCoordinator(t)
+		// State() is called once before the select fires on the cancelled context.
+		// Poll interval is set to 1h so the ticker never competes with timeoutCtx.Done().
+		mockCoord.EXPECT().State().Return(coordinator.State{}).Times(1)
+
+		log, _ := logger.New("", false)
+		u := NewUpgrade(log, mockCoord)
+		u.endpointWaitTimeout = 5 * time.Second
+		u.endpointPollInterval = 1 * time.Hour
+
+		notified := atomic.Bool{}
+		u.notifyUnitsOfProxiedActionFn = func(_ context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
+			notified.Store(true)
+			return nil
+		}
+
+		action := &fleetapi.ActionUpgrade{
+			ActionType: fleetapi.ActionTypeUpgrade,
+			Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
+		}
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel() // cancel before calling — timeoutCtx inherits the cancellation
+
+		err := u.notifyEndpointOfUpgrade(ctx, log, action)
+		require.ErrorIs(t, err, context.Canceled)
+		assert.False(t, notified.Load())
+	})
 }
 
 type fakeAcker struct {
