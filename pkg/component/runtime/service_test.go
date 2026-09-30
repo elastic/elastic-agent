@@ -616,8 +616,7 @@ func mockEndpointBinary(t *testing.T, exitCode int) string {
 // Regression: the connection-info server (CIS) was opened before s.start() ran the
 // installer. The old service reconnected, its checkin queued on the channel, and once
 // s.start() returned the Run goroutine immediately processed it — flipping the component
-// to HEALTHY and pushing CheckinExpected (which on a tamper-protected Endpoint overwrites
-// the sealed upgrade config, closing the token-less replacement window).
+// to HEALTHY and pushing a CheckinExpected with the wrong policy.
 //
 // Fix: run the installer before opening the CIS, and drain any stale checkins after a
 // failed install before scheduling the retry.
