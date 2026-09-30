@@ -13,6 +13,7 @@ scms:
       commitusingapi: true
       branch: '{{ .scm.branch }}'
       force: false
+      singleBranch: true
 
 
 actions:
