@@ -273,8 +273,15 @@ func PreviousMinor() (*version.ParsedSemVer, error) {
 		return nil, ErrNoPreviousMinor
 	}
 
+<<<<<<< HEAD
 	for _, v := range versions {
 		if v.Prerelease() != "" || v.BuildMetadata() != "" {
+=======
+	for _, v := range upgradeableVersions {
+		// Accept plain GA releases and IAR versions (independent artifact releases with build
+		// metadata matching ^build\d{12}), consistent with findRequiredVersions.
+		if v.Prerelease() != "" || (v.BuildMetadata() != "" && !v.IsIndependentRelease()) {
+>>>>>>> 8452d99 ([fix] Address mismatch between version file generation and `PreviousMinor` filter (#16901))
 			continue
 		}
 		if v.Major() == current.Major() && v.Minor() < current.Minor() {
