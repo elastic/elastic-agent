@@ -237,29 +237,49 @@ func TestCleanupAgentDirectories_AbsentSymlink_NotDegraded(t *testing.T) {
 	assert.NotEmpty(t, debugEntries, "absent symlink must produce a debug log entry")
 }
 
-func TestCleanupAgentDirectories_AbsentSymlink_WithMarker_IsDegraded(t *testing.T) {
+func TestCleanupAgentDirectories_AbsentSymlink_WithMarker_NotDegraded(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
 
 	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
 	source := ttl.NewTTLMarkerRegistry(log, topDir)
 
-	// Write an upgrade marker — this means an upgrade was in progress.
+	// Write an upgrade marker — exercises the code path where the symlink is
+	// absent but a marker is present (e.g. the symlink was deleted externally).
 	require.NoError(t, os.MkdirAll(filepath.Join(topDir, "data"), 0o750))
 	require.NoError(t,
 		SaveMarker(paths.DataFrom(topDir), &UpdateMarker{Version: "1.0.0", Hash: "aaaaaa"}, true),
 		"writing upgrade marker fixture")
 
-	// No symlink. The marker's presence means this is not a fresh-volume start,
-	// so cleanup must still treat it as degraded.
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
-	require.Error(t, err)
-	require.ErrorIs(t, err, errCleanupDegraded,
-		"absent symlink with an upgrade marker must still return errCleanupDegraded")
+	// No symlink. callerProtected covers the live versioned home, so cleanup must
+	// proceed without degrading even when a marker is present.
+	callerProtected := map[string]bool{filepath.Clean(relHome): true}
+	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: true})
+	require.NoError(t, err, "absent symlink with callerProtected must not be treated as degraded")
 
-	// The install must be kept conservatively.
+	// The live versioned home is protected via callerProtected and must be kept.
 	require.NotNil(t, leftover)
 	assert.DirExists(t, filepath.Join(topDir, relHome))
+}
+
+func TestCleanupAgentDirectories_AbsentSymlink_OrphansRemoved(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+
+	// Models an RPM/DEB host after several upgrades: one live install and two orphans.
+	liveHome := createFakeAgentInstall(t, topDir, "9.5.2", "92fc15", true)
+	orphan1 := createFakeAgentInstall(t, topDir, "8.18.2", "52ce20", true)
+	orphan2 := createFakeAgentInstall(t, topDir, "9.3.1", "2ec825", true)
+	source := ttl.NewTTLMarkerRegistry(log, topDir)
+
+	// No symlink, no upgrade marker (upgrade completed and marker was cleaned up).
+	callerProtected := map[string]bool{filepath.Clean(liveHome): true}
+	_, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: false})
+	require.NoError(t, err, "absent symlink with callerProtected must not be treated as degraded")
+
+	assert.DirExists(t, filepath.Join(topDir, liveHome), "live versioned home must be preserved")
+	assert.NoDirExists(t, filepath.Join(topDir, orphan1), "orphan must be removed")
+	assert.NoDirExists(t, filepath.Join(topDir, orphan2), "orphan must be removed")
 }
 
 func TestCleanupAgentDirectories_DanglingSymlink_IsDegraded(t *testing.T) {
