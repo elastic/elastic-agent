@@ -1,0 +1,7 @@
+kind: feature
+
+summary: Add regression test for Kubernetes metrics RBAC deadlock (#15666).
+
+component: elastic-agent
+
+issue: https://github.com/elastic/elastic-agent/issues/15666

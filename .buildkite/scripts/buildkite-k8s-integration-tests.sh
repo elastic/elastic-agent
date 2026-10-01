@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${K8S_VERSION:?Error: Specify Kubernetes version via K8S_VERSION env variable}"
-: "${TARGET_ARCH:?Error: Specify target architecture via ARCH env variable}"
+: "${K8S_PROVISIONER:?Error: Specify the Kubernetes provisioner via K8S_PROVISIONER env variable}"
+: "${K8S_VERSION:?Error: Specify the cluster version via K8S_VERSION env variable}"
+: "${TARGET_ARCH:?Error: Specify target architecture via TARGET_ARCH env variable}"
+: "${DOCKER_VARIANTS:?Error: Specify the Docker variants via DOCKER_VARIANTS env variable}"
 : "${DOCKER_IMAGE_ARCHIVES_DIR:=build/distributions}"
-
-DOCKER_VARIANTS="${DOCKER_VARIANTS:-basic,wolfi,complete,complete-wolfi,service,cloud}"
-CLUSTER_NAME="${K8S_VERSION}-kubernetes"
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
   if [[ -f "${WORKSPACE}/.package-version" ]]; then
@@ -17,50 +16,25 @@ if [[ -z "${AGENT_VERSION:-}" ]]; then
     AGENT_VERSION="${AGENT_VERSION}-SNAPSHOT"
     echo "~~~ Agent version: ${AGENT_VERSION} (from version/version.go)"
   fi
-
   export AGENT_VERSION
 else
   echo "~~~ Agent version: ${AGENT_VERSION} (specified by env var)"
 fi
 
-echo "~~~ Create kind cluster '${CLUSTER_NAME}'"
-kind create cluster --image  "kindest/node:${K8S_VERSION}" --name "${CLUSTER_NAME}" --wait 60s --config - <<EOF
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: ClusterConfiguration
-    scheduler:
-      extraArgs:
-        bind-address: "0.0.0.0"
-        secure-port: "10259"
-    controllerManager:
-      extraArgs:
-        bind-address: "0.0.0.0"
-        secure-port: "10257"
-EOF
+# Buildkite defines K8S_VERSION with a v prefix (for example "v1.34.0") but mage
+# expects it without.
+K8S_VERSION="${K8S_VERSION#v}"
+echo "~~~ Kubernetes version: ${K8S_VERSION}"
+
+GOTEST_FLAGS=""
+if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
+  GOTEST_FLAGS="-test.short"
+fi
 
 IFS=',' read -r -a docker_variants <<< "${DOCKER_VARIANTS}"
 
-echo "~~~ Building k8s inner tests binary"
-GOOS=linux GOARCH="${TARGET_ARCH}" CGO_ENABLED=0 go test -tags 'kubernetes_inner' -c -o ./testsBinary ./testing/kubernetes_inner/...
-chmod +x ./testsBinary
-
-export TEST_DEFINE_PREFIX="${CLUSTER_NAME}"
-
-make install-gotestsum
-
-GOTEST_OPTS="-test.shuffle on -test.timeout 2h0m0s"
-if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
-  GOTEST_OPTS="${GOTEST_OPTS} -test.short"
-fi
-
-TESTS_EXIT_STATUS=0
+echo "~~~ Loading Docker images"
 for variant in "${docker_variants[@]}"; do
-  echo "~~~ k8s Integration tests for variant: ${variant}"
-
   # construct image archive path
   image_archive="elastic-agent-${variant}-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   if [[ "${variant}" == "basic" ]]; then
@@ -70,11 +44,7 @@ for variant in "${docker_variants[@]}"; do
   elif [[ "${variant}" == "elastic-otel-collector-wolfi" ]]; then
     image_archive="elastic-otel-collector-wolfi-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   fi
-  image_archive_path="${DOCKER_IMAGE_ARCHIVES_DIR}/$image_archive"
-
-  # load image
-  echo "Loading Docker image from ${image_archive_path}"
-  BUILDKIT_PROGRESS=plain docker load -i "${image_archive_path}"
+  image_archive_path="${DOCKER_IMAGE_ARCHIVES_DIR}/${image_archive}"
 
   # Check that manifest.json is present in image archive
   # NOTE: Do not use --wildcards option because it is not supported on MacOS
@@ -90,35 +60,29 @@ for variant in "${docker_variants[@]}"; do
       exit 1
   fi
 
-  # read image name from manifest
-  image=$(tar -Oxf "${image_archive_path}" manifest.json | jq -r '.[0].RepoTags[0]')
+  # load image
+  echo "Loading Docker image from ${image_archive_path}"
+  BUILDKIT_PROGRESS=plain docker load -i "${image_archive_path}"
+done
 
-  # embed k8s inner tests binary and build again the same image
-  echo "Embedding k8s inner tests binary into ${image}"
-  BUILDKIT_PROGRESS=plain docker build --tag "${image}" . -f - <<EOF
-FROM "${image}"
-COPY testsBinary /usr/share/elastic-agent/k8s-inner-tests
-EOF
+TESTS_EXIT_STATUS=0
+for variant in "${docker_variants[@]}"; do
+  echo "~~~ Kubernetes integration tests for variant: ${variant}"
 
-  # load image to kind cluster
-  echo "Loading Docker image ${image} to kind cluster ${CLUSTER_NAME}"
-  kind load docker-image --name "${CLUSTER_NAME}" "$image"
-
-  # Run integration tests
-  echo "Running k8s integration tests for ${variant}"
-  group_name="kubernetes"
-  fully_qualified_group_name="${CLUSTER_NAME}_${TARGET_ARCH}_${variant}"
-  outputXML="build/${fully_qualified_group_name}.integration.xml"
-  outputJSON="build/${fully_qualified_group_name}.integration.out.json"
-  pod_logs_base="${PWD}/build/${fully_qualified_group_name}.pod_logs_dump"
-
+  # We are setting TEST_INTEG_CLEAN_ON_EXIT=false because the .buildkite/hooks/pre-exit script
+  # will automatically clean up the kubernetes clusters on CI completion.
   set +e
-  K8S_TESTS_POD_LOGS_BASE="${pod_logs_base}" AGENT_IMAGE="${image}" DOCKER_VARIANT="${variant}" gotestsum --hide-summary=skipped --format testname --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- -tags kubernetes,integration ${GOTEST_OPTS} github.com/elastic/elastic-agent/testing/integration/k8s -v -args -integration.groups="${group_name}" -integration.sudo="false"
+  INSTANCE_PROVISIONER="${K8S_PROVISIONER}" \
+    STACK_PROVISIONER=external \
+    TEST_PLATFORMS="kubernetes/${TARGET_ARCH}/${K8S_VERSION}/${variant}" \
+    GOTEST_FLAGS="${GOTEST_FLAGS}" \
+    TEST_INTEG_CLEAN_ON_EXIT=false \
+    mage -v integration:testKubernetes
   exit_status=$?
   set -e
 
   if [[ $exit_status -ne 0 ]]; then
-     echo "^^^ +++"
+    echo "^^^ +++"
   fi
 
   if [[ $TESTS_EXIT_STATUS -eq 0 && $exit_status -ne 0 ]]; then

@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	tssh "github.com/elastic/elastic-agent/pkg/testing/ssh"
 	"github.com/elastic/elastic-agent/pkg/testing/supported"
@@ -442,8 +444,12 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 		return common.OSRunnerResult{}, fmt.Errorf("failed to determine SSH private key path: %w", err)
 	}
 
-	logger.Logf("Starting SSH; connect with `ssh -i %s %s@%s`", sshPrivateKeyPath, instance.Username, instance.IP)
-	client := tssh.NewClient(instance.IP, instance.Username, sshAuth, logger)
+	sshPort := ""
+	if instance.SSHPort != 0 {
+		sshPort = strconv.Itoa(instance.SSHPort)
+	}
+	logger.Logf("Starting SSH; connect with `ssh -i %s -p %s %s@%s`", sshPrivateKeyPath, sshPort, instance.Username, instance.IP)
+	client := tssh.NewClient(instance.IP, sshPort, instance.Username, sshAuth, logger)
 	connectCtx, connectCancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer connectCancel()
 	err = client.Connect(connectCtx)
@@ -901,6 +907,11 @@ func (r *Runner) findStack(id string) *common.Stack {
 }
 
 func (r *Runner) addOrUpdateStack(stack common.Stack) error {
+	// do not update state for an external stack
+	if stack.Provisioner == ess.ProvisionerExternal {
+		return nil
+	}
+
 	r.stateMx.Lock()
 	defer r.stateMx.Unlock()
 

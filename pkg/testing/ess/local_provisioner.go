@@ -277,7 +277,10 @@ func (p *LocalProvisioner) command(ctx context.Context, args ...string) *exec.Cm
 func (p *LocalProvisioner) commandWithProfile(ctx context.Context, profile string, args ...string) *exec.Cmd {
 	//nolint:gosec // G204: p.bin is the elastic-package binary resolved by the test framework and args are framework-controlled, not external input.
 	cmd := exec.CommandContext(ctx, p.bin, args...)
-	cmd.Env = append(os.Environ(), epProfileEnv+"="+profile)
+	// COMPOSE_ANSI=never stops docker compose from attempting TTY-based progress
+	// output (which fails when stdout is piped to a buffer rather than a real
+	// terminal, producing "failed to get console: provided file is not a console").
+	cmd.Env = append(os.Environ(), epProfileEnv+"="+profile, "COMPOSE_ANSI=never")
 	return cmd
 }
 

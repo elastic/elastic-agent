@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix rollback cleaner permanently skipping cleanup on RPM/DEB installs due to absent live-install symlink
+component: elastic-agent

@@ -499,7 +499,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
 				assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
-				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
 				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
 				t.Logf("received output %s from upgrade command", retVal)
 			},
@@ -541,7 +541,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 				}, 4*time.Minute, 10*time.Second)
 				t.Log("elastic agent is out of grace period.")
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
-				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
 				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
 				t.Logf("received output %s from upgrade command", retVal)
 			},
@@ -593,7 +593,7 @@ func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
 		func(ctx context.Context, t *testing.T, c client.Client, startFixture, endFixture *atesting.Fixture) {
 			assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
 			t.Logf("sending rollback: version=%s rollback=%v", startFixture.Version(), true)
-			retVal, err := c.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+			retVal, err := c.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
 			require.NoError(t, err, "rollback should succeed")
 			t.Logf("rollback output: %s", retVal)
 		},
@@ -610,7 +610,7 @@ func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
 	defer replayClient.Disconnect()
 
 	t.Logf("Sending replayed rollback to version %s (simulating Fleet re-send)", fromFixture.Version())
-	retVal, err := replayClient.Upgrade(ctx, fromFixture.Version(), true, "", false, false)
+	retVal, err := replayClient.Upgrade(ctx, fromFixture.Version(), true, nil, false, false)
 	require.NoError(t, err, "replayed rollback should not error")
 	t.Logf("replayed rollback output: %s", retVal)
 

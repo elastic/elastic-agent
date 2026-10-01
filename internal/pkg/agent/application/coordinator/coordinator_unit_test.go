@@ -1984,7 +1984,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
+	err := coord.Upgrade(ctx, "1.2.3", nil, nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -2663,7 +2663,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 
@@ -2723,7 +2723,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 		wg.Done()
 	}()
 
-	err := coord.Upgrade(t.Context(), "", "", nil)
+	err := coord.Upgrade(t.Context(), "", nil, nil)
 	require.Error(t, err)
 	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
 

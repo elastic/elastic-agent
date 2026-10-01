@@ -199,6 +199,8 @@ components:
     platforms:
       - *linux-amd64
       - *linux-arm64
+      - *windows-amd64
+      - *windows-arm64
     packageTypes: *all-package-types
 # The shared section contains YAML anchors that are used to
 # define common parts of the package in order to not repeat ourselves.
@@ -647,11 +649,11 @@ shared:
   - &docker_ubi_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/amd64 redhat/ubi10-minimal'
+      from: '--platform=linux/amd64 redhat/ubi9-minimal'
   - &docker_ubi_arm_spec
     docker_variant: 'basic'
     extra_vars:
-      from: '--platform=linux/arm64 redhat/ubi10-minimal'
+      from: '--platform=linux/arm64 redhat/ubi9-minimal'
   - &docker_wolfi_spec
     docker_variant: 'wolfi'
     extra_vars:

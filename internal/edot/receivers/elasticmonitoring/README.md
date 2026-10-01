@@ -32,10 +32,10 @@ Here is a list of metrics currently available when using the `elasticmonitoringr
 - `beat.stats.libbeat.pipeline.queue.filled.events`: otelcol_exporter_queue_size
 - `beat.stats.libbeat.pipeline.queue.max_events`: otelcol_exporter_queue_capacity
 - `beat.stats.libbeat.pipeline.queue.filled.pct`: derived from queue size / capacity
-- `beat.stats.libbeat.output.events.total`: otelcol.elasticsearch.docs.processed
-- `beat.stats.libbeat.output.events.active`: otelcol.elasticsearch.docs.processed - (otelcol_exporter_send_failed_log_records + otelcol_exporter_send_failed_spans + otelcol_exporter_send_failed_metric_points)
+- `beat.stats.libbeat.output.events.total`: otelcol.elasticsearch.docs.processed + enqueue_failed_total (the sum of enqueue_failed counters for logs, spans, and metric points)
+- `beat.stats.libbeat.output.events.active`: otelcol.elasticsearch.docs.processed - sent_total - send_failed_total (enqueue failures never reach the bulk indexer and are excluded from docs.processed)
 - `beat.stats.libbeat.output.events.acked`: otelcol_exporter_sent_metric_points + otelcol_exporter_sent_spans + otelcol_exporter_sent_log_records
-- `beat.stats.libbeat.output.events.dropped`: otelcol_exporter_send_failed_log_records + otelcol_exporter_send_failed_spans + otelcol_exporter_send_failed_metric_points
+- `beat.stats.libbeat.output.events.dropped`: otelcol_exporter_send_failed_log_records + otelcol_exporter_send_failed_spans + otelcol_exporter_send_failed_metric_points + otelcol_exporter_enqueue_failed_log_records + otelcol_exporter_enqueue_failed_spans + otelcol_exporter_enqueue_failed_metric_points
 - `beat.stats.libbeat.output.events.failed`: otelcol.elasticsearch.docs.retried.
 - `beat.stats.libbeat.output.events.batches`: otelcol.elasticsearch.bulk_requests.count
 - `beat.stats.libbeat.output.write.bytes`: otelcol.elasticsearch.flushed.bytes
