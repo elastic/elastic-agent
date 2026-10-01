@@ -189,9 +189,10 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 	allVars := append([]*Vars{ctxVars}, podVars...)
 
 	// Baseline heap: everything built but cache not yet populated.
-	// Null out local slices so only allVars/inputs remain live.
-	podVars = nil
-	ctxVars = nil
+	// KeepAlive ensures podVars/ctxVars are live up to this point but not beyond,
+	// so only allVars and inputs contribute to the baseline reading.
+	runtime.KeepAlive(podVars)
+	runtime.KeepAlive(ctxVars)
 	heapBaseline := heapInUse()
 
 	cache := NewRenderCache()
@@ -234,9 +235,10 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 		}
 	}
 
-	// Drop rendering inputs and vars so only the cache holds live data.
-	allVars = nil
-	inputNodes = nil
+	// KeepAlive ensures allVars/inputNodes are live through the keepRendered block above
+	// but not beyond, so only the cache contributes to the heap reading below.
+	runtime.KeepAlive(allVars)
+	runtime.KeepAlive(inputNodes)
 
 	cacheEntries := cache.Len()
 	b.ReportMetric(float64(cacheEntries), "cache-entries")
