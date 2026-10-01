@@ -1,5 +1,0 @@
-kind: bug-fix
-
-summary: Removes unneeded Temporary Resource ID
-
-component: elastic-agent
