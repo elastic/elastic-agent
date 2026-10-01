@@ -6,11 +6,11 @@ This template renders two Dockerfiles:
     image because the Ironbank registry needs privileged access.
 
 Ironbank has strict Dockerfile requirements, e.g. ADD is prohibited (use COPY;
-external resources are declared in hardening_manifest.yaml.tmpl and supplied by
-the pipeline). A violation only surfaces as a failed build in the dso.mil
-GitLab repo, so keep everything Ironbank-incompatible, such as ADD, inside
-public_build branches. See
-https://docs-ironbank.dso.mil/hardening/dockerfile-requirements/
+external resources such as tinit and jq are declared in
+hardening_manifest.yaml.tmpl and supplied by the pipeline). A violation only
+surfaces as a failed build in the dso.mil GitLab repo, so keep this file
+Ironbank-compatible: public_build branches may differ only in where the files
+come from. See https://docs-ironbank.dso.mil/hardening/dockerfile-requirements/
 */ -}}
 ################################################################################
 # Build stage 0
@@ -70,16 +70,7 @@ COPY LICENSE /licenses/elastic-${ELASTIC_PRODUCT}
 {{- end }}
 
 # Add a dumb init process
-{{ if .public_build -}}
-# ADD is not allowed by Ironbank (DoD, https://repo1.dso.mil/dsop): it fetches
-# tinit and jq through hardening_manifest.yaml and the Dockerfile must use COPY.
-# ADD is only safe here because this branch is the public CI build (public_build)
-# and is never rendered into the Dockerfile submitted to Ironbank.
-ADD {{ .tinit_url }} /tinit
-RUN echo '{{ .tinit_sha256 }}  /tinit' | sha256sum -c - && chmod 0755 /tinit
-{{ else -}}
 COPY tinit /tinit
-{{ end -}}
 RUN chmod +x /tinit
 # Help with supporting the override in the ECK entrypoint
 # https://github.com/elastic/cloud-on-k8s/blob/272fd0f2b344b1f86f04decb561eceab8a5a3254/pkg/controller/agent/pod.go#L455
@@ -128,13 +119,7 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
     find /usr/share/elastic-agent/data/elastic-agent-*/components -name "*.yml" -type f -exec chmod 0644 {} \; && \
     chmod +x /usr/share/elastic-agent/data/elastic-agent-*/elastic-agent
 
-{{ if .public_build -}}
-# ADD is public-CI-only, see the note on tinit above.
-ADD {{ .jq_url }} /usr/local/bin/jq
-RUN echo '{{ .jq_sha256 }}  /usr/local/bin/jq' | sha256sum -c -
-{{ else -}}
 COPY jq /usr/local/bin
-{{ end -}}
 RUN chown root:root /usr/local/bin/jq && chmod 0755 /usr/local/bin/jq
 
 {{ if .public_build -}}
