@@ -727,8 +727,8 @@ func (c *contextProviderState) Current() (*transpiler.AST, uint64) {
 }
 
 type dynamicProviderMapping struct {
-	id         string
-	priority   int
+	id       string
+	priority int
 	// mapping holds the AST form of the dynamic provider's variables. It is inserted by
 	// reference into each per-pod Vars shallow-clone in generateVars, so the same allocation is
 	// shared between the mapping and every Vars that references it — no per-Vars copy.
