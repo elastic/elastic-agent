@@ -56,7 +56,7 @@ COPY {{ if .public_build }}beat/LICENSE.txt{{ else }}LICENSE{{ end }} /licenses/
 # Fetched at build time only for the public CI build; Ironbank supplies
 # tinit and jq through hardening_manifest.yaml and the Dockerfile uses COPY.
 ADD {{ .tinit_url }} /tinit
-RUN echo '{{ .tinit_sha256 }}  /tinit' | sha256sum -c -
+RUN echo '{{ .tinit_sha256 }}  /tinit' | sha256sum -c - && chmod 0755 /tinit
 {{ else -}}
 COPY tinit /tinit
 {{ end -}}
