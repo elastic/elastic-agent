@@ -75,6 +75,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [snmpreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/snmpreceiver/v0.161.0/receiver/snmpreceiver/README.md) | v0.161.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.161.0/receiver/sqlserverreceiver/README.md) | v0.161.0 |
 | [statsdreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/statsdreceiver/v0.161.0/receiver/statsdreceiver/README.md) | v0.161.0 |
+| [syslogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/syslogreceiver/v0.161.0/receiver/syslogreceiver/README.md) | v0.161.0 |
 | [vcenterreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/vcenterreceiver/v0.161.0/receiver/vcenterreceiver/README.md) | v0.161.0 |
 | [windowseventlogreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowseventlogreceiver/v0.161.0/receiver/windowseventlogreceiver/README.md) | v0.161.0 |
 | [windowsperfcountersreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/windowsperfcountersreceiver/v0.161.0/receiver/windowsperfcountersreceiver/README.md) | v0.161.0 |

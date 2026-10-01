@@ -27,7 +27,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	"github.com/stretchr/testify/require"
-	helmKube "helm.sh/helm/v3/pkg/kube"
+	helmKube "helm.sh/helm/v4/pkg/kube"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -444,7 +444,7 @@ func k8sWaitForReady(ctx context.Context, client klient.Client, waitDuration tim
 	if err != nil {
 		return fmt.Errorf("error creating clientset: %w", err)
 	}
-	readyChecker := helmKube.NewReadyChecker(clientSet, func(s string, i ...interface{}) {})
+	readyChecker := helmKube.NewReadyChecker(clientSet)
 
 	httpClient, err := rest.HTTPClientFor(client.RESTConfig())
 	if err != nil {
@@ -611,12 +611,12 @@ func kibanaGetAgent(ctx context.Context, kc *kibana.Client, id string) (*GetAgen
 	return &agentResp.Item, nil
 }
 
-func queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value string) map[string]any {
+func queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value string, filters ...any) map[string]any {
 	return map[string]any{
 		"_source": []string{"message"},
 		"query": map[string]any{
 			"bool": map[string]any{
-				"filter": []any{
+				"filter": append([]any{
 					map[string]any{
 						"term": map[string]any{
 							"data_stream.dataset": dataset,
@@ -637,7 +637,7 @@ func queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attr
 							"resource.attributes." + attribute: value,
 						},
 					},
-				},
+				}, filters...),
 			},
 		},
 	}

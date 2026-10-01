@@ -135,6 +135,10 @@ receivers:
     endpoint: 0.0.0.0:9090
   statsd:
     endpoint: localhost:8125
+  syslog:
+    tcp:
+      listen_address: 127.0.0.1:54526
+    protocol: rfc5424
   elasticmonitoringreceiver:
   verifier:
     cloud_connector_id: "test-cc-001"
@@ -259,6 +263,7 @@ service:
         - azure_event_hub
         - awscloudwatch
         - verifier
+        - syslog
 
     logs/forward_receive:
       receivers:

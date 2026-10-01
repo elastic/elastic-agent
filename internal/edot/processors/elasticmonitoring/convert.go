@@ -359,27 +359,57 @@ func buildExporterMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource,
 	}
 }
 
-// buildInputMetrics appends one ResourceMetrics per (component, input) pair to
-// out, copying each data point that carries an input_id attribute. Only
-// filebeat inputs are included, matching the behaviour of the former connector.
-// System-level metrics (process stats, cgroup, memory) are excluded because
-// they are identical across all streams and must not be multiplied per input.
-func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
-	type inputKey struct{ compID, inputID string }
-	type inputEvent struct {
-		sm     pmetric.ScopeMetrics
-		fields map[string]pmetric.NumberDataPoint
-	}
-	events := map[inputKey]*inputEvent{}
+// inputSystemMetricPrefixes mirrors the systemMetricPrefixes list in the beats
+// RegistryBridge (bridge.go). Metrics with these prefixes describe the beat
+// process or host and are identical across all streams of a component; they
+// must not appear in per-input events.
+var inputSystemMetricPrefixes = []string{
+	"beat.memstats.",
+	"beat.cpu.",
+	"beat.handles.",
+	"beat.runtime.",
+	"beat.cgroup.",
+	"beat.info.uptime.ms",
+	"system.",
+}
 
+// isInputSystemMetric reports whether name matches any of the
+// inputSystemMetricPrefixes.
+func isInputSystemMetric(name string) bool {
+	for _, prefix := range inputSystemMetricPrefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+type inputKey struct{ compID, inputID string }
+
+type inputDP struct {
+	outName string
+	src     pmetric.Metric
+	dp      pmetric.NumberDataPoint
+}
+
+type inputCollected struct {
+	inputType string
+	dps       []inputDP
+}
+
+// collectInputMetrics gathers per-(component, input) raw data points from receiver
+// scopes. Only filebeat receiver metrics that carry an input_id attribute and are
+// not system-level metrics are included. The component ID has its per-stream suffix
+// stripped so all streams of the same component aggregate together.
+func collectInputMetrics(md pmetric.Metrics) map[inputKey]*inputCollected {
+	result := map[inputKey]*inputCollected{}
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
 		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
 			sm := rm.ScopeMetrics().At(j)
 
-			// Prefer receiver kind, but fall back to any component ID present
-			// for scopes that carry no component kind (e.g. beat bridge metrics).
-			// Scopes with an explicit non-receiver kind are skipped.
+			// Accept receiver-kind scopes; fall back to any scope that carries a
+			// component ID but no explicit non-receiver kind (e.g. beat bridge metrics).
 			otelID := componentIDForScope(sm, "receiver")
 			if otelID == "" {
 				if kindVal, hasKind := sm.Scope().Attributes().Get(otelComponentKindKey); hasKind && kindVal.Str() != "receiver" {
@@ -393,13 +423,16 @@ func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Met
 			}
 
 			beatType := beatTypeFromOtelID(otelID)
-			compID := agentComponentID(otelID)
+			compID := baseComponentID(agentComponentID(otelID))
 			if compID == "" || beatType != "filebeat" {
 				continue
 			}
 
 			for k := 0; k < sm.Metrics().Len(); k++ {
 				m := sm.Metrics().At(k)
+				if isInputSystemMetric(m.Name()) {
+					continue
+				}
 				outName := beatType + "_input." + m.Name()
 				dps := numberDataPoints(m)
 				for l := 0; l < dps.Len(); l++ {
@@ -409,41 +442,55 @@ func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Met
 						continue
 					}
 					key := inputKey{compID: compID, inputID: inputIDVal.Str()}
-					event, exists := events[key]
-					if !exists {
-						sm := newEventScope(out, res, internaltelemetry.EventTypeInput, key.compID)
-						sm.Scope().Attributes().PutStr(internaltelemetry.InputIDAttr, key.inputID)
-						event = &inputEvent{sm: sm, fields: map[string]pmetric.NumberDataPoint{}}
-						events[key] = event
+					acc := result[key]
+					if acc == nil {
+						acc = &inputCollected{}
+						result[key] = acc
 					}
-					if inputType, ok := dp.Attributes().Get(otelInputTypeKey); ok {
-						event.sm.Scope().Attributes().PutStr(internaltelemetry.InputTypeAttr, inputType.Str())
+					if acc.inputType == "" {
+						if v, ok := dp.Attributes().Get(otelInputTypeKey); ok {
+							acc.inputType = v.Str()
+						}
 					}
-					if existing, ok := event.fields[outName]; ok {
-						addDataPointValue(existing, dp)
-					} else {
-						event.fields[outName] = copyNumberMetric(event.sm, m, outName, dp)
-					}
+					acc.dps = append(acc.dps, inputDP{outName: outName, src: m, dp: dp})
 				}
+			}
+		}
+	}
+	return result
+}
+
+// buildInputMetrics appends one ResourceMetrics per (component, input) pair to out.
+func buildInputMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
+	for key, acc := range collectInputMetrics(md) {
+		sm := newEventScope(out, res, internaltelemetry.EventTypeInput, key.compID)
+		sm.Scope().Attributes().PutStr(internaltelemetry.InputIDAttr, key.inputID)
+		if acc.inputType != "" {
+			sm.Scope().Attributes().PutStr(internaltelemetry.InputTypeAttr, acc.inputType)
+		}
+		fields := map[string]pmetric.NumberDataPoint{}
+		for _, raw := range acc.dps {
+			if existing, ok := fields[raw.outName]; ok {
+				addDataPointValue(existing, raw.dp)
+			} else {
+				fields[raw.outName] = copyNumberMetric(sm, raw.src, raw.outName, raw.dp)
 			}
 		}
 	}
 }
 
-// buildReceiverPipelineMetrics appends one ResourceMetrics per component to
-// out, mapping RegistryBridge metrics (scope name: registryBridgeScopeName) to
-// Beats-compatible field names via receiverMetricField. Each data point carries
-// a "receiver" attribute containing the OTel component ID; per-container
-// receivers sharing the same base component ID are aggregated into a single
-// event with summed values.
-func buildReceiverPipelineMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
-	type receiverEvent struct {
-		sm     pmetric.ScopeMetrics
-		fields map[string]pmetric.NumberDataPoint
-	}
-	events := map[string]*receiverEvent{}
-	beatTypes := map[string]string{} // cache beatTypeFromOtelID results by otelID
+type receiverDP struct {
+	field string
+	src   pmetric.Metric
+	dp    pmetric.NumberDataPoint
+}
 
+// collectReceiverPipelineMetrics gathers per-component raw data points from the
+// RegistryBridge instrumentation scope. Data points that carry an input_id attribute
+// are excluded because buildInputMetrics handles them.
+func collectReceiverPipelineMetrics(md pmetric.Metrics) map[string][]receiverDP {
+	result := map[string][]receiverDP{}
+	beatTypes := map[string]string{}
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
 		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
@@ -460,31 +507,43 @@ func buildReceiverPipelineMetrics(res pcommon.Resource, md pmetric.Metrics, out 
 					if !ok || dp.ValueType() == pmetric.NumberDataPointValueTypeEmpty {
 						continue
 					}
+					if _, hasInputID := dp.Attributes().Get(otelInputIDKey); hasInputID {
+						continue
+					}
 					otelID := receiverVal.Str()
 					compID := baseComponentID(agentComponentID(otelID))
 					if compID == "" {
 						continue
-					}
-					event, exists := events[compID]
-					if !exists {
-						event = &receiverEvent{
-							sm:     newEventScope(out, res, internaltelemetry.EventTypeReceiver, compID),
-							fields: map[string]pmetric.NumberDataPoint{},
-						}
-						events[compID] = event
 					}
 					bt, ok := beatTypes[otelID]
 					if !ok {
 						bt = beatTypeFromOtelID(otelID)
 						beatTypes[otelID] = bt
 					}
-					field := receiverMetricField(bt, m.Name())
-					if existing, exists := event.fields[field]; exists {
-						addDataPointValue(existing, dp)
-					} else {
-						event.fields[field] = copyNumberMetric(event.sm, m, field, dp)
-					}
+					result[compID] = append(result[compID], receiverDP{
+						field: receiverMetricField(bt, m.Name()),
+						src:   m,
+						dp:    dp,
+					})
 				}
+			}
+		}
+	}
+	return result
+}
+
+// buildReceiverPipelineMetrics appends one ResourceMetrics per component to out.
+// Per-container receivers sharing the same base component ID are aggregated into
+// a single event with summed values.
+func buildReceiverPipelineMetrics(res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
+	for compID, dps := range collectReceiverPipelineMetrics(md) {
+		sm := newEventScope(out, res, internaltelemetry.EventTypeReceiver, compID)
+		fields := map[string]pmetric.NumberDataPoint{}
+		for _, raw := range dps {
+			if existing, ok := fields[raw.field]; ok {
+				addDataPointValue(existing, raw.dp)
+			} else {
+				fields[raw.field] = copyNumberMetric(sm, raw.src, raw.field, raw.dp)
 			}
 		}
 	}
