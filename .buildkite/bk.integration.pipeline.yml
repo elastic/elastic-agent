@@ -218,6 +218,13 @@ common:
     command: &openshift_test_command |
       buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
+    command_retry: &openshift_test_command_with_sleep |
+      MIN=0
+      MAX=9
+      # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
+      sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
+      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
     artifact_paths: &openshift_test_artifact_paths
       - build/*
       - build/diagnostics/**
@@ -1018,6 +1025,16 @@ steps:
               *k8s_test_versions
 
       - label: "openshift:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
+        # OpenShift differs from Kubernetes in the deployment manifests and container images, not in the agent code.
+        # Tier 3 catches the rare exceptions.
+        if_changed:
+          include:
+            - deploy/helm/**
+            - deploy/kubernetes/**
+            - dev-tools/packaging/packages.yml
+            - dev-tools/packaging/templates/docker/**
+            - pkg/testing/kubernetes/**
+            - testing/integration/k8s/**
         env:
           *openshift_test_env
         command: *openshift_test_command
@@ -1083,6 +1100,16 @@ steps:
               - *k8s_max_test_version
 
       - label: "openshift:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
+        # OpenShift differs from Kubernetes in the deployment manifests and container images, not in the agent code.
+        # Tier 3 catches the rare exceptions.
+        if_changed:
+          include:
+            - deploy/helm/**
+            - deploy/kubernetes/**
+            - dev-tools/packaging/packages.yml
+            - dev-tools/packaging/templates/docker/**
+            - pkg/testing/kubernetes/**
+            - testing/integration/k8s/**
         env:
           *openshift_test_env
         command: *openshift_test_command
@@ -1144,7 +1171,7 @@ steps:
       - label: "openshift:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
         env:
           *openshift_test_env
-        command: *openshift_test_command
+        command: *openshift_test_command_with_sleep
         artifact_paths:
           *openshift_test_artifact_paths
         retry:
