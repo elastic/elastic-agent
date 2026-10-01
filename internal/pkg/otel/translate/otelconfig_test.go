@@ -561,8 +561,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"http": map[string]any{
 				"enabled": false,
 			},
-			"management.otel.enabled": true,
-			"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+			"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 		}
 	}
 
@@ -732,8 +731,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"http": map[string]any{
 				"enabled": false,
 			},
-			"management.otel.enabled": true,
-			"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+			"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 		}
 	}
 
@@ -782,8 +780,7 @@ func TestGetOtelConfig(t *testing.T) {
 		"http": map[string]any{
 			"enabled": false,
 		},
-		"management.otel.enabled": true,
-		"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+		"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 	}
 
 	tests := []struct {
@@ -1085,8 +1082,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"http": map[string]any{
 							"enabled": false,
 						},
-						"management.otel.enabled": true,
-						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+						"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -1647,8 +1643,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"http": map[string]any{
 							"enabled": false,
 						},
-						"management.otel.enabled": true,
-						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+						"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -1842,8 +1837,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"http": map[string]any{
 							"enabled": false,
 						},
-						"management.otel.enabled": true,
-						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+						"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -1954,8 +1948,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"http": map[string]any{
 							"enabled": false,
 						},
-						"management.otel.enabled": true,
-						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
+						"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -3178,14 +3171,16 @@ func TestGetReceiversConfigForComponentAgentInfo(t *testing.T) {
 
 			for _, value := range result {
 				receiverConfig := value.(map[string]any)
-				assert.Equal(t, true, receiverConfig["management.otel.enabled"])
 				assert.Equal(t, map[string]any{
-					"id":           "agent-id",
-					"version":      "9.6.0",
-					"snapshot":     true,
-					"mode":         tc.expectedMode,
-					"unprivileged": tc.unprivileged,
-				}, receiverConfig["management.otel.agent"])
+					"enabled": true,
+					"agent": map[string]any{
+						"id":           "agent-id",
+						"version":      "9.6.0",
+						"snapshot":     true,
+						"mode":         tc.expectedMode,
+						"unprivileged": tc.unprivileged,
+					},
+				}, receiverConfig["management.otel"])
 			}
 		})
 	}
