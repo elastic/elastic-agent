@@ -866,13 +866,11 @@ shared:
     extra_vars:
       dockerfile: '../ironbank/Dockerfile.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
-      base_registry: 'registry.access.redhat.com'
-      base_image: 'ubi10/ubi'
-      base_tag: '10.2'
-      license_source: 'beat/LICENSE.txt'
-      tinit_source: 'https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64'
-      jq_source: 'https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64'
-      entrypoint_source: 'docker-entrypoint'
+      # The Ironbank base image needs privileged registry access, so CI builds
+      # this variant on the public UBI image instead. tinit and jq details are
+      # injected from hardening_manifest.yaml.tmpl by the Package mage target.
+      public_build: 'true'
+      build_args: 'BASE_REGISTRY=registry.access.redhat.com,BASE_IMAGE=ubi10/ubi'
       user: '{{ .BeatName }}'
       linux_capabilities: ''
       beats_install_path: "install"

@@ -2138,18 +2138,26 @@ func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankReso
 }
 
 // injectIronbankManifestVars reads the hardening manifest template and injects
-// tinit_sha256 / jq_sha256 into every ironbank Docker variant spec so that
-// packages.yml does not need to duplicate values that are authoritative in the
-// manifest.
+// the download URL and sha256 of tinit and jq into every ironbank Docker variant
+// spec. Ironbank itself fetches these through the manifest; the public CI build
+// has no such step, so its Dockerfile downloads and verifies them using the same
+// values, keeping the manifest their only definition.
 func injectIronbankManifestVars(specs []devtools.OSPackageArgs) error {
 	manifestPath := filepath.Join("dev-tools", "packaging", "templates", "ironbank", "hardening_manifest.yaml.tmpl")
 	resources, err := ironbankResourcesFromManifest(manifestPath)
 	if err != nil {
 		return err
 	}
+	for _, name := range []string{"tinit", "jq"} {
+		if resources[name].URL == "" || resources[name].SHA256 == "" {
+			return fmt.Errorf("%s: no sha256-validated %q resource found", manifestPath, name)
+		}
+	}
 	for i := range specs {
 		if specs[i].Spec.DockerVariant == devtools.Ironbank {
+			specs[i].Spec.ExtraVar("tinit_url", resources["tinit"].URL)
 			specs[i].Spec.ExtraVar("tinit_sha256", resources["tinit"].SHA256)
+			specs[i].Spec.ExtraVar("jq_url", resources["jq"].URL)
 			specs[i].Spec.ExtraVar("jq_sha256", resources["jq"].SHA256)
 		}
 	}
@@ -2161,25 +2169,11 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 	buildDir := filepath.Join("build", getIronbankContextName(cfg))
 	templatesDir := filepath.Join("dev-tools", "packaging", "templates", "ironbank")
 
-	resources, err := ironbankResourcesFromManifest(filepath.Join(templatesDir, "hardening_manifest.yaml.tmpl"))
-	if err != nil {
-		return fmt.Errorf("reading ironbank resource hashes: %w", err)
-	}
-
 	data := map[string]interface{}{
-		"MajorMinor":        majorMinor(cfg),
-		"base_registry":     "registry1.dsop.io",
-		"base_image":        "redhat/ubi/ubi10",
-		"base_tag":          "10.2",
-		"license_source":    "LICENSE",
-		"tinit_source":      "tinit",
-		"tinit_sha256":      resources["tinit"].SHA256,
-		"jq_source":         "jq",
-		"jq_sha256":         resources["jq"].SHA256,
-		"entrypoint_source": "config/docker-entrypoint",
+		"MajorMinor": majorMinor(cfg),
 	}
 
-	err = filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
 		if !d.IsDir() {
 			target := strings.TrimSuffix(
 				filepath.Join(buildDir, filepath.Base(path)),
