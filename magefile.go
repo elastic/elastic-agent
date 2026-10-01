@@ -2112,7 +2112,7 @@ func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankReso
 	}
 
 	// Strip Go template expressions so the file parses as plain YAML.
-	stripped := regexp.MustCompile(`\{\{[^}]*\}\}`).ReplaceAll(raw, []byte(`""`))
+	stripped := regexp.MustCompile(`\{\{[^}]*\}\}`).ReplaceAll(raw, []byte("tmpl"))
 
 	var manifest struct {
 		Resources []struct {
