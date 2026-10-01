@@ -39,12 +39,54 @@ steps:
           context: "buildkite/elastic-agent - Packaging"
     steps:
       # Build matrix is not used for packaging in favor to unique step keys
-      # Packaging amd64 non-containers
-      - label: ":package: amd64: zip,tar.gz,rpm,deb "
-        key: packaging-amd64
+      # Packaging amd64 non-containers.
+      #
+      # Linux and Windows are packaged in separate steps so that every step only
+      # cross-builds one platform and integration tests can start as soon as the
+      # package for their platform is ready. The deb/rpm packages are built by a
+      # third step because building them takes several extra minutes and only the
+      # deb and rpm test groups need them.
+      - label: ":package: linux/amd64: tar.gz"
+        key: packaging-linux-amd64
         env:
-          PLATFORMS: "windows/amd64,linux/amd64"
-          PACKAGES: "zip,tar.gz,rpm,deb"
+          PLATFORMS: "linux/amd64"
+          PACKAGES: "tar.gz"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *google_oidc_plugin
+
+      - label: ":package: windows/amd64: zip"
+        key: packaging-windows-amd64
+        env:
+          PLATFORMS: "windows/amd64"
+          PACKAGES: "zip"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *google_oidc_plugin
+
+      - label: ":package: linux/amd64: rpm,deb"
+        key: packaging-linux-amd64-deb-rpm
+        env:
+          PLATFORMS: "linux/amd64"
+          PACKAGES: "rpm,deb"
         command: ".buildkite/scripts/steps/integration-package.sh"
         artifact_paths:
           - build/distributions/**
@@ -188,11 +230,6 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
           - *google_oidc_plugin
-
-  - label: "Triggering Integration tests"
-    command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
-    plugins:
-    - *sparse_checkout_plugin
 
   ## PRs
   - label: "Triggering custom FIPS integration tests"
