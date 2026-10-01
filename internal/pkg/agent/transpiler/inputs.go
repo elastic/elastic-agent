@@ -40,7 +40,9 @@ type RenderedInputs struct {
 	entries []*renderEntry
 }
 
-// Node returns the rendered inputs as a list node.
+// Node returns the rendered inputs as a list node. Only valid when the RenderedInputs was
+// produced without a cache (i.e. via RenderInputs); cached entries have their rendered field
+// cleared after being stored.
 func (r *RenderedInputs) Node() Node {
 	nodes := make([]Node, 0, len(r.entries))
 	for _, entry := range r.entries {
@@ -140,7 +142,7 @@ func RenderInputsCached(inputs Node, varsArray []*Vars, cache *RenderCache) (*Re
 					cache.put(key, entry)
 				}
 			}
-			if entry.rendered == nil {
+			if entry.removed {
 				// removed by an unresolved variable or a condition
 				continue
 			}
@@ -180,7 +182,7 @@ func renderInput(dict *Dict, vars *Vars, hasher *xxhash.Digest) (*renderEntry, e
 	n, err := dict.Apply(applyVars)
 	if errors.Is(err, ErrNoMatch) {
 		// has a variable that didn't exist, so we ignore it
-		return &renderEntry{}, nil
+		return &renderEntry{removed: true}, nil
 	}
 	if err != nil {
 		// another error that needs to be reported
@@ -188,12 +190,12 @@ func renderInput(dict *Dict, vars *Vars, hasher *xxhash.Digest) (*renderEntry, e
 	}
 	if n == nil {
 		// condition removed it
-		return &renderEntry{}, nil
+		return &renderEntry{removed: true}, nil
 	}
 	rendered := n.(*Dict)
 	if hadStreams && getStreams(rendered) == nil {
 		// conditions removed all streams (input is removed)
-		return &renderEntry{}, nil
+		return &renderEntry{removed: true}, nil
 	}
 	hasher.Reset()
 	_ = rendered.Hash64With(hasher)
