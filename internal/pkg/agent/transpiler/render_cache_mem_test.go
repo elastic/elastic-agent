@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/cespare/xxhash/v2"
+
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
@@ -71,8 +72,8 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 			},
 			"streams": []interface{}{
 				map[string]interface{}{
-					"id":          fmt.Sprintf("logfile-kubernetes.container_logs_%d-${kubernetes.pod.uid}", i),
-					"paths":       []interface{}{"${kubernetes.pod.log_path}/*.log"},
+					"id":             fmt.Sprintf("logfile-kubernetes.container_logs_%d-${kubernetes.pod.uid}", i),
+					"paths":          []interface{}{"${kubernetes.pod.log_path}/*.log"},
 					"close_inactive": "5m",
 					"scan_frequency": "10s",
 					"processors": []interface{}{
@@ -89,8 +90,8 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 					"tags": []interface{}{"containerlog", "forwarded"},
 				},
 				map[string]interface{}{
-					"id":    fmt.Sprintf("logfile-kubernetes.stdout_%d-${kubernetes.pod.uid}", i),
-					"paths": []interface{}{"/var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/*/*.log"},
+					"id":             fmt.Sprintf("logfile-kubernetes.stdout_%d-${kubernetes.pod.uid}", i),
+					"paths":          []interface{}{"/var/log/pods/${kubernetes.namespace}_${kubernetes.pod.name}_${kubernetes.pod.uid}/*/*.log"},
 					"close_inactive": "5m",
 				},
 			},
@@ -247,9 +248,9 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 	heapWithCache := heapInUse()
 
 	// Delta = steady-state heap added by the cache entries.
-	var cacheHeap int64
-	if int64(heapWithCache) > int64(heapBaseline) {
-		cacheHeap = int64(heapWithCache) - int64(heapBaseline)
+	var cacheHeap uint64
+	if heapWithCache > heapBaseline {
+		cacheHeap = heapWithCache - heapBaseline
 	}
 	b.ReportMetric(float64(cacheHeap)/(1024*1024), "cache-delta-MB")
 	if cacheEntries > 0 {
