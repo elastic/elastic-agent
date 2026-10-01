@@ -32,35 +32,27 @@ func renderIronbankDockerfile(t *testing.T, data map[string]interface{}) string 
 	return string(out)
 }
 
-// TestIronbankDockerfileSubmissionHasNoAdd guards the Dockerfile submitted to
-// Ironbank. The template is shared with the public CI variant, which uses ADD,
-// but Ironbank prohibits ADD and a violation only shows up as a failed build in
-// the dso.mil GitLab repo. Anything Ironbank-incompatible must stay inside
-// {{ if .public_build }} branches.
-func TestIronbankDockerfileSubmissionHasNoAdd(t *testing.T) {
-	t.Run("submission render has no ADD", func(t *testing.T) {
+// TestIronbankDockerfileHasNoAdd guards the Dockerfile submitted to Ironbank.
+// The template is shared with the public CI variant, but Ironbank prohibits ADD
+// and a violation only shows up as a failed build in the dso.mil GitLab repo.
+// Neither variant needs it: external resources reach the build context through
+// COPY (Ironbank supplies them via the hardening manifest, mage package
+// downloads them).
+func TestIronbankDockerfileHasNoAdd(t *testing.T) {
+	// Without this the checks below could pass vacuously if the pattern broke.
+	require.Regexp(t, dockerfileAddInstruction, "FROM scratch\n  ADD https://example.com/x /x\n")
+	require.NotRegexp(t, dockerfileAddInstruction, "COPY add-on /x\n# ADD is prohibited\n")
+
+	tests := map[string]map[string]interface{}{
 		// Mirrors the template data built by prepareIronbankBuild in magefile.go.
-		out := renderIronbankDockerfile(t, map[string]interface{}{
-			"MajorMinor":   "9.6",
-			"public_build": false,
+		"submission": {"MajorMinor": "9.6", "public_build": false},
+		"public CI":  {"public_build": "true"},
+	}
+	for name, data := range tests {
+		t.Run(name, func(t *testing.T) {
+			out := renderIronbankDockerfile(t, data)
+			assert.NotRegexp(t, dockerfileAddInstruction, out,
+				"%s must use COPY, not ADD, because the template is submitted to Ironbank", ironbankDockerfileTemplate)
 		})
-
-		assert.NotRegexp(t, dockerfileAddInstruction, out,
-			"the Dockerfile submitted to Ironbank must use COPY, not ADD; "+
-				"keep ADD inside {{ if .public_build }} branches of %s", ironbankDockerfileTemplate)
-	})
-
-	// Without this the check above could pass vacuously, e.g. if the pattern
-	// stopped matching or the public build stopped using ADD.
-	t.Run("public CI render uses ADD", func(t *testing.T) {
-		out := renderIronbankDockerfile(t, map[string]interface{}{
-			"public_build": "true",
-			"tinit_url":    "https://example.com/tini",
-			"tinit_sha256": "tinitsha",
-			"jq_url":       "https://example.com/jq",
-			"jq_sha256":    "jqsha",
-		})
-
-		assert.Regexp(t, dockerfileAddInstruction, out)
-	})
+	}
 }

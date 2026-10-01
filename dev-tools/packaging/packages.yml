@@ -863,8 +863,9 @@ shared:
       dockerfile: '../ironbank/Dockerfile.tmpl'
       docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
       # The Ironbank base image needs privileged registry access, so CI builds
-      # this variant on the public UBI image instead. tinit and jq details are
-      # injected from hardening_manifest.yaml.tmpl by the Package mage target.
+      # this variant on the public UBI image instead. tinit and jq are added to
+      # the build context from hardening_manifest.yaml.tmpl by the Package mage
+      # target.
       public_build: 'true'
       build_args: 'BASE_REGISTRY=registry.access.redhat.com,BASE_IMAGE=ubi10/ubi'
       user: '{{ .BeatName }}'
