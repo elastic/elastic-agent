@@ -2180,6 +2180,9 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 
 	data := map[string]interface{}{
 		"MajorMinor": majorMinor(cfg),
+		// Dockerfile.tmpl is shared with the public CI variant; the template
+		// engine rejects missing keys, so this must be defined here.
+		"public_build": false,
 	}
 
 	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
