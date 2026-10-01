@@ -42,33 +42,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 
 	kCtx := k8sGetContext(t, info)
 
-	defaultValues := values.Options{
-		ValueFiles: []string{"../../../deploy/helm/elastic-agent/values.yaml"},
-		Values: []string{
-			fmt.Sprintf("agent.image.repository=%s", kCtx.agentImageRepo),
-			fmt.Sprintf("agent.image.tag=%s", kCtx.agentImageTag),
-
-			"outputs.default.type=ESPlainAuthAPI",
-			fmt.Sprintf("outputs.default.url=%s", kCtx.esHost),
-			fmt.Sprintf("outputs.default.api_key=%s", kCtx.esAPIKey),
-
-			// Enable k8s and container logs
-			"kubernetes.enabled=true",
-			"kubernetes.containers.logs.enabled=true",
-
-			// Disable others
-			"kubernetes.state.enabled=false",
-			"kubernetes.metrics.enabled=false",
-			"kubernetes.apiserver.enabled=false",
-			"kubernetes.proxy.enabled=false",
-			"kubernetes.scheduler.enabled=false",
-			"kubernetes.controller_manager.enabled=false",
-			"kubernetes.containers.metrics.enabled=false",
-			"kubernetes.containers.state.enabled=false",
-			"kubernetes.containers.audit_logs.enabled=false",
-			"kubernetes.pods.enabled=false",
-		},
-	}
+	defaultValues := helmContainerLogsValues(kCtx)
 
 	steps := []k8sTestStep{
 		k8sStepCreateNamespace(),
@@ -123,6 +97,141 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 
 	for _, step := range steps {
 		step(t, ctx, kCtx, testNamespace)
+	}
+}
+
+// helmContainerLogsValues returns the Helm values that enable only the
+// Kubernetes container logs stream.
+func helmContainerLogsValues(kCtx k8sContext) values.Options {
+	return values.Options{
+		ValueFiles: []string{"../../../deploy/helm/elastic-agent/values.yaml"},
+		Values: []string{
+			fmt.Sprintf("agent.image.repository=%s", kCtx.agentImageRepo),
+			fmt.Sprintf("agent.image.tag=%s", kCtx.agentImageTag),
+
+			"outputs.default.type=ESPlainAuthAPI",
+			fmt.Sprintf("outputs.default.url=%s", kCtx.esHost),
+			fmt.Sprintf("outputs.default.api_key=%s", kCtx.esAPIKey),
+
+			// Enable k8s and container logs
+			"kubernetes.enabled=true",
+			"kubernetes.containers.logs.enabled=true",
+
+			// Disable others
+			"kubernetes.state.enabled=false",
+			"kubernetes.metrics.enabled=false",
+			"kubernetes.apiserver.enabled=false",
+			"kubernetes.proxy.enabled=false",
+			"kubernetes.scheduler.enabled=false",
+			"kubernetes.controller_manager.enabled=false",
+			"kubernetes.containers.metrics.enabled=false",
+			"kubernetes.containers.state.enabled=false",
+			"kubernetes.containers.audit_logs.enabled=false",
+			"kubernetes.pods.enabled=false",
+		},
+	}
+}
+
+// TestKubernetesAgentHelmSingleContainerLogsInput verifies that container logs
+// are ingested, enriched with Kubernetes metadata, in both modes of
+// `kubernetes.containers.logs.single_input` (the default, true, and false), and
+// that switching between the modes keeps the logs flowing.
+func TestKubernetesAgentHelmSingleContainerLogsInput(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			{Type: define.Kubernetes, DockerVariant: "basic"},
+		},
+		Group: define.Kubernetes,
+	})
+
+	containerRegex, err := regexp.Compile(`^/var/log/containers/.*flog.*\.log$`)
+	require.NoError(t, err, "failed to compile container log regex")
+	containerFile := expectedLogFile{
+		regex:       containerRegex,
+		description: "container log (" + containerRegex.String() + ")",
+	}
+
+	kCtx := k8sGetContext(t, info)
+
+	// single_input is intentionally not set so the chart default is tested.
+	defaultValues := helmContainerLogsValues(kCtx)
+	perContainerValues := values.Options{
+		ValueFiles: defaultValues.ValueFiles,
+		Values: append(append([]string{}, defaultValues.Values...),
+			"kubernetes.containers.logs.single_input=false"),
+	}
+	singleInputValues := values.Options{
+		ValueFiles: defaultValues.ValueFiles,
+		Values: append(append([]string{}, defaultValues.Values...),
+			"kubernetes.containers.logs.single_input=true"),
+	}
+
+	checkIngested := func() []k8sTestStep {
+		return []k8sTestStep{
+			k8sStepCheckRunningPods("name=agent-pernode-elastic-agent", 1, "agent"),
+			k8sStepCheckLogFilesIngested(info,
+				"logs", "kubernetes.container_logs", "default", "/var/log/containers/*flog*.log",
+				containerFile),
+			k8sStepCheckContainerLogsMetadata(info, "/var/log/containers/*flog*.log"),
+		}
+	}
+
+	steps := []k8sTestStep{
+		k8sStepCreateNamespace(),
+		func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+			k8sStepDeployApp("flog.yaml")(t, ctx, kCtx, namespace)
+		},
+
+		// default: single input
+		k8sStepHelmDeployWithValueOptions(AgentHelmChartPath, "elastic-agent", defaultValues),
+	}
+	steps = append(steps, checkIngested()...)
+
+	// opt out: one input per container
+	steps = append(steps, k8sStepHelmUpgrade(AgentHelmChartPath, "elastic-agent", perContainerValues))
+	steps = append(steps, checkIngested()...)
+
+	// back to the single input, taking over the per-container inputs' state
+	steps = append(steps, k8sStepHelmUpgrade(AgentHelmChartPath, "elastic-agent", singleInputValues))
+	steps = append(steps, checkIngested()...)
+
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
+	testNamespace := kCtx.getNamespace(t)
+
+	for _, step := range steps {
+		step(t, ctx, kCtx, testNamespace)
+	}
+}
+
+// k8sStepCheckContainerLogsMetadata verifies that the flog container logs
+// ingested from wildcardPath are enriched with Kubernetes metadata.
+func k8sStepCheckContainerLogsMetadata(info *define.Info, wildcardPath string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		require.EventuallyWithT(t, func(collectT *assert.CollectT) {
+			query := map[string]any{
+				"size": 0,
+				"query": map[string]any{
+					"bool": map[string]any{
+						"filter": []any{
+							map[string]any{"term": map[string]any{"data_stream.dataset": "kubernetes.container_logs"}},
+							map[string]any{"term": map[string]any{"data_stream.type": "logs"}},
+							map[string]any{"wildcard": map[string]any{"log.file.path": map[string]any{"value": wildcardPath}}},
+							map[string]any{"wildcard": map[string]any{"kubernetes.pod.name": map[string]any{"value": "flog-log-generator*"}}},
+							map[string]any{"term": map[string]any{"kubernetes.container.name": "flog-unstructured-cont-rot"}},
+							map[string]any{"term": map[string]any{"kubernetes.namespace": namespace}},
+						},
+					},
+				},
+			}
+
+			resp, err := PerformQuery(ctx, query, ".ds-logs*", info.ESClient)
+			require.NoError(collectT, err, "failed to query container logs metadata")
+			assert.Positive(collectT, resp.Hits.Total.Value,
+				"no flog container logs from %s enriched with kubernetes metadata", wildcardPath)
+		}, 3*time.Minute, 10*time.Second, "no container logs with kubernetes metadata found")
 	}
 }
 
