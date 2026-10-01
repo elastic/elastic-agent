@@ -257,7 +257,7 @@ func uint64Field(m map[string]interface{}, name string, prefix string) (uint64, 
 		return u, nil
 	}
 	if f, ok := numberValue(v); ok {
-		if f < 0 {
+		if f < 0 || f >= float64(^uint64(0)) {
 			return 0, fmt.Errorf("cannot parse '%s%s', %v overflows uint", prefix, name, v)
 		}
 		switch t := v.(type) {
