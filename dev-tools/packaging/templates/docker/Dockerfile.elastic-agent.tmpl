@@ -304,6 +304,7 @@ RUN for iter in {1..10}; do \
 
 # Setup synthetics env vars
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
+ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
 ENV NPM_CONFIG_PREFIX={{ $beatHome }}/.npm
 ENV PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
