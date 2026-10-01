@@ -47,7 +47,7 @@ The 8.19.23 release adds the following new and notable features.
 
 
 
-* Add regression test for Kubernetes metrics RBAC deadlock (#15666). https://github.com/elastic/elastic-agent/pull/16910[#16910] https://github.com/elastic/elastic-agent/pull/16901[#16901] https://github.com/elastic/elastic-agent/pull/16938[#16938] https://github.com/elastic/elastic-agent/pull/16937[#16937] https://github.com/elastic/elastic-agent/issues/15666[#15666]
+* Add regression test for Kubernetes metrics RBAC deadlock (#15666). https://github.com/elastic/elastic-agent/pull/15900[#15900] https://github.com/elastic/elastic-agent/issues/15666[#15666]
 
 
 [discrete]
@@ -58,7 +58,7 @@ The 8.19.23 release adds the following new and notable features.
 
 
 * Update Go to 1.26.8. https://github.com/elastic/elastic-agent/pull/16490[#16490] 
-* Update OTel Collector components to v0.161.0. https://github.com/elastic/elastic-agent/pull/16910[#16910] https://github.com/elastic/elastic-agent/pull/16901[#16901] https://github.com/elastic/elastic-agent/pull/16938[#16938] https://github.com/elastic/elastic-agent/pull/16937[#16937] 
+* Update OTel Collector components to v0.161.0. https://github.com/elastic/elastic-agent/pull/16745[#16745] 
 * Do not install manpages and docs in docker image. https://github.com/elastic/elastic-agent/pull/16763[#16763] 
 
 
