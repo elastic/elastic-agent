@@ -783,7 +783,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		// same mapping; no need to update and signal
 		return nil
 	}
-	processors, err = cloneMapArray(processors, processorsJSON)
+	processors, err = unmarshalMapArray(processors, processorsJSON)
 	if err != nil {
 		return err
 	}
@@ -851,8 +851,8 @@ func (c *dynamicProviderState) Mappings() []dynamicProviderMapping {
 	return mappings
 }
 
-// cloneMapArray returns a copy of source decoded from its JSON form.
-func cloneMapArray(source []map[string]interface{}, sourceJSON []byte) ([]map[string]interface{}, error) {
+// unmarshalMapArray returns a deep copy of source by unmarshalling its pre-computed JSON form.
+func unmarshalMapArray(source []map[string]interface{}, sourceJSON []byte) ([]map[string]interface{}, error) {
 	if source == nil {
 		return nil, nil
 	}
