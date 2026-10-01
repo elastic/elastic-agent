@@ -102,6 +102,9 @@ steps:
 
     - label: ":package: DRA Prep elastic-agent-core / ${BEAT_VERSION} / snapshot"
       key: "dra-prep-snapshot"
+      # publish only from main and release branches, never from pull requests
+      # or feature branches forced with RUN_SNAPSHOT/RUN_STAGING/VERSION_QUALIFIER
+      if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+$/)
       command: ".buildkite/scripts/stage_artifacts.sh"
       agents:
         image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
@@ -120,6 +123,7 @@ steps:
     - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION} / snapshot"
       trigger: "unified-release-dra-processing"
       depends_on: "dra-prep-snapshot"
+      if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+$/)
       build:
         env:
           DRA_PRODUCT_ID: "elastic-agent-core"
@@ -190,7 +194,7 @@ steps:
         instanceType: "c6g.4xlarge"
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
-        DRA_WORKFLOW: "dra-core-staging"
+        DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
       plugins:
         - *google_oidc_plugin
@@ -207,7 +211,7 @@ steps:
         instanceType: "c6g.4xlarge"
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
-        DRA_WORKFLOW: "dra-core-staging"
+        DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/arm64 windows/arm64"
         FIPS: "true"
       plugins:
@@ -215,33 +219,19 @@ steps:
 
     - wait
 
-    - label: ":package: DRA Prep elastic-agent-core / ${BEAT_VERSION} / staging"
-      key: "dra-prep-staging"
-      command: |
-        source .buildkite/scripts/version_qualifier.sh
-        .buildkite/scripts/stage_artifacts.sh
+    # stack_version must carry the qualifier, which is only known at runtime
+    - label: ":pipeline: Upload DRA staging steps"
+      key: "dra-upload-staging"
+      # publish only from main and release branches, never from pull requests
+      # or feature branches forced with RUN_SNAPSHOT/RUN_STAGING/VERSION_QUALIFIER
+      if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+$/)
+      command: ".buildkite/scripts/upload_dra_staging.sh"
       agents:
         image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
-        cpu: "2"
-        memory: "4Gi"
-        ephemeralStorage: "10Gi"
-      env:
-        DRA_WORKFLOW: "staging"
+        cpu: "1"
+        memory: "1Gi"
       plugins:
         - *google_oidc_plugin
-        - elastic/dra-prep#v0.1.6:
-            product_id: "elastic-agent-core"
-            stack_version: "${BEAT_VERSION}"
-            workflow: "staging"
-
-    - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION} / staging"
-      trigger: "unified-release-dra-processing"
-      depends_on: "dra-prep-staging"
-      build:
-        env:
-          DRA_PRODUCT_ID: "elastic-agent-core"
-          DRA_STACK_VERSION: "${BEAT_VERSION}"
-          DRA_WORKFLOW: "staging"
 
 notify:
   - slack: "#ingest-notifications"

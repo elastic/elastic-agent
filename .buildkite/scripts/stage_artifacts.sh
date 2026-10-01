@@ -11,16 +11,20 @@
 #   DRA_WORKFLOW  - "snapshot" or "staging"
 #
 # Required Buildkite artifacts (uploaded by prior build steps):
-#   build/distributions/**/*
+#   build/distributions/*
+#   build/distributions/reports/*.csv
 set -euo pipefail
 
 WORKFLOW="${DRA_WORKFLOW:?DRA_WORKFLOW is required}"
 
 echo "--- :compression: Downloading ${WORKFLOW} artifacts"
 
-mkdir -p build/distributions/
+mkdir -p build/distributions/reports/
 
-buildkite-agent artifact download "build/distributions/**/*" .
+# Buildkite's "**" needs at least one directory, so the top-level binaries
+# and the reports are fetched separately.
+buildkite-agent artifact download "build/distributions/*" .
+buildkite-agent artifact download "build/distributions/reports/*.csv" .
 
 if ls build/distributions/* 1>/dev/null 2>&1; then
   chmod -R a+r build/distributions/
@@ -29,19 +33,25 @@ fi
 echo "--- :package: Staging ${WORKFLOW} artifacts"
 mkdir -p artifacts
 
-# Copy all binaries (tar.gz, zip, deb, rpm)
-find build/distributions -maxdepth 1 \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" -o -name "*.rpm" \) \
-  -exec cp {} artifacts/ \; 2>/dev/null || true
-
-# Copy dependency report CSV — snapshot ones have "SNAPSHOT" in the name, staging ones don't
+# Release branches build both workflows in one build: snapshot files have
+# "-SNAPSHOT" in the name, staging ones don't.
 if [[ "${WORKFLOW}" == "snapshot" ]]; then
-  find build/distributions/reports -name "*SNAPSHOT*.csv" -exec cp {} artifacts/ \; 2>/dev/null || true
+  name_filter=(-name "*-SNAPSHOT*")
 else
-  find build/distributions/reports -name "*.csv" ! -name "*SNAPSHOT*" -exec cp {} artifacts/ \; 2>/dev/null || true
+  name_filter=(! -name "*-SNAPSHOT*")
 fi
 
-if ! ls artifacts/* 1>/dev/null 2>&1; then
-  echo "ERROR: no ${WORKFLOW} artifacts found." >&2
+# Copy all binaries (tar.gz, zip, deb, rpm)
+find build/distributions -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" -o -name "*.rpm" \) \
+  "${name_filter[@]}" -exec cp {} artifacts/ \;
+
+# Copy the dependency report CSV
+find build/distributions/reports -maxdepth 1 -type f -name "*.csv" "${name_filter[@]}" -exec cp {} artifacts/ \;
+
+binaries=$(find artifacts -maxdepth 1 -type f ! -name "*.csv" | wc -l)
+reports=$(find artifacts -maxdepth 1 -type f -name "*.csv" | wc -l)
+if [[ "${binaries}" -eq 0 || "${reports}" -ne 1 ]]; then
+  echo "ERROR: expected ${WORKFLOW} binaries and one dependency report, found ${binaries} binaries and ${reports} reports." >&2
   exit 1
 fi
 
