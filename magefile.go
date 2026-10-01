@@ -2188,7 +2188,7 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 		"entrypoint_source": "config/docker-entrypoint",
 	}
 
-	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
+	err = filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
 		if !d.IsDir() {
 			target := strings.TrimSuffix(
 				filepath.Join(buildDir, filepath.Base(path)),
