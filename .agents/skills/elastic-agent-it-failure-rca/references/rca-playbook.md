@@ -143,7 +143,7 @@ Endpoint (Elastic Defend) is an OS service the agent installs and supervises; it
 | Upgrade rolled back: `agent reported failed component(s) state` naming `endpoint` | Endpoint reported FAILED during the watcher grace period after the new agent re-ran `install --upgrade` |
 | `components/endpoint/error.txt`: `diagnostic action timed out, deadline is 20s` | Endpoint didn't answer the diagnostics request — itself a sign it was stuck at collection time |
 
-When Endpoint's own log shows the failure originating inside Endpoint, report that and stop: that's for the Endpoint team, and there's no source here to trace.
+Endpoint is another team's product. Report what the evidence shows — the agent's log lines, component and unit state changes with timestamps, Endpoint's own log and `policy_response.json` — and stop there. Don't speculate about Endpoint internals; there's no source here to trace.
 
 ## After unenroll
 
@@ -196,5 +196,5 @@ Normal when the failure happened before the agent was installed (install command
 - **An empty `otel.yaml` is normal** when the agent is not in OTel runtime mode. The merged config in `otel-merged.yaml` (or `edot/otel-merged-actual.yaml`) is the running config.
 - **A `collector.status: 2` (HEALTHY) in `state.yaml` means the collector process is healthy**, not that all expected receivers are running. A collector with only monitoring receivers can be HEALTHY while the data receiver is absent.
 - **`DeadlineExceeded` from the test's status polls isn't necessarily a hung agent.** Check which context the poll uses: if it's the test's own `context.WithTimeout`, the budget simply ran out while the `Eventually` kept polling.
-- **The test's own gate can be the bug.** Many tests wait on Fleet-side state (`IsPolicyRevision`, agent documents, Fleet status) before checking agent behaviour. A `Condition never satisfied` there, with a healthy bundle, usually points at the gate — e.g. exact revision equality while other writers on the shared stack keep bumping revisions. See the `integration-test-review` skill's `references/flake-taxonomy.md`.
+- **The test's own gate can be the bug.** Many tests wait on Fleet-side state (`IsPolicyRevision`, agent documents, Fleet status) before checking agent behaviour. A `Condition never satisfied` there, with a healthy bundle, usually points at the gate — e.g. exact revision equality while other writers on the shared stack keep bumping revisions. In general all CI jobs share one ESS/Fleet stack, so other jobs' writes to shared Fleet objects (e.g. `fleet-default-output`) can interfere; you usually can't tell which job did it, so say that rather than guessing. See the `integration-test-review` skill's `references/flake-taxonomy.md`.
 - **Multiple bundles at similar timestamps**: if a test creates two agents (e.g. fleet-server + agent under test), both produce diagnostics at roughly the same time. The bundle without fleet-server paths in its config is the agent under test.
