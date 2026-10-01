@@ -63,7 +63,11 @@ FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG}
 
 ARG ELASTIC_PRODUCT=elastic-agent
 
-COPY {{ if .public_build }}beat/LICENSE.txt{{ else }}LICENSE{{ end }} /licenses/elastic-${ELASTIC_PRODUCT}
+{{ if .public_build -}}
+COPY beat/LICENSE.txt /licenses/elastic-${ELASTIC_PRODUCT}
+{{- else -}}
+COPY LICENSE /licenses/elastic-${ELASTIC_PRODUCT}
+{{- end }}
 
 # Add a dumb init process
 {{ if .public_build -}}
@@ -133,7 +137,11 @@ COPY jq /usr/local/bin
 {{ end -}}
 RUN chown root:root /usr/local/bin/jq && chmod 0755 /usr/local/bin/jq
 
-COPY {{ if .public_build }}docker-entrypoint{{ else }}config/docker-entrypoint{{ end }} /usr/local/bin/docker-entrypoint
+{{ if .public_build -}}
+COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+{{ else -}}
+COPY config/docker-entrypoint /usr/local/bin/docker-entrypoint
+{{ end -}}
 RUN chmod 755 /usr/local/bin/docker-entrypoint
 
 USER ${ELASTIC_PRODUCT}
