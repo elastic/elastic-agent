@@ -1,0 +1,12 @@
+kind: enhancement
+
+summary: Pass Elastic Agent information to beat receivers in the OTel runtime
+
+description: |
+  Beat receivers now get the agent ID, version, snapshot flag, managed mode and privilege mode under
+  `management.otel.agent` in their configuration. Beat receivers don't use the control protocol, so they
+  had no Agent information and reported incorrect values, for example `Standalone` in the User-Agent.
+
+component: elastic-agent
+
+issue: https://github.com/elastic/beats/issues/53390

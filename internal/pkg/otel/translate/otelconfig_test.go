@@ -562,6 +562,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
+			"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 		}
 	}
 
@@ -732,6 +733,7 @@ func TestGetOtelConfig(t *testing.T) {
 				"enabled": false,
 			},
 			"management.otel.enabled": true,
+			"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 		}
 	}
 
@@ -781,6 +783,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"enabled": false,
 		},
 		"management.otel.enabled": true,
+		"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 	}
 
 	tests := []struct {
@@ -1083,6 +1086,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -1644,6 +1648,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -1838,6 +1843,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -1949,6 +1955,7 @@ func TestGetOtelConfig(t *testing.T) {
 							"enabled": false,
 						},
 						"management.otel.enabled": true,
+						"management.otel.agent":   agentInfoForReceiver(&info.AgentInfo{}),
 					},
 				},
 				"service": map[string]any{
@@ -3113,6 +3120,75 @@ func TestKeepScheduledMonitors(t *testing.T) {
 		got := keepScheduledMonitors(in)
 		assert.Equal(t, in, got)
 	})
+}
+
+func TestGetReceiversConfigForComponentAgentInfo(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-agent-info",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"streams": []any{
+						map[string]any{
+							"id":    "test-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	tests := []struct {
+		name         string
+		standalone   bool
+		unprivileged bool
+		expectedMode string
+	}{
+		{name: "managed privileged", standalone: false, unprivileged: false, expectedMode: "managed"},
+		{name: "standalone unprivileged", standalone: true, unprivileged: true, expectedMode: "standalone"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			agentInfo := info.NewMockAgent(t)
+			agentInfo.EXPECT().AgentID().Return("agent-id").Maybe()
+			agentInfo.EXPECT().Version().Return("9.6.0").Maybe()
+			agentInfo.EXPECT().Snapshot().Return(true).Maybe()
+			agentInfo.EXPECT().IsStandalone().Return(tc.standalone).Maybe()
+			agentInfo.EXPECT().Unprivileged().Return(tc.unprivileged).Maybe()
+
+			result, err := getReceiversConfigForComponent(comp, agentInfo, nil)
+			require.NoError(t, err)
+			require.Len(t, result, 1)
+
+			for _, value := range result {
+				receiverConfig := value.(map[string]any)
+				assert.Equal(t, true, receiverConfig["management.otel.enabled"])
+				assert.Equal(t, map[string]any{
+					"id":           "agent-id",
+					"version":      "9.6.0",
+					"snapshot":     true,
+					"mode":         tc.expectedMode,
+					"unprivileged": tc.unprivileged,
+				}, receiverConfig["management.otel.agent"])
+			}
+		})
+	}
 }
 
 // TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
