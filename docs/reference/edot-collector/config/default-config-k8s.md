@@ -67,15 +67,13 @@ The Daemonset collectors receive that data through [`OTLP`], batch the data ([`b
 
 ## Gateway collectors pipeline
 
-The Gateway collectors pipelines differ between the two different deployment use cases, direct ingestion into {{es}} and using the [{{motlp}}](opentelemetry://reference/motlp.md).
+The Gateway collectors pipelines differ between the two different deployment use cases, direct ingestion into {{es}} and using the [{{motlp}}](opentelemetry://reference/managed-inputs/managed-otlp-endpoint.md).
 
 ### Direct ingestion into {{es}} [direct-ingestion-into-elasticsearch]
 
-In self-managed and {{ech}} Stack deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is being ingested directly into {{es}} using the [`elasticsearch`] exporter.
+In self-managed {{stack}}, {{ece}}, and {{eck}} deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is being ingested directly into {{es}} using the [`elasticsearch`] exporter.
 
 The Gateway Collector configuration comprises the pipelines for data enrichment of [application telemetry](/reference/edot-collector/config/default-config-standalone.md#application-and-traces-collection-pipeline) and [host metrics](/reference/edot-collector/config/default-config-standalone.md#host-metrics-collection-pipeline). For more details, refer to the linked descriptions of the corresponding standalone use cases.
-
-The [`routing`] connector separates the infrastructure metrics from other metrics and routes them into the ECS-based pipeline, with ECS-compatibility exporter mode. Other metrics are exported in OTel-native format to {{es}}.
 
 ### Managed OTLP Endpoint
 
@@ -97,4 +95,3 @@ With this scenario there's no need to do any Elastic-specific enrichment in your
 [`kubeletstats`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/kubeletstatsreceiver
 [`batch`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor/batchprocessor
 [`OTLP`]: https://github.com/open-telemetry/opentelemetry-collector/tree/main/receiver/otlpreceiver
-[`routing`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/connector/routingconnector
