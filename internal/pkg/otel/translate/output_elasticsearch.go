@@ -301,6 +301,96 @@ func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	return retryCfg
 }
 
+<<<<<<< HEAD
+=======
+func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
+	// Create url using host name, protocol and path
+	outputHosts, err := outputs.ReadHostList(output)
+	if err != nil {
+		return nil, fmt.Errorf("error reading host list: %w", err)
+	}
+
+	hosts := []string{}
+	for _, h := range outputHosts {
+		esURL, err := common.MakeURL(escfg.Protocol, escfg.Path, h, 9200)
+		if err != nil {
+			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
+		}
+		if !slices.Contains(hosts, esURL) {
+			hosts = append(hosts, esURL)
+		}
+	}
+
+	if len(escfg.Params) != 0 {
+		// convert params to map[string][]string
+		params := make(map[string][]string, 0)
+		for key, value := range escfg.Params {
+			params[key] = []string{value}
+		}
+
+		decodedParam := url.Values(params)
+		// It is enough to add params as encoded query to any one host
+		// Elasticsearch exporter will make sure to add these for every outgoing request
+		for i := range hosts {
+			hosts[i] = strings.Join([]string{hosts[i], decodedParam.Encode()}, "?")
+		}
+	}
+
+	return hosts, nil
+}
+
+// getBeatsAuthExtensionID returns the id for beatsauth extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
+}
+
+// getBeatsAuthExtensionConfig sets http transport settings on beatsauth
+// this is only required for elasticsearch output
+func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
+	authSettings := beatsauthextension.BeatsAuthConfig{
+		Transport: elasticsearch.ESDefaultTransportSettings(),
+	}
+
+	if err := outputCfg.Unpack(&authSettings); err != nil {
+		return nil, err
+	}
+
+	newConfig, err := config.NewConfigFrom(authSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
+	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
+	if authSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
+		if err != nil {
+			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
+	}
+
+	if authSettings.Kerberos != nil {
+		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
+		if err != nil {
+			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
+		}
+	}
+
+	var newMap map[string]any
+	err = newConfig.Unpack(&newMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// required to make the extension not cause the collector to fail and exit on startup
+	newMap["continue_on_error"] = true
+
+	return newMap, nil
+}
+
+>>>>>>> a2b46f7 (Fix ES parameters causing all endpoints to use the first host (#16937))
 // log warning for unsupported config
 func checkUnsupportedConfig(cfg *config.C) error {
 	if cfg.HasField("indices") {

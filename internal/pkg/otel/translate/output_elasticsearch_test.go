@@ -239,6 +239,20 @@ compression_params:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
+	t.Run("parameters are added to every host", func(t *testing.T) {
+		cfg := config.MustNewConfigFrom(map[string]any{
+			"hosts":      []any{"es-1:9200", "es-2:9200", "es-3:9200"},
+			"parameters": map[string]any{"somekey": "somevalue"},
+		})
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		assert.Equal(t, []string{
+			"http://es-1:9200?somekey=somevalue",
+			"http://es-2:9200?somekey=somevalue",
+			"http://es-3:9200?somekey=somevalue",
+		}, got["endpoints"])
+	})
+
 	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
 		beatCfg := `
 hosts: "localhost:9200"
