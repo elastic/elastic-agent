@@ -65,11 +65,16 @@ common:
     - "default"
     - "fleet"
     - "fleet-endpoint-security"
+    - "fleet-endpoint-security-mtls"
     - "fleet-privileged"
+    - "fleet-proxy"
+    - "fleet-upgrade"
     - "install-uninstall"
     - "standalone-upgrade"
+    - "standalone-upgrade-unprivileged"
     - "upgrade"
     - "upgrade-flavor"
+    - "upgrade-rollback"
 
   # Variants/Groups for the Linux AMD64 ITs
   - linux_deb_variants: &linux_deb_variants
@@ -80,13 +85,18 @@ common:
     - fleet-airgapped
     - fleet-airgapped-privileged
     - fleet-endpoint-security
+    - fleet-endpoint-security-mtls
     - fleet-privileged
+    - fleet-proxy
+    - fleet-upgrade
     - fleet-upgrade-to-pr-build
     - fqdn
     - install-uninstall
     - standalone-upgrade
+    - standalone-upgrade-unprivileged
     - upgrade
     - upgrade-flavor
+    - upgrade-rollback
 
   # Variants/Groups for the Linux AMD64 ITs
   - linux_rpm_variants: &linux_rpm_variants
@@ -96,11 +106,16 @@ common:
   - linux_arm_variants: &linux_arm_variants
     - default
     - fleet
+    - fleet-proxy
+    - fleet-upgrade
     - standalone-upgrade
+    - standalone-upgrade-unprivileged
     - upgrade
     - upgrade-flavor
+    - upgrade-rollback
     # ARM tests are enabled for only selected groups in order to save resources
     # - fleet-endpoint-security
+    # - fleet-endpoint-security-mtls
     # - fleet-airgapped
     # - fleet-airgapped-privileged
     # - fleet-privileged
