@@ -49,7 +49,7 @@ import (
 // would be redundant.
 func TestFleetManagedUpgradeUnprivileged(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -309,9 +309,13 @@ func testFleetAirGappedUpgrade(t *testing.T, stack *define.Info, unprivileged bo
 	rctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(rctx, http.MethodGet, "https://"+host, nil)
-	_, err = http.DefaultClient.Do(req)
-	if !(errors.Is(err, context.DeadlineExceeded) ||
-		errors.Is(err, os.ErrDeadlineExceeded)) {
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	if resp != nil {
+		_ = resp.Body.Close()
+	}
+	if !errors.Is(err, context.DeadlineExceeded) &&
+		!errors.Is(err, os.ErrDeadlineExceeded) {
 		t.Fatalf(
 			"request to %q should have failed, iptables rules should have blocked it",
 			host)
@@ -415,7 +419,6 @@ func PerformManagedUpgrade(
 		return fmt.Errorf("failed creating policy: %w", err)
 	}
 
-	policy = policyResp.AgentPolicy
 	t.Log("Creating Agent enrollment API key...")
 	createEnrollmentApiKeyReq := kibana.CreateEnrollmentAPIKeyRequest{
 		PolicyID: policyResp.ID,
@@ -458,7 +461,9 @@ func PerformManagedUpgrade(
 	// configure itself. This is obviously not fit for production code or even guaranteed to be stable.
 	if upgradeOpts.CustomWatcherCfg != "" {
 		t.Log("Setting custom watcher config")
-		err = startFixture.Configure(ctx, []byte("fleet.enabled: true\n"+upgradeOpts.CustomWatcherCfg))
+		if err = startFixture.Configure(ctx, []byte("fleet.enabled: true\n"+upgradeOpts.CustomWatcherCfg)); err != nil {
+			return fmt.Errorf("failed to configure agent watcher: %w", err)
+		}
 	}
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
@@ -555,6 +560,9 @@ func PerformManagedUpgrade(
 		}
 		return newVersion, nil
 	}, backoff.WithMaxElapsedTime(5*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(time.Second)))
+	if err != nil {
+		return fmt.Errorf("waiting for agent version %s: %w", endVersionInfo.Binary.Version, err)
+	}
 
 	t.Logf("Waiting for upgrade watcher to finish...")
 	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
@@ -597,7 +605,7 @@ func defaultPolicy() kibana.AgentPolicy {
 // simulateAirGapedEnvironment uses iptables to block outgoing packages to the
 // IPs (v4 and v6) associated with host.
 func simulateAirGapedEnvironment(t *testing.T, host string) {
-	ips, err := net.LookupIP(host)
+	ips, err := net.LookupIP(host) //nolint:noctx // DNS lookup for iptables setup; no context cancellation needed
 	require.NoErrorf(t, err, "could not get IPs for host %q", host)
 
 	// iptables -A OUTPUT -j DROP -d IP
@@ -613,12 +621,12 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 		}
 		args := []string{"-A", "OUTPUT", "-j", "DROP", "-d", ip.String()}
 
-		out, err := exec.Command(
+		out, err := exec.Command( //nolint:noctx // iptables fire-and-forget; no context cancellation needed
 			cmd, args...).
 			CombinedOutput()
 		if err != nil {
-			fmt.Println("FAILED:", cmd, args)
-			fmt.Println(string(out))
+			t.Logf("FAILED: %s %v", cmd, args)
+			t.Log(string(out))
 		}
 		t.Logf("added iptables rule %v", args[1:])
 		toCleanUp = append(toCleanUp, append([]string{cmd, "-D"}, args[1:]...))
@@ -631,12 +639,12 @@ func simulateAirGapedEnvironment(t *testing.T, host string) {
 			cmd := c[0]
 			args := c[1:]
 
-			out, err := exec.Command(
+			out, err := exec.Command( //nolint:noctx // iptables cleanup; no context cancellation needed
 				cmd, args...).
 				CombinedOutput()
 			if err != nil {
-				fmt.Println("clean up FAILED:", cmd, args)
-				fmt.Println(string(out))
+				t.Logf("clean up FAILED: %s %v", cmd, args)
+				t.Log(string(out))
 			}
 		}
 	})
@@ -662,22 +670,13 @@ func newArtifactsServer(ctx context.Context, t *testing.T, version string, packa
 	for _, d := range dl {
 		files = append(files, d.Name())
 	}
-	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-		fileServerDir, files)
+	t.Logf("ArtifactsServer root dir %q, served files %q", fileServerDir, files)
 
 	fs := http.FileServer(http.Dir(fileServerDir))
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fs.ServeHTTP(w, r)
 	}))
-}
-
-func agentUpgradeDetailsString(a kibana.GetAgentResponse) string {
-	if a.UpgradeDetails == nil {
-		return "upgrade details is NIL"
-	}
-
-	return fmt.Sprintf("%#v", *a.UpgradeDetails)
 }
 
 // startHTTPSFileServer prepares and returns a started HTTPS file server serving
@@ -690,8 +689,7 @@ func startHTTPSFileServer(t *testing.T, rootDir string, cert tls.Certificate) *h
 	for _, d := range dl {
 		files = append(files, d.Name())
 	}
-	fmt.Printf("ArtifactsServer root dir %q, served files %q\n",
-		rootDir, files)
+	t.Logf("ArtifactsServer root dir %q, served files %q", rootDir, files)
 
 	fs := http.FileServer(http.Dir(rootDir))
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -699,7 +697,7 @@ func startHTTPSFileServer(t *testing.T, rootDir string, cert tls.Certificate) *h
 		fs.ServeHTTP(w, r)
 	}))
 
-	server.Listener, err = net.Listen("tcp", "127.0.0.1:443")
+	server.Listener, err = net.Listen("tcp", "127.0.0.1:443") //nolint:noctx // test file server binds to fixed port; no context needed
 	require.NoError(t, err, "could not create net listener for port 443")
 
 	server.TLS = &tls.Config{Certificates: []tls.Certificate{cert}}
@@ -794,7 +792,7 @@ func isFIPSCapableVersion(ver *version.ParsedSemVer, os, arch string) bool {
 // TestFleetUpgradeCommandPRBuildWithSource tests upgrading an agent enrolled in fleet using the upgrade command with the --source-uri and --force args
 func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
