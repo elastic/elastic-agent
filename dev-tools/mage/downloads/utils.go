@@ -17,7 +17,7 @@ import (
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 )
 
 var checksumFileRegex = regexp.MustCompile(`^([0-9a-f]{128})\s+(\w.*)$`)
