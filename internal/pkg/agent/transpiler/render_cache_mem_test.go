@@ -236,15 +236,12 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 		}
 	}
 
-	// KeepAlive ensures allVars/inputNodes are live through the keepRendered block above
-	// but not beyond, so only the cache contributes to the heap reading below.
-	runtime.KeepAlive(allVars)
-	runtime.KeepAlive(inputNodes)
-
 	cacheEntries := cache.Len()
 	b.ReportMetric(float64(cacheEntries), "cache-entries")
 
-	// Heap after GC with only the cache alive.
+	// Measure heap with allVars, inputNodes, and cache all alive. Both heapBaseline and
+	// heapWithCache include allVars+inputNodes, so they cancel in the delta and only the
+	// cache entries' contribution remains.
 	heapWithCache := heapInUse()
 
 	// Delta = steady-state heap added by the cache entries.
@@ -257,6 +254,9 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 		b.ReportMetric(float64(cacheHeap)/float64(cacheEntries), "bytes-per-entry")
 	}
 
-	// Keep cache alive through the heap measurement.
+	// Keep all live objects alive through both heap samples so neither sample is
+	// affected by premature GC of the other's allocations.
+	runtime.KeepAlive(allVars)
+	runtime.KeepAlive(inputNodes)
 	runtime.KeepAlive(cache)
 }
