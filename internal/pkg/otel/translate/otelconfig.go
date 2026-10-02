@@ -398,6 +398,11 @@ func getReceiversConfigForComponent(
 		}
 	}
 
+	// An empty receivers list causes the OTel collector to reject the pipeline and crash.
+	if len(inputs) == 0 {
+		return nil, fmt.Errorf("component %s has no enabled streams: %w", comp.ID, errors.ErrUnsupported)
+	}
+
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
