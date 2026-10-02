@@ -61,30 +61,19 @@ common:
       elastic/vault-github-token#v0.2.1:
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
-<<<<<<< HEAD
     - "default"
     - "fleet"
     - "fleet-endpoint-security"
+    - "fleet-endpoint-security-mtls"
     - "fleet-privileged"
+    - "fleet-proxy"
+    - "fleet-upgrade"
     - "install-uninstall"
     - "standalone-upgrade"
+    - "standalone-upgrade-unprivileged"
     - "upgrade"
     - "upgrade-flavor"
-=======
-      - "default"
-      - "fleet"
-      - "fleet-endpoint-security"
-      - "fleet-endpoint-security-mtls"
-      - "fleet-privileged"
-      - "fleet-proxy"
-      - "fleet-upgrade"
-      - "install-uninstall"
-      - "standalone-upgrade"
-      - "standalone-upgrade-unprivileged"
-      - "upgrade"
-      - "upgrade-flavor"
-      - "upgrade-rollback"
->>>>>>> 7ea3fa0 (Split the longest integration test groups (#16919))
+    - "upgrade-rollback"
   # Variants/Groups for the Linux AMD64 ITs
   - linux_deb_variants: &linux_deb_variants
     - container
