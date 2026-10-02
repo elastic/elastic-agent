@@ -2201,8 +2201,13 @@ func fetchIronbankResource(dir, name string, r ironbankResource) error {
 		return err
 	}
 	fmt.Printf(">> downloading %s from %s\n", name, r.URL)
-	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(r.URL)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.URL, nil)
+	if err != nil {
+		return fmt.Errorf("downloading %s: %w", r.URL, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("downloading %s: %w", r.URL, err)
 	}
