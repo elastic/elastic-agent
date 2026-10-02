@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/google/go-cmp/cmp"
@@ -604,4 +607,107 @@ func mockEndpointBinary(t *testing.T, exitCode int) string {
 	require.NoError(t, err)
 
 	return outPath
+}
+
+// TestOldServiceAdoptedDuringInstallRace verifies that a previously-running service
+// (e.g. the old Endpoint version still registered as a system service) that connects
+// while the installer for the new version is running is NOT adopted as HEALTHY.
+//
+// Regression: the connection-info server (CIS) was opened before s.start() ran the
+// installer. The old service reconnected, its checkin queued on the channel, and once
+// s.start() returned the Run goroutine immediately processed it — flipping the component
+// to HEALTHY and pushing a CheckinExpected with the wrong policy.
+//
+// Fix: run the installer before opening the CIS, and drain any stale checkins after a
+// failed install before scheduling the retry.
+func TestOldServiceAdoptedDuringInstallRace(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9996,
+		CSocket: ".testraceinstall.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	// Long retry delay so the automatic retry doesn't interfere with the assertion window.
+	service.serviceRestartDelay = 30 * time.Second
+
+	var startOnce, doneOnce sync.Once
+	installStarted := make(chan struct{})
+	installDone := make(chan struct{})
+	firstCall := true // first call is always check; subsequent calls are install
+
+	service.executeServiceCommandImpl = func(ctx context.Context, _ *logger.Logger, _ string, _ *component.ServiceOperationsCommandSpec) error {
+		if firstCall {
+			firstCall = false
+			return errors.New("service not installed") // check fails → install is triggered
+		}
+		startOnce.Do(func() { close(installStarted) })
+		defer doneOnce.Do(func() { close(installDone) })
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		return errors.New("install failed") // simulate exit 284
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	comm := newMockCommunicator("")
+
+	statesCh := make(chan ComponentState, 50)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-service.ch:
+				select {
+				case statesCh <- s:
+				default:
+				}
+			}
+		}
+	}()
+
+	go func() { _ = service.Run(ctx, comm) }()
+
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	select {
+	case <-installStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not start within timeout")
+	}
+
+	// Simulate the old service reconnecting to the CIS mid-install.
+	// In production this happens because the old service is still running as a
+	// system service and reconnects when the new agent opens the named pipe.
+	comm.ch <- &proto.CheckinObserved{}
+
+	select {
+	case <-installDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not complete within timeout")
+	}
+
+	// The old service's checkin must be drained and discarded, never processed.
+	// If the runtime adopts it as HEALTHY the fix is not in effect.
+	require.Never(t, func() bool {
+		select {
+		case s := <-statesCh:
+			return s.State == client.UnitStateHealthy
+		default:
+			return false
+		}
+	}, 500*time.Millisecond, 10*time.Millisecond,
+		"old service was incorrectly adopted as HEALTHY while the installer was running")
 }
