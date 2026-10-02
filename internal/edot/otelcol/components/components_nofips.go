@@ -7,8 +7,6 @@
 package components
 
 import (
-	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
-	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/receiver"
@@ -16,7 +14,6 @@ import (
 
 func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	receivers = append(receivers,
-		kafkareceiver.NewFactory(),
 		prometheusreceiver.NewFactory(),
 	)
 
@@ -24,8 +21,5 @@ func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 }
 
 func addNonFipsExporters(exporters []exporter.Factory) []exporter.Factory {
-	exporters = append(exporters,
-		kafkaexporter.NewFactory(),
-	)
 	return exporters
 }
