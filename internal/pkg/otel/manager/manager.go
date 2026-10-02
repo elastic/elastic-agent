@@ -96,7 +96,6 @@ type OTelManager struct {
 
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
-	collectorCfg              *confmap.Conf
 	components                []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
@@ -322,7 +321,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.mx.Lock()
 			previousConfigHash := m.mergedCollectorCfgHash
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
-			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
 			lvl, err := newLogLevelAfterConfigUpdate(cfgUpdate, mergedCfg)
 			if err != nil {

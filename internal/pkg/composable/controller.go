@@ -5,7 +5,6 @@
 package composable
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -728,14 +727,18 @@ func (c *contextProviderState) Current() (*transpiler.AST, uint64) {
 }
 
 type dynamicProviderMapping struct {
-	id         string
-	priority   int
+	id       string
+	priority int
+	// mapping holds the AST form of the dynamic provider's variables. It is inserted by
+	// reference into each per-pod Vars shallow-clone in generateVars, so the same allocation is
+	// shared between the mapping and every Vars that references it — no per-Vars copy.
 	mapping    *transpiler.AST
 	processors transpiler.Processors
-	// hash is the hash of mapping and processorsJSON the JSON form of processors, both are used
-	// to detect that an update carries the same content.
+	// hash is the hash of mapping; processorsHash is the xxhash of the JSON-encoded processors.
+	// Both are used to detect that an update carries the same content without storing the full
+	// JSON bytes of the processors.
 	hash           uint64
-	processorsJSON []byte
+	processorsHash uint64
 	// generation identifies the current content across renders, see mappingGeneration.
 	generation uint64
 }
@@ -757,21 +760,26 @@ type dynamicProviderState struct {
 // for the processor. Lower priority mappings will always be sorted before higher priority mappings
 // to ensure that matching of variables occurs on the lower priority mappings first.
 func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[string]interface{}, processors []map[string]interface{}) error {
-	// the JSON form is both the comparison key and the source of the stored copy, so the
-	// processors are only decoded when they actually changed
+	// The JSON form of processors is the comparison key and clone source; it is computed locally
+	// and not stored — only its hash is kept to detect future changes.
 	processorsJSON, err := json.Marshal(processors)
 	if err != nil {
 		return fmt.Errorf("failed to clone: %w", err)
 	}
+	// Build the AST to compute a stable hash of the mapping (Go map iteration order is not
+	// stable, so JSON bytes of the raw map cannot be used for change detection). The AST is
+	// stored directly so that generateVars can insert it by reference into each Vars
+	// shallow-clone, letting all Vars for the same pod share the same allocation.
 	ast, err := transpiler.NewAST(mapping)
 	if err != nil {
 		return err
 	}
 	hash := astHash(ast)
+	processorsHash := xxhash.Sum64(processorsJSON)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	curr, ok := c.mappings[id]
-	if ok && curr.hash == hash && bytes.Equal(curr.processorsJSON, processorsJSON) {
+	if ok && curr.hash == hash && curr.processorsHash == processorsHash {
 		// same mapping; no need to update and signal
 		return nil
 	}
@@ -785,7 +793,7 @@ func (c *dynamicProviderState) AddOrUpdate(id string, priority int, mapping map[
 		mapping:        ast,
 		processors:     processors,
 		hash:           hash,
-		processorsJSON: processorsJSON,
+		processorsHash: processorsHash,
 		generation:     nextMappingGeneration(),
 	}
 
