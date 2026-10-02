@@ -164,7 +164,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		"http": map[string]any{
 			"enabled": false,
 		},
-		"management.otel.enabled": true,
+		"management.otel": managementConfigForReceiver(&info.AgentInfo{}),
 	}
 
 	model := &component.Model{
