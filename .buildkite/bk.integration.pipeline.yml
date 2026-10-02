@@ -59,6 +59,11 @@ common:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.2.1:
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      # Adding this plugin to a step also enables the S3-backed Go build cache
+      # (GOCACHEPROG), see .buildkite/scripts/setup-cacheprog.sh.
+      elastic/oblt-aws-auth#v0.2.0:
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
       - "default"
@@ -268,6 +273,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
 
       - label: "Windows:2025:amd64:sudo"
         depends_on:
@@ -291,6 +297,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
 
       - label: "Ubuntu:2404:amd64:sudo"
         depends_on: packaging-amd64
@@ -313,6 +320,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
 
   - group: "Stateful: Windows (tier 1)"
     if: build.pull_request.id != null
@@ -345,6 +353,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             variant: *windows_variants
@@ -371,6 +380,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             variant:
@@ -416,6 +426,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -447,6 +458,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -490,6 +502,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -521,6 +534,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -552,6 +566,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -584,6 +599,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             variant: *windows_variants
@@ -612,6 +628,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             variant:
@@ -647,6 +664,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             variant:
@@ -676,6 +694,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             variant: *linux_deb_variants
@@ -717,6 +736,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -748,6 +768,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -775,6 +796,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -817,6 +839,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -852,6 +875,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -884,6 +908,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -915,6 +940,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:
@@ -945,6 +971,7 @@ steps:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
+          - *aws_oidc
         matrix:
           setup:
             os:

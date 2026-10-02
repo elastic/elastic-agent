@@ -25,3 +25,23 @@ if [ -n "${TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE:-}" ]; then
     rm $TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE
   fi
 fi
+
+if [[ -n "${CI_CACHEPROG_LOG:-}" ]]; then
+  echo "--- cacheprog statistics"
+  # Sum the per-process statistics over every `go` invocation in the job,
+  # including ones run as root by the sudo integration tests.
+  cat "$(dirname "$(dirname "${CI_CACHEPROG_LOG}")")"/cacheprog-*/cacheprog.log 2>/dev/null |
+    awk '/msg="cacheprog statistics"/ {
+      n++
+      for (i = 1; i <= NF; i++) {
+        split($i, kv, "=")
+        if (kv[1] == "get_calls") gets += kv[2]
+        if (kv[1] == "get_hits") hits += kv[2]
+        if (kv[1] == "put_calls") puts += kv[2]
+      }
+    }
+    END {
+      printf "processes=%d get_calls=%d get_hits=%d hit_ratio=%.2f put_calls=%d\n", n, gets, hits, (gets ? hits / gets : 0), puts
+    }' || true
+  grep -h 'level=\(WARN\|ERROR\)' "${CI_CACHEPROG_LOG}" 2>/dev/null | tail -n 20 || true
+fi
