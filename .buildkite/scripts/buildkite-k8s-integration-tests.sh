@@ -30,6 +30,9 @@ GOTEST_FLAGS=""
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
   GOTEST_FLAGS="-test.short"
 fi
+if [[ -n "${TEST_RUN:-}" ]]; then
+  GOTEST_FLAGS="${GOTEST_FLAGS:+${GOTEST_FLAGS} }-test.run ${TEST_RUN}"
+fi
 
 IFS=',' read -r -a docker_variants <<< "${DOCKER_VARIANTS}"
 

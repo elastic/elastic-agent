@@ -743,6 +743,19 @@ Notes:
   environment, or locally as root via `mage integration:local` (which runs directly on
   the host in the initial PID namespace).
 
+## Running targeted tests on Buildkite
+
+To run specific integration tests on CI, trigger a manual build on [elastic-agent-extended-testing](https://buildkite.com/elastic/elastic-agent-extended-testing) with your branch and set the environment variables below in the **New Build** dialog under **Options → Environment Variables**.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TEST_RUN` | _(unset)_ | Passed as `-test.run` to the test binary — run only tests whose name matches this regexp. |
+| `TEST_TIER3` | _(unset)_ | Set to `true` to enable tier-3 test groups on a manual build. Without this, tier-3 only runs on scheduled builds. |
+| `AGENT_VERSION` | from `.package-version` | Override the agent version under test. |
+| `FIPS` | `false` | Set to `true` to run the FIPS variant of the tests. |
+| `FORCE_ESS_CREATE` | `false` | Set to `true` to force ESS stack re-creation even on the first run (not just retries). |
+| `INTEGRATION_SERVER_DOCKER_IMAGE` | _(unset)_ | Override the elastic-agent Docker image used when provisioning the ESS stack. |
+
 ## Troubleshooting Tips
 
 ### Error: GCE service token missing; run 'mage integration:auth'
