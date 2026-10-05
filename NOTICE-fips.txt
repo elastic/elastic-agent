@@ -10782,11 +10782,11 @@ Public License instead of this License.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/azure-sdk-for-go/sdk/azcore
-Version: v1.23.1
+Version: v1.23.2
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/azure-sdk-for-go/sdk/azcore@v1.23.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/azure-sdk-for-go/sdk/azcore@v1.23.2/LICENSE.txt:
 
 MIT License
 
@@ -32480,11 +32480,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/api
-Version: v0.299.0
+Version: v0.300.0
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/api@v0.299.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/api@v0.300.0/LICENSE:
 
 Copyright (c) 2011 Google Inc. All rights reserved.
 
@@ -85373,11 +85373,11 @@ Contents of probable licence file $GOMODCACHE/github.com/googleapis/enterprise-c
 
 --------------------------------------------------------------------------------
 Dependency : github.com/googleapis/gax-go/v2
-Version: v2.24.1
+Version: v2.26.2
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/googleapis/gax-go/v2@v2.24.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/googleapis/gax-go/v2@v2.26.2/LICENSE:
 
 Copyright 2016, Google Inc.
 All rights reserved.
@@ -102149,11 +102149,11 @@ Contents of probable licence file $GOMODCACHE/github.com/open-telemetry/opentele
 
 --------------------------------------------------------------------------------
 Dependency : github.com/openshift/api
-Version: v0.0.0-20260925090845-44bef346c3f0
+Version: v0.0.0-20261002115817-f8795cdde518
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20260925090845-44bef346c3f0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/openshift/api@v0.0.0-20261002115817-f8795cdde518/LICENSE:
 
 
                                  Apache License
