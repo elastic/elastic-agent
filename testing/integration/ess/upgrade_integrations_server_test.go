@@ -10,11 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-<<<<<<< HEAD
-=======
-	"runtime"
 	"slices"
->>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 	"sort"
 	"testing"
 	"time"
@@ -63,14 +59,10 @@ func TestUpgradeIntegrationsServer(t *testing.T) {
 	statefulProv, ok := prov.(*ess.StatefulProvisioner)
 	require.True(t, ok)
 
-<<<<<<< HEAD
-	startVersions = filterVersionsForECH(t, startVersions, statefulProv)
-=======
 	echVersions, err := statefulProv.AvailableVersions()
 	require.NoError(t, err)
 
 	startVersions = filterStartVersionsForECH(t, startVersions, echVersions, endVersion)
->>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 
 	t.Logf("Running test cases for upgrade from versions [%v] to version [%s]", startVersions, endVersion)
 	for _, startVersion := range startVersions {
@@ -127,47 +119,21 @@ func getUpgradeableFIPSVersions(t *testing.T) version.SortableParsedVersions {
 	versions, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err, "could not get upgradable versions")
 
-<<<<<<< HEAD
 	filteredVersions := make([]*version.ParsedSemVer, 0)
 	for _, ver := range versions {
 		// Filter out versions that are not FIPS-capable
 		if !isFIPSCapableVersion(ver) {
 			continue
 		}
-=======
-	versions = slices.DeleteFunc(versions, func(ver *version.ParsedSemVer) bool {
-		return !isFIPSCapableVersion(ver, os, arch)
-	})
->>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 
-	sortedVers := version.SortableParsedVersions(versions)
+		filteredVersions = append(filteredVersions, ver)
+	}
+
+	sortedVers := version.SortableParsedVersions(filteredVersions)
 	sort.Sort(sortedVers)
 	return sortedVers
 }
 
-<<<<<<< HEAD
-func filterVersionsForECH(t *testing.T, versions []*version.ParsedSemVer, echProv *ess.StatefulProvisioner) []*version.ParsedSemVer {
-	echVersions, err := echProv.AvailableVersions()
-	require.NoError(t, err)
-
-	filteredVersions := make([]*version.ParsedSemVer, 0)
-	for _, ver := range versions {
-		if isVersionInList(ver, echVersions) {
-			filteredVersions = append(filteredVersions, ver)
-		}
-	}
-
-	return filteredVersions
-}
-
-func isVersionInList(candidateVersion *version.ParsedSemVer, allowedVersions []*version.ParsedSemVer) bool {
-	for _, allowedVersion := range allowedVersions {
-		if allowedVersion.Equal(*candidateVersion) {
-			return true
-		}
-	}
-	return false
-=======
 // filterStartVersionsForECH keeps only versions that ECH can deploy and then upgrade to endVersion.
 func filterStartVersionsForECH(t *testing.T, versions, echVersions []*version.ParsedSemVer, endVersion string) []*version.ParsedSemVer {
 	t.Helper()
@@ -191,5 +157,4 @@ func filterStartVersionsForECH(t *testing.T, versions, echVersions []*version.Pa
 		// released yet is rejected.
 		return ver.IsSnapshot() && !isAvailableInECH(version.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "", ""))
 	})
->>>>>>> 9547841 (Don't use non-GA snapshot versions as ECH upgrade start versions (#16866))
 }
