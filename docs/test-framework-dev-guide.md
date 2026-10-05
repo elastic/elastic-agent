@@ -329,12 +329,12 @@ between, and it can be very specific or not very specific.
 #### Selecting specific group
 
 By default, the runner will run all test groups. Each group runs on a dedicated machine instance. When working on groups of tests it's better to limit to a specific
-group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default upgrade-standalone"`
+group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default standalone-upgrade"`
 environment variable. This variable can take multiple groups with a space between.
 
 - `TEST_GROUPS="default" mage integration:test` to execute only tests in the "default" group.
-- `TEST_GROUPS="default upgrade-standalone" mage integration:test` to execute only tests in the "default" or
-"upgrade-standalone" group.
+- `TEST_GROUPS="default standalone-upgrade" mage integration:test` to execute only tests in the "default" or
+"standalone-upgrade" group.
 
 #### Passing additional go test flags
 
@@ -599,7 +599,7 @@ package for helper utilities.
 
 Every `define.Require` must define a `Group` that it belongs to. Each group is executed on a separate instance with all tests within the same group executed
 on the same instance. Placing similar tests in the same group allows those tests to run on their own instance
-as well as provides a way for a developer to select a specific group of tests with `TEST_GROUP="{group-name}"`.
+as well as provides a way for a developer to select a specific group of tests with `TEST_GROUPS="{group-name}"`.
 
 Grouping tests is another way of spreading out the testing load across multiple instances. The more groups that
 are defined the more instances will be provisioned to complete all tests. A balance between a small good set of
@@ -608,38 +608,30 @@ outweigh the benefits of creating another group.
 
 #### Creating a new test group and Buildkite integration tests
 
-  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+  When creating a new test group, it is important to add the new group to the variant lists at the top of the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
 
-  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  The groups are defined as YAML anchors (`windows_variants`, `linux_deb_variants`, `linux_rpm_variants`, `linux_arm_variants`),
+  which the tiered steps reference as the `variant` axis of their `matrix`. Add the new group to every list for a platform it should run on.
+  Some steps (for example the non-sudo ones) list only the `default` variant instead of an anchor, so check which tiers and steps should run the new group.
   Example:
 
   ```yaml
-  - label: "x86_64:sudo: {{matrix}}"
-        command: |
-          ...
-        artifact_paths:
-          - build/**
-        agents:
-          provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
-        plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
-              field: "token"
-              env_var: "BUILDKITE_ANALYTICS_TOKEN"
-          - test-collector#v1.11.0:
-              files: "build/TEST-*.xml"
-              format: "junit"
-              debug: true
-              annotation-link: true
-        matrix:
-          - default
-          - container
-          - fleet-upgrade-to-pr-build
-          - upgrade
-          - fleet
+  - linux_deb_variants: &linux_deb_variants
+    - container
+    - deb
+    - default
+    - your-new-group
+    # ...
+
+  - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
+    # ...
+    matrix:
+      setup:
+        variant: *linux_deb_variants
   ```
+
+  Test results are not collected in each of these steps: they upload `build/*` (including the JUnit `.xml` reports) as artifacts, and the single
+  `Aggregate test reports` step downloads them and runs the Buildkite `test-collector` plugin over `build/*.xml`.
 
   This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
 

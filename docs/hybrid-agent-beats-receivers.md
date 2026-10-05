@@ -11,10 +11,10 @@ testing instructions.
 **Beat Receivers** are beat inputs and processors executing as a receiver in an OpenTelemetry collector pipeline.
 Beat receivers are designed to output the exact same data they do today, and do not output data in the OTLP schema.
 
-Beat receivers will eventually be the default execution mode for Beat inputs in an elastic-agent.yml file (whether
-written by hand or generated via Fleet). Elastic Agent will automatically translate the relevant parts of its
-elastic-agent.yml file into OpenTelemetry collector configurations and execute them in the collector. This capability
-is currently gated by a feature flag.
+Beat receivers are the default execution mode for most Beat inputs in an elastic-agent.yml file (whether
+written by hand or generated via Fleet). Elastic Agent automatically translates the relevant parts of its
+elastic-agent.yml file into OpenTelemetry collector configurations and executes them in the collector. The runtime
+can be selected per Beat and per input type, see [Beat Receivers for Data Collection](#beat-receivers-for-data-collection).
 
 ### Beat Receivers for Agent Monitoring
 
@@ -35,8 +35,10 @@ agent.monitoring:
 
 ### Beat Receivers for Data Collection
 
-The capability to use Beat receivers is being enabled on per Beat and per input type basis. As of 9.4.0 all Metricbeat inputs run as
-beats receivers by default, and all other beat inputs are capable of being run as beats receivers.
+The runtime is selected on a per Beat and per input type basis. By default, the Filebeat, Metricbeat, Auditbeat,
+Osquerybeat and Packetbeat inputs run as beats receivers (`otel`). Heartbeat has no Beat-level default, so its inputs
+use the global default, which is `process`. See `DefaultRuntimeConfig` in `pkg/component/component.go`. Inputs that
+the `otel` runtime cannot handle (for example because of unsupported output options) fall back to the `process` runtime.
 
 With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
 the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
@@ -221,7 +223,7 @@ outputs:
 inputs:
   - id: filestream-system-66cab0a6-6fa3-46b1-9af1-2ea171fbd887
     type: filestream
-    # _runtime_experimental: otel # Optional - also run the filestream input as a collector receiver.
+    # _runtime_experimental: otel # Optional - explicitly run the filestream input as a collector receiver.
     data_stream:
       namespace: default
     streams:
