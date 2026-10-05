@@ -200,7 +200,7 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -283,7 +283,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 // rolled back to the previous version and that Fleet reports the correct informations
 func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		Stack: &define.Stack{},
@@ -337,7 +337,7 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 // See https://github.com/elastic/elastic-agent/issues/12910
 func TestFleetManagedUpgradeRollback(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Local: false,
 		Sudo:  true,
 		Stack: &define.Stack{},
@@ -474,7 +474,7 @@ type rollbackTriggerFunc func(ctx context.Context, t *testing.T, client client.C
 // of Agent, a manual rollback is triggered. It checks that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeManualRollback(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -645,7 +645,7 @@ func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesti
 
 func TestCleanupRollbacks(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
