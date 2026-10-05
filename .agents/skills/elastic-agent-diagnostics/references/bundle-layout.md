@@ -18,8 +18,6 @@ The bundle is a `.zip` produced by `elastic-agent diagnostics`. Files sit at the
 | `otel.yaml` | The OTel config delivered via policy / user override. "no active OTel configuration" when none has been applied. |
 | `otel-merged.yaml` | The merged running OTel collector config (agent-managed components + user-provided otel.yaml). This is what the collector is *actually running*. Use this to check which receivers/exporters/pipelines are active. |
 | `variables.yaml` | Fleet-provided dynamic variable values (host metadata, cloud provider info, etc.) |
-| `fleet-policy.yaml` | (when present) The raw Fleet policy as received from Fleet Server before compilation. |
-| `acl.txt` | (when present) File ACL for the agent data directory. |
 | `*.pprof.gz` | Agent process profiles at the root: `goroutine`, `heap`, `allocs`, `block`, `mutex`, `threadcreate`; `cpu.pprof` only with `--cpu-profile` |
 
 ## `state.yaml` structure
@@ -32,21 +30,20 @@ message: <string>     # human-readable state message
 fleet_state: <int>    # Fleet connection state
 fleet_message: <string>
 log_level: <string>   # e.g. "info"
-info:
-  id: <uuid>          # agent ID
-  version: <string>
-  snapshot: <bool>
-collector:
+collector:            # present when the OTel collector runtime is in use
   status: <int>       # OTel collector health state (see state-enums.md)
+  error: <string>     # only when set
   timestamp: <RFC3339>
+  components: {}      # only when the collector reports per-pipeline/per-component status: same shape, nested
+upgrade_details: {}   # only while an upgrade is in progress or recently finished
 components:
   - id: <string>      # e.g. "filestream-monitoring", "packet-default"
     state:
       state: <int>    # component state (see state-enums.md)
       message: <string>
-      pid: <int>      # OS PID when running as subprocess; absent for OTel-hosted components
+      pid: <int>      # only non-zero for Endpoint (the agent doesn't know beat PIDs); 0 otherwise
     units:
-      <unit-id>:
+      <type>-<unit-id>:    # key is "input-<id>" or "output-<id>"
         state: <int>
         message: <string>
         payload: {}   # unit-specific runtime state (streams, etc.)

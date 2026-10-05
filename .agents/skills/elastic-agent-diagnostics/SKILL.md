@@ -43,7 +43,7 @@ Tools: `jq` for NDJSON logs and JSON; `yq` for YAML. The recipes assume kislyuk'
 
 - **Don't cat large log files.** Daily NDJSON logs can be hundreds of KB to MBs. Filter with `jq` or `grep` first, then read the filtered output.
 - **Don't dump pprof binary content.** Always go through `go tool pprof` with `-top`, `-list <symbol>`, `-text`, or `-traces`.
-- **Redaction is already applied.** Passwords, tokens, API keys, and certs appear as `<REDACTED>`. Don't try to recover them — note their presence and move on.
+- **Redaction is already applied.** Passwords, tokens, API keys, and certs appear as `<REDACTED>`. Don't try to recover them — note their presence and move on (see [docs/PII_HANDLING.md](../../../docs/PII_HANDLING.md)).
 - **`components-expected.yaml` and `components-actual.yaml`** are usually byte-identical when the agent has converged. A diff between them indicates an in-flight reconfiguration or a stuck applier — that diff itself is the signal.
 - **Time correlation.** Log timestamps, `state.yaml` `collector.timestamp`, and the bundle filename's timestamp are all UTC. Correlate explicitly when sequencing events.
 - **Bundle is a snapshot, not a stream.** `state.yaml` reflects the moment `diagnostics` ran. Only the logs cover history.

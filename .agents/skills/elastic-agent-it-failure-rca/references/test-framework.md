@@ -4,15 +4,7 @@
 
 Integration tests live in Go packages under `testing/integration/`. The package is the Test Engine *scope* (e.g. `github.com/elastic/elastic-agent/testing/integration/ess`); the *group* each test runs in is declared in its `define.Require(... Group: integration.<X>)` (values in `testing/integration/groups.go`), and the group is what shows up in CI job names and JUnit file names.
 
-| Directory | Typical focus |
-|---|---|
-| `testing/integration/ess/` | ESS (Elastic Cloud) scenarios — fleet-managed, upgrades, packages (rpm/deb), monitoring, network traffic |
-| `testing/integration/k8s/` | Kubernetes (kind) — Helm charts, kustomize, container images |
-| `testing/integration/serverless/` | Serverless projects |
-| `testing/integration/beats/`, `leak/` | Beats-specific and resource-leak tests |
-| `pkg/testing/` | Shared test framework: fixtures, install/upgrade helpers, Fleet/ES clients, `define` |
-
-The test suite name (`TestNetworkTraffic`, `TestUpgradeFleetManagedElasticAgent`, etc.) maps directly to the Go `testing.T` top-level test function. Subtests (`/otel`, `/process`, `/compare`) are `/`-separated suffixes.
+Directory layout (`ess/`, `k8s/`, `serverless/`, `beats/`, `leak/`) and the shared framework in `pkg/testing/` are described in [docs/test-framework-dev-guide.md](../../../../docs/test-framework-dev-guide.md).
 
 Two families need runtime-specific reading (see the diagnostics skill's `references/runtimes.md`):
 - **Runtime comparison / switch tests** — subtests named `otel`, `process`, `compare` (`TestBeatsMetrics` runners in `*_monitoring_test.go`), and `beat_receivers_test.go` (`TestMonitoringNoDuplicates`, `TestComponentWorkDir`, `TestBeatsReceiverProcessRuntimeFallback`, …). They switch components between the otel and process runtimes via policy (`agent.internal.runtime.*`).
@@ -62,8 +54,7 @@ JUnit XML and gotestsum NDJSON file names, structure, and extraction recipes are
 | `agentFixture.IsHealthy` | `pkg/testing/fixture.go` | Checks agent returns HEALTHY status |
 | `agentFixture.ExecDiagnostics` | `pkg/testing/fixture.go` | Triggers diagnostics collection |
 | `require.Eventually` | testify | Polls a condition with timeout + interval |
-| `triggerFreshTLSConnection` | test file | Dials the ES HTTPS endpoint to produce a network_traffic event |
 
 ## Reproducing
 
-To re-run a single test, see [docs/test-framework-dev-guide.md](../../../../docs/test-framework-dev-guide.md) — e.g. `mage integration:single TestNetworkTraffic` with `TEST_PLATFORMS`, `AGENT_VERSION`, and `TEST_PACKAGES` set. `TEST_INTEG_CLEAN_ON_EXIT=false` (the local default) keeps mage artifacts and `.integration-cache` after the run.
+To re-run a single test, see [docs/test-framework-dev-guide.md](../../../../docs/test-framework-dev-guide.md) — e.g. `mage integration:single TestNetworkTraffic` with `TEST_PLATFORMS`, `AGENT_VERSION`, and `TEST_PACKAGES` set. For failures that need a live agent or more evidence, the guide's §"Debugging tests" covers `AGENT_COLLECT_DIAG`, `AGENT_KEEP_INSTALLED`, `TEST_RUN_UNTIL_FAILURE` and `TEST_INTEG_CLEAN_ON_EXIT`.

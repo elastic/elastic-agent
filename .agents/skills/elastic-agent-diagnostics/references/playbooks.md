@@ -112,8 +112,8 @@ These are the high-value findings. A bug typically shows up as one layer thinkin
 
 | Pair | Discrepancy | Likely cause |
 |---|---|---|
-| L1 → L2 | Supervisor: "Stopping collector" → Collector core: never logs `Starting shutdown...` | Supervisor failed to deliver the stop signal (IPC/socket bug). |
-| L1 → L2 | Supervisor: "Config update sent" → Collector core: never logs `Config updated, restart service` | Config delivery bug; collector never picked up the new policy. |
+| L1 → L2 | Supervisor (`otel_manager`) asks the collector to stop (stdin closed / signal) → Collector core: never logs `Starting shutdown...`; the manager eventually logs `timeout waiting (3s) for the supervised collector to stop, killing it` | Supervisor failed to deliver the stop signal (IPC/socket bug). |
+| L1 → L2 | Supervisor applies a new component model (`component model updated`) → Collector core: never logs `Config updated, restart service` | Config delivery bug; collector never picked up the new policy. |
 | L2 → L3 | Collector core: `Starting shutdown...` → Receiver: continues logging activity | Receiver ignored the shutdown — receiver-side bug. |
 | L2 → L3 | Collector core: ready → Receiver: never logs startup | Receiver failed to register with the pipeline. |
 | L3 → L4 | Receiver shell: configured → Embedded beat: never logs `Beat ID: ...` | Receiver bridge broken; beat never got initialized. |
@@ -236,7 +236,7 @@ yq '.components[] | {
 }' "$BUNDLE_DIR/components-actual.yaml"
 ```
 
-(`type` on a unit is a `UnitType` integer: `0` = INPUT, `1` = OUTPUT.)
+(`type` on a unit in `components-*.yaml` is a `UnitType` integer: `0` = INPUT, `1` = OUTPUT. In `state.yaml` the unit key is `input-<id>` / `output-<id>`.)
 
 ### What streams does each input have?
 
@@ -353,7 +353,7 @@ jq -c 'select((.message // "") | test("upgrade|rollback|watcher|grace"; "i"))' \
   "$BUNDLE_DIR"/logs/*/elastic-agent-*.ndjson
 ```
 
-Look for: "Upgrade Watcher invoked" → "Watcher detected unhealthy" → "Rollback initiated" sequences.
+Look for the sequence (strings from `internal/pkg/agent/application/upgrade/rollback.go`, `watcher.go` and `cmd/watch.go`): `Upgrade Watcher invoked` (agent log) → `Upgrade Watcher started` / `Loaded update marker` (watcher log) → on failure `Agent reported failure (starting failed timer)` / `agent reported failed component(s) state` → `Error detected, proceeding to rollback` → `rolling back to <versioned home>`. A clean upgrade ends with the grace period expiring without any of the failure lines.
 
 ## 6. Beat-based component telemetry
 

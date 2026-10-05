@@ -6,6 +6,8 @@ Commands below use `bk`; the `curl` + `BUILDKITE_API_TOKEN` and MCP equivalents 
 
 ### A — human-filed
 
+Filed from the `.github/ISSUE_TEMPLATE/flaky-test.yml` form; the sections below are its fields.
+
 Title: `[Flaky Test]:TestFunctionName – <short error>` or `[Flaky Test] TestName/SubTest on <OS>`. Body sections (`###` headings):
 
 | Section | Contents |

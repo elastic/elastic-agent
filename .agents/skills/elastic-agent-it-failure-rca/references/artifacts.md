@@ -8,6 +8,7 @@
 | `build/<same>.integration.out.json` | gotestsum NDJSON — every test event with timestamps |
 | `build/TEST-go-k8s-<…>.k8s.xml` / `.k8s.out.json` / `.k8s.out` | the same for Kubernetes tests (`pkg/testing/kubernetes/runner.go`) |
 | `build/TEST-report.html` | HTML rendering of the JUnit; skip it |
+| `build/k8s-logs-*/**` | pod logs, on Kubernetes jobs |
 | `build/diagnostics/<Test-Name>-<RFC3339 with : → ->-diagnostics.zip` | agent diagnostics bundle, one per fixture that collected diagnostics (`pkg/testing/fixture_install.go`); subtest `/` → `-` |
 | `build/diagnostics/<…>-ProcessDump-<phase>.json` | process listing captured around install/cleanup |
 | `build/distributions/**` | packages, on packaging jobs — ignore |

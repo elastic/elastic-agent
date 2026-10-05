@@ -40,16 +40,11 @@ A component stuck at **5 (STOPPING)** is a common failure mode — the superviso
 
 Same `cproto.State` enum. Units are the individual input/output configurations within a component (one unit per stream, one unit for the output).
 
-The `type` field on a unit is a `UnitType` integer:
-
-| Int | Name |
-|-----|------|
-| 0 | INPUT — a data source (log file, metricset, packet capture, etc.) |
-| 1 | OUTPUT — the output configuration (elasticsearch, logstash, kafka) |
+In `state.yaml` the unit's type is part of its key: `input-<unit id>` is a data source (log file, metricset, packet capture, …) and `output-<unit id>` is the output configuration (elasticsearch, logstash, kafka). In `components-*.yaml` the type is a `UnitType` integer: `0` = INPUT, `1` = OUTPUT.
 
 ## OTel collector status (`state.yaml: collector.status`)
 
-Maps to `cproto.CollectorComponentStatus`. This reflects the aggregate health of the OTel collector process (not the individual receivers/exporters within it).
+Serialized from the OTel `componentstatus.Status` of the collector's aggregate status (`coordinator.go`, the `state.yaml` hook). `collector.status` is the aggregate for the whole collector; when the collector reports per-pipeline and per-component status, `collector.components` holds the same structure (`status`, `error`, `timestamp`, nested `components`) for each — look there to see which receiver or exporter is unhealthy. The key is omitted when there is nothing to report.
 
 | Int | Name | Meaning |
 |-----|------|---------|
@@ -76,7 +71,7 @@ In NDJSON log lines, `log.level` is a string:
 | `"info"` | Normal operation events |
 | `"warn"` | Something unexpected but non-fatal |
 | `"error"` | A component or operation failed; investigation warranted |
-| `"critical"` / `"fatal"` | Process-level failure; agent or collector may be about to exit |
+| `"fatal"` | Process-level failure; agent or collector may be about to exit (log levels come from zap/logp: debug, info, warn, error, and the process-ending dpanic/panic/fatal) |
 
 ## Quick decode one-liner
 
