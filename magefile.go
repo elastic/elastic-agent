@@ -151,9 +151,6 @@ type Check mg.Namespace
 // Prepare tasks related to bootstrap the environment or get information about the environment.
 type Prepare mg.Namespace
 
-// Format automatically format the code.
-type Format mg.Namespace
-
 // Demo runs agent out of container.
 type Demo mg.Namespace
 
@@ -226,7 +223,7 @@ func (Dev) RegenerateMocks() error {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.SerialDeps(Format.License, devtools.Format)
+	mg.SerialDeps(devtools.Format)
 	return nil
 }
 
@@ -589,6 +586,7 @@ func (Test) Coverage() error {
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
+<<<<<<< HEAD
 // All format automatically all the codes.
 func (Format) All() {
 	mg.SerialDeps(Format.License)
@@ -600,6 +598,8 @@ func (Format) License() error {
 	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
 }
 
+=======
+>>>>>>> f4069c5 (Fix mage addLicenseHeaders (#16978))
 // Package packages the Elastic Agent for distribution.
 //
 // With no env vars set, `mage package` on a fresh checkout produces a
@@ -940,7 +940,7 @@ func Config(ctx context.Context) error {
 }
 
 // ControlProto generates pkg/agent/control/proto module.
-func ControlProto() error {
+func ControlProto(ctx context.Context) error {
 	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v2/cproto", "--go_opt=paths=source_relative",
@@ -957,8 +957,10 @@ func ControlProto() error {
 		return err
 	}
 
-	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
-	return nil
+	if err := devtools.AddLicenseHeaders(devtools.SettingsFromContext(ctx)); err != nil {
+		return err
+	}
+	return devtools.GoImports()
 }
 
 func BuildPGP() error {
