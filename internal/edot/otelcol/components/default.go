@@ -26,6 +26,7 @@ import (
 	jaegerreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/jaegerreceiver"
 	k8sclusterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver"
 	k8sobjectsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sobjectsreceiver"
+	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	kubeletstatsreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kubeletstatsreceiver"
 	nginxreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/nginxreceiver"
 	receivercreator "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/receivercreator"
@@ -57,6 +58,7 @@ import (
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
+	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
@@ -117,6 +119,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			mbreceiver.NewFactory(),
 			nopreceiver.NewFactory(),
 			azuremonitorreceiver.NewFactory(),
+			kafkareceiver.NewFactory(),
 		}
 		// some receivers should only be available when
 		// not in fips mode due to restrictions on crypto usage
@@ -152,6 +155,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			debugexporter.NewFactory(),
 			fileexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
+			kafkaexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),

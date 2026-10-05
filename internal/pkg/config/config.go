@@ -205,6 +205,15 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 	if err != nil {
 		return err
 	}
+	if m, ok := from.(map[string]interface{}); ok {
+		// A raw map must go through NewConfigFrom so the skip keys (inputs, outputs) are not resolved by ucfg.
+		// Otherwise a variable like ${agent.id} that exists in this config is expanded before the transpiler
+		// sees it, which breaks conditions such as `${agent.id} == 'x'`.
+		from, err = NewConfigFrom(m, opts...)
+		if err != nil {
+			return err
+		}
+	}
 	cfg, ok := from.(*Config)
 	if ok {
 		// can merge both together

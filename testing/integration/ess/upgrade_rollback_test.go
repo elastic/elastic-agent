@@ -165,7 +165,7 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
