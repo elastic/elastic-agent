@@ -121,7 +121,7 @@ func prepareAgentCMD(
 	}
 
 	t.Cleanup(func() {
-		if cmd.Process != nil {
+		if cmd.Process != nil && cmd.ProcessState == nil {
 			t.Log(">> cleaning up: killing the Elastic-Agent process")
 			if err := cmd.Process.Kill(); err != nil {
 				t.Fatalf("could not kill Elastic-Agent process: %s", err)
