@@ -36,7 +36,7 @@ import (
 
 func TestProxyURL(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Local: false,
 		Sudo:  true,
 	})
