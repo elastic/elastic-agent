@@ -264,7 +264,7 @@ logs_dynamic_pipeline:
 			"hosts":      []any{"es-1:9200", "es-2:9200", "es-3:9200"},
 			"parameters": map[string]any{"somekey": "somevalue"},
 		})
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		assert.Equal(t, []string{
 			"http://es-1:9200?somekey=somevalue",
