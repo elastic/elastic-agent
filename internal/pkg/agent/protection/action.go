@@ -59,16 +59,13 @@ type VerifiedAction struct {
 // cannot be tampered with while keeping a valid signature.
 func VerifyActionSignature(a signedAction, signatureValidationKey []byte, agentID string) (*VerifiedAction, error) {
 	fa, err := validateAction(a, signatureValidationKey, agentID)
-	if len(signatureValidationKey) != 0 && errors.Is(err, ErrNotSigned) {
-		return nil, err
-	}
-	if err != nil && !errors.Is(err, ErrNotSigned) {
-		return nil, err
-	}
-	if errors.Is(err, ErrNotSigned) {
+	if errors.Is(err, ErrNotSigned) && len(signatureValidationKey) == 0 {
 		// No key configured and the action is unsigned: accepted, but there are
 		// no verified fields to return.
 		return nil, nil
+	}
+	if err != nil {
+		return nil, err
 	}
 	return &VerifiedAction{Data: fa.Data, Expiration: fa.Expiration}, nil
 }
