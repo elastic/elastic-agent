@@ -50,8 +50,9 @@ type VerifiedAction struct {
 // VerifyActionSignature reports an error when the action's signature is required
 // but missing or invalid. When a signatureValidationKey is configured the action
 // must be signed and valid; when no key is configured an unsigned action is
-// accepted (no verification is performed). It is a thin gate over ValidateAction
-// used by callers that only care whether the action may proceed.
+// accepted (no verification is performed). It is a thin gate over the shared
+// signature validation, used by callers that only care whether the action may
+// proceed.
 //
 // On success it returns the verified fields from the signed envelope, or nil when
 // the action carries no signature. Callers should prefer these verified fields
