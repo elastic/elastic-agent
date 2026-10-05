@@ -41,19 +41,22 @@ else
   name_filter=(! -name "*-SNAPSHOT*")
 fi
 
-# Copy all binaries (tar.gz, zip, deb, rpm)
-find build/distributions -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" -o -name "*.rpm" \) \
+# Copy all binaries (tar.gz, zip, deb, rpm) and their checksums
+find build/distributions -maxdepth 1 -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.deb" -o -name "*.rpm" -o -name "*.sha512" \) \
   "${name_filter[@]}" -exec cp {} artifacts/ \;
 
 # Copy the dependency report CSV
 find build/distributions/reports -maxdepth 1 -type f -name "*.csv" "${name_filter[@]}" -exec cp {} artifacts/ \;
 
-binaries=$(find artifacts -maxdepth 1 -type f ! -name "*.csv" | wc -l)
+binaries=$(find artifacts -maxdepth 1 -type f ! -name "*.csv" ! -name "*.sha512" | wc -l)
 reports=$(find artifacts -maxdepth 1 -type f -name "*.csv" | wc -l)
 if [[ "${binaries}" -eq 0 || "${reports}" -ne 1 ]]; then
   echo "ERROR: expected ${WORKFLOW} binaries and one dependency report, found ${binaries} binaries and ${reports} reports." >&2
   exit 1
 fi
+
+# Generate checksum for the dependency report CSV
+(cd artifacts && for f in *.csv; do sha512sum "$f" > "$f.sha512"; done)
 
 echo "Staged artifacts:"
 ls -1 artifacts/

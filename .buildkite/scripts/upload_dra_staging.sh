@@ -35,11 +35,11 @@ steps:
     env:
       DRA_WORKFLOW: "staging"
     plugins:
-      - elastic/oblt-google-auth#v1.3.1:
+      - elastic/oblt-google-auth#v1.3.5:
           lifetime: 10800
           project-id: "elastic-observability-ci"
           project-number: "911195782929"
-      - elastic/dra-prep#v0.1.6:
+      - elastic/dra-prep#v0.1.7:
           product_id: "elastic-agent-core"
           stack_version: "${STACK_VERSION}"
           workflow: "staging"
