@@ -18,7 +18,7 @@ allowHostPID: false
 allowHostIPC: false
 # Needed when a preset requires it (e.g. the per-node collector).
 allowHostNetwork: {{ include "elasticagent.hostNetwork" $ | default "false" }}
-allowHostPorts: {{ include "elasticagent.hostNetwork" $ | default "false" }}
+allowHostPorts: {{ include "elasticagent.allowHostPorts" $ }}
 # Needed for /var/log and state dir.
 allowHostDirVolumePlugin: true
 allowPrivilegedContainer: false
@@ -109,7 +109,7 @@ roleRef:
 {{- end }}
 {{- $ksmValues := index $.Values "kube-state-metrics" -}}
 {{- if $ksmValues.enabled -}}
-{{- $ksmSAName := dig "fullnameOverride" "kube-state-metrics" $ksmValues -}}
+{{- $ksmSAName := include "kube-state-metrics.serviceAccountName" (index $.Subcharts "kube-state-metrics") -}}
 {{- $ksmRBName := printf "kube-state-metrics-%s-%s-scc" $.Release.Name $.Release.Namespace }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

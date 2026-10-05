@@ -11,6 +11,7 @@ import (
 	"io"
 
 	configv1 "github.com/openshift/api/config/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -18,8 +19,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	clientsetscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
-
-	securityv1 "github.com/openshift/api/security/v1"
 
 	"github.com/elastic/cloud-on-k8s/v3/pkg/apis/agent/v1alpha1"
 )

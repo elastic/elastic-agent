@@ -205,7 +205,7 @@ func (p *provisioner) setup(ctx context.Context, instanceName, kubernetesVersion
 	p.logger.Logf("microshift: control plane ready in %s", time.Since(controlPlaneStart).Round(time.Millisecond))
 
 	if !exists {
-		// MicroShift does not provide the OpenShift monitoring andinfrastructure CRDs
+		// MicroShift does not provide the OpenShift monitoring and infrastructure CRDs
 		// available in full OpenShift clusters.
 		if err := p.installOpenShiftCRDs(ctx, c, repoDir); err != nil {
 			return "", "", fmt.Errorf("installing OpenShift CRDs: %w", err)

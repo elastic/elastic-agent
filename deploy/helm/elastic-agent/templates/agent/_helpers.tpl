@@ -369,6 +369,21 @@ Whether any agent preset runs with host network
 {{- $hostNetwork -}}
 {{- end -}}
 
+{{/* Whether any agent preset explicitly requests a host port. */}}
+{{- define "elasticagent.allowHostPorts" -}}
+{{- $hostPorts := false -}}
+{{- range $preset := .Values.agent.presets -}}
+{{- range $container := concat (list $preset) ($preset.extraContainers | default list) ($preset.initContainers | default list) -}}
+{{- range $port := $container.ports -}}
+{{- if $port.hostPort -}}
+{{- $hostPorts = true -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $hostPorts -}}
+{{- end -}}
+
 {{- define "elasticagent.init.valueFrom" -}}
 {{- $ := index . 0 -}}
 {{- $valueFrom := index . 1 -}}
