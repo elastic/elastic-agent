@@ -441,6 +441,9 @@ type Coordinator struct {
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
 
+	// renderCache reuses the rendered inputs of the previous refresh for the (input, vars)
+	// pairs that did not change. It is reset whenever ast changes.
+	renderCache *transpiler.RenderCache
 	// expectedConfigCache reuses the unit configurations of the previous refresh for the
 	// units whose configuration did not change.
 	expectedConfigCache *component.ExpectedConfigCache
@@ -608,6 +611,7 @@ func New(
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
 		canReExec:        reexec.CanReExec,
 
+		renderCache:         transpiler.NewRenderCache(),
 		expectedConfigCache: component.NewExpectedConfigCache(),
 	}
 	// Setup communication channels for any non-nil components. This pattern
@@ -1901,6 +1905,7 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	c.renderCache.Reset()
 	return nil
 }
 
@@ -2387,13 +2392,16 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	var renderedInputInfo map[string]transpiler.RenderedInputInfo
+	var renderedInputs *transpiler.RenderedInputs
 	if ok {
-		var renderedInputs transpiler.Node
-		renderedInputs, renderedInputInfo, err = transpiler.RenderInputs(inputs, c.vars)
+		renderedInputs, err = transpiler.RenderInputsCached(inputs, c.vars, c.renderCache)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		renderedInputInfo = renderedInputs.Info
+		// the rendered inputs are added to the map form of the policy below, straight from
+		// the render cache, instead of being converted from the tree on every refresh
+		err = transpiler.Insert(ast, transpiler.NewList(nil), "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
@@ -2416,6 +2424,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	cfg, err := ast.Map()
 	if err != nil {
 		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	if renderedInputs != nil {
+		cfg["inputs"] = renderedInputs.Maps()
 	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {

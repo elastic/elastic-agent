@@ -206,10 +206,23 @@ func (d *Dict) Vars(vars []string, defaultProvider string) []string {
 }
 
 // Apply applies the vars to all the nodes in the dictionary. This does not modify the original dictionary.
+//
+// When no node in the dictionary is affected by the vars the dictionary itself is returned, so
+// static parts of a tree are shared between the original and the rendered tree instead of being
+// copied. Callers that need to modify the result must clone it first.
 func (d *Dict) Apply(vars *Vars) (Node, error) {
-	nodes := make([]Node, 0, len(d.value))
-	for _, v := range d.value {
+	// nodes is only allocated once a child differs from the original; until then the
+	// original dictionary can be reused as-is.
+	var nodes []Node
+	changed := func(i int) {
+		if nodes == nil {
+			nodes = make([]Node, 0, len(d.value))
+			nodes = append(nodes, d.value[:i]...)
+		}
+	}
+	for i, v := range d.value {
 		if v == nil {
+			changed(i)
 			continue
 		}
 		k := v.(*Key)
@@ -218,6 +231,7 @@ func (d *Dict) Apply(vars *Vars) (Node, error) {
 			return nil, err
 		}
 		if n == nil {
+			changed(i)
 			continue
 		}
 		if k.name == conditionKey {
@@ -227,9 +241,19 @@ func (d *Dict) Apply(vars *Vars) (Node, error) {
 				return nil, nil
 			}
 			// condition successful, but don't include condition in result
+			changed(i)
 			continue
 		}
-		nodes = append(nodes, n)
+		if n != v {
+			changed(i)
+		}
+		if nodes != nil {
+			nodes = append(nodes, n)
+		}
+	}
+	if nodes == nil {
+		// nothing was affected by the vars; share the original
+		return d, nil
 	}
 	return &Dict{nodes, nil}, nil
 }
@@ -378,6 +402,10 @@ func (k *Key) Apply(vars *Vars) (Node, error) {
 	if v == nil {
 		return nil, nil
 	}
+	if v == k.value {
+		// value not affected by the vars; share the original key
+		return k, nil
+	}
 	return &Key{name: k.name, value: v}, nil
 }
 
@@ -504,10 +532,19 @@ func (l *List) Vars(vars []string, defaultProvider string) []string {
 }
 
 // Apply applies the vars to all nodes in the list. This does not modify the original list.
+//
+// When no node in the list is affected by the vars the list itself is returned, see Dict.Apply.
 func (l *List) Apply(vars *Vars) (Node, error) {
-	nodes := make([]Node, 0, len(l.value))
-	for _, v := range l.value {
+	var nodes []Node
+	changed := func(i int) {
+		if nodes == nil {
+			nodes = make([]Node, 0, len(l.value))
+			nodes = append(nodes, l.value[:i]...)
+		}
+	}
+	for i, v := range l.value {
 		if v == nil {
+			changed(i)
 			continue
 		}
 		n, err := v.Apply(vars)
@@ -515,9 +552,18 @@ func (l *List) Apply(vars *Vars) (Node, error) {
 			return nil, err
 		}
 		if n == nil {
+			changed(i)
 			continue
 		}
-		nodes = append(nodes, n)
+		if n != v {
+			changed(i)
+		}
+		if nodes != nil {
+			nodes = append(nodes, n)
+		}
+	}
+	if nodes == nil {
+		return l, nil
 	}
 	return NewList(nodes), nil
 }
@@ -601,7 +647,12 @@ func (s *StrVal) Vars(vars []string, defaultProvider string) []string {
 }
 
 // Apply applies the vars to the string value. This does not modify the original string.
+//
+// When the string doesn't reference any variable the node itself is returned, see Dict.Apply.
 func (s *StrVal) Apply(vars *Vars) (Node, error) {
+	if !strings.Contains(s.value, varsPrefix) {
+		return s, nil
+	}
 	return vars.Replace(s.value)
 }
 
@@ -1039,10 +1090,54 @@ func (a *AST) Lookup(name string) (interface{}, bool) {
 		node = node.Value().(Node)
 	}
 
-	m := &MapVisitor{}
-	a.dispatch(node, m)
+	return toInterface(node), true
+}
 
-	return m.Content, true
+// toInterface converts the node into its native form: map[string]interface{} for a Dict,
+// []interface{} for a List and the value itself for the value nodes. It is equivalent to
+// visiting the node with a MapVisitor, without the visitor allocations.
+func toInterface(n Node) interface{} {
+	switch t := n.(type) {
+	case *Dict:
+		m := make(map[string]interface{}, len(t.value))
+		for _, child := range t.value {
+			if child == nil {
+				continue
+			}
+			key := child.(*Key)
+			if key.value == nil {
+				m[key.name] = nil
+				continue
+			}
+			m[key.name] = toInterface(key.value)
+		}
+		return m
+	case *List:
+		l := make([]interface{}, 0, len(t.value))
+		for _, child := range t.value {
+			if child == nil {
+				continue
+			}
+			l = append(l, toInterface(child))
+		}
+		return l
+	case *Key:
+		if t.value == nil {
+			return nil
+		}
+		return toInterface(t.value)
+	case *StrVal:
+		return t.value
+	case *IntVal:
+		return t.value
+	case *UIntVal:
+		return t.value
+	case *BoolVal:
+		return t.value
+	case *FloatVal:
+		return t.value
+	}
+	return nil
 }
 
 func splitPath(s Selector) []string {
@@ -1148,13 +1243,21 @@ func loadSliceOrArray(val reflect.Value) (Node, error) {
 }
 
 func lookupVal(val reflect.Value) reflect.Value {
-	for (val.Kind() == reflect.Ptr || val.Kind() == reflect.Interface) && !val.IsNil() {
+	for (val.Kind() == reflect.Pointer || val.Kind() == reflect.Interface) && !val.IsNil() {
 		val = val.Elem()
 	}
 	return val
 }
 
+// attachProcessors returns a copy of the node with the processors attached.
+//
+// The node comes from the vars tree, which is shared by every render and every set of vars, so it
+// must never be modified in place.
 func attachProcessors(node Node, processors Processors) Node {
+	if processors == nil {
+		return node
+	}
+	node = node.ShallowClone()
 	switch n := node.(type) {
 	case *Dict:
 		n.processors = processors
@@ -1289,11 +1392,10 @@ func Insert(a *AST, node Node, to Selector) error {
 // Map transforms the AST into a map[string]interface{} and will abort and return any errors related
 // to type conversion.
 func (a *AST) Map() (map[string]interface{}, error) {
-	m := &MapVisitor{}
-	a.Accept(m)
-	mapped, ok := m.Content.(map[string]interface{})
+	content := toInterface(a.root)
+	mapped, ok := content.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("could not convert to map[string]iface, type is %T", m.Content)
+		return nil, fmt.Errorf("could not convert to map[string]iface, type is %T", content)
 	}
 	return mapped, nil
 }
