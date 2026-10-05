@@ -278,6 +278,90 @@ func TestPreviousMinor(t *testing.T) {
 	assert.Empty(t, v.BuildMetadata())
 }
 
+// TestPreviousMinorIndependentRelease verifies how PreviousMinor treats independent artifact
+// release (IAR) versions, i.e. those with build metadata matching ^build\d{12}.
+func TestPreviousMinorIndependentRelease(t *testing.T) {
+	testCases := []struct {
+		name           string
+		currentVersion string
+		testVersions   []string
+		expected       string
+		expectedErr    error
+	}{
+		{
+			name:           "IAR version is accepted as previous minor",
+			currentVersion: "8.19.5",
+			testVersions:   []string{"8.18.3+build202506011200", "8.17.4"},
+			expected:       "8.18.3+build202506011200",
+		},
+		{
+			name:           "IAR version is preferred over older GA when listed first",
+			currentVersion: "9.2.0",
+			testVersions:   []string{"9.1.5+build202506011200", "9.1.4", "9.0.8"},
+			expected:       "9.1.5+build202506011200",
+		},
+		{
+			name:           "GA version listed before IAR version is preferred",
+			currentVersion: "9.2.0",
+			testVersions:   []string{"9.1.5", "9.1.4+build202506011200"},
+			expected:       "9.1.5",
+		},
+		{
+			name:           "non-IAR build metadata is skipped",
+			currentVersion: "8.19.5",
+			testVersions:   []string{"8.18.3+someothermetadata", "8.17.4"},
+			expected:       "8.17.4",
+		},
+		{
+			name:           "build metadata with fewer than 12 digits is skipped",
+			currentVersion: "8.19.5",
+			testVersions:   []string{"8.18.3+build2025060112", "8.17.4"},
+			expected:       "8.17.4",
+		},
+		{
+			name:           "prerelease IAR version is skipped",
+			currentVersion: "8.19.5",
+			testVersions:   []string{"8.18.3-SNAPSHOT+build202506011200", "8.17.4"},
+			expected:       "8.17.4",
+		},
+		{
+			name:           "IAR version of the current minor is not a previous minor",
+			currentVersion: "8.19.5",
+			testVersions:   []string{"8.19.4+build202506011200", "8.18.3"},
+			expected:       "8.18.3",
+		},
+		{
+			name:           "only non-matching versions yields ErrNoPreviousMinor",
+			currentVersion: "8.19.5",
+			testVersions:   []string{"8.18.3+someothermetadata", "8.19.4+build202506011200"},
+			expectedErr:    ErrNoPreviousMinor,
+		},
+		{
+			name:           "first release of a new major returns the newest IAR version of the previous major",
+			currentVersion: "9.0.0",
+			testVersions:   []string{"8.19.5+build202506011200", "8.19.4"},
+			expected:       "8.19.5+build202506011200",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			originalVersions := agentVersions
+			t.Cleanup(func() { agentVersions = originalVersions })
+			agentVersions = &AgentVersions{TestVersions: tc.testVersions}
+			t.Setenv("AGENT_VERSION", tc.currentVersion)
+
+			v, err := PreviousMinor()
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, v.String())
+		})
+	}
+}
+
 func buildVersionList(t *testing.T, versions []string) version.SortableParsedVersions {
 	result := make(version.SortableParsedVersions, 0, len(versions))
 	for _, v := range versions {
