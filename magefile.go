@@ -915,6 +915,24 @@ func PackageAgentCore(ctx context.Context) {
 	cfg := mage.SettingsFromContext(ctx)
 	mg.CtxDeps(ctx, CrossBuild)
 
+<<<<<<< HEAD
+=======
+	cfg := devtools.SettingsFromContext(ctx)
+
+	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
+	// docker) is selected the core build would produce nothing, causing
+	// extractAgentCoreForPackage to fail. Add TarGz so the core archive is always
+	// built regardless of which final package types were requested.
+	if !cfg.IsPackageTypeSelected(devtools.TarGz) {
+		cfg = cfg.WithAddedPackageType(devtools.TarGz)
+		ctx = devtools.ContextWithSettings(ctx, cfg)
+	}
+
+	fmt.Println("--- Build elastic-agent-core")
+	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
+
+	fmt.Println("--- Package elastic-agent-core")
+>>>>>>> 6055fc3 (Split packaging steps for integration tests (#16923))
 	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		panic(err)
