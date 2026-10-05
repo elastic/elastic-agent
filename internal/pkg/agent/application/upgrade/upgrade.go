@@ -825,15 +825,13 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool, fileDirCopy fil
 		}
 	}
 
-	// Use a fixed concurrency of 4 — see install.calculateCopyConcurrency for
-	// the rationale.
 	return fileDirCopy(from, to, filecopy.Options{
 		OnSymlink: func(_ string) filecopy.SymlinkAction {
 			return filecopy.Shallow
 		},
 		Sync:         true,
 		OnError:      onErr,
-		NumOfWorkers: 4,
+		NumOfWorkers: install.CopyConcurrency,
 	})
 }
 

@@ -39,6 +39,10 @@ const (
 	DefaultStopTimeout = 30 * time.Second
 	// DefaultStopInterval is the check interval to determine if the service has stopped.
 	DefaultStopInterval = 250 * time.Millisecond
+
+	// CopyConcurrency is the number of concurrent workers used when copying files
+	// during install and upgrade.
+	CopyConcurrency = 4
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
@@ -76,8 +80,6 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 	pathMappings := manifest.Package.PathMappings
 
 	pt.Describe("Copying install files")
-	copyConcurrency := calculateCopyConcurrency(streams)
-
 	skipFn := func(relPath string) bool { return false }
 	if flavor != "" {
 		flavorDefinition, err := Flavor(flavor, "", manifest.Package.Flavors)
@@ -90,7 +92,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 		}
 	}
 
-	err = copyFiles(copyConcurrency, pathMappings, dir, topPath, skipFn)
+	err = copyFiles(CopyConcurrency, pathMappings, dir, topPath, skipFn)
 	if err != nil {
 		pt.Describe("Error copying files")
 		return utils.FileOwner{}, err
@@ -240,20 +242,6 @@ func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error
 	}
 
 	return manifest, nil
-}
-
-func calculateCopyConcurrency(_ *cli.IOStreams) int {
-	// Use a fixed concurrency of 4. Benchmarking showed that the gains from
-	// concurrent file copies saturate around 4 workers (1→2→4 each roughly
-	// halve install time; beyond 4 the improvement is marginal). Hardware
-	// detection via ghw was previously used to distinguish SSDs from HDDs, but
-	// it is unreliable: virtual and paravirtualised block devices (VirtIO,
-	// device-mapper, NVMe-in-VM) are often misclassified, and the distinction
-	// that actually matters — whether fsync flushes through QEMU emulation or
-	// directly to hardware — is not visible from inside the guest at all. On
-	// real HDDs, 4 concurrent requests are handled well by the I/O scheduler
-	// without measurable head-seek regression.
-	return 4
 }
 
 func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir string, topPath string, skipFn func(string) bool) error {
