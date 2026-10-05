@@ -606,20 +606,6 @@ func (Test) Coverage() error {
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
-<<<<<<< HEAD
-// All format automatically all the codes.
-func (Format) All() {
-	mg.SerialDeps(Format.License)
-}
-
-// License applies the right license header.
-func (Format) License() error {
-	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
-}
-
-=======
->>>>>>> f4069c5 (Fix mage addLicenseHeaders (#16978))
 // Package packages the Elastic Agent for distribution.
 //
 // With no env vars set, `mage package` on a fresh checkout produces a
