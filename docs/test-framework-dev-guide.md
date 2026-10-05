@@ -422,6 +422,10 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 
 ### Debugging tests
 
+For CI failures and diagnostics bundles, the repository ships agent skills (in [.agents/skills/](../.agents/skills/)):
+`elastic-agent-it-failure-rca` for root-causing integration test failures from CI and `elastic-agent-diagnostics` for
+analyzing diagnostics bundles.
+
 #### Connecting to VMs
 All VMs (including Windows) support connections via SSH, the framework
 generates and stores the necessary SSH keys to access the VMs, the
