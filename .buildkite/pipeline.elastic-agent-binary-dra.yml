@@ -15,13 +15,10 @@ env:
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
-  - docker_login_plugin: &docker_login_plugin
-      elastic/vault-docker-login#v0.5.2:
-        secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
   - google_oidc_plugin: &google_oidc_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
-      elastic/oblt-google-auth#v1.3.1:
+      elastic/oblt-google-auth#v1.3.5:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
@@ -100,24 +97,35 @@ steps:
 
     - wait
 
-    - label: ":hammer: DRA Publish Elastic-Agent Core Snapshot"
-      command: |
-        echo "+++ Restoring Artifacts"
-        buildkite-agent artifact download "build/**/*" .
-        echo "+++ Changing permissions for the release manager"
-        sudo chown -R :1000 build/distributions/
-        echo "+++ Running DRA publish step"
-        .buildkite/scripts/steps/dra-publish.sh
-      key: "publish-dra-snapshot"
+    - label: ":package: DRA Prep elastic-agent-core / ${BEAT_VERSION} / snapshot"
+      key: "dra-prep-snapshot"
+      # publish only from main and release branches, never from pull requests
+      # or feature branches forced with RUN_SNAPSHOT/RUN_STAGING/VERSION_QUALIFIER
+      if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+\$/)
+      command: ".buildkite/scripts/stage_artifacts.sh"
       agents:
-        provider: "gcp"
-        machineType: "c2-standard-16"
-        image: "${IMAGE_UBUNTU_2404_X86_64}"
+        image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
+        cpu: "2"
+        memory: "4Gi"
+        ephemeralStorage: "10Gi"
       env:
         DRA_WORKFLOW: "snapshot"
       plugins:
         - *google_oidc_plugin
-        - *docker_login_plugin
+        - elastic/dra-prep#v0.1.7:
+            product_id: "elastic-agent-core"
+            stack_version: "${BEAT_VERSION}-SNAPSHOT"
+            workflow: "snapshot"
+
+    - label: ":pipeline: DRA processing for elastic-agent-core / ${BEAT_VERSION}-SNAPSHOT / snapshot"
+      trigger: "unified-release-dra-processing"
+      depends_on: "dra-prep-snapshot"
+      if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+\$/)
+      build:
+        env:
+          DRA_PRODUCT_ID: "elastic-agent-core"
+          DRA_STACK_VERSION: "${BEAT_VERSION}-SNAPSHOT"
+          DRA_WORKFLOW: "snapshot"
 
     # TODO: this step should be removed as soon as 8.19 or 9.3 are onboarded to the
     #       helm-charts publishing automation in the DRA.
@@ -183,7 +191,7 @@ steps:
         instanceType: "c6g.4xlarge"
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
-        DRA_WORKFLOW: "dra-core-staging"
+        DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/arm64 darwin/arm64 windows/arm64"
       plugins:
         - *google_oidc_plugin
@@ -200,7 +208,7 @@ steps:
         instanceType: "c6g.4xlarge"
         image: "${IMAGE_UBUNTU_2404_ARM_64}"
       env:
-        DRA_WORKFLOW: "dra-core-staging"
+        DRA_WORKFLOW: "staging"
         PLATFORMS: "linux/arm64 windows/arm64"
         FIPS: "true"
       plugins:
@@ -208,25 +216,19 @@ steps:
 
     - wait
 
-    - label: ":hammer: DRA Publish Elastic-Agent Core staging"
-      command: |
-        source .buildkite/scripts/version_qualifier.sh
-        echo "+++ Restoring Artifacts"
-        buildkite-agent artifact download "build/**/*" .
-        echo "+++ Changing permissions for the release manager"
-        sudo chown -R :1000 build/distributions/
-        echo "+++ Running DRA publish step"
-        .buildkite/scripts/steps/dra-publish.sh
-      key: "publish-dra-staging"
+    # stack_version must carry the qualifier, which is only known at runtime
+    - label: ":pipeline: Upload DRA staging steps"
+      key: "dra-upload-staging"
+      # publish only from main and release branches, never from pull requests
+      # or feature branches forced with RUN_SNAPSHOT/RUN_STAGING/VERSION_QUALIFIER
+      if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+\$/)
+      command: ".buildkite/scripts/upload_dra_staging.sh"
       agents:
-        provider: "gcp"
-        machineType: "c2-standard-16"
-        image: "${IMAGE_UBUNTU_2404_X86_64}"
-      env:
-        DRA_WORKFLOW: "staging"
+        image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
+        cpu: "1"
+        memory: "1Gi"
       plugins:
         - *google_oidc_plugin
-        - *docker_login_plugin
 
 notify:
   - slack: "#ingest-notifications"
