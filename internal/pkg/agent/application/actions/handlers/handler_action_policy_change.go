@@ -559,6 +559,35 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 		return false
 	}
 
+	// different TLS settings (certificate/key or CAs), e.g. a Fleet Server CA rotation
+	if !tlsClientEqual(k1.Transport.TLS, k2.Transport.TLS) {
+		return false
+	}
+
+	return true
+}
+
+func tlsClientEqual(t1, t2 *tlscommon.Config) bool {
+	if t1 == nil || t2 == nil {
+		return t1 == t2
+	}
+
+	if t1.Certificate != t2.Certificate {
+		return false
+	}
+
+	if len(t1.CAs) != len(t2.CAs) {
+		return false
+	}
+
+	sort.Strings(t1.CAs)
+	sort.Strings(t2.CAs)
+	for i, v := range t1.CAs {
+		if v != t2.CAs[i] {
+			return false
+		}
+	}
+
 	return true
 }
 
