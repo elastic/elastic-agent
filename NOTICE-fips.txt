@@ -2541,11 +2541,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/moby/moby/api
-Version: v1.56.0
+Version: v1.56.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.56.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.56.1/LICENSE:
 
 
                                  Apache License
@@ -2753,11 +2753,11 @@ Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.56.0/L
 
 --------------------------------------------------------------------------------
 Dependency : github.com/moby/moby/client
-Version: v0.6.0
+Version: v0.6.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.6.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.6.1/LICENSE:
 
 
                                  Apache License
@@ -32486,11 +32486,11 @@ Apache License
 
 --------------------------------------------------------------------------------
 Dependency : github.com/docker/go-connections
-Version: v0.7.0
+Version: v0.8.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/docker/go-connections@v0.7.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/docker/go-connections@v0.8.1/LICENSE:
 
 
                                  Apache License
