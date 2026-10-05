@@ -530,18 +530,6 @@ func (Test) Coverage() error {
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
-<<<<<<< HEAD
-// All format automatically all the codes.
-func (Format) All() {
-	mg.SerialDeps(Format.License)
-}
-
-// License applies the right license header.
-func (Format) License() error {
-	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic")
-}
-
 // AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
 // universal binary using `lipo`. It's automatically invoked by CrossBuild whenever
 // the darwin/amd64 and darwin/arm64 are present.
@@ -569,8 +557,6 @@ func AssembleDarwinUniversal(ctx context.Context) error {
 	return lipo(lipoArgs...)
 }
 
-=======
->>>>>>> f4069c5 (Fix mage addLicenseHeaders (#16978))
 // Package packages the Elastic Agent for distribution.
 //
 // With no env vars set, `mage package` on a fresh checkout produces a
