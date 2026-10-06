@@ -9,7 +9,7 @@ Review important information about the  8.19.23 release.
 [[security-updates-8.19.23]]
 === Security updates
 
-The 8.19.23 release contains fixes for potential security vulnerabilities. For details, go to the https://discuss.elastic.co/c/announcements/security-announcements/31[security announcements].
+The 8.19.23 release contains fixes for potential security vulnerabilities. For details, go to the https://discuss.elastic.co/t/elastic-agent-endpoint-8-19-22-9-4-8-and-9-5-5-security-update-esa-2026-194/390868[security announcements].
 
 [discrete]
 [[breaking-changes-8.19.23]]
