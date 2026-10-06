@@ -5,7 +5,11 @@
 
 Review important information about the  8.19.23 release.
 
+[discrete]
+[[security-updates-8.19.23]]
+=== Security updates
 
+The 8.19.23 release contains fixes for potential security vulnerabilities. For details, go to the https://discuss.elastic.co/c/announcements/security-announcements/31[security announcements].
 
 [discrete]
 [[breaking-changes-8.19.23]]
