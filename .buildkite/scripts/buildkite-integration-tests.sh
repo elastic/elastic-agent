@@ -68,6 +68,10 @@ GOTEST_OPTS="-test.shuffle on -test.timeout 2h0m0s"
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
   GOTEST_OPTS="${GOTEST_OPTS} -test.short"
 fi
+# Optional: only run tests matching this regex (used by the macOS smoke ITs)
+if [[ -n "${TEST_RUN:-}" ]]; then
+  GOTEST_OPTS="${GOTEST_OPTS} -test.run ${TEST_RUN}"
+fi
 GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
 set +e
 TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
