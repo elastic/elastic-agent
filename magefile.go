@@ -912,8 +912,18 @@ func CrossBuild(ctx context.Context) error {
 func PackageAgentCore(ctx context.Context) {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
-	cfg := mage.SettingsFromContext(ctx)
 	mg.CtxDeps(ctx, CrossBuild)
+
+	cfg := devtools.SettingsFromContext(ctx)
+
+	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
+	// docker) is selected the core build would produce nothing, causing
+	// extractAgentCoreForPackage to fail. Add TarGz so the core archive is always
+	// built regardless of which final package types were requested.
+	if !cfg.IsPackageTypeSelected(devtools.TarGz) {
+		cfg = cfg.WithAddedPackageType(devtools.TarGz)
+		ctx = devtools.ContextWithSettings(ctx, cfg)
+	}
 
 	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
