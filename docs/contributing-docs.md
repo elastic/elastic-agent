@@ -1,6 +1,6 @@
 # Contributing to the docs
 
-The published Elastic Agent docs are the Markdown under `docs/reference/edot-collector/` and `docs/release-notes/`. `docs/docset.yml` defines the docset. Markdown files directly under `docs/` are developer docs. The `exclude: "*.md"` entry keeps them out of the build, because `*.md` matches only the files in that directory. This page is one of them.
+The published Elastic Agent docs are the Markdown under `docs/reference/edot-collector/` and `docs/release-notes/`. `docs/docset.yml` defines the docset. Markdown files directly under `docs/` are repository documentation. The `exclude: "*.md"` entry keeps them out of the build, because `*.md` matches only the files in that directory. This page is one of them.
 
 The `elastic-agent` entry in [docs-builder `assembler.yml`](https://github.com/elastic/docs-builder/blob/main/config/assembler.yml) sets no `current`, `next`, or `edge`. When those are unset they are `main`, so every environment publishes `main`. Read that entry. If it gains a `current` ref, production publishes that ref instead, and a docs change is on the live site only once it is on that ref. Open the pull request against `main`.
 
