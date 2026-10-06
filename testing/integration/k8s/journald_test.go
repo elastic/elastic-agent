@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -235,11 +234,6 @@ func journaldTest(
 // journaldHostPath returns the host directory that holds the systemd journal.
 func journaldHostPath(kCtx k8sContext) string {
 	if kCtx.openshift {
-		// TODO(samuelvl): always return /var/log/journal once 4.22 (Kubernetes 1.35) uses the
-		// microshift-io image instead of minc.
-		if strings.HasPrefix(os.Getenv("K8S_VERSION"), "1.35.") {
-			return "/run/log/journal"
-		}
 		return "/var/log/journal"
 	}
 	return "/run/log/journal"

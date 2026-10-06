@@ -64,9 +64,7 @@ var apiPort = network.MustParsePort("6443/tcp")
 var imagesByKubernetesMinor = map[string]string{
 	"1.33": "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
 	"1.34": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
-	// TODO(samuelvl): microshift has not released a 4.22 image yet, use minc which is fully compatible.
-	// Tracked in https://github.com/microshift-io/microshift/issues/235
-	"1.35": "quay.io/minc-org/minc:4.22.0-okd-scos.ec.10",
+	"1.35": "ghcr.io/microshift-io/microshift:4.22.0_202610051505_gfa0f8cee8_4.22.0_okd_scos.ec.16",
 }
 
 var openShiftCRDManifestPaths = []string{
@@ -518,11 +516,6 @@ func (p *provisioner) startContainer(ctx context.Context, containerName, image s
 		ExposedPorts: network.PortSet{apiPort: struct{}{}},
 	}
 
-	// minc needs a writable /host-container volume to start but it's never used
-	if microShiftIsMincImage(image) {
-		cfg.Volumes = map[string]struct{}{"/host-container": {}}
-	}
-
 	hostCfg := &container.HostConfig{
 		Privileged:   true,
 		CgroupnsMode: container.CgroupnsModePrivate,
@@ -595,12 +588,5 @@ func microShiftImageForKubernetesVersion(kubernetesVersion, arch string) (string
 	if !found {
 		return "", fmt.Errorf("no MicroShift image configured for Kubernetes version %q", kubernetesVersion)
 	}
-	if microShiftIsMincImage(image) {
-		image = image + "-" + arch
-	}
 	return image, nil
-}
-
-func microShiftIsMincImage(image string) bool {
-	return strings.HasPrefix(image, "quay.io/minc-org/minc:")
 }
