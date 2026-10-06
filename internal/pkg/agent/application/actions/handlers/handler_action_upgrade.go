@@ -115,7 +115,10 @@ func (h *Upgrade) notifyEndpointOfUpgrade(ctx context.Context, log *logger.Logge
 			ucs := findMatchingUnitsByActionType(state, action.Type())
 			if allComponentsReady(ucs, expected) {
 				log.Debugf("handlerUpgrade: dispatching %v action to %d component(s)", action.Type(), len(expected))
-				if err := h.notifyUnitsOfProxiedActionFn(timeoutCtx, log, action, ucs, h.coord.PerformAction); err != nil {
+				// Use the parent ctx, not timeoutCtx: the notifier derives its own
+				// retry timeout, and it should get the full budget regardless of how
+				// long we spent polling for the component to appear.
+				if err := h.notifyUnitsOfProxiedActionFn(ctx, log, action, ucs, h.coord.PerformAction); err != nil {
 					return fmt.Errorf("failed to notify components of upgrade action: %w", err)
 				}
 				return nil

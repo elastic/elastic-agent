@@ -647,6 +647,52 @@ func TestNotifyEndpointOfUpgrade(t *testing.T) {
 		require.ErrorIs(t, err, context.Canceled)
 		assert.False(t, notified.Load())
 	})
+
+	t.Run("notification gets the parent ctx, not the poll-bounded timeout ctx", func(t *testing.T) {
+		// Endpoint only becomes ready on the last poll before endpointWaitTimeout
+		// expires. The notification call must still get the full retry budget
+		// (i.e. the parent ctx, which here has no deadline), not whatever is
+		// left of the polling timeout.
+		mockCoord := newMockUpgradeCoordinator(t)
+		callIdx := 0
+		stateSequence := []coordinator.State{
+			policyAppliedNoUnits,
+			policyAppliedNoUnits,
+			endpointState,
+		}
+		mockCoord.EXPECT().State().RunAndReturn(func() coordinator.State {
+			idx := callIdx
+			if idx >= len(stateSequence) {
+				idx = len(stateSequence) - 1
+			}
+			callIdx++
+			return stateSequence[idx]
+		}).Times(len(stateSequence))
+
+		log, _ := logger.New("", false)
+		u := NewUpgrade(log, mockCoord)
+		u.endpointWaitTimeout = 20 * time.Millisecond
+		u.endpointPollInterval = 1 * time.Millisecond
+
+		var gotCtx context.Context
+		u.notifyUnitsOfProxiedActionFn = func(ctx context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
+			gotCtx = ctx
+			return nil
+		}
+
+		action := &fleetapi.ActionUpgrade{
+			ActionType: fleetapi.ActionTypeUpgrade,
+			Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
+		}
+
+		// Parent ctx has no deadline — if notifyEndpointOfUpgrade passed the
+		// internal timeoutCtx instead, gotCtx would have one.
+		err := u.notifyEndpointOfUpgrade(t.Context(), log, action)
+		require.NoError(t, err)
+		require.NotNil(t, gotCtx)
+		_, hasDeadline := gotCtx.Deadline()
+		assert.False(t, hasDeadline, "notification must receive the parent ctx, not the endpointWaitTimeout-bounded ctx")
+	})
 }
 
 type fakeAcker struct {

@@ -2062,7 +2062,6 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		// Nothing to process yet
 		return nil
 	}
-	c.state.PolicyApplied = true
 
 	defer func() {
 		// Update componentModelErr with the results.
@@ -2103,6 +2102,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		Signed:     signed,
 	}
 	c.state.PolicyConfiguredActionTypes = policyConfiguredActionTypes(c.componentModel)
+	c.state.PolicyApplied = true
 
 	c.logger.Info("Updating running component model")
 	if c.logger.IsDebug() {
