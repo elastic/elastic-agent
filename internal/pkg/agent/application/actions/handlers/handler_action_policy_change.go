@@ -580,10 +580,14 @@ func tlsClientEqual(t1, t2 *tlscommon.Config) bool {
 		return false
 	}
 
-	sort.Strings(t1.CAs)
-	sort.Strings(t2.CAs)
-	for i, v := range t1.CAs {
-		if v != t2.CAs[i] {
+	// Compare as a set: trust pools are unordered, and updateFleetConfig makes
+	// no ordering guarantee. Sort copies to avoid mutating the caller's slices.
+	cas1 := append([]string(nil), t1.CAs...)
+	cas2 := append([]string(nil), t2.CAs...)
+	sort.Strings(cas1)
+	sort.Strings(cas2)
+	for i, v := range cas1 {
+		if v != cas2[i] {
 			return false
 		}
 	}
