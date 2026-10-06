@@ -54,6 +54,10 @@ const (
 	// elasticMonitoringConnectorName is the component type name for the elastic monitoring connector.
 	// The connector receives pdata.Metrics from the receiver and converts them to Beats-format pdata.Logs.
 	elasticMonitoringConnectorName = "elasticmonitoringconnector"
+	// elasticMonitoringProcessorName is the component type name for the elastic monitoring processor.
+	// The processor aggregates and renames raw collector internal-telemetry metrics into a canonical
+	// form; both the file exporter and the connector consume its output.
+	elasticMonitoringProcessorName = "elasticmonitoringprocessor"
 )
 
 type collectorRecoveryTimer interface {
@@ -679,6 +683,8 @@ func injectMonitoringReceiver(
 
 	diagName := translate.OtelNamePrefix + receiverName
 	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
+	monitoringProcessorType := otelcomponent.MustNewType(elasticMonitoringProcessorName)
+	monitoringProcessorID := otelcomponent.NewIDWithName(monitoringProcessorType, diagName).String()
 	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + receiverName
 	logsPipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
@@ -698,14 +704,20 @@ func injectMonitoringReceiver(
 		metricsPipelineExporters = append(metricsPipelineExporters, connectorID)
 	}
 	metricsPipelineCfg := map[string]any{
-		"receivers": []string{receiverID},
-		"exporters": metricsPipelineExporters,
+		"receivers":  []string{receiverID},
+		"processors": []string{monitoringProcessorID},
+		"exporters":  metricsPipelineExporters,
 	}
 
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"interval": monitoring.MetricsPeriod,
+			},
+		},
+		"processors": map[string]any{
+			monitoringProcessorID: map[string]any{
+				"exporter_names": outputNameLookup,
 			},
 		},
 		"exporters": map[string]any{
@@ -737,10 +749,8 @@ func injectMonitoringReceiver(
 			// This pipeline forwards Agent's own internal telemetry in beats format,
 			// not a specific beat's data, so it always gets the standard default
 			// processors.
-			collectorCfg["processors"] = map[string]any{
-				processorID: map[string]any{
-					"processors": translate.GetDefaultProcessors(""),
-				},
+			collectorCfg["processors"].(map[string]any)[processorID] = map[string]any{
+				"processors": translate.GetDefaultProcessors(""),
 			}
 			logsPipelineCfg["processors"] = []string{processorID}
 		}
@@ -748,7 +758,6 @@ func injectMonitoringReceiver(
 			connectorID: map[string]any{
 				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
 				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
-				"exporter_names":       outputNameLookup,
 			},
 		}
 		collectorCfg["service"].(map[string]any)["pipelines"].(map[string]any)[logsPipelineID] = logsPipelineCfg

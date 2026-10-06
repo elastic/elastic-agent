@@ -351,7 +351,6 @@ autoOps:
   enabled: false
   autoops_token: ""
   autoops_otel_url: ""
-  autoops_temp_resource_id: ""
   es_api_key: ""
   es_username: ""
   es_password: ""
