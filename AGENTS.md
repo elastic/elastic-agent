@@ -125,9 +125,8 @@ The repo contains **multiple Go modules**; use **`mage tidy`** to keep `go.mod` 
 ### Lint Commands
 
 ```bash
-mage fmt             # formats source code (.go and .py) and adds license headers.
-mage format:all      # format automatically all the codes.
-mage format:license  # applies the right license header.
+mage fmt               # formats source code (.go and .py) and adds license headers.
+mage addLicenseHeaders # adds license headers without formatting imports.
 ```
 
 ### Rules enforced by tooling
