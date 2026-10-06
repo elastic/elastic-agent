@@ -148,6 +148,10 @@ CI and local checks enforce the following (details in [.golangci.yml](./.golangc
 - **Go toolchain:** Version pinned in [.go-version](./.go-version).
 - **FIPS:** The codebase supports FIPS-oriented builds and tests (for example **`mage test:fIPSOnlyUnit`**, `requirefips` build tag). Crypto-related changes should remain compatible with FIPS expectations where applicable.
 
+## Documentation
+
+When a change adds or edits a published doc page, read `docs-authoring` (`.agents/skills/docs-authoring`) and `docs/contributing-docs.md` before writing. The skill holds the rules that apply in every docs repository. The page holds the Elastic Agent facts: where the docset lives, which branch publishes, and which sections are generated.
+
 ## Contribution hygiene
 
 Principles and repo-specific process: [CONTRIBUTING.md](./CONTRIBUTING.md).
@@ -175,6 +179,7 @@ Unless instructed otherwise, always add the `backport-active-all` label to the p
 ## Further documentation
 
 - [README.md](./README.md) — setup, packaging, dependency hygiene
+- [docs/contributing-docs.md](./docs/contributing-docs.md) — where the published docs live and how generated sections are updated
 - [docs/architecture.md](./docs/architecture.md) — architecture overview
 - [docs/component-specs.md](./docs/component-specs.md) — component spec format
 - [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md) — integration tests
