@@ -5,7 +5,24 @@
 # Orka images have no git mirror (/opt/git-mirrors) and BUILDKITE_GIT_CLONE_FLAGS from the pipeline env is
 # not honored there, so the default checkout is a full ~500 MiB clone that takes minutes. Skip it and fetch
 # only the commit under test.
+env:
+  # Same values as integration.pipeline.yml
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1789434098"
+
 common:
+  - google_oidc_plugin: &google_oidc_plugin
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+        project-id: "elastic-observability-ci"
+        project-number: "911195782929"
+  - google_oidc_observability_plugin: &google_oidc_observability_plugin
+      elastic/oblt-google-auth#v1.3.1:
+        lifetime: 10800 # seconds
+  - oblt_cli_plugin: &oblt_cli_plugin
+      elastic/oblt-cli#v0.4.2:
+        version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.2.1:
   - shallow_checkout: &shallow_checkout |
       set -euo pipefail
       echo "~~~ Shallow checkout of $${BUILDKITE_COMMIT}"
@@ -19,6 +36,7 @@ common:
 
 steps:
   - group: "Orka macOS probe"
+    if: build.env("MACOS_SMOKE") != "true"
     steps:
       - label: "probe macos 15 arm64 (generic-base-15-arm-002)"
         env:
@@ -44,3 +62,89 @@ steps:
           provider: orka
           imagePrefix: endpoint-macos-27-arm
         timeout_in_minutes: 30
+
+  # Smoke ITs on macOS (enroll + standalone upgrade against an ESS stack). Run with MACOS_SMOKE=true.
+  - group: "Orka macOS smoke ITs"
+    if: build.env("MACOS_SMOKE") == "true"
+    steps:
+      - label: ":package: darwin/arm64: tar.gz"
+        key: packaging-darwin-arm64
+        env:
+          PLATFORMS: "darwin/arm64"
+          PACKAGES: "tar.gz"
+        command: ".buildkite/scripts/steps/integration-package.sh"
+        artifact_paths:
+          - build/distributions/**
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "Start ESS stack"
+        key: macos-smoke-ess
+        command: .buildkite/scripts/steps/ess_start_oblt-cli.sh
+        agents:
+          image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+          useCustomGlobalHooks: true
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+
+      - label: "smoke macos 27 arm64: enroll"
+        key: macos-smoke-enroll
+        depends_on: [packaging-darwin-arm64, macos-smoke-ess]
+        soft_fail: true
+        env:
+          BUILDKITE_SKIP_CHECKOUT: "true"
+          BUILDKITE_GIT_SUBMODULES: "false"
+          TEST_RUN: "^TestEnrollReplaceToken$"
+        command:
+          - *shallow_checkout
+          - .buildkite/scripts/macos_smoke.sh default
+        artifact_paths:
+          - src/build/**
+        agents:
+          provider: orka
+          imagePrefix: endpoint-macos-27-arm
+        timeout_in_minutes: 60
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+
+      - label: "smoke macos 27 arm64: standalone upgrade"
+        key: macos-smoke-upgrade
+        depends_on: [packaging-darwin-arm64, macos-smoke-ess]
+        soft_fail: true
+        env:
+          BUILDKITE_SKIP_CHECKOUT: "true"
+          BUILDKITE_GIT_SUBMODULES: "false"
+          TEST_RUN: "^TestStandaloneUpgrade$"
+        command:
+          - *shallow_checkout
+          - .buildkite/scripts/macos_smoke.sh standalone-upgrade
+        artifact_paths:
+          - src/build/**
+        agents:
+          provider: orka
+          imagePrefix: endpoint-macos-27-arm
+        timeout_in_minutes: 90
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+
+      - label: "ESS stack cleanup"
+        depends_on: [macos-smoke-enroll, macos-smoke-upgrade]
+        allow_dependency_failure: true
+        command: .buildkite/scripts/steps/ess_cleanup_all.sh
+        agents:
+          image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
+          useCustomGlobalHooks: true
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
