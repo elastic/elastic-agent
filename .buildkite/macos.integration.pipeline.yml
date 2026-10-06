@@ -23,6 +23,7 @@ steps:
       - label: "probe macos 15 arm64 (generic-base-15-arm-002)"
         env:
           BUILDKITE_SKIP_CHECKOUT: "true"
+          BUILDKITE_GIT_SUBMODULES: "false"
         command:
           - *shallow_checkout
           - .buildkite/scripts/macos_probe.sh
@@ -34,6 +35,7 @@ steps:
       - label: "probe macos 27 arm64 (endpoint-macos-27-arm)"
         env:
           BUILDKITE_SKIP_CHECKOUT: "true"
+          BUILDKITE_GIT_SUBMODULES: "false"
         soft_fail: true
         command:
           - *shallow_checkout
