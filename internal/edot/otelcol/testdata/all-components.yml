@@ -130,7 +130,6 @@ receivers:
       queries:
         - namespace: AWS/Lambda
           metric_name: Invocations
-          account_id: 123456789012
   prometheusremotewrite:
     endpoint: 0.0.0.0:9090
   statsd:
