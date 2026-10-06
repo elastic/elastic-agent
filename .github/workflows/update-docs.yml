@@ -64,6 +64,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          # Always work from main. On `release` events the default ref is the release tag,
+          # whose components.yml `since` map and docs lag behind main and would cause
+          # already-stamped components to be re-stamped with the new version.
+          # Release data is still read from the tag via `git show`.
+          ref: main
           submodules: true
           fetch-depth: 0  # Fetch all history including tags
           persist-credentials: false  # Avoid credential conflicts with create-pull-request
@@ -122,7 +127,7 @@ jobs:
 
             ## References
             - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/go.mod
-            - **Source components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/internal/edot/components.yaml
+            - **Source components.yml**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/internal/edot/components.yml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ needs.check-latest.outputs.version }}
 
             cc @elastic/ski-docs
