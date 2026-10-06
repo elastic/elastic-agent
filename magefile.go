@@ -901,8 +901,11 @@ func PackageAgentCore(ctx context.Context) error {
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	// If Docker is selected but TarGz isn't, add TarGz since it's required for docker images
-	if cfg.IsPackageTypeSelected(devtools.Docker) && !cfg.IsPackageTypeSelected(devtools.TarGz) {
+	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
+	// docker) is selected the core build would produce nothing, causing
+	// extractAgentCoreForPackage to fail. Add TarGz so the core archive is always
+	// built regardless of which final package types were requested.
+	if !cfg.IsPackageTypeSelected(devtools.TarGz) {
 		cfg = cfg.WithAddedPackageType(devtools.TarGz)
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
