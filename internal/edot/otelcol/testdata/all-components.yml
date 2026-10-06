@@ -189,6 +189,8 @@ receivers:
     transport: udp
   couchdb:
     endpoint: http://localhost:5984
+    username: guest
+    password: guest
   oracledb:
     datasource: oracle://otel:password@localhost:1521/orcl
   vcenter:
