@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+#
+# Spike for observability-robots#5246 (ingest-dev#3042, phase A): probe what Orka macOS VMs offer.
+steps:
+  - group: "Orka macOS probe"
+    steps:
+      - label: "probe macos 15 arm64 (generic-base-15-arm-002)"
+        command: .buildkite/scripts/macos_probe.sh
+        agents:
+          provider: orka
+          imagePrefix: generic-base-15-arm-002
+        timeout_in_minutes: 30
+
+      - label: "probe macos 27 arm64 (endpoint-macos-27-arm)"
+        command: .buildkite/scripts/macos_probe.sh
+        soft_fail: true
+        agents:
+          provider: orka
+          imagePrefix: endpoint-macos-27-arm
+        timeout_in_minutes: 30
