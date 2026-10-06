@@ -303,6 +303,19 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		return runtime.ComponentComponentState{}, err
 	}
 
+	// A pipeline built with the shared no-op receiver (see getReceiversConfigForComponent)
+	// means the component's policy has no enabled streams: it collects no data. Only
+	// override the message when the pipeline is otherwise healthy (e.g. not when the
+	// exporter side is degraded/failed), so the message never contradicts the state.
+	if pipelineState == client.UnitStateHealthy {
+		for receiverOtelID := range receiverStatuses {
+			if receiverOtelID.Type().String() == NoEnabledStreamsReceiverType {
+				compState.Message = "Healthy: component has no enabled streams, no data will be collected"
+				break
+			}
+		}
+	}
+
 	// Build a map from input ID to receiver status.
 	receiverByInputID := make(map[string]*status.AggregateStatus)
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {

@@ -47,6 +47,11 @@ const (
 	// components with single_receiver: true, so that all receiver names uniformly have
 	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
 	SingleReceiverStreamID = "single"
+	// NoEnabledStreamsReceiverType is the receiver type used in place of a component's
+	// normal receivers when it has no enabled streams. The OTel collector rejects a
+	// pipeline with zero receivers, so a shared no-op receiver keeps the pipeline valid
+	// (and the component healthy, collecting no data) instead of crashing the collector.
+	NoEnabledStreamsReceiverType = "nop"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -396,6 +401,37 @@ func getReceiversConfigForComponent(
 			}
 			inputs = append(inputs, unitInputs...)
 		}
+	}
+
+	// A component whose policy has all streams disabled produces zero inputs. An empty
+	// receivers list would cause the OTel collector to reject the pipeline and crash, so
+	// fall back to a no-op receiver: the component stays OTel-managed and healthy, just
+	// collecting no data (see the Message set in getComponentState for diagnostics).
+	//
+	// The receiver is named per-component (and per-input-unit, when derivable) rather than
+	// using a single shared ID: getComponentState's receiverByInputID matching expects
+	// receiver names of the form "<comp.ID>/<beatInputID>", and GetOtelConfig's otelConfig.Merge
+	// assumes each component defines its own receivers. For SingleReceiver components the
+	// placeholder stream ID is used instead, matching the naming getComponentState's
+	// SingleReceiver branch looks for; per-unit status is still not resolved in that case
+	// (no shipped spec combines single_receiver with zero streams today).
+	if len(inputs) == 0 {
+		receiverName := comp.ID
+		if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+			receiverName = comp.ID + "/" + SingleReceiverStreamID
+		} else {
+			for _, unit := range comp.Units {
+				if unit.Type != client.UnitTypeInput {
+					continue
+				}
+				if beatInputID := comp.GetBeatInputIDForUnit(unit.ID); beatInputID != "" {
+					receiverName = comp.ID + "/" + beatInputID
+					break
+				}
+			}
+		}
+		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), receiverName)
+		return map[string]any{receiverID.String(): map[string]any{}}, nil
 	}
 
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
