@@ -7,7 +7,7 @@
 # only the commit under test.
 env:
   # Same values as integration.pipeline.yml
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1789434098"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1789434098"
 
 common:
   - google_oidc_plugin: &google_oidc_plugin
@@ -76,9 +76,10 @@ steps:
         artifact_paths:
           - build/distributions/**
         agents:
-          provider: "gcp"
-          machineType: "n2-standard-8"
-          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          # the darwin/arm64 golang-crossbuild image only runs on arm64 hosts
+          provider: "aws"
+          instanceType: "c6g.2xlarge"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
           - *google_oidc_plugin
 
