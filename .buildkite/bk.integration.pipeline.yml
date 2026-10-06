@@ -11,6 +11,8 @@ env:
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1789434098"
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1789434098"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1789434098"
+  IMAGE_UBUNTU_2604_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1789434098"
+  IMAGE_UBUNTU_2604_ARM_64: "platform-ingest-elastic-agent-ubuntu-2604-aarch64-1789434098"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1789434098"
   IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1789434098"
   IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1789434098"
@@ -63,11 +65,16 @@ common:
     - "default"
     - "fleet"
     - "fleet-endpoint-security"
+    - "fleet-endpoint-security-mtls"
     - "fleet-privileged"
+    - "fleet-proxy"
+    - "fleet-upgrade"
     - "install-uninstall"
     - "standalone-upgrade"
+    - "standalone-upgrade-unprivileged"
     - "upgrade"
     - "upgrade-flavor"
+    - "upgrade-rollback"
 
   # Variants/Groups for the Linux AMD64 ITs
   - linux_deb_variants: &linux_deb_variants
@@ -78,13 +85,18 @@ common:
     - fleet-airgapped
     - fleet-airgapped-privileged
     - fleet-endpoint-security
+    - fleet-endpoint-security-mtls
     - fleet-privileged
+    - fleet-proxy
+    - fleet-upgrade
     - fleet-upgrade-to-pr-build
     - fqdn
     - install-uninstall
     - standalone-upgrade
+    - standalone-upgrade-unprivileged
     - upgrade
     - upgrade-flavor
+    - upgrade-rollback
 
   # Variants/Groups for the Linux AMD64 ITs
   - linux_rpm_variants: &linux_rpm_variants
@@ -94,11 +106,16 @@ common:
   - linux_arm_variants: &linux_arm_variants
     - default
     - fleet
+    - fleet-proxy
+    - fleet-upgrade
     - standalone-upgrade
+    - standalone-upgrade-unprivileged
     - upgrade
     - upgrade-flavor
+    - upgrade-rollback
     # ARM tests are enabled for only selected groups in order to save resources
     # - fleet-endpoint-security
+    # - fleet-endpoint-security-mtls
     # - fleet-airgapped
     # - fleet-airgapped-privileged
     # - fleet-privileged
@@ -712,6 +729,7 @@ steps:
             os:
               - "${IMAGE_UBUNTU_2204_X86_64}"
               - "${IMAGE_UBUNTU_2404_X86_64}"
+              - "${IMAGE_UBUNTU_2604_X86_64}"
               - "${IMAGE_DEBIAN_11}"
             variant:
               - default
@@ -745,6 +763,7 @@ steps:
             os:
               - "${IMAGE_UBUNTU_2204_X86_64}"
               - "${IMAGE_UBUNTU_2404_X86_64}"
+              - "${IMAGE_UBUNTU_2604_X86_64}"
               - "${IMAGE_DEBIAN_11}"
             variant: *linux_deb_variants
 
@@ -780,7 +799,7 @@ steps:
               - "false"
             variant: *linux_rpm_variants
 
-      - label: "linux:arm64:tier3:sudo:{{matrix.variant}}"
+      - label: "linux:arm64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
         depends_on:
           - packaging-arm64
         env:
@@ -793,7 +812,7 @@ steps:
           - build/diagnostics/**
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "{{matrix.os}}"
           instanceType: "m6g.2xlarge"
         retry:
           automatic:
@@ -804,9 +823,12 @@ steps:
           - *vault_github_token
         matrix:
           setup:
+            os:
+              - "${IMAGE_UBUNTU_2404_ARM_64}"
+              - "${IMAGE_UBUNTU_2604_ARM_64}"
             variant: *linux_arm_variants
 
-      - label: "linux:arm64:tier3:non-sudo:{{matrix.variant}}"
+      - label: "linux:arm64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
         skip: true
         depends_on:
           - packaging-arm64
@@ -823,7 +845,7 @@ steps:
             limit: 1
         agents:
           provider: "aws"
-          image: "${IMAGE_UBUNTU_2404_ARM_64}"
+          image: "{{matrix.os}}"
           instanceType: "m6g.xlarge"
         plugins:
           - *google_oidc_observability_plugin
@@ -831,6 +853,9 @@ steps:
           - *vault_github_token
         matrix:
           setup:
+            os:
+              - "${IMAGE_UBUNTU_2404_ARM_64}"
+              - "${IMAGE_UBUNTU_2604_ARM_64}"
             variant:
               - default
 
