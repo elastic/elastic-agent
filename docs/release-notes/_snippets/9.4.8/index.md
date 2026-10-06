@@ -1,7 +1,7 @@
 ## 9.4.8 [elastic-agent-release-notes-9.4.8]
 
 ::::{important} 
-The 9.4.8 release contains fixes for potential security vulnerabilities. For details, go to [security announcements](https://discuss.elastic.co/c/announcements/security-announcements/31).
+The 9.4.8 release contains fixes for potential security vulnerabilities. For details, go to [security announcements](https://discuss.elastic.co/t/elastic-agent-endpoint-8-19-22-9-4-8-and-9-5-5-security-update-esa-2026-194/390868).
 ::::
 
 _This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.4.8-breaking-changes)._
