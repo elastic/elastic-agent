@@ -21,7 +21,8 @@ steps:
   - group: "Orka macOS probe"
     steps:
       - label: "probe macos 15 arm64 (generic-base-15-arm-002)"
-        skip_checkout: true
+        env:
+          BUILDKITE_SKIP_CHECKOUT: "true"
         command:
           - *shallow_checkout
           - .buildkite/scripts/macos_probe.sh
@@ -31,7 +32,8 @@ steps:
         timeout_in_minutes: 30
 
       - label: "probe macos 27 arm64 (endpoint-macos-27-arm)"
-        skip_checkout: true
+        env:
+          BUILDKITE_SKIP_CHECKOUT: "true"
         soft_fail: true
         command:
           - *shallow_checkout
