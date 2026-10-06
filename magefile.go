@@ -45,6 +45,7 @@ import (
 	xpacketbeat "github.com/elastic/beats/v7/x-pack/packetbeat/scripts/mage"
 
 	"github.com/elastic/elastic-agent/dev-tools/devmachine"
+	"github.com/elastic/elastic-agent/dev-tools/licenses"
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
@@ -53,6 +54,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	dockerprov "github.com/elastic/elastic-agent/pkg/testing/docker"
 	"github.com/elastic/elastic-agent/pkg/testing/ess"
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
@@ -82,14 +84,15 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/downloader"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/action"
+	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/downloader"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/registry"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const (
@@ -146,9 +149,6 @@ type Check mg.Namespace
 
 // Prepare tasks related to bootstrap the environment or get information about the environment.
 type Prepare mg.Namespace
-
-// Format automatically format the code.
-type Format mg.Namespace
 
 // Demo runs agent out of container.
 type Demo mg.Namespace
@@ -219,12 +219,12 @@ func (Dev) Package(ctx context.Context) {
 }
 
 func (Dev) RegenerateMocks() error {
-	err := sh.Run("mockery")
+	err := sh.Run("go", "tool", "mockery")
 	if err != nil {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.Deps(devtools.Format)
+	mg.SerialDeps(devtools.Format)
 	return nil
 }
 
@@ -319,7 +319,7 @@ func (Build) WindowsArchiveRootBinary(ctx context.Context) {
 	}
 }
 
-// GolangCrossBuild build the Beat binary inside of the golang-builder.
+// GolangCrossBuild build the elastic-agent binary inside of the golang-builder.
 // Do not use directly, use crossBuild instead.
 func GolangCrossBuild(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -327,6 +327,16 @@ func GolangCrossBuild(ctx context.Context) error {
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
 	injectBuildVars(cfg, params.Vars)
+
+	// The elastic-agent binary only requires cgo on darwin (Keychain access
+	// in internal/pkg/agent/vault and host/process stats). On every other
+	// platform CGO_ENABLED=1 forces external/dynamic linking against glibc,
+	// which pulls in the cgo runtime support and NSS resolver as opaque C
+	// objects that bypass the Go linker's dead code elimination entirely
+	// and produces a dynamically linked binary instead of a static one.
+	if cfg.Platform().GOOS != "darwin" {
+		params.CGO = false
+	}
 
 	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
 		return err
@@ -514,7 +524,7 @@ func (Check) LintAll() error {
 func (Check) License() error {
 	mg.Deps(Prepare.InstallGoLicenser)
 	// exclude copied files until we come up with a better option
-	return sh.RunV("go-licenser", "-d", "-license", "Elasticv2", "-exclude", "beats")
+	return sh.RunV("go-licenser", "-d", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
 }
 
 // DocsFiles validates that files required by the docs generation script exist.
@@ -596,64 +606,93 @@ func (Test) Coverage() error {
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
 }
 
-// All format automatically all the codes.
-func (Format) All() {
-	mg.SerialDeps(Format.License)
-}
-
-// License applies the right license header.
-func (Format) License() error {
-	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic", "-exclude", "beats")
-}
-
-// Package packages the Beat for distribution.
-// Snapshot builds are the default; use SNAPSHOT=false to build a release package.
-// Use PLATFORMS to control the target platforms.
-// Use VERSION_QUALIFIER to control the version qualifier.
-// Use PACKAGES to override the package types (e.g. PACKAGES=tar.gz,rpm,deb,zip,docker).
-// If PACKAGES is not set, defaults to tar.gz for non-Windows platforms and zip for Windows.
+// Package packages the Elastic Agent for distribution.
+//
+// With no env vars set, `mage package` on a fresh checkout produces a
+// single host-native artifact (tar.gz on Unix, zip on Windows) built for
+// the host platform, pulling external components from the manifest URL in
+// .package-version. Override with PACKAGES=rpm,deb or PLATFORMS=linux/arm64
+// etc.
+//
+// AGENT_CORE_SOURCE selects where elastic-agent-core comes from:
+//   - "local" (default): compile from the current checkout via PackageAgentCore.
+//   - "manifest":        download the pre-built core from MANIFEST_URL.
+//
+// MANIFEST_URL, when set, is the source of truth for version and snapshot.
+// In "local" mode it also supplies external components (beats, osquery, ...);
+// the manifest's elastic-agent-core entry is skipped because we are
+// compiling it locally.
+//
+// The commit stamped into the resulting artifact follows the core source:
+// local compiles stamp git HEAD (the commit actually baked into the binary);
+// manifest downloads stamp the manifest's elastic-agent-core commit (the
+// commit the downloaded binary was built at). Mixing the two produces
+// packages whose metadata disagrees with their binary contents.
+//
+// SNAPSHOT, FIPS, VERSION_QUALIFIER, DOCKER_VARIANTS, AGENT_DROP_PATH, and
+// KEEP_ARCHIVE apply as documented on their respective settings.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
 	defer func() { fmt.Println("package ran for", time.Since(start)) }()
 
 	if len(cfg.GetPlatforms()) == 0 {
-		panic("elastic-agent package is expected to build at least one platform package")
+		return errors.New("elastic-agent package is expected to build at least one platform package")
 	}
 
-	// needs elastic-agent-core built first
-	mg.CtxDeps(ctx, PackageAgentCore)
-
-	// switch to the main package target
-	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	cfg, err := cfg.WithPackageVersionOverrides()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
 	}
 
-	// manifest is not passed into packageAgent below because we want packageAgent to go through the
-	// flow using the elastic-agent-core that was built above. if it was passed in, it would download
-	// elastic-agent-core from the manifest and it would not be the code from this repository in the package
-	cfgWithManifest, err := cfg.WithManifestInfo(ctx)
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
-	// only take the snapshot and version from the manifest, we don't want the commit hash or dependency version
-	cfg = cfg.WithSnapshot(cfgWithManifest.Build.Snapshot).WithAgentCoreVersion(cfgWithManifest.AgentCoreVersion())
 
-	if cfg.Packaging.ManifestURL != "" {
-		// don't download the elastic-agent-core components; built above
-		if err := downloadManifest(ctx, cfg, pkgSpec, packaging.WithoutProjectName(devtools.AgentCoreProjectName)); err != nil {
+	if cfg.Packaging.CoreSource == devtools.CoreSourceManifest && cfg.Packaging.Manifest == nil {
+		return errors.New("AGENT_CORE_SOURCE=manifest requires MANIFEST_URL to be set")
+	}
+
+	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return fmt.Errorf("error loading agent package spec: %w", err)
+	}
+
+	// Pass the resolved settings to dependency targets. Without this,
+	// PackageAgentCore would re-load settings from the environment and — not
+	// being a .package-version opt-in target — name the core archive with
+	// version/version.go's version instead of the one used for the package,
+	// breaking the lookup in extractAgentCoreForPackage.
+	ctx = devtools.ContextWithSettings(ctx, cfg)
+
+	if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+		mg.CtxDeps(ctx, PackageAgentCore)
+	}
+
+	if cfg.Packaging.Manifest != nil {
+		var filters []packaging.ComponentFilter
+		if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+			// Skip the manifest's elastic-agent-core; we compiled it above.
+			filters = append(filters, packaging.WithoutProjectName(devtools.AgentCoreProjectName))
+		}
+
+		if err := downloadManifest(ctx, cfg, pkgSpec, filters...); err != nil {
 			return fmt.Errorf("failed downloading manifest components: %w", err)
 		}
 	}
-	return packageAgent(ctx, cfg, pkgSpec, "", nil)
+
+	return packageAgent(ctx, cfg, pkgSpec)
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
 func DownloadManifest(ctx context.Context) error {
 	// Load elastic-agent packaging specs to correctly load component dependencies
 	cfg := devtools.SettingsFromContext(ctx)
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
@@ -870,14 +909,23 @@ func CrossBuild(ctx context.Context) error {
 
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
+//
+// The commit stamped into both the binary (where applicable, e.g. the Windows
+// .syso metadata) and the package metadata is always git HEAD: this is the
+// commit the compiler bakes into the binary. AgentCoreCommitHash() delegates
+// to git HEAD when Build.AgentCoreCommitHash is unset, so Package's
+// CoreSourceLocal case (which never sets that field) is always correct here.
 func PackageAgentCore(ctx context.Context) error {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	// If Docker is selected but TarGz isn't, add TarGz since it's required for docker images
-	if cfg.IsPackageTypeSelected(devtools.Docker) && !cfg.IsPackageTypeSelected(devtools.TarGz) {
+	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
+	// docker) is selected the core build would produce nothing, causing
+	// extractAgentCoreForPackage to fail. Add TarGz so the core archive is always
+	// built regardless of which final package types were requested.
+	if !cfg.IsPackageTypeSelected(devtools.TarGz) {
 		cfg = cfg.WithAddedPackageType(devtools.TarGz)
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
@@ -901,7 +949,7 @@ func Config(ctx context.Context) error {
 }
 
 // ControlProto generates pkg/agent/control/proto module.
-func ControlProto() error {
+func ControlProto(ctx context.Context) error {
 	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v2/cproto", "--go_opt=paths=source_relative",
@@ -918,8 +966,10 @@ func ControlProto() error {
 		return err
 	}
 
-	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
-	return nil
+	if err := devtools.AddLicenseHeaders(devtools.SettingsFromContext(ctx)); err != nil {
+		return err
+	}
+	return devtools.GoImports()
 }
 
 func BuildPGP() error {
@@ -1007,6 +1057,11 @@ func (Cloud) Image(ctx context.Context) error {
 // DOCKER_IMPORT_SOURCE - override source for import
 func (Cloud) Load(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Resolve the version the same way Package does so the artifact filename matches.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	agentVersion := cfg.AgentPackageVersion()
 
 	source := devtools.DistributionsDir + "/elastic-agent-cloud-" + agentVersion + "-SNAPSHOT-linux-" + runtime.GOARCH + ".docker.tar.gz"
@@ -1024,6 +1079,11 @@ func (Cloud) Load(ctx context.Context) error {
 // Previous login to elastic registry is required!
 func (Cloud) Push(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Resolve the version the same way Package does so the source image tag matches.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	agentVersion := cfg.AgentPackageVersion()
 
 	sourceCloudImageName := fmt.Sprintf("docker.elastic.co/beats-ci/elastic-agent-cloud:%s-SNAPSHOT", agentVersion)
@@ -1044,14 +1104,16 @@ func (Cloud) Push(ctx context.Context) error {
 	}
 
 	fmt.Printf(">> Setting a docker image tag to %s\n", targetCloudImageName)
-	err := sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
+	err = sh.RunV("docker", "tag", sourceCloudImageName, targetCloudImageName)
 	if err != nil {
 		return fmt.Errorf("failed setting a docker image tag: %w", err)
 	}
 	fmt.Println(">> Docker image tag updated successfully")
 
 	fmt.Println(">> Pushing a docker image to remote registry")
-	err = sh.RunV("docker", "image", "push", targetCloudImageName)
+	err = devtools.Retry(func() error {
+		return sh.RunV("docker", "image", "push", targetCloudImageName)
+	})
 	if err != nil {
 		return fmt.Errorf("failed pushing docker image: %w", err)
 	}
@@ -1109,7 +1171,7 @@ func runAgent(ctx context.Context, env map[string]string) error {
 		if err != nil {
 			return err
 		}
-		err = packageAgent(ctx, cfg, pkgSpec, "", nil)
+		err = packageAgent(ctx, cfg, pkgSpec)
 		if err != nil {
 			return fmt.Errorf("failed to package elastic-agent: %w", err)
 		}
@@ -1159,9 +1221,16 @@ func runAgent(ctx context.Context, env map[string]string) error {
 	return sh.Run("docker", dockerCmdArgs...)
 }
 
-func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs, dependenciesVersion string, manifestResponse *manifest.Build) error {
+func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs) error {
 	fmt.Println("--- Package elastic-agent")
 
+	// DependenciesVersion is populated by WithManifestInfo when MANIFEST_URL
+	// is set; otherwise derive it from the beat version. The CoreSource
+	// decision (whether to read core from build/distributions or DRA, and
+	// whether to resolve component checksums via the manifest) is made
+	// inside the functions that care, reading cfg.Packaging.CoreSource
+	// directly.
+	dependenciesVersion := cfg.Build.DependenciesVersion
 	if dependenciesVersion == "" {
 		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
 		if agentCoreVersion == "" {
@@ -1208,10 +1277,10 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	defer os.RemoveAll(flatPath)
 
 	// extract all dependencies from their archives into flat dir
-	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
+	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
 
 	// extract elastic-agent-core to be used for packaging
-	err = extractAgentCoreForPackage(ctx, cfg, manifestResponse, dependenciesVersion)
+	err = extractAgentCoreForPackage(ctx, cfg, dependenciesVersion)
 	if err != nil {
 		return err
 	}
@@ -1361,8 +1430,10 @@ func removePythonWheels(cfg *devtools.Settings, matches []string, version string
 }
 
 // flattenDependencies will extract all the required packages collected in archivePath and dropPath in flatPath and
-// regenerate checksums
-func flattenDependencies(cfg *devtools.Settings, platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, manifestResponse *manifest.Build, dependencies []packaging.BinarySpec) {
+// regenerate checksums. When CoreSource is manifest, manifest-declared SHAs
+// are used for component checksums; otherwise checksums are computed from
+// the local files.
+func flattenDependencies(cfg *devtools.Settings, platforms []string, dependenciesVersion, archivePath, dropPath, flatPath string, dependencies []packaging.BinarySpec) {
 	for _, pltf := range platforms {
 
 		rp := manifest.PlatformPackages[pltf]
@@ -1425,9 +1496,12 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		}
 
 		var checksums map[string]string
-		// Operate on the files depending on if we're packaging from a manifest or not
-		if manifestResponse != nil {
-			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, manifestResponse, dependencies)
+		// Manifest-declared SHAs are only correct when every binary being
+		// checksummed came from the manifest — i.e. CoreSource=manifest. When
+		// the core was compiled locally, its on-disk SHA wouldn't match the
+		// manifest's entry, so compute everything from the files on disk.
+		if cfg.Packaging.CoreSource == devtools.CoreSourceManifest {
+			checksums = devtools.ChecksumsWithManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, cfg.Packaging.Manifest, dependencies)
 		} else {
 			checksums = devtools.ChecksumsWithoutManifest(pltf, dependenciesVersion, versionedFlatPath, versionedDropPath, dependencies)
 		}
@@ -1498,39 +1572,27 @@ func FetchLatestAgentCoreStagingDRA(ctx context.Context, branch string) error {
 	return nil
 }
 
-// PackageUsingDRA packages elastic-agent for distribution using Daily Released Artifacts specified in manifest.
-func PackageUsingDRA(ctx context.Context) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	start := time.Now()
-	defer func() { fmt.Println("package ran for", time.Since(start)) }()
-
-	if len(cfg.GetPlatforms()) == 0 {
-		return fmt.Errorf("elastic-agent package is expected to build at least one platform package")
-	}
-
-	// final package build
-	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
-	if err != nil {
-		return err
-	}
-
-	// When MANIFEST_URL is not provided in the environment elastic-agent-core packages from build/distributions
-	// will be used instead of pulling from the manifest.
-	if cfg.Packaging.ManifestURL == "" {
-		fmt.Println("NOTICE: No MANIFEST_URL was provided, using elastic-agent-core packages from build/distributions.")
-	}
-	cfg, err = cfg.WithManifestInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed downloading manifest: %w", err)
-	}
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-
-	return packageAgent(ctx, cfg, pkgSpec, cfg.Build.DependenciesVersion, cfg.Packaging.Manifest)
-}
-
 func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string) (*branchInfo, error) {
 	// latest build info for a branch is at "<base url>/latest/<branch>.json"
 	branchLatestBuildUrl := strings.TrimSuffix(baseURL, "/") + fmt.Sprintf("/latest/%s.json", branch)
+	var bi *branchInfo
+	err := devtools.Retry(func() error {
+		var fetchErr error
+		bi, fetchErr = fetchBranchInfo(ctx, branchLatestBuildUrl)
+		return fetchErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if mg.Verbose() {
+		log.Printf("Received branch information for %q: %+v", branch, bi)
+	}
+
+	return bi, nil
+}
+
+func fetchBranchInfo(ctx context.Context, branchLatestBuildUrl string) (*branchInfo, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, branchLatestBuildUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error composing request for finding latest build using %q: %w", branchLatestBuildUrl, err)
@@ -1554,10 +1616,6 @@ func findLatestBuildForBranch(ctx context.Context, baseURL string, branch string
 	err = json.NewDecoder(resp.Body).Decode(bi)
 	if err != nil {
 		return nil, fmt.Errorf("decoding json branch information: %w", err)
-	}
-
-	if mg.Verbose() {
-		log.Printf("Received branch information for %q: %+v", branch, bi)
 	}
 
 	return bi, nil
@@ -1633,7 +1691,7 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 	return downloadedArtifacts, errGrp.Wait()
 }
 
-func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, manifestResponse *manifest.Build, version string) error {
+func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
@@ -1654,16 +1712,19 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, man
 	downloadDir := filepath.Join(repositoryRoot, "build", "core")
 
 	var coreDownloadDir string
-	if manifestResponse == nil {
-		// Use the build elastic-agent-core packages from the build/distributions
-		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
-	} else {
+	switch cfg.Packaging.CoreSource {
+	case devtools.CoreSourceManifest:
 		// Download the artifacts from the manifest response with the buildID at <downloadDir>/<buildID>
-		coreDownloadDir = filepath.Join(downloadDir, manifestResponse.BuildID)
-		_, err = downloadDRAArtifacts(ctx, manifestResponse, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
+		coreDownloadDir = filepath.Join(downloadDir, cfg.Packaging.Manifest.BuildID)
+		_, err = downloadDRAArtifacts(ctx, cfg.Packaging.Manifest, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
 		if err != nil {
 			return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
 		}
+	default:
+		// CoreSourceLocal (and the empty zero value, which callers outside
+		// Package may leave unset): use the packages written by
+		// PackageAgentCore into build/distributions.
+		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
 	}
 
 	// Create extracted director, ensure it doesn't exist.
@@ -1953,7 +2014,11 @@ func Ironbank(ctx context.Context) error {
 		return nil
 	}
 	cfg := devtools.SettingsFromContext(ctx)
-	cfg, err := cfg.WithManifestInfo(ctx)
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
@@ -2071,17 +2136,33 @@ func (Integration) Clean(ctx context.Context) error {
 	fmt.Println("--- Clean mage artifacts")
 	_ = os.RemoveAll(".agent-testing")
 
-	// Clean out .integration-cache always
-	defer os.RemoveAll(".integration-cache")
-
 	_, err := os.Stat(".integration-cache")
 	if err != nil {
-		fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
-		return nil
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Println(">>> No .integration-cache found; nothing to clean via the runner (orphaned VMs or stacks will not be touched)")
+			return nil
+		}
+		return err
 	}
 	fmt.Println(">>> Found .integration-cache; running runner.Clean")
 
 	cfg := devtools.SettingsFromContext(ctx)
+
+	// Detect provisioners from saved state when they are not explicitly selected,
+	// so cleanup reconstructs the same provisioners that created the resources.
+	if state, stateErr := readFrameworkState(); stateErr == nil {
+		if cfg.IntegrationTest.InstanceProvisioner == "" && len(state.Instances) > 0 {
+			detected := state.Instances[0].Provisioner
+			fmt.Printf(">>> Detected instance provisioner from state: %s\n", detected)
+			cfg = cfg.WithInstanceProvisioner(detected)
+		}
+		if cfg.IntegrationTest.StackProvisioner == "" && len(state.Stacks) > 0 {
+			detected := state.Stacks[0].Provisioner
+			fmt.Printf(">>> Detected stack provisioner from state: %s\n", detected)
+			cfg = cfg.WithStackProvisioner(detected)
+		}
+	}
+
 	r, err := createTestRunner(cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
@@ -2089,6 +2170,9 @@ func (Integration) Clean(ctx context.Context) error {
 	err = r.Clean()
 	if err != nil {
 		return fmt.Errorf("error running clean: %w", err)
+	}
+	if err := os.RemoveAll(".integration-cache"); err != nil {
+		return fmt.Errorf("error removing integration cache: %w", err)
 	}
 	fmt.Println(">>> runner.Clean completed")
 	return nil
@@ -2120,6 +2204,13 @@ func (Integration) Local(ctx context.Context, testName string) error {
 
 	// clean the .agent-testing/local so this run will use the latest build
 	_ = os.RemoveAll(".agent-testing/local")
+
+	// These tests run in-process on this host where a human is watching, so default
+	// to streaming each test's progress live instead of gotestsum's quiet mode
+	// (which prints nothing until a package finishes). A host-set value wins.
+	if os.Getenv("GOTESTSUM_FORMAT") == "" {
+		os.Setenv("GOTESTSUM_FORMAT", "standard-verbose")
+	}
 
 	cfg = cfg.WithInstanceProvisioner(local.Name)
 	ctx = devtools.ContextWithSettings(ctx, cfg)
@@ -2823,6 +2914,12 @@ func (i Integration) testForResourceLeaks(ctx context.Context, matrix bool, test
 // TestOnRemote shouldn't be called locally (called on remote host to perform testing)
 func (Integration) TestOnRemote(ctx context.Context) error {
 	cfg := devtools.SettingsFromContextWithOptions(ctx, devtools.LoadOptions{SkipVCS: true})
+	// Default the agent version from .package-version (the repo copy is
+	// present on the remote host); an explicit AGENT_VERSION env var wins.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	mg.Deps(Build.TestFakeComponent)
 	version := cfg.IntegrationTest.AgentVersion
 	if version == "" {
@@ -2895,6 +2992,12 @@ func (Integration) TestOnRemote(ctx context.Context) error {
 
 func (Integration) Buildkite(ctx context.Context) error {
 	envCfg := devtools.SettingsFromContext(ctx)
+	// Default the agent and stack versions from .package-version; explicit
+	// AGENT_VERSION / AGENT_STACK_VERSION env vars win.
+	envCfg, err := envCfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	goTestFlags := envCfg.IntegrationTest.GoTestFlags
 	batches, err := define.DetermineBatches("testing/integration/ess", goTestFlags, "integration")
 	if err != nil {
@@ -2973,6 +3076,13 @@ func integRunner(ctx context.Context, testDir string, matrix bool, singleTest st
 
 func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTest string) (int, error) {
 	cfg := devtools.SettingsFromContext(ctx)
+	// Default the agent and stack versions from .package-version so tests run
+	// against the published snapshot build; explicit AGENT_VERSION /
+	// AGENT_STACK_VERSION env vars win.
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return 0, fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
 	goTestFlags := cfg.IntegrationTest.GoTestFlags
 
 	batches, err := define.DetermineBatches(testDir, goTestFlags, "integration")
@@ -3049,94 +3159,82 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	if agentBuildDir == "" {
 		agentBuildDir = filepath.Join("build", "distributions")
 	}
-	essToken, ok, err := ess.GetESSAPIKey()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
-	}
-
-	// Possible to change the region for deployment, default is gcp-us-west2 which is
-	// the CFT region.
-	essRegion := cfg.IntegrationTest.ESSRegion
-	if essRegion == "" {
-		essRegion = "gcp-us-west2"
-	}
-
-	serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
-	}
-	datacenter := cfg.IntegrationTest.GCPDatacenter
-	if datacenter == "" {
-		// us-central1-a is used because T2A instances required for ARM64 testing are only
-		// available in the central regions
-		datacenter = "us-central1-a"
-	}
-
-	gcloudCfg := gcloud.Config{
-		ServiceTokenPath: serviceTokenPath,
-		Datacenter:       datacenter,
-	}
-
 	var instanceProvisioner tcommon.InstanceProvisioner
 	instanceProvisionerMode := cfg.IntegrationTest.InstanceProvisioner
+	var identifier string
 	switch instanceProvisionerMode {
 	case "", gcloud.Name:
+		serviceTokenPath, ok, err := getGCEServiceTokenPath(cfg)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, fmt.Errorf("GCE service token missing; run 'mage integration:auth'")
+		}
+		datacenter := cfg.IntegrationTest.GCPDatacenter
+		if datacenter == "" {
+			// us-central1-a is used because T2A instances required for ARM64 testing are only
+			// available in the central regions
+			datacenter = "us-central1-a"
+		}
+		gcloudCfg := gcloud.Config{
+			ServiceTokenPath: serviceTokenPath,
+			Datacenter:       datacenter,
+		}
 		instanceProvisioner, err = gcloud.NewProvisioner(gcloudCfg)
 		if err != nil {
 			return nil, err
 		}
+		email, err := gcloudCfg.ClientEmail()
+		if err != nil {
+			return nil, err
+		}
+		identifier = fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-"))
 	case multipass.Name:
 		instanceProvisioner = multipass.NewProvisioner()
+		identifier = localIdentifier()
 	case kind.Name:
-		instanceProvisioner = kind.NewProvisioner()
+		var err error
+		instanceProvisioner, err = kind.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
+		identifier = localIdentifier()
+	case dockerprov.Name:
+		instanceProvisioner, err = dockerprov.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
+		identifier = localIdentifier()
 	case local.Name:
 		instanceProvisioner = local.NewProvisioner()
+		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud' or 'multipass', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
 	}
 
-	email, err := gcloudCfg.ClientEmail()
+	// The local stack provisioner runs elastic-package locally and the external one
+	// reads an already running stack from the environment, so neither needs ESS
+	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
+	var provisionCfg ess.ProvisionerConfig
+	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
+	if stackProvisionerMode != ess.ProvisionerLocal && stackProvisionerMode != ess.ProvisionerExternal {
+		provisionCfg, err = essProvisionerConfig(cfg, identifier)
+		if err != nil {
+			return nil, err
+		}
+	}
+	stackProvisioner, _, err := newStackProvisioner(cfg, provisionCfg)
 	if err != nil {
 		return nil, err
-	}
-
-	provisionCfg := ess.ProvisionerConfig{
-		Identifier: fmt.Sprintf("at-%s", strings.ReplaceAll(strings.Split(email, "@")[0], ".", "-")),
-		APIKey:     essToken,
-		Region:     essRegion,
-	}
-
-	var stackProvisioner tcommon.StackProvisioner
-	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
-	switch stackProvisionerMode {
-	case "", ess.ProvisionerStateful:
-		stackProvisioner, err = ess.NewProvisioner(provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	case ess.ProvisionerServerless:
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		stackProvisioner, err = ess.NewServerlessProvisioner(ctx, provisionCfg)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q or %q, not %s",
-			ess.ProvisionerStateful,
-			ess.ProvisionerServerless,
-			stackProvisionerMode)
 	}
 
 	timestamp := cfg.IntegrationTest.TimestampEnabled
 
 	extraEnv := map[string]string{}
+	if cfg.IntegrationTest.AgentDevelop != "" {
+		extraEnv["TEST_AGENT_DEVELOP"] = cfg.IntegrationTest.AgentDevelop
+	}
 	if cfg.IntegrationTest.CollectDiag != "" {
 		extraEnv["AGENT_COLLECT_DIAG"] = cfg.IntegrationTest.CollectDiag
 	}
@@ -3147,6 +3245,17 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 	extraEnv["TEST_LONG_RUNNING"] = cfg.IntegrationTest.LongRunning
 	extraEnv["LONG_TEST_RUNTIME"] = cfg.IntegrationTest.LongTestRuntime
 	extraEnv["TEST_UPGRADE_VERSIONS"] = cfg.IntegrationTest.UpgradeVersions
+
+	// Control the gotestsum output format on the remote host. The remote test
+	// process otherwise runs in quiet mode and prints nothing until a package
+	// finishes. A host-set GOTESTSUM_FORMAT always wins; for the local provisioners
+	// (multipass/kind/docker), where a human is watching, default to streaming each
+	// test's progress live. CI (gcloud) is left untouched unless explicitly set.
+	if format := os.Getenv("GOTESTSUM_FORMAT"); format != "" {
+		extraEnv["GOTESTSUM_FORMAT"] = format
+	} else if instanceProvisionerMode != gcloud.Name {
+		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
+	}
 
 	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
 	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
@@ -3188,6 +3297,61 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		return nil, fmt.Errorf("failed to create runner: %w", err)
 	}
 	return r, nil
+}
+
+// essProvisionerConfig builds the ESS provisioner configuration (API key + region)
+// used by both the stateful and serverless stack provisioners.
+func essProvisionerConfig(cfg *devtools.Settings, identifier string) (ess.ProvisionerConfig, error) {
+	essToken, ok, err := ess.GetESSAPIKey()
+	if err != nil {
+		return ess.ProvisionerConfig{}, err
+	}
+	if !ok {
+		return ess.ProvisionerConfig{}, fmt.Errorf("ESS api key missing; run 'mage integration:auth'")
+	}
+
+	// Possible to change the region for deployment, default is gcp-us-west2 which is
+	// the CFT region.
+	essRegion := cfg.IntegrationTest.ESSRegion
+	if essRegion == "" {
+		essRegion = "gcp-us-west2"
+	}
+
+	return ess.ProvisionerConfig{
+		Identifier: identifier,
+		APIKey:     essToken,
+		Region:     essRegion,
+	}, nil
+}
+
+// newStackProvisioner creates the stack provisioner selected by STACK_PROVISIONER
+// (defaulting to stateful), returning the provisioner and its resolved mode.
+func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerConfig) (tcommon.StackProvisioner, string, error) {
+	mode := cfg.IntegrationTest.StackProvisioner
+	switch mode {
+	case "", ess.ProvisionerStateful:
+		mode = ess.ProvisionerStateful
+		sp, err := ess.NewProvisioner(provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerServerless:
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
+		return sp, mode, err
+	case ess.ProvisionerExternal:
+		sp, err := ess.NewExternalProvisioner()
+		return sp, mode, err
+	case ess.ProvisionerLocal:
+		sp, err := ess.NewLocalProvisioner()
+		return sp, mode, err
+	default:
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q, %q or %q, not %s",
+			ess.ProvisionerStateful,
+			ess.ProvisionerServerless,
+			ess.ProvisionerExternal,
+			ess.ProvisionerLocal,
+			mode)
+	}
 }
 
 func shouldBuildAgent(cfg *devtools.Settings) bool {
@@ -3400,6 +3564,18 @@ func gceFindMissingRoles(actual []string, expected []string) []string {
 		}
 	}
 	return missing
+}
+
+// localIdentifier returns a short identifier derived from the current OS user,
+// used as the ESS stack name prefix when not using the gcloud provisioner.
+func localIdentifier() string {
+	if u := os.Getenv("USER"); u != "" {
+		return fmt.Sprintf("at-%s", strings.ReplaceAll(u, ".", "-"))
+	}
+	if hostname, err := os.Hostname(); err == nil {
+		return fmt.Sprintf("at-%s", strings.ReplaceAll(hostname, ".", "-"))
+	}
+	return "at-dev"
 }
 
 func getGCEServiceTokenPath(cfg *devtools.Settings) (string, bool, error) {
@@ -3670,22 +3846,45 @@ func (Otel) StripOsquerydGolangCrossBuild(ctx context.Context) error {
 			continue
 		}
 
-		var stripCmd string
-		var binaryPath string
-		switch platform.Arch() {
-		case "amd64":
-			stripCmd = "x86_64-linux-gnu-strip"
-			binaryPath = "build/data/install/linux/amd64/osqueryd"
-		case "arm64":
-			stripCmd = "aarch64-linux-gnu-strip"
-			binaryPath = "build/data/install/linux/arm64/osqueryd"
-		default:
-			return fmt.Errorf("unsupported architecture %s", platform.Arch())
-		}
+		switch platform.GOOS() {
+		case "linux":
+			var stripCmd string
+			var binaryPath string
+			switch platform.Arch() {
+			case "amd64":
+				stripCmd = "x86_64-linux-gnu-strip"
+				binaryPath = "build/data/install/linux/amd64/osqueryd"
+			case "arm64":
+				stripCmd = "aarch64-linux-gnu-strip"
+				binaryPath = "build/data/install/linux/arm64/osqueryd"
+			default:
+				return fmt.Errorf("unsupported linux architecture %s", platform.Arch())
+			}
+			if err := sh.RunV(stripCmd, binaryPath); err != nil {
+				return fmt.Errorf("failed to strip osqueryd: %w", err)
+			}
 
-		err := sh.RunV(stripCmd, binaryPath)
-		if err != nil {
-			return fmt.Errorf("failed to strip osqueryd: %w", err)
+		case "darwin":
+			var lipoArch string
+			switch platform.Arch() {
+			case "amd64":
+				lipoArch = "x86_64"
+			case "arm64":
+				lipoArch = "arm64"
+			default:
+				return fmt.Errorf("unsupported darwin architecture %s", platform.Arch())
+			}
+			binaryPath := filepath.Join("build", "data", "install", "darwin", platform.Arch(),
+				"osquery.app", "Contents", "MacOS", "osqueryd")
+			if err := sh.RunV("lipo", "-thin", lipoArch, binaryPath, "-output", binaryPath); err != nil {
+				return fmt.Errorf("failed to thin osqueryd for darwin/%s: %w", platform.Arch(), err)
+			}
+			if err := sh.RunV("llvm-strip", binaryPath); err != nil {
+				return fmt.Errorf("failed to strip osqueryd for darwin/%s: %w", platform.Arch(), err)
+			}
+
+		default:
+			return fmt.Errorf("unsupported OS %s for osqueryd stripping", platform.GOOS())
 		}
 	}
 
@@ -3698,7 +3897,7 @@ func (Otel) OsquerybeatFetchOsqueryDistros(ctx context.Context) error {
 
 	// crossBuild container is used to strip the osqueryd binary (strip needs to be built for the specific
 	// os/architecture for it to work properly)
-	opts := []devtools.CrossBuildOption{devtools.WithName("strip-osqueryd"), devtools.WithTarget("otel:stripOsquerydGolangCrossBuild"), devtools.ForPlatforms("linux")}
+	opts := []devtools.CrossBuildOption{devtools.WithName("strip-osqueryd"), devtools.WithTarget("otel:stripOsquerydGolangCrossBuild"), devtools.ForPlatforms("linux darwin")}
 	return devtools.CrossBuild(ctx, cfg, opts...)
 }
 
@@ -3865,8 +4064,7 @@ func (h Helm) RenderExamples() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -3912,16 +4110,17 @@ func (h Helm) RenderExamples() error {
 		installAction := action.NewInstall(actionConfig)
 		installAction.Namespace = "default"
 		installAction.ReleaseName = "example"
-		installAction.CreateNamespace = true
 		installAction.UseReleaseName = true
-		installAction.CreateNamespace = false
-		installAction.DryRun = true
+		installAction.DryRunStrategy = action.DryRunClient
 		installAction.Replace = true
-		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
-		installAction.ClientOnly = true
-		release, err := installAction.Run(helmChart, helmValues)
+		installAction.KubeVersion = &helmchartcommon.KubeVersion{Version: "1.27.0"}
+		relResult, err := installAction.Run(helmChart, helmValues)
 		if err != nil {
 			return fmt.Errorf("failed to install helm chart: %w", err)
+		}
+		rel, ok := relResult.(*releasev1.Release)
+		if !ok {
+			return fmt.Errorf("unexpected release type: %T", relResult)
 		}
 
 		renderedFolder := filepath.Join(exampleFullPath, "rendered")
@@ -3931,7 +4130,7 @@ func (h Helm) RenderExamples() error {
 		}
 
 		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
-		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
+		err = os.WriteFile(renderedManifestPath, []byte(rel.Manifest), 0o644)
 		if err != nil {
 			return fmt.Errorf("failed to write rendered manifest %q: %w", renderedManifestPath, err)
 		}
@@ -4006,8 +4205,7 @@ func (h Helm) Lint() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4100,7 +4298,10 @@ func (Helm) ensureRepository(repoName, repoURL string, settings *cli.EnvSettings
 		return fmt.Errorf("could not create repo %s: %w", repoURL, err)
 	}
 
-	_, err = chartRepo.DownloadIndexFile()
+	err = devtools.Retry(func() error {
+		_, err := chartRepo.DownloadIndexFile()
+		return err
+	})
 	if err != nil {
 		return fmt.Errorf("could not download index file for repo %s: %w", repoURL, err)
 	}
@@ -4147,8 +4348,7 @@ func (h Helm) handleDependencies(update bool) error {
 		}
 	}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-		func(format string, v ...interface{}) {})
+	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4176,6 +4376,7 @@ func (h Helm) handleDependencies(update bool) error {
 		RegistryClient:   registryClient,
 		RepositoryConfig: settings.RepositoryConfig,
 		RepositoryCache:  settings.RepositoryCache,
+		ContentCache:     settings.ContentCache,
 		Debug:            settings.Debug,
 	}
 	if client.Verify {
@@ -4183,12 +4384,12 @@ func (h Helm) handleDependencies(update bool) error {
 	}
 
 	if update {
-		if err = man.Update(); err != nil {
-			return fmt.Errorf("failed to build helm dependencies: %w", err)
+		if err = devtools.Retry(man.Update); err != nil {
+			return fmt.Errorf("failed to update helm dependencies: %w", err)
 		}
 	} else {
-		if err = man.Build(); err != nil {
-			return fmt.Errorf("failed to update helm dependencies: %w", err)
+		if err = devtools.Retry(man.Build); err != nil {
+			return fmt.Errorf("failed to build helm dependencies: %w", err)
 		}
 	}
 
@@ -4244,7 +4445,16 @@ func (h Helm) Package(ctx context.Context) error {
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	cfg, err := cfg.WithManifestInfo(ctx)
+	// Use package-version overrides so the Helm chart version matches the
+	// other snapshot artifacts built in the same DRA run. Use
+	// USE_PACKAGE_VERSION=false to disable this (e.g. during a GHA-triggered
+	// Helm chart release, where the chart version comes from the release tag).
+	cfg, err := cfg.WithPackageVersionOverrides()
+	if err != nil {
+		return fmt.Errorf("failed applying %s overrides: %w", devtools.PackageVersionFilename, err)
+	}
+
+	cfg, err = cfg.WithManifestInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed downloading manifest: %w", err)
 	}
@@ -4282,8 +4492,7 @@ func (h Helm) Package(ctx context.Context) error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}

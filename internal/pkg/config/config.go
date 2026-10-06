@@ -199,6 +199,15 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 	if err != nil {
 		return err
 	}
+	if m, ok := from.(map[string]interface{}); ok {
+		// A raw map must go through NewConfigFrom so the skip keys (inputs, outputs) are not resolved by ucfg.
+		// Otherwise a variable like ${agent.id} that exists in this config is expanded before the transpiler
+		// sees it, which breaks conditions such as `${agent.id} == 'x'`.
+		from, err = NewConfigFrom(m, opts...)
+		if err != nil {
+			return err
+		}
+	}
 	cfg, ok := from.(*Config)
 	if ok {
 		// can merge both together
@@ -218,6 +227,24 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 		return nil
 	}
 	return c.access().Merge(from, ucfgOpts...)
+}
+
+// Clone returns an independent copy of the configuration.
+func (c *Config) Clone() (*Config, error) {
+	raw, err := c.ToMapStr()
+	if err != nil {
+		return nil, err
+	}
+
+	clone, err := NewConfigFrom(raw)
+	if err != nil {
+		return nil, err
+	}
+	if c.OTel != nil {
+		clone.OTel = confmap.NewFromStringMap(c.OTel.ToStringMap())
+	}
+
+	return clone, nil
 }
 
 // ToMapStr takes the config and transform it into a map[string]interface{}

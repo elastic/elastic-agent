@@ -14,9 +14,9 @@ BRANCH="${DRA_BRANCH:="${BUILDKITE_BRANCH:=""}"}"
 
 qualifier=""
 URL="https://storage.googleapis.com/dra-qualifier/${BRANCH}"
-if curl -sf -o /dev/null "$URL" ; then
-  qualifier=$(curl -s "$URL")
-fi
+# A missing qualifier file (404) is expected and leaves the qualifier empty;
+# --retry protects against transient failures (timeouts, 429, 5xx).
+qualifier=$(curl -sf --retry 5 --retry-delay 5 "$URL") || qualifier=""
 
 export VERSION_QUALIFIER="$qualifier"
 echo "~~~ VERSION_QUALIFIER set to [$VERSION_QUALIFIER]"

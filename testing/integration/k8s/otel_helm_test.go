@@ -13,15 +13,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/cli/values"
-	"helm.sh/helm/v3/pkg/getter"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/getter"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/elastic/elastic-agent-libs/testing/estools"
@@ -55,9 +59,11 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			name: "managed helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
+				k8sStepCreateOpenShiftInfrastructure(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/values.yaml"},
+						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/values.yaml"),
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
@@ -84,14 +90,70 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// telemetry.
 				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
 				// validate k8s metrics are being pushed
-				k8sStepCheckDatastreamsHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
-				k8sStepCheckDatastreamsHits(info, "metrics", "k8sclusterreceiver.otel", "default"),
+				k8sStepCheckNamespaceDatastreamHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				k8sStepCheckNamespaceDatastreamHits(info, "metrics", "k8sclusterreceiver.otel", "default"),
+				// validate the openshift resource detector reads the cluster name
+				k8sStepCheckClusterNameDatastreamHits(info, "metrics", "k8sclusterreceiver.otel", "default"),
 				// validates auto-instrumentation and traces
 				// datastream generation
 				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
-					k8sStepCheckDatastreamsHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
+					k8sStepCheckNamespaceDatastreamHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
 				},
+			},
+		},
+		{
+			name: "managed helm kube-stack operator standalone agent openshift rootless",
+			steps: []k8sTestStep{
+				k8sStepRequireOpenShift(),
+				k8sStepCreateNamespace(),
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
+						values.Options{
+							ValueFiles: []string{
+								"../../../deploy/helm/edot-collector/kube-stack/values.yaml",
+								"../../../deploy/helm/edot-collector/kube-stack/openshift/values.yaml",
+								"../../../deploy/helm/edot-collector/kube-stack/openshift/rootless-values.yaml",
+							},
+							Values: []string{
+								fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
+								fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
+								"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
+								// store the filelog checkpoints of each run in a new directory
+								// of the hostPath, so earlier runs do not leave offsets in them
+								fmt.Sprintf("collectors.daemon.config.extensions.file_storage.directory=/var/lib/otelcol/%s", namespace),
+								"collectors.daemon.config.extensions.file_storage.create_directory=true",
+							},
+							JSONValues: []string{
+								fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
+								fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
+							},
+						},
+					)(t, ctx, kCtx, namespace)
+				},
+				// - An OpenTelemetry Operator Deployment (1 pod per
+				// cluster)
+				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
+				// - A Daemonset to collect K8s node's metrics and logs
+				// (1 EDOT collector pod per node)
+				// - A Cluster wide Deployment to collect K8s metrics and
+				// events (1 EDOT collector pod per cluster)
+				// - Two Gateway pods to collect, aggregate and forward
+				// telemetry.
+				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
+				// validate the daemon collector runs as non-root
+				k8sStepCheckPodsRunAs("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container", 1000, 0),
+				// validate k8s metrics are being pushed
+				k8sStepCheckNamespaceDatastreamHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
+				// validates pod logs are being pushed
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
+					k8sStepCheckNamespaceFilelogDatastreamHits(info, "logs", "generic.otel", "default")(t, ctx, kCtx, namespace)
+				},
+				// validate filelog checkpoints are persisted across restarts
+				k8sStepRestartPods("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container"),
+				k8sStepCheckPodsLogContains("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container",
+					"Resuming from previously known offset(s)"),
 			},
 		},
 		{
@@ -100,8 +162,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"),
+						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -129,8 +192,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs-values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs-values.yaml"),
+						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -159,8 +223,9 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmTemplateApplyWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
+							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"),
+						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
 
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
@@ -189,6 +254,14 @@ func TestOtelKubeStackHelm(t *testing.T) {
 	}
 }
 
+func k8sStepRequireOpenShift() k8sTestStep {
+	return func(t *testing.T, _ context.Context, kCtx k8sContext, _ string) {
+		if !kCtx.openshift {
+			t.Skip("only supported on OpenShift")
+		}
+	}
+}
+
 func k8sStepHelmDeployWithValueOptions(chartPath string, releaseName string, values values.Options) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		helmValues := mergeValues(t, namespace, values)
@@ -210,9 +283,6 @@ func k8sStepHelmTemplateApplyWithValueOptions(chartPath string, releaseName stri
 }
 
 func mergeValues(t *testing.T, namespace string, values values.Options) map[string]any {
-	// Initialize a map to hold the parsed data
-	helmValues := make(map[string]any)
-
 	settings := cli.New()
 	settings.SetNamespace(namespace)
 	providers := getter.All(settings)
@@ -264,6 +334,123 @@ func k8sStepCheckRunningPods(podLabelSelector string, expectedPodNumber int, con
 	}
 }
 
+// k8sCreateOpenShiftInfrastructure creates the object that the openshift resource detector reads.
+func k8sStepCreateOpenShiftInfrastructure() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		if !kCtx.openshift {
+			return
+		}
+
+		const infrastructureCrd = "infrastructures.config.openshift.io"
+
+		// Only MicroShift needs this CRD. A real OpenShift cluster ships it and owns the
+		// Infrastructure object, which holds the real cluster name.
+		err := kCtx.client.Resources().Get(ctx, infrastructureCrd, "", &apiextensionsv1.CustomResourceDefinition{})
+		if err == nil {
+			t.Logf("the %q CRD already exists", infrastructureCrd)
+			return
+		}
+
+		crd := &apiextensionsv1.CustomResourceDefinition{
+			ObjectMeta: metav1.ObjectMeta{Name: infrastructureCrd},
+			Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+				Group: configv1.GroupName,
+				Scope: apiextensionsv1.ClusterScoped,
+				Names: apiextensionsv1.CustomResourceDefinitionNames{
+					Plural:   "infrastructures",
+					Singular: "infrastructure",
+					Kind:     "Infrastructure",
+				},
+				Versions: []apiextensionsv1.CustomResourceDefinitionVersion{{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					// The detector reads the status subresource.
+					Subresources: &apiextensionsv1.CustomResourceSubresources{Status: &apiextensionsv1.CustomResourceSubresourceStatus{}},
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"spec":   {Type: "object", XPreserveUnknownFields: new(true)},
+								"status": {Type: "object", XPreserveUnknownFields: new(true)},
+							},
+						},
+					},
+				}},
+			},
+		}
+
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, crd)
+		require.NoErrorf(t, err, "failed to create the %q CRD", infrastructureCrd)
+
+		// Delete the CRD on test completion to also remove the Infrastructure object with it.
+		t.Cleanup(func() {
+			if err := kCtx.client.Resources().Delete(ctx, crd); err != nil {
+				t.Logf("failed to delete the %q CRD: %s", infrastructureCrd, err)
+			}
+		})
+
+		infra := &configv1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{}, infra)
+		require.NoErrorf(t, err, "failed to create the %q object", infrastructureCrd)
+
+		// Use the test namespace as the cluster name since it is unique.
+		infra.Status = configv1.InfrastructureStatus{InfrastructureName: namespace}
+		err = kCtx.client.Resources().UpdateStatus(ctx, infra)
+		require.NoErrorf(t, err, "failed to update the %q object status", infrastructureCrd)
+	}
+}
+
+// k8sStepCheckPodsRunAs checks the user and group of the container inside the pods returned by the selector
+func k8sStepCheckPodsRunAs(podLabelSelector string, containerName string, uid, gid int64) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		pods := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = podLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector %q", podLabelSelector)
+		require.NotEmptyf(t, pods.Items, "no pod found for label selector %q", podLabelSelector)
+
+		checkedContainers := 0
+		for _, pod := range pods.Items {
+			for _, container := range pod.Spec.Containers {
+				if container.Name != containerName {
+					continue
+				}
+
+				sc := container.SecurityContext
+				require.NotNilf(t, sc, "securityContext of container %q in pod %s", containerName, pod.Name)
+				assert.Equalf(t, new(uid), sc.RunAsUser, "runAsUser of container %q in pod %s", containerName, pod.Name)
+				assert.Equalf(t, new(gid), sc.RunAsGroup, "runAsGroup of container %q in pod %s", containerName, pod.Name)
+				checkedContainers++
+			}
+		}
+
+		require.Equalf(t, len(pods.Items), checkedContainers,
+			"every pod with selector %q should have a container with name %q", podLabelSelector, containerName)
+	}
+}
+
+// k8sStepCheckPodsLogContains checks the logs of the container inside the pods returned by the selector contain the expected text
+func k8sStepCheckPodsLogContains(podLabelSelector string, containerName string, expected string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		pods := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+			opt.LabelSelector = podLabelSelector
+		})
+		require.NoError(t, err, "failed to list pods with selector %q", podLabelSelector)
+		require.NotEmptyf(t, pods.Items, "no pod found for label selector %q", podLabelSelector)
+
+		for _, pod := range pods.Items {
+			require.EventuallyWithTf(t, func(collectT *assert.CollectT) {
+				lines, err := k8sReadPodLogLines(ctx, kCtx.clientSet, namespace, pod.Name, &corev1.PodLogOptions{Container: containerName}, 0)
+				require.NoError(collectT, err, "failed to read logs of pod %s", pod.Name)
+				require.True(collectT, slices.ContainsFunc(lines, func(line string) bool { return strings.Contains(line, expected) }))
+			}, 2*time.Minute, 5*time.Second, "logs of container %q in pod %s should contain %q", containerName, pod.Name, expected)
+		}
+	}
+}
+
 func k8sStepDeployJavaApp() k8sTestStep {
 	return k8sStepDeployApp("java_app.yaml")
 }
@@ -281,15 +468,95 @@ func k8sStepDeployApp(manifest string) func(t *testing.T, ctx context.Context, k
 	}
 }
 
-// k8sStepCheckDatastreams checks the corresponding Elasticsearch datastreams
-// are created and documents being written
-func k8sStepCheckDatastreamsHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+func k8sStepCheckNamespaceDatastreamHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		require.Eventually(t, func() bool {
-			query := queryK8sNamespaceDataStream(dsType, dataset, datastreamNamespace, namespace)
-			docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
-			require.NoError(t, err, "failed to get %s datastream documents", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace))
-			return docs.Hits.Total.Value > 0
-		}, 5*time.Minute, 10*time.Second, fmt.Sprintf("at least one document should be available for %s datastream", fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)))
+		k8sCheckDatastreamHits(t, ctx, info, dsType, dataset, datastreamNamespace, "k8s.namespace.name", namespace)
 	}
+}
+
+func k8sStepCheckNamespaceFilelogDatastreamHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		k8sCheckDatastreamHits(t, ctx, info, dsType, dataset, datastreamNamespace, "k8s.namespace.name", namespace,
+			map[string]any{"exists": map[string]any{"field": "attributes.log.file.path"}})
+	}
+}
+
+func k8sStepCheckClusterNameDatastreamHits(info *define.Info, dsType, dataset, datastreamNamespace string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, _ string) {
+		if !kCtx.openshift {
+			return
+		}
+		infra := &configv1.Infrastructure{}
+		err := kCtx.client.Resources().Get(ctx, "cluster", "", infra)
+		require.NoError(t, err)
+		require.NotEmpty(t, infra.Status.InfrastructureName)
+		k8sCheckDatastreamHits(t, ctx, info, dsType, dataset, datastreamNamespace, "k8s.cluster.name", infra.Status.InfrastructureName)
+	}
+}
+
+func k8sStepRestartPods(podLabelSelector string, containerName string) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		listOpts := func(opt *metav1.ListOptions) { opt.LabelSelector = podLabelSelector }
+
+		oldPods := &corev1.PodList{}
+		err := kCtx.client.Resources(namespace).List(ctx, oldPods, listOpts)
+		require.NoError(t, err, "failed to list pods with selector %q", podLabelSelector)
+		require.NotEmptyf(t, oldPods.Items, "no pod found for label selector %q", podLabelSelector)
+
+		oldNames := make(map[string]struct{}, len(oldPods.Items))
+		for _, pod := range oldPods.Items {
+			oldNames[pod.Name] = struct{}{}
+			require.NoError(t, kCtx.client.Resources(namespace).Delete(ctx, &pod), "failed to delete pod %q", pod.Name)
+		}
+
+		require.EventuallyWithTf(t, func(collectT *assert.CollectT) {
+			pods := &corev1.PodList{}
+			err := kCtx.client.Resources(namespace).List(ctx, pods, listOpts)
+			require.NoError(collectT, err, "failed to list pods with selector %q", podLabelSelector)
+
+			readyContainers := 0
+			for _, pod := range pods.Items {
+				_, old := oldNames[pod.Name]
+				require.Falsef(collectT, old, "pod %s is not deleted yet", pod.Name)
+
+				for _, container := range pod.Status.ContainerStatuses {
+					if container.Name != containerName {
+						continue
+					}
+
+					if container.Ready {
+						readyContainers++
+					}
+				}
+			}
+
+			require.GreaterOrEqualf(collectT, readyContainers, len(oldPods.Items),
+				"at least %d containers with name %q should be ready", len(oldPods.Items), containerName)
+		}, 5*time.Minute, 10*time.Second, "pods with selector %q should be replaced", podLabelSelector)
+	}
+}
+
+// k8sCheckDatastreamHits waits until the datastream has at least one document carrying the given resource attribute.
+func k8sCheckDatastreamHits(t *testing.T, ctx context.Context, info *define.Info, dsType, dataset, datastreamNamespace, attribute, value string, filters ...any) {
+	dsName := fmt.Sprintf("%s-%s-%s", dsType, dataset, datastreamNamespace)
+	// Check errors against the CollectT so a transient query failure is
+	// retried on the next tick instead of aborting the test.
+	require.EventuallyWithT(t, func(collectT *assert.CollectT) {
+		query := queryDataStreamResourceAttribute(dsType, dataset, datastreamNamespace, attribute, value, filters...)
+		docs, err := estools.PerformQueryForRawQuery(ctx, query, fmt.Sprintf(".ds-%s*", dsType), info.ESClient)
+		require.NoError(collectT, err, "failed to get %s datastream documents", dsName)
+		require.Greater(collectT, docs.Hits.Total.Value, 0)
+	}, 5*time.Minute, 10*time.Second, fmt.Sprintf(
+		"at least one document with the %s %q should be available for %s datastream",
+		attribute, value, dsName))
+}
+
+// helmValuesWithOpenShiftOverlay appends OpenShift-specific helm value files to base when on OpenShift.
+func helmValuesWithOpenShiftOverlay(kCtx k8sContext, base ...string) []string {
+	if kCtx.openshift {
+		return append(base,
+			"../../../deploy/helm/edot-collector/kube-stack/openshift/values.yaml",
+		)
+	}
+	return base
 }

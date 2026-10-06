@@ -8,6 +8,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -80,7 +81,7 @@ func GlobalHooks() Hooks {
 				v := release.Info()
 				o, err := yaml.Marshal(v)
 				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
+					return fmt.Appendf(nil, "error: %q", err)
 				}
 				return o
 			},
@@ -93,11 +94,11 @@ func GlobalHooks() Hooks {
 			Hook: func(_ context.Context) []byte {
 				pkgVersionPath, err := version.GetAgentPackageVersionFilePath()
 				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
+					return fmt.Appendf(nil, "error: %q", err)
 				}
 				fileBytes, err := os.ReadFile(pkgVersionPath)
 				if err != nil {
-					return []byte(fmt.Sprintf("error: %q", err))
+					return fmt.Appendf(nil, "error: %q", err)
 				}
 				return fileBytes
 			},
@@ -108,13 +109,13 @@ func GlobalHooks() Hooks {
 			Description: "Environment variables",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				redacted, err := redactEnv()
+				redacted, err := RedactEnv()
 				if err != nil {
 					return []byte(err.Error())
 				}
 				out, err := yaml.Marshal(redacted)
 				if err != nil {
-					return []byte(fmt.Sprintf("Unable to marshall env vars into yaml: %v", err))
+					return fmt.Appendf(nil, "Unable to marshall env vars into yaml: %v", err)
 				}
 				return out
 			},
@@ -170,7 +171,7 @@ func pprofDiag(name string, debug int) func(context.Context) []byte {
 		err := pprof.Lookup(name).WriteTo(&w, debug)
 		if err != nil {
 			// error is returned as the content
-			return []byte(fmt.Sprintf("failed to write pprof to bytes buffer: %s", err))
+			return fmt.Appendf(nil, "failed to write pprof to bytes buffer: %s", err)
 		}
 		return w.Bytes()
 	}
@@ -329,7 +330,7 @@ func ZipArchive(
 	}
 
 	// Gather Logs:
-	return zipLogs(zw, ts, topPath, excludeEvents, errOut)
+	return zipLogs(zw, ts, topPath, paths.Components(), excludeEvents, errOut)
 }
 
 func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
@@ -363,34 +364,57 @@ func RedactOpts(w io.Writer) []redact.RedactOption {
 func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResult client.DiagnosticFileResult) error {
 	out := &fileResult.Content
 
-	// Should we support json too?
-	if fileResult.ContentType == "application/yaml" {
-		var unmarshalled any
-		err := yaml.Unmarshal(fileResult.Content, &unmarshalled)
+	var (
+		unmarshalled any
+		marshal      func(any) ([]byte, error)
+		err          error
+	)
+
+	switch fileResult.ContentType {
+	case "application/yaml":
+		err = yaml.Unmarshal(fileResult.Content, &unmarshalled)
+		marshal = yaml.Marshal
+	case "application/json":
+		decoder := json.NewDecoder(bytes.NewReader(fileResult.Content))
+		decoder.UseNumber()
+		err = decoder.Decode(&unmarshalled)
+		marshal = func(value any) ([]byte, error) {
+			return json.MarshalIndent(value, "", "  ")
+		}
+	default:
+		_, err = resultWriter.Write(*out)
+		return err
+	}
+
+	if err != nil {
+		// Best effort, output a warning but still include the file
+		fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
+	} else {
+		// Only redact structured diagnostic content, leaving plain text unchanged.
+		switch unmarshalled.(type) {
+		case map[string]any, []any:
+		default:
+			_, err = resultWriter.Write(*out)
+			return err
+		}
+
+		// Redact accepts a map, so wrap the value to support top-level arrays.
+		wrapped := map[string]any{"content": unmarshalled}
+		redact.Redact(wrapped, RedactOpts(errOut)...)
+		redacted, err := marshal(wrapped["content"])
 		if err != nil {
 			// Best effort, output a warning but still include the file
-			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to unmarshalling error: %s\n", fullFilePath, err)
+			fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
 		} else {
-			switch t := unmarshalled.(type) { // could be a plain string, we only redact if this is a proper map
-			case map[string]any:
-				redact.Redact(t, RedactOpts(errOut)...)
-				redacted, err := yaml.Marshal(t)
-				if err != nil {
-					// Best effort, output a warning but still include the file
-					fmt.Fprintf(errOut, "[WARNING] Could not redact %s due to marshalling error: %s\n", fullFilePath, err)
-				} else {
-					out = &redacted
-				}
-			default:
-			}
+			out = &redacted
 		}
 	}
 
-	_, err := resultWriter.Write(*out)
+	_, err = resultWriter.Write(*out)
 	return err
 }
 
-func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool, errOut io.Writer) error {
+func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string, excludeEvents bool, errOut io.Writer) error {
 	homePath := paths.HomeFrom(topPath)
 	dataPath := paths.DataFrom(topPath)
 	currentDir := filepath.Base(homePath)
@@ -411,7 +435,16 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, excludeEvents bool, e
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		return zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut)
+		if err := zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut); err != nil {
+			return err
+		}
+		// Components run from the install tree, which is a different directory than topPath
+		// when a custom state path is set, so it needs its own walk.
+		installHome := filepath.Dir(componentsPath)
+		if installHome == homePath {
+			return nil
+		}
+		return zipLogsWithPath(installHome, filepath.Base(installHome), excludeEvents, zw, ts, errOut)
 	}
 
 	dataDir, err := os.Open(dataPath)
@@ -661,7 +694,7 @@ func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 	return aggregateError
 }
 
-func redactEnv() (map[string]any, error) {
+func RedactEnv() (map[string]any, error) {
 	envMap := map[string]any{}
 	for _, e := range os.Environ() {
 		pair := strings.SplitN(e, "=", 2)

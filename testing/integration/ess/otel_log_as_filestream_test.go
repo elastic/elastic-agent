@@ -196,13 +196,6 @@ func TestFilebeatReceiverLogAsFilestream(t *testing.T) {
 		20*time.Second,
 		"Filestream did not detect change in the file")
 
-	// Wait for Filestream to finish reading the file
-	agentLogFile.WaitLogsContains(
-		t,
-		"End of file reached: "+inputFilePathStr+"; Backoff now",
-		20*time.Second,
-		"Filestream did not reach EOF")
-
 	// Ensure all 100 events have been ingested and stop Elastic Agent
 	waitEventsInES(100)
 

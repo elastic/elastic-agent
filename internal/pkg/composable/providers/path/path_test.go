@@ -13,13 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 )
 
 func TestContextProvider(t *testing.T) {
-	builder, _ := composable.Providers.GetContextProvider("path")
-	provider, err := builder(nil, nil, true)
+	provider, err := ContextProviderBuilder(nil, nil, true)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)

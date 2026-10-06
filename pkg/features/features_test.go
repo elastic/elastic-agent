@@ -82,6 +82,49 @@ agent:
 	}
 }
 
+func TestParsePreservesFeatureSource(t *testing.T) {
+	c, err := config.NewConfigFrom(`
+agent:
+  features:
+    fqdn:
+      enabled: true
+    log_input_run_as_filestream:
+      enabled: false
+    aws_s3_v2:
+      enabled: true
+    future_feature:
+      enabled: true
+      settings:
+        mode: test
+`)
+	require.NoError(t, err)
+
+	flags, err := Parse(c)
+	require.NoError(t, err)
+	require.True(t, flags.FQDN())
+	require.Equal(t, map[string]any{
+		"agent": map[string]any{
+			"features": map[string]any{
+				"fqdn": map[string]any{
+					"enabled": true,
+				},
+				"log_input_run_as_filestream": map[string]any{
+					"enabled": false,
+				},
+				"aws_s3_v2": map[string]any{
+					"enabled": true,
+				},
+				"future_feature": map[string]any{
+					"enabled": true,
+					"settings": map[string]any{
+						"mode": "test",
+					},
+				},
+			},
+		},
+	}, flags.AsProto().Source.AsMap())
+}
+
 func TestFQDNCallbacks(t *testing.T) {
 	cb1Called, cb2Called := false, false
 

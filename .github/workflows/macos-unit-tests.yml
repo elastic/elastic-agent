@@ -2,8 +2,7 @@ name: macos-unit-tests
 
 on:
   workflow_dispatch:
-  # Temporary disabled for PRs
-  # pull_request:
+  pull_request:
   push:
     branches:
       - main
@@ -21,7 +20,12 @@ concurrency:
 
 jobs:
   unit-tests:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, xcode-27]
+    name: macos-unit-tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -30,7 +34,7 @@ jobs:
           # pkg/testing/tools/git TestGetReleaseBranches test require full git history
           fetch-depth: 0
 
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@v7
         with:
           go-version-file: .go-version
 

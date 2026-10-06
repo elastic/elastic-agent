@@ -26,7 +26,7 @@ var (
 func init() {
 	flag.StringVar(&input, "in", "", "config to embed")
 	flag.StringVar(&output, "output", "-", "Output path. \"-\" means writing to stdout")
-	flag.StringVar(&license, "license", "Elasticv2", "License header for generated file.")
+	flag.StringVar(&license, "license", licen.Elasticv2LicenseName, "License header for generated file.")
 }
 
 var tmpl = template.Must(template.New("cfg").Parse(`

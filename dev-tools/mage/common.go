@@ -33,6 +33,7 @@ import (
 	"time"
 	"unicode"
 
+	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/magefile/mage/sh"
 )
 
@@ -215,35 +216,41 @@ func HaveKubectl() error {
 	return nil
 }
 
-// FindReplace reads a file, performs a find/replace operation, then writes the
-// output to the same file path.
-func FindReplace(file string, re *regexp.Regexp, repl string) error {
-	info, err := os.Stat(file)
-	if err != nil {
-		return err
-	}
+// retryMaxRetries bounds the number of retries of a failed network operation,
+// in addition to the initial attempt.
+const retryMaxRetries = 3
 
-	contents, err := os.ReadFile(file)
-	if err != nil {
-		return err
-	}
-
-	out := re.ReplaceAllString(string(contents), repl)
-	return os.WriteFile(file, []byte(out), info.Mode().Perm())
+// Retry runs f up to retryMaxRetries+1 times with exponential backoff between
+// attempts, to protect network operations against transient failures.
+func Retry(f func() error) error {
+	exp := backoff.NewExponentialBackOff()
+	exp.InitialInterval = 1 * time.Second
+	exp.Multiplier = 3
+	exp.MaxInterval = 10 * time.Second
+	return backoff.RetryNotify(f, backoff.WithMaxRetries(exp, retryMaxRetries),
+		func(err error, wait time.Duration) {
+			log.Printf("Attempt failed: %v, retrying in %v", err, wait)
+		})
 }
 
-// MustFindReplace invokes FindReplace and panics if an error occurs.
-func MustFindReplace(file string, re *regexp.Regexp, repl string) {
-	if err := FindReplace(file, re, repl); err != nil {
-		panic(fmt.Errorf("failed to find and replace: %w", err))
-	}
-}
-
-// DownloadFile downloads the given URL and writes the file to destinationDir.
-// The path to the file is returned.
+// DownloadFile downloads the given URL and writes the file to destinationDir,
+// retrying transient failures. The path to the file is returned.
 func DownloadFile(url, destinationDir string) (string, error) {
 	log.Println("Downloading", url)
 
+	var name string
+	err := Retry(func() error {
+		var err error
+		name, err = downloadFileAttempt(url, destinationDir)
+		return err
+	})
+	if err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+func downloadFileAttempt(url, destinationDir string) (string, error) {
 	//nolint:gosec,noctx // url is not user input
 	resp, err := http.Get(url)
 	if err != nil {
@@ -252,7 +259,7 @@ func DownloadFile(url, destinationDir string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed with http status: %v : %w", resp.StatusCode, err)
+		return "", fmt.Errorf("download failed with http status: %v", resp.StatusCode)
 	}
 
 	name := filepath.Join(destinationDir, filepath.Base(url))
@@ -352,6 +359,14 @@ func Tar(src string, targetFile string) error {
 	zr := gzip.NewWriter(f)
 	tw := tar.NewWriter(zr)
 
+	// open files via a root scoped to src so a path component replaced with a
+	// symlink mid-walk cannot redirect reads outside the tree (TOCTOU)
+	root, err := os.OpenRoot(src)
+	if err != nil {
+		return fmt.Errorf("error opening source directory: %w", err)
+	}
+	defer root.Close()
+
 	// walk through every file in the folder
 	err = filepath.WalkDir(src, func(file string, d fs.DirEntry, errFn error) error {
 		if errFn != nil {
@@ -386,7 +401,11 @@ func Tar(src string, targetFile string) error {
 
 		// if not a dir, write file content
 		if !fi.IsDir() {
-			data, err := os.Open(file)
+			rel, err := filepath.Rel(src, file)
+			if err != nil {
+				return fmt.Errorf("error resolving path relative to %q: %w", src, err)
+			}
+			data, err := root.Open(rel)
 			if err != nil {
 				return fmt.Errorf("error opening file: %w", err)
 			}
@@ -640,7 +659,8 @@ func FindFiles(globs ...string) ([]string, error) {
 
 // FindFilesRecursive recursively traverses from the CWD and invokes the given
 // match function on each regular file to determine if the given path should be
-// returned as a match. It ignores files in .git directories.
+// returned as a match. It ignores files in .git directories and the roots of
+// nested git repositories (submodules and worktrees).
 func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, error) {
 	var matches []string
 	err := filepath.WalkDir(".", func(path string, d fs.DirEntry, err error) error {
@@ -653,9 +673,12 @@ func FindFilesRecursive(match func(path string, d fs.FileInfo) bool) ([]string, 
 			return filepath.SkipDir
 		}
 
-		// Don't look for files in beats submodule
-		if d.IsDir() && filepath.Base(path) == "beats" {
-			return filepath.SkipDir
+		// Skip directories that are the root of a separate git repository
+		// (submodules and worktrees have a .git file at their root).
+		if d.IsDir() && path != "." {
+			if _, err := os.Lstat(filepath.Join(path, ".git")); err == nil {
+				return filepath.SkipDir
+			}
 		}
 
 		if !d.Type().IsRegular() {

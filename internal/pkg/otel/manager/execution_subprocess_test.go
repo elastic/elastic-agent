@@ -7,6 +7,7 @@ package manager
 import (
 	"context"
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -158,8 +159,8 @@ func TestProcHandle_UpdateConfigYamlBytes_LatestWins(t *testing.T) {
 	h := newTestProcHandle(t, doneCh, func(context.Context, error) {})
 
 	// Send two configs rapidly; only the latest should remain.
-	h.updateConfigYamlBytes([]byte("first"))
-	h.updateConfigYamlBytes([]byte("second"))
+	h.updateConfigBytes([]byte("first"))
+	h.updateConfigBytes([]byte("second"))
 
 	got := <-h.configCh
 	assert.Equal(t, "second", string(got))
@@ -187,7 +188,7 @@ func TestProcHandle_WriteToPipe(t *testing.T) {
 
 	// Send a config and read it from the pipe.
 	expected := []byte("receivers:\n  nop:\n")
-	h.updateConfigYamlBytes(expected)
+	h.updateConfigBytes(expected)
 
 	decoder := gob.NewDecoder(pipeReader)
 	var got []byte
@@ -217,7 +218,7 @@ func TestProcHandle_WriteToPipe_SuppressesClosedPipeError(t *testing.T) {
 		h.writeToPipe(t.Context(), pipeWriter)
 	}()
 
-	h.updateConfigYamlBytes([]byte("test"))
+	h.updateConfigBytes([]byte("test"))
 
 	// Give the goroutine time to process, then verify no error was reported.
 	select {
@@ -264,11 +265,23 @@ func TestPrepareAndSerializeConfig(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("serializes to yaml", func(t *testing.T) {
+	t.Run("serializes to json", func(t *testing.T) {
 		cfg := confmap.NewFromStringMap(map[string]any{"key": "value"})
-		yamlBytes, err := prepareAndSerializeConfig(cfg)
+		cfgBytes, err := prepareAndSerializeConfig(cfg)
 		require.NoError(t, err)
-		assert.Contains(t, string(yamlBytes), "key: value")
+		assert.Contains(t, string(cfgBytes), `"key":"value"`)
+	})
+
+	t.Run("round-trips multiline strings with inconsistent indentation", func(t *testing.T) {
+		// regression test for https://github.com/elastic/elastic-agent/issues/16174
+		auditRules := "      ## comment\n-a never,exit -S all -F exe=/usr/bin/example\n  -a always,exit -F arch=b64\n"
+		cfg := confmap.NewFromStringMap(map[string]any{"audit_rules": auditRules})
+		cfgBytes, err := prepareAndSerializeConfig(cfg)
+		require.NoError(t, err)
+
+		var decoded map[string]any
+		require.NoError(t, json.Unmarshal(cfgBytes, &decoded))
+		assert.Equal(t, auditRules, decoded["audit_rules"])
 	})
 }
 

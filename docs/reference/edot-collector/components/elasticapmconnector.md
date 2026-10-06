@@ -17,9 +17,9 @@ The Elastic {{product.apm}} connector generates pre-aggregated metrics from Open
 
 The connector works together with the [Elastic {{product.apm}} processor](elasticapmprocessor.md), which enriches OpenTelemetry traces with Elastic-specific attributes to ensure optimal compatibility with Elastic {{product.apm}} UIs.
 
-## Default usage in EDOT
+## Default usage in {{agent}} [default-usage-in-edot]
 
-The `elasticapm` connector is included by default in EDOT Collector deployments that ingest trace data directly into {{es}}. It's not needed when using the [{{motlp}}](opentelemetry://reference/motlp.md), as the metric aggregation happens server-side.
+The `elasticapm` connector is included by default in {{agent}} deployments that ingest trace data directly into {{es}}. It's not needed when using the [{{motlp}}](opentelemetry://reference/motlp.md), as the metric aggregation happens server-side.
 
 ### Standalone deployments
 
@@ -117,7 +117,7 @@ Follow these recommendations when using the Elastic {{product.apm}} connector:
 
 * **Use only for direct {{es}} ingestion**: If you're using the {{motlp}}, you don't need the Elastic {{product.apm}} connector, because the endpoint handles metric aggregation automatically. Using both can cause conflicts or duplicate metrics.
 
-* **Keep the connector updated**: The Elastic {{product.apm}} connector evolves with new Elastic {{product.apm}} features. Keep your EDOT Collector version current to benefit from the latest enhancements and compatibility improvements.
+* **Keep the connector updated**: The Elastic {{product.apm}} connector evolves with new Elastic {{product.apm}} features. Keep your {{agent}} version current to benefit from the latest enhancements and compatibility improvements.
 
 * **Monitor connector performance**: The connector aggregates metrics in memory before flushing. For high-throughput environments, monitor memory usage and adjust the aggregation interval or deployment resources as needed.
 
@@ -127,7 +127,7 @@ Be aware of these constraints and behaviors when using the Elastic {{product.apm
 
 * **Required for Elastic {{product.apm}} metrics**: Without the Elastic {{product.apm}} connector, you'll only have raw trace data in {{es}}. Service maps, transaction histograms, and other metric-driven {{product.apm}} features might require the pre-aggregated metrics that this connector generates.
 
-* **Not available in contrib OTel Collector**: The Elastic {{product.apm}} connector is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use EDOT Collector or [build a custom collector](../custom-collector.md) that includes Elastic's components.
+* **Not available in contrib OTel Collector**: The Elastic {{product.apm}} connector is an Elastic-specific component not included in the standard OpenTelemetry Collector or Collector Contrib distributions. To use it, you must either use {{agent}} or [build a custom collector](../custom-collector.md) that includes Elastic's components.
 
 * **Memory usage scales with cardinality**: The connector maintains in-memory aggregations for unique combinations of service names, transaction names, and other dimensions. High-cardinality data (many unique values) increases memory requirements. Monitor memory usage in high-cardinality environments.
 

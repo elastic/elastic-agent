@@ -16,6 +16,7 @@ scms:
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       force: false
       submodules: false
+      singleBranch: true
 
 actions:
   elastic-agent:
@@ -25,9 +26,11 @@ actions:
     spec:
       automerge: false
       labels:
+        - automation
         - dependencies
         - backport-skip
         - skip-changelog
+        - Team:Elastic-Agent-Control-Plane
       title: '[{{ requiredEnv "BRANCH_NAME" }}][Automation] Bump VM Image version to {{ source "latestVersion" }}'
 
 sources:

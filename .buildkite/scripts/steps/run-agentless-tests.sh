@@ -29,7 +29,7 @@ setup_extract_sha() {
     fi
 
     # Install yq for YAML parsing
-    go install github.com/mikefarah/yq/v4@v4.45.1
+    retry 3 go install github.com/mikefarah/yq/v4@v4.45.1
 }
 
 extract_sha() {

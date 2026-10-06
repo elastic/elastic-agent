@@ -1,6 +1,6 @@
 ---
 navigation_title: Logs collection
-description: Learn how to configure and customize logs collection through the Elastic Distribution of OpenTelemetry Collector. 
+description: Learn how to configure and customize logs collection through the {{agent}}. 
 applies_to:
   stack:
   serverless:
@@ -15,7 +15,7 @@ products:
 
 # Configure logs collection
 
-Learn how to configure and customize logs collection through the {{edot}} Collector. 
+Learn how to configure and customize logs collection through the {{agent}}. 
 
 :::{note}
 {{es}} Ingest Pipelines are not yet applicable to OTel-native data. Use OTel Collector processing pipelines for pre-processing and parsing of logs.
@@ -215,7 +215,7 @@ receivers:
 
 ## Customize logs parsing on Kubernetes
 
-The OpenTelemetry Collector also supports dynamic logs collection for Kubernetes Pods by defining Pods annotations. For detailed examples refer to [Dynamic workload discovery on Kubernetes now supported with EDOT Collector](https://www.elastic.co/observability-labs/blog/k8s-discovery-with-EDOT-collector) and the
+The OpenTelemetry Collector also supports dynamic logs collection for Kubernetes Pods by defining Pods annotations. For detailed examples refer to [Dynamic workload discovery on Kubernetes now supported with {{agent}}](https://www.elastic.co/observability-labs/blog/k8s-discovery-with-EDOT-collector) and the
 [Collector documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/receivercreator/README.md#supported-logs-annotations).
 
 Make sure that the Collector configuration includes the [`k8s_observer`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.123.0/extension/observer/k8sobserver) and the [`receiver_creator`](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/v0.123.0/receiver/receivercreator):

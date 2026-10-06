@@ -21,7 +21,7 @@ import (
 func TestInputsResolveNOOP(t *testing.T) {
 	contents := map[string]interface{}{
 		"outputs": map[string]interface{}{
-			"default": map[string]interface{}{
+			"default": map[string]interface{}{ // #nosec G101 -- test fixture references environment variables, not credentials
 				"type":     "elasticsearch",
 				"hosts":    []interface{}{"127.0.0.1:9200"},
 				"username": "${env.ES_USER}",
@@ -272,6 +272,66 @@ func TestConfigOTelNotNil(t *testing.T) {
 	assert.NotNil(t, c.OTel.Get("service"))
 }
 
+func TestConfigClone(t *testing.T) {
+	original, err := NewConfigFrom(map[string]interface{}{
+		"agent": map[string]interface{}{
+			"logging": map[string]interface{}{
+				"level":     "info",
+				"to_files":  false,
+				"to_stderr": true,
+			},
+		},
+		"receivers": map[string]interface{}{
+			"otlp": map[string]interface{}{},
+		},
+	})
+	require.NoError(t, err)
+
+	cloneConfig := func(t *testing.T) *Config {
+		t.Helper()
+		clone, err := original.Clone()
+		require.NoError(t, err)
+		assert.NotSame(t, original.Agent, clone.Agent)
+		assert.NotSame(t, original.OTel, clone.OTel)
+		return clone
+	}
+
+	t.Run("agent configuration", func(t *testing.T) {
+		clone := cloneConfig(t)
+		require.NoError(t, clone.Merge(map[string]interface{}{
+			"agent.logging.level":     "debug",
+			"agent.logging.to_files":  true,
+			"agent.logging.to_stderr": false,
+		}))
+
+		originalLevel, err := original.Agent.String("agent.logging.level", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		clonedLevel, err := clone.Agent.String("agent.logging.level", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		assert.Equal(t, "info", originalLevel)
+		assert.Equal(t, "debug", clonedLevel)
+
+		originalLogging, err := original.Agent.Bool("agent.logging.to_files", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		clonedLogging, err := clone.Agent.Bool("agent.logging.to_files", -1, ucfg.PathSep("."))
+		require.NoError(t, err)
+		assert.False(t, originalLogging)
+		assert.True(t, clonedLogging)
+	})
+
+	t.Run("OTel configuration", func(t *testing.T) {
+		clone := cloneConfig(t)
+		require.NoError(t, clone.OTel.Merge(confmap.NewFromStringMap(map[string]interface{}{
+			"receivers": map[string]interface{}{
+				"filelog": map[string]interface{}{},
+			},
+		})))
+
+		assert.Nil(t, original.OTel.Get("receivers::filelog"))
+		assert.NotNil(t, clone.OTel.Get("receivers::filelog"))
+	})
+}
+
 func TestConfigMerge(t *testing.T) {
 	scenarios := []struct {
 		Name   string
@@ -357,6 +417,69 @@ func TestConfigMerge(t *testing.T) {
 			err := s.Into.Merge(s.From)
 			require.NoError(t, err)
 			assert.Equal(t, s.Result, s.Into)
+		})
+	}
+}
+
+// TestConfigMergeKeepsInputVariables ensures variables in inputs and outputs are left for the transpiler when
+// merging a policy, even when they reference a path that exists in the agent's own config (e.g. agent.id).
+func TestConfigMergeKeepsInputVariables(t *testing.T) {
+	policy := func() map[string]interface{} {
+		return map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"id":        "synthetics",
+					"condition": "${agent.id} == 'abc'",
+					"streams": []interface{}{
+						map[string]interface{}{"condition": "${agent.logging.level} == 'info'"},
+					},
+				},
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{"type": "elasticsearch", "api_key": "${agent.id}"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		from func(t *testing.T) interface{}
+	}{
+		{
+			name: "raw map",
+			from: func(t *testing.T) interface{} { return policy() },
+		},
+		{
+			name: "config built with NewConfigFrom",
+			from: func(t *testing.T) interface{} {
+				c, err := NewConfigFrom(policy())
+				require.NoError(t, err)
+				return c
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			base, err := NewConfigFrom(map[string]interface{}{
+				"agent": map[string]interface{}{
+					"id":      "e1eef1e7-b4d8-4d65-85be-5dc49fc5d6eb",
+					"logging": map[string]interface{}{"level": "info"},
+				},
+			})
+			require.NoError(t, err)
+			require.NoError(t, base.Merge(tc.from(t)))
+
+			m, err := base.ToMapStr()
+			require.NoError(t, err)
+
+			input := m["inputs"].([]interface{})[0].(map[string]interface{})
+			assert.Equal(t, "${agent.id} == 'abc'", input["condition"])
+			stream := input["streams"].([]interface{})[0].(map[string]interface{})
+			assert.Equal(t, "${agent.logging.level} == 'info'", stream["condition"])
+			output := m["outputs"].(map[string]interface{})["default"].(map[string]interface{})
+			assert.Equal(t, "${agent.id}", output["api_key"])
+			// the rest of the config is still resolved as usual
+			assert.Equal(t, "e1eef1e7-b4d8-4d65-85be-5dc49fc5d6eb", m["agent"].(map[string]interface{})["id"])
 		})
 	}
 }

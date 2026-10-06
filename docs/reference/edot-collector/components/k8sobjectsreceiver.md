@@ -1,6 +1,6 @@
 ---
 navigation_title: Kubernetes objects receiver
-description: The Kubernetes objects receiver is an OpenTelemetry Collector component that collects Kubernetes API objects and events for Elastic Observability through the EDOT Collector.
+description: The Kubernetes objects receiver is an OpenTelemetry Collector component that collects Kubernetes API objects and events for Elastic Observability through {{agent}}.
 applies_to:
   stack: ga
   serverless:
@@ -13,7 +13,7 @@ products:
 
 # Kubernetes objects receiver
 
-The Kubernetes objects receiver (`k8sobjects`) is a core component of the {{edot}} (EDOT) Collector. It collects Kubernetes API objects, such as events, pods, and namespaces, and emits them as log signals for Elastic Observability.
+The Kubernetes objects receiver (`k8sobjects`) is a core component of {{agent}}. It collects Kubernetes API objects, such as events, pods, and namespaces, and emits them as log signals for Elastic Observability.
 
 For full contrib details, refer to the [OpenTelemetry `k8sobjects` receiver documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/receiver/k8sobjectsreceiver).
 

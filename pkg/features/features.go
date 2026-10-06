@@ -5,7 +5,6 @@
 package features
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -186,20 +185,31 @@ func (f *Flags) setEncryptedConfig(newValue bool) {
 	f.encryptedConfig = newValue
 }
 
-// setSource sets the source from he given cfg.
-func (f *Flags) setSource(c cfg) error {
-	// Use JSON marshalling-unmarshalling to convert cfg to mapstr
-	data, err := json.Marshal(c)
-	if err != nil {
-		return fmt.Errorf("could not convert feature flags configuration to JSON: %w", err)
+// setSource preserves the original agent.features subtree so consumers can
+// receive feature flags that are not represented by typed Agent fields.
+func (f *Flags) setSource(c *config.Config) error {
+	options := make([]interface{}, len(config.NoResolveOptions))
+	for i, option := range config.NoResolveOptions {
+		options[i] = option
 	}
 
-	var s map[string]interface{}
-	if err := json.Unmarshal(data, &s); err != nil {
-		return fmt.Errorf("could not convert feature flags JSON to mapstr: %w", err)
+	var policy map[string]any
+	if err := c.UnpackTo(&policy, options...); err != nil {
+		return fmt.Errorf("could not unpack feature flags source: %w", err)
 	}
 
-	source, err := structpb.NewStruct(s)
+	featureConfig := map[string]any{}
+	if agentConfig, ok := policy["agent"].(map[string]any); ok {
+		if configuredFeatures, ok := agentConfig["features"].(map[string]any); ok {
+			featureConfig = configuredFeatures
+		}
+	}
+
+	source, err := structpb.NewStruct(map[string]any{
+		"agent": map[string]any{
+			"features": featureConfig,
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("unable to create source from feature flags configuration: %w", err)
 	}
@@ -269,7 +279,7 @@ func Parse(policy any) (*Flags, error) {
 		flags.setEncryptedConfig(defaultEncryptedConfig)
 	}
 
-	if err := flags.setSource(parsedFlags); err != nil {
+	if err := flags.setSource(c); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
 

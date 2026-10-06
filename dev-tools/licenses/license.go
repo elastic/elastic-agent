@@ -4,4 +4,7 @@
 
 package licenses
 
+// Elasticv2LicenseName is the go-licenser license type used across this repo.
+const Elasticv2LicenseName = "Elasticv2"
+
 //go:generate go run license_generate.go

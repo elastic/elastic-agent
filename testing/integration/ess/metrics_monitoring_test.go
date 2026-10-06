@@ -178,12 +178,11 @@ func (runner *MetricsRunner) TestBeatsMetrics() {
 				{"exists", "field", "beat.stats.libbeat.output.events.acked"},
 			},
 		},
-		// per-input metrics for filestream-monitoring from elasticmonitoringreceiver.
-		// The component.id includes the stream suffix because each stream has its own receiver.
+		// per-input metrics for filestream-monitoring from elasticmonitoringreceiver
 		{
 			name: "filestream-monitoring",
 			fields: [][]string{
-				{"match", "component.id", "filestream-monitoring/filestream-monitoring-agent"},
+				{"match", "component.id", "filestream-monitoring"},
 				{"match", "metricset.name", "stats"},
 			},
 		},

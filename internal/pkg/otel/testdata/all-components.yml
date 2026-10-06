@@ -34,6 +34,10 @@ extensions:
       access_key_id: tom 
       secret_access_key: tom
       session_token: dG9tCg==
+  oauth2client:
+    client_id: someclientid
+    client_secret: someclientsecret
+    token_url: https://example.com/oauth2/default/v1/token
 
 processors:
   attributes:
@@ -115,6 +119,7 @@ receivers:
     credentials_provider: awscredentialsprovider
     region: us-east-1
     logs:
+      initial_lookback: 1h
       poll_interval: 1m
       groups:
         autodiscover:
@@ -130,6 +135,10 @@ receivers:
     endpoint: 0.0.0.0:9090
   statsd:
     endpoint: localhost:8125
+  syslog:
+    tcp:
+      listen_address: 127.0.0.1:54526
+    protocol: rfc5424
   elasticmonitoringreceiver:
   verifier:
     cloud_connector_id: "test-cc-001"
@@ -152,6 +161,13 @@ receivers:
       - 00000000-0000-0000-0000-000000000000
     cloud: AzureCloud
     credentials: default_credentials
+  # googlecloudmonitoring is intentionally omitted from this fixture (see
+  # internal/edot/otelcol/components/default.go for its registration): its
+  # Start() eagerly calls google.FindDefaultCredentials, which errors out
+  # without real GCP Application Default Credentials. This fixture is used to
+  # exercise starting every configured receiver, so a trivial config isn't
+  # practical here (no ADC available in unit-test/CI environments). This
+  # mirrors the iis/sqlserver exclusions from elastic/elastic-agent#9344.
   kafkametrics:
     brokers: [localhost:9092]
     protocol_version: 2.0.0
@@ -220,6 +236,7 @@ service:
     - awslogs_encoding/elbaccess
     - azure_auth
     - azure_encoding
+    - oauth2client
   pipelines:
     logs:
       exporters:
@@ -246,6 +263,7 @@ service:
         - azure_event_hub
         - awscloudwatch
         - verifier
+        - syslog
 
     logs/forward_receive:
       receivers:

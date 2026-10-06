@@ -86,6 +86,15 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	info := sysInfo.Info()
 	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
 
+	// Total physical memory is best-effort: some platforms/providers don't
+	// report it, in which case we leave it at 0 (omitted in the payload).
+	var totalMemory uint64
+	if memInfo, memErr := sysInfo.Memory(); memErr != nil {
+		l.Warnf("failed to gather host memory info: %v", memErr)
+	} else if memInfo != nil {
+		totalMemory = memInfo.Total
+	}
+
 	return &ecsmeta.ECSMeta{
 		Elastic: &ecsmeta.ElasticECSMeta{
 			Agent: &ecsmeta.AgentECSMeta{
@@ -109,6 +118,7 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 			ID:       info.UniqueID,
 			IP:       info.IPs,
 			MAC:      info.MACs,
+			Memory:   totalMemory,
 		},
 
 		// Operating system

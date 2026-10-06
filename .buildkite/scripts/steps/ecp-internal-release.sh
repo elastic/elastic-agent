@@ -58,7 +58,7 @@ docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VE
 echo "Tagging AMD64 image as ${PRIVATE_IMAGE_AMD64}..."
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE_AMD64"
 echo "Pushing AMD64 image..."
-docker push "$PRIVATE_IMAGE_AMD64"
+retry 3 docker push "$PRIVATE_IMAGE_AMD64"
 AMD64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE_AMD64")
 echo "AMD64 digest: ${AMD64_DIGEST}"
 
@@ -68,13 +68,13 @@ docker load -i ./build/distributions/elastic-agent-service-$DOCKER_TAG-$BUILD_VE
 echo "Tagging ARM64 image as ${PRIVATE_IMAGE_ARM64}..."
 docker image tag "elastic-agent-service:$DOCKER_TAG" "$PRIVATE_IMAGE_ARM64"
 echo "Pushing ARM64 image..."
-docker push "$PRIVATE_IMAGE_ARM64"
+retry 3 docker push "$PRIVATE_IMAGE_ARM64"
 ARM64_DIGEST=$(docker image inspect --format "{{index .RepoDigests 0}}" "$PRIVATE_IMAGE_ARM64")
 echo "ARM64 digest: ${ARM64_DIGEST}"
 
 echo "--- :rocket: Creating multi-architecture manifest"
 echo "Creating multi-arch image from digests..."
-docker buildx imagetools create -t "$PRIVATE_IMAGE" \
+retry 3 docker buildx imagetools create -t "$PRIVATE_IMAGE" \
   "$AMD64_DIGEST" \
   "$ARM64_DIGEST"
 echo "Multi-architecture image created and pushed successfully"

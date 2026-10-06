@@ -1,0 +1,157 @@
+version: 9.4.5
+entries:
+    - kind: bug-fix
+      summary: Stop upgrade rollback from being triggered by slow service component restarts
+      description: |
+        Elastic Defend restarting slowly after an upgrade could be mistaken for a
+        broken Agent build and trigger an unnecessary rollback. Agent now gives
+        service-managed components more time to check in before treating them as
+        failed, while keeping a safe margin below the upgrade watcher's grace
+        period so a truly failed component is still caught.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15863
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783505837
+      file:
+        name: 1783505837-give-service-runtime-components-more-time-to-check-in-before-failing-an-upgrade.yaml
+        checksum: 770d79b9f38748a5db2e8a74d95dd7a5624122ca
+    - kind: unknown
+      summary: Use the most verbose configured log level for the OTel collector
+      description: |
+        The collector uses the most verbose log level configured for the agent or
+        any of its components.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15765
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783951984
+      file:
+        name: 1783951984-otel-collector-most-verbose-log-level.yaml
+        checksum: 01406bd26a79da70cc00485386b8f7049718b496
+    - kind: enhancement
+      summary: Add environment variables to collector diagnostics
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15659
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1783991840
+      file:
+        name: 1783991840-add-collector-env-diagnostics.yaml
+        checksum: dd3da715be8c76541114f359b46f8e01240a8fad
+    - kind: bug-fix
+      summary: Fix getting current user failing on Windows when no profile directory is present
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16006
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784257071
+      file:
+        name: 1784257071-fix-windows-no-profile-directory.yaml
+        checksum: 36263e1ed203ce3566233fae445e9add923626a3
+    - kind: bug-fix
+      summary: fix orphaned filelog receiver in edot collector helm charts
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15731
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784562105
+      file:
+        name: 1784562105-fix-orphaned-filelog-receiver-in-edot-collector-helm-charts.yaml
+        checksum: d2cb0eaaeb62010e972b97870edcc67398fffc7f
+    - kind: other
+      summary: Bump npm to 12.0.1 in the Heartbeat synthetics Docker image.
+      description: ""
+      component: heartbeat
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15744
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784643475
+      file:
+        name: 1784643475-bump-heartbeat-npm-12.0.1.yaml
+        checksum: 91b169245a4cbb9794a0bbb549da7fadc43053c3
+    - kind: bug-fix
+      summary: Fix continuous container restarts after Fleet policy updates
+      description: |
+        In containers, Elastic Agent could restart indefinitely after a Fleet policy
+        changed the log level. Settings missing from the policy were reset to
+        defaults instead of keeping the startup values, causing the same mismatch
+        after each restart. Elastic Agent now uses startup logging as the baseline
+        and changes only settings included in the Fleet policy.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15843
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784815776
+      file:
+        name: 1784815776-fleet-policy-preserves-base-logging-settings.yaml
+        checksum: 36110763a081d5ca338684e4cdda4dfa7d98f6aa
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.156.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15813
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784893952
+      file:
+        name: 1784893952-update-otel-components-to-v0.156.0.yaml
+        checksum: 8c01feee82e44a16eed0d95dc60d0100cff3175f
+    - kind: security
+      summary: Sensitive values in JSON diagnostic files are now redacted
+      description: |
+        When collecting diagnostics, files with a JSON content type were not having
+        sensitive values (such as passwords and private keys) redacted before being
+        included in the diagnostic bundle. Only YAML files were redacted. JSON files
+        are now redacted in the same way as YAML files.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15902
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785317648
+      file:
+        name: 1785317648-redact-json-diagnostics.yaml
+        checksum: b5e5bd0248d0f560251ec77fab8b87d68a29d419
+    - kind: bug-fix
+      summary: Bake Synthetics browser binaries into the elastic-agent-complete image
+      description: |
+        npm 12 no longer runs a dependency's `install` lifecycle script during `npm i` by
+        default, so the transitive playwright-chromium `install` hook that used to download
+        the Playwright browsers into the elastic-agent-complete image during build stopped
+        running. As a result the 9.5.0 complete image shipped with no browsers and all
+        Synthetics browser monitors on Fleet-managed Private Locations failed with
+        "browserType.launch: Executable doesn't exist at .../chromium_headless_shell-<rev>/...".
+        The image build now installs the browsers explicitly with the bundled Playwright CLI
+        after `npm i`, independent of npm's install-script policy.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16016
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15993
+      impact: ""
+      action: ""
+      timestamp: 1785872496
+      file:
+        name: 1785872496-fix-complete-image-synthetics-browser-install.yaml
+        checksum: 632e8a2fd52a3010ba28a89d30ef3c7c0675e4bd

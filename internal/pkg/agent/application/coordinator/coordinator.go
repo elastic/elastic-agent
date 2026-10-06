@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,6 +28,7 @@ import (
 
 	"go.elastic.co/apm/v2"
 	"go.opentelemetry.io/collector/confmap"
+	gproto "google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -79,6 +79,13 @@ var ErrNotUpgradable = errors.New(
 	"cannot be upgraded; must be installed with install sub-command and " +
 		"running under control of the systems supervisor")
 
+// ErrNotRestartable error is returned when a restart cannot be performed
+// because the agent is not running in an environment where a re-execution
+// would be recovered.
+var ErrNotRestartable = errors.New(
+	"cannot be restarted; must be installed with install sub-command and " +
+		"running under control of the systems supervisor")
+
 // ErrUpgradeInProgress error is returned if two or more upgrades are
 // attempted at the same time.
 var ErrUpgradeInProgress = errors.New("upgrade already in progress")
@@ -98,7 +105,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -186,6 +193,9 @@ type OTelManager interface {
 	// PerformComponentDiagnostics executes the diagnostic action for the provided components. If no components are provided,
 	// then it performs the diagnostics for all current units.
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
+
+	// PerformAction executes a Fleet action for the specified component and unit.
+	PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error)
 }
 
 // ConfigChange provides an interface for receiving a new configuration.
@@ -334,6 +344,12 @@ type Coordinator struct {
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
+	// canReExec reports whether a re-execution of the process will be recovered
+	// (installed and running under a system supervisor). It is a field so tests
+	// can override it; it defaults to reexec.CanReExec. Both the upgrade path
+	// (via UpgradeManager.Upgradeable) and the restart path rely on this check.
+	canReExec func() bool
+
 	monitoringServerReloader configReloader
 
 	runtimeMgr RuntimeManager
@@ -424,6 +440,13 @@ type Coordinator struct {
 
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
+
+	// renderCache reuses the rendered inputs of the previous refresh for the (input, vars)
+	// pairs that did not change. It is reset whenever ast changes.
+	renderCache *transpiler.RenderCache
+	// expectedConfigCache reuses the unit configurations of the previous refresh for the
+	// units whose configuration did not change.
+	expectedConfigCache *component.ExpectedConfigCache
 
 	// The final component model generated from ast and vars (this is the same
 	// value that is sent to the runtime manager).
@@ -586,6 +609,10 @@ func New(
 
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
+		canReExec:        reexec.CanReExec,
+
+		renderCache:         transpiler.NewRenderCache(),
+		expectedConfigCache: component.NewExpectedConfigCache(),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -696,6 +723,23 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
+// Restart re-executes the agent to fulfil a RESTART action. It reuses the same
+// re-exec machinery as an upgrade, but performs no upgrade steps (no download,
+// marker, or version change). Unlike an upgrade it does not consider the
+// release-level upgrade flag; it only requires that a re-execution will be
+// recovered (canReExec). The action is not acknowledged here; it is
+// acknowledged on the next startup by the managed config manager.
+// Called from external goroutines.
+func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) error {
+	if !c.canReExec() {
+		return ErrNotRestartable
+	}
+
+	// ReExec sets the override state to Stopping and performs the re-execution.
+	c.ReExec(nil)
+	return nil
+}
+
 // Migrate migrates agent to a new cluster and ACKs success to the old one.
 // In case of failure no ack is performed and error is returned.
 func (c *Coordinator) Migrate(
@@ -746,7 +790,7 @@ func (c *Coordinator) Migrate(
 	}
 
 	// Target is checked prior to enroll
-	if err := fleetapiClient.CheckRemote(ctx, newFleetClient); err != nil {
+	if err := fleetapiClient.CheckRemote(ctx, c.logger, newFleetClient); err != nil {
 		return err
 	}
 
@@ -876,7 +920,7 @@ func WithRollback(rollback bool) UpgradeOpt {
 
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
 	var uOpts upgradeOpts
 	for _, opt := range opts {
 		opt(&uOpts)
@@ -941,14 +985,15 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// early check capabilities to ensure this upgrade actions is allowed
 	if c.caps != nil {
-		if !c.caps.AllowUpgrade(version, sourceURI) {
+		if !c.caps.AllowUpgrade(version, sources) {
 			c.ClearOverrideState()
 			det.Fail(ErrNotUpgradable)
 			return ErrNotUpgradable
 		}
+		sources = c.caps.FilterUpgradeSources(version, sources)
 	}
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sources, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -1005,6 +1050,9 @@ func (c *Coordinator) AckUpgrade(ctx context.Context, acker acker.Acker) error {
 // PerformAction executes an action on a unit.
 // Called from external goroutines.
 func (c *Coordinator) PerformAction(ctx context.Context, comp component.Component, unit component.Unit, name string, params map[string]interface{}) (map[string]interface{}, error) {
+	if comp.RuntimeManager == component.OtelRuntimeManager {
+		return c.otelMgr.PerformAction(ctx, comp, unit, name, params)
+	}
 	return c.runtimeMgr.PerformAction(ctx, comp, unit, name, params)
 }
 
@@ -1727,8 +1775,6 @@ func (c *Coordinator) processConfigChange(ctx context.Context, change ConfigChan
 	}
 
 	if err := change.Ack(); err != nil {
-		// This currently only happens if we fail to save the action to the state store.
-		// Not a transient failure, so return error instead of just logging.
 		return fmt.Errorf("failed to ack new policy change: %w", err)
 	}
 
@@ -1859,6 +1905,7 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	c.renderCache.Reset()
 	return nil
 }
 
@@ -1922,17 +1969,67 @@ func (c *Coordinator) observeASTVars(ctx context.Context) error {
 	return nil
 }
 
-// getDynamicInputs returns the set of dynamic inputs based on a map from input id to the dynamic provider used.
-// Currently, this simply checks if the provider really is dynamic, but this may become more complex in the future.
+// getDynamicInputs returns the set of dynamic inputs based on the information recorded while
+// rendering the inputs.
+//
+// An input is dynamic when it was rendered from a dynamic variable provider and it resolved at
+// least one variable owned by that provider which isn't listed in staticVariables. If no provider
+// variables were recorded for an input we can't tell whether it is static, so it stays flagged
+// as dynamic.
 // Returns a map of input ID to bool.
-func getDynamicInputs(inputToDynamicProvider map[string]string) map[string]bool {
+func getDynamicInputs(
+	log *logger.Logger,
+	renderedInputs map[string]transpiler.RenderedInputInfo,
+	staticVariables []string,
+) map[string]bool {
 	dynamicInputs := make(map[string]bool)
-	for inputId, dynamicProvider := range inputToDynamicProvider {
-		if composable.IsDynamic(dynamicProvider) {
-			dynamicInputs[inputId] = true
+	for inputId, info := range renderedInputs {
+		if !composable.IsDynamic(info.DynamicProvider) {
+			continue
 		}
+		// keep inputs without recorded variables flagged as dynamic
+		isDynamic := len(info.ProviderVars) == 0
+		for _, name := range info.ProviderVars {
+			if !isStaticVariable(staticVariables, name) {
+				isDynamic = true
+				break
+			}
+		}
+		if !isDynamic {
+			log.Debugf(
+				"Input %s is not treated as dynamic, all %s provider variables it uses (%v) are configured as static",
+				inputId, info.DynamicProvider, info.ProviderVars,
+			)
+			continue
+		}
+		dynamicInputs[inputId] = true
 	}
 	return dynamicInputs
+}
+
+// isStaticVariable reports whether the variable name is covered by one of the configured static
+// variables, either by an exact match or as a '.'-separated path prefix. For example
+// `kubernetes.node` covers `kubernetes.node.name` but not `kubernetes.nodename`.
+func isStaticVariable(staticVariables []string, name string) bool {
+	for _, static := range staticVariables {
+		if name == static || strings.HasPrefix(name, static+".") {
+			return true
+		}
+	}
+	return false
+}
+
+// renderedInputsForLog turns the variable introspection results into a value suitable for
+// structured logging.
+func renderedInputsForLog(renderedInputs map[string]transpiler.RenderedInputInfo) map[string]any {
+	loggable := make(map[string]any, len(renderedInputs))
+	for inputId, info := range renderedInputs {
+		loggable[inputId] = map[string]any{
+			"dynamic_provider": info.DynamicProvider,
+			"provider_vars":    info.ProviderVars,
+		}
+	}
+	return loggable
 }
 
 // processVars updates the transpiler vars in the Coordinator.
@@ -2006,7 +2103,10 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 	}
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", model.Components).Debug("Updating running component model")
+	if c.logger.IsDebug() {
+		// With encodes the components eagerly, so only pay for it when it can be logged
+		c.logger.With("components", model.Components).Debug("Updating running component model")
+	}
 	c.updateManagersWithConfig(model)
 	return nil
 }
@@ -2243,8 +2343,8 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *compone
 
 		// check if the component is dynamic and use the right runtime
 		// dynamic components can cause problems for the otel collector because of its expensive configuration reloading
-		dynamicRuntimeManager := component.RuntimeManager(runtimeCfg.DynamicInputs)
-		if runtimeCfg.DynamicInputs != "" && comp.Dynamic && comp.RuntimeManager != dynamicRuntimeManager {
+		dynamicRuntimeManager := runtimeCfg.DynamicInputs.RuntimeManagerForDynamicInput(comp.BeatName(), comp.InputType)
+		if dynamicRuntimeManager != "" && comp.Dynamic && comp.RuntimeManager != dynamicRuntimeManager {
 			logger.Warnf("Component %s uses dynamic variable providers, switching to %s runtime", comp.ID, dynamicRuntimeManager)
 			comp.RuntimeManager = dynamicRuntimeManager
 		}
@@ -2291,14 +2391,17 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
-	var inputToDynamicProvider map[string]string
+	var renderedInputInfo map[string]transpiler.RenderedInputInfo
+	var renderedInputs *transpiler.RenderedInputs
 	if ok {
-		var renderedInputs transpiler.Node
-		renderedInputs, inputToDynamicProvider, err = transpiler.RenderInputs(inputs, c.vars)
+		renderedInputs, err = transpiler.RenderInputsCached(inputs, c.vars, c.renderCache)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		renderedInputInfo = renderedInputs.Info
+		// the rendered inputs are added to the map form of the policy below, straight from
+		// the render cache, instead of being converted from the tree on every refresh
+		err = transpiler.Insert(ast, transpiler.NewList(nil), "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
@@ -2322,6 +2425,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
+	if renderedInputs != nil {
+		cfg["inputs"] = renderedInputs.Maps()
+	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
 		configInjector = c.monitorMgr.MonitoringConfig
@@ -2338,8 +2444,15 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		}
 		return comps, nil
 	}
-	dynamicInputs := getDynamicInputs(inputToDynamicProvider)
-	c.logger.With("dynamic_inputs", dynamicInputs).Debugf("Dynamic inputs found")
+	dynamicInputs := getDynamicInputs(
+		c.logger, renderedInputInfo, c.currentCfg.Settings.Internal.Runtime.DynamicInputs.StaticVariables)
+	if c.logger.IsDebug() {
+		// building the introspection details isn't free, only do it when it can be logged
+		c.logger.With(
+			"dynamic_inputs", dynamicInputs,
+			"rendered_dynamic_inputs", renderedInputsForLog(renderedInputInfo),
+		).Debugf("Dynamic inputs found")
+	}
 	comps, err := c.specs.ToComponents(
 		cfg,
 		c.currentCfg.Settings.Internal.Runtime,
@@ -2349,6 +2462,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		c.agentInfo,
 		existingCompState,
 		dynamicInputs,
+		component.WithExpectedConfigCache(c.expectedConfigCache),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
@@ -2554,7 +2668,7 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 		if oldUnit, ok := oldMap[id]; ok {
 			diff.inLast = true
 			if newUnits.Config != nil && oldUnit.Config != nil && newUnits.Config.GetSource() != nil && oldUnit.Config.GetSource() != nil {
-				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+				diff.updated = !gproto.Equal(newUnits.Config.GetSource(), oldUnit.Config.GetSource())
 			}
 			delete(oldMap, id)
 		}

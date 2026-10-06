@@ -9,16 +9,11 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
-	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-func init() {
-	composable.Providers.MustAddContextProvider("agent", ContextProviderBuilder)
-}
 
 type contextProvider struct{}
 

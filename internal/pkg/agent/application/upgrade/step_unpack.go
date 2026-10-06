@@ -125,7 +125,7 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 	}
 	defer r.Close()
 
-	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+	fileNamePrefix := getFileNamePrefix(archivePath)
 
 	pm := pathMapper{}
 	var versionedHome string
@@ -266,7 +266,7 @@ func getPackageMetadataFromZip(archivePath string) (packageMetadata, error) {
 		return packageMetadata{}, fmt.Errorf("opening zip archive %q: %w", archivePath, err)
 	}
 	defer r.Close()
-	fileNamePrefix := strings.TrimSuffix(filepath.Base(archivePath), ".zip") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
+	fileNamePrefix := getFileNamePrefix(archivePath)
 	return getPackageMetadataFromZipReader(r, fileNamePrefix)
 }
 
@@ -660,10 +660,11 @@ func readCommitHash(reader io.Reader) (string, error) {
 }
 
 func getFileNamePrefix(archivePath string) string {
-	prefix := strings.TrimSuffix(filepath.Base(archivePath), ".tar.gz") + "/" // omitting `elastic-agent-{version}-{os}-{arch}/` in filename
-	prefix = strings.Replace(prefix, fipsPrefix, "", 1)
-
-	return prefix
+	base := filepath.Base(archivePath)
+	base = strings.TrimSuffix(base, ".tar.gz")
+	base = strings.TrimSuffix(base, ".zip")
+	base = strings.Replace(base, fipsPrefix, "", 1)
+	return base + "/"
 }
 
 func validFileName(p string) bool {

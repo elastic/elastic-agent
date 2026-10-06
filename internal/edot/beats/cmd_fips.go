@@ -11,6 +11,7 @@ import (
 
 	auditbeat "github.com/elastic/beats/v7/x-pack/auditbeat/cmd"
 	filebeat "github.com/elastic/beats/v7/x-pack/filebeat/cmd"
+	heartbeat "github.com/elastic/beats/v7/x-pack/heartbeat/cmd"
 	metricbeat "github.com/elastic/beats/v7/x-pack/metricbeat/cmd"
 )
 
@@ -18,6 +19,7 @@ func AddCommands(cmd *cobra.Command) {
 	cmd.AddCommand(
 		prepareCommand(auditbeat.RootCmd),
 		prepareCommand(filebeat.Filebeat()),
+		prepareCommand(heartbeat.RootCmd),
 		prepareCommand(metricbeat.Initialize()),
 	)
 }

@@ -13,9 +13,9 @@ products:
 
 # Attributes processor
 
-The attributes processor modifies telemetry attributes as they pass through the {{edot}} Collector pipeline. It can add, update, rename, hash, or delete attributes on spans, metrics, and logs before they reach downstream processors or exporters.
+The attributes processor modifies telemetry attributes as they pass through the {{agent}} pipeline. It can add, update, rename, hash, or delete attributes on spans, metrics, and logs before they reach downstream processors or exporters.
 
-This processor is part of the core {{edot}} Collector distribution. It is useful when you need to normalize attribute names, remove sensitive fields, or enrich telemetry with additional context.
+This processor is part of the core {{agent}} distribution. It is useful when you need to normalize attribute names, remove sensitive fields, or enrich telemetry with additional context.
 
 For full contrib details, refer to the [OpenTelemetry `attributesprocessor` documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor).
 
@@ -79,7 +79,7 @@ processors:
         action: hash
 ```
 
-To enable the processor in a {{edot}} Collector pipeline:
+To enable the processor in an {{agent}} pipeline:
 
 ```yaml
 service:

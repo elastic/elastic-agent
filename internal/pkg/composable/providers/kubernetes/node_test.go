@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes"
-	"github.com/elastic/elastic-agent-autodiscover/kubernetes/metadata"
+	"github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
+	"github.com/elastic/beats/v7/pkg/autodiscover/kubernetes/metadata"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	v1 "k8s.io/api/core/v1"

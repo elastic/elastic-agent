@@ -5,10 +5,14 @@
 set -euo pipefail
 set -x # for debugging
 
+_SELF=$(dirname "$0")
+# shellcheck source=.buildkite/scripts/retry.sh
+source "${_SELF}/../retry.sh"
+
 mkdir -p build
 MERGED_COV_FILE="build/TEST-go-unit.cov"
 
-go install github.com/wadey/gocovmerge@latest
+retry 3 go install github.com/wadey/gocovmerge@latest
 
 buildkite-agent artifact download "coverage-*.out" .
 # Space separated list of paths to coverage files

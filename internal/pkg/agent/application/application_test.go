@@ -27,92 +27,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
-
-func TestLoadConfig(t *testing.T) {
-	validFleetEnc := `fleet:
-  enabled: true
-  kibana:
-    host: demo
-  access_api_key: "123"
-agent:
-  grpc:
-    port: 6790`
-
-	cases := []struct {
-		name     string
-		baseCfg  string
-		fleetEnc string
-		assert   func(t *testing.T, cfg *configuration.Configuration)
-	}{
-		{
-			name:     "fleet enabled, fleet.enc merged",
-			baseCfg:  "fleet:\n  enabled: true\n",
-			fleetEnc: validFleetEnc,
-			assert: func(t *testing.T, cfg *configuration.Configuration) {
-				assert.True(t, cfg.Fleet.Enabled)
-				assert.Equal(t, "123", cfg.Fleet.AccessAPIKey)
-				assert.Equal(t, uint16(6790), cfg.Settings.GRPC.Port)
-			},
-		},
-		{
-			name:     "standalone ignores fleet.enc",
-			baseCfg:  "fleet:\n  enabled: false\n",
-			fleetEnc: validFleetEnc,
-			assert: func(t *testing.T, cfg *configuration.Configuration) {
-				assert.False(t, cfg.Fleet.Enabled)
-				assert.Empty(t, cfg.Fleet.AccessAPIKey)
-			},
-		},
-		{
-			name: "overlapping agent.logging.level",
-			baseCfg: `fleet:
-  enabled: true
-agent:
-  logging:
-    level: info
-`,
-			fleetEnc: `fleet:
-  enabled: true
-  kibana:
-    host: demo
-  access_api_key: "123"
-agent:
-  logging:
-    level: debug`,
-			assert: func(t *testing.T, cfg *configuration.Configuration) {
-				assert.True(t, cfg.Fleet.Enabled)
-				assert.Equal(t, logp.DebugLevel, cfg.Settings.LoggingConfig.Level)
-			},
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			origCfg := paths.Config()
-			t.Cleanup(func() { paths.SetConfig(origCfg) })
-			paths.SetConfig(t.TempDir())
-			testutils.InitStorage(t)
-			require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte(tc.baseCfg), 0o644))
-
-			if tc.fleetEnc != "" {
-				store, err := storage.NewEncryptedDiskStore(t.Context(), paths.AgentConfigFile())
-				require.NoError(t, err)
-				require.NoError(t, store.Save(strings.NewReader(tc.fleetEnc)))
-			}
-
-			cfg, err := configuration.LoadConfig(t.Context(), nil)
-			require.NoError(t, err)
-			require.NotNil(t, cfg)
-			tc.assert(t, cfg)
-		})
-	}
-}
 
 func TestLimitsLog(t *testing.T) {
 	log, obs := loggertest.New("TestLimitsLog")
@@ -125,6 +44,7 @@ func TestLimitsLog(t *testing.T) {
 		ctx,
 		log,
 		log,
+		log,
 		logp.DebugLevel,
 		&info.AgentInfo{}, // info.AgentInfo
 		nil,               // coordinator.ReExecManager
@@ -132,6 +52,7 @@ func TestLimitsLog(t *testing.T) {
 		true,              // testingMode
 		time.Millisecond,  // fleetInitTimeout
 		true,              // disable monitoring
+		nil,
 		configuration.DefaultConfiguration(),
 		nil,
 		rollbackSrc,
@@ -540,10 +461,10 @@ func createFakeAgentInstall(t *testing.T, topDir, version, hash string, useVersi
 	if runtime.GOOS == "windows" {
 		agentExecutableName += ".exe"
 	}
-	err = os.WriteFile(paths.BinaryPath(absVersionedHomePath, agentExecutableName), []byte(fmt.Sprintf("Placeholder for agent %s", version)), 0o750)
+	err = os.WriteFile(paths.BinaryPath(absVersionedHomePath, agentExecutableName), fmt.Appendf(nil, "Placeholder for agent %s", version), 0o750)
 	require.NoErrorf(t, err, "error writing elastic agent binary placeholder %q", agentExecutableName)
 	fakeLogPath := filepath.Join(absLogsDirPath, "fakelog.ndjson")
-	err = os.WriteFile(fakeLogPath, []byte(fmt.Sprintf("Sample logs for agent %s", version)), 0o750)
+	err = os.WriteFile(fakeLogPath, fmt.Appendf(nil, "Sample logs for agent %s", version), 0o750)
 	require.NoErrorf(t, err, "error writing fake log placeholder %q", fakeLogPath)
 
 	// return the path relative to top exactly like the step_unpack does
@@ -580,10 +501,10 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Ensure New encrypts config")
-	cfg, err := configuration.LoadConfig(t.Context(), nil)
-	require.NoError(t, err)
+	startupCfg, cfg := loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -593,6 +514,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -607,10 +529,10 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 	require.EqualValues(t, storage.DefaultAgentEncryptedStandaloneConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
 
 	t.Log("Ensure New does not alter contents when no changes are made")
-	cfg, err = configuration.LoadConfig(t.Context(), nil)
-	require.NoError(t, err)
+	startupCfg, cfg = loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -620,6 +542,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -640,10 +563,10 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
       enabled: true`), 0640)
 	require.NoError(t, err)
 
-	cfg, err = configuration.LoadConfig(t.Context(), nil)
-	require.NoError(t, err)
+	startupCfg, cfg = loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -653,6 +576,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -675,10 +599,10 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
     level: debug`), 0640)
 	require.NoError(t, err)
 
-	cfg, err = configuration.LoadConfig(t.Context(), nil)
-	require.NoError(t, err)
+	startupCfg, cfg = loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -688,6 +612,7 @@ func TestApplicationStandaloneEncrypted(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -754,10 +679,10 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
   host: https://localhost:8220`))
 	require.NoError(t, err)
 
-	cfg, err := configuration.LoadConfig(t.Context(), nil)
-	require.NoError(t, err)
+	startupCfg, cfg := loadTestConfig(t)
 	_, _, _, err = New(
 		t.Context(),
+		log,
 		log,
 		log,
 		logp.DebugLevel,
@@ -767,6 +692,7 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 		false, // not in testing mode - we are testing fs interactions
 		time.Second,
 		true,
+		startupCfg,
 		cfg,
 		nil,
 		nil,
@@ -776,4 +702,12 @@ func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	ymlBytes, err := os.ReadFile(paths.ConfigFile())
 	require.NoError(t, err)
 	require.EqualValues(t, DefaultAgentFleetConfig, ymlBytes, "unexpected contents in elastic-agent.yml")
+}
+
+func loadTestConfig(t *testing.T) (startupCfg, cfg *configuration.Configuration) {
+	t.Helper()
+
+	reloader, err := configuration.NewConfigReloader(t.Context(), nil, nil)
+	require.NoError(t, err)
+	return reloader.StartupConfiguration(), reloader.Configuration()
 }

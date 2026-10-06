@@ -8,6 +8,10 @@ package cmd
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -20,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
@@ -122,4 +127,79 @@ func Test_Enroll_mTLS(t *testing.T) {
 	assert.Equal(t, enrollOptions.Key, fleetTLS.Certificate.Key)
 	assert.Equal(t,
 		enrollOptions.KeyPassphrasePath, fleetTLS.Certificate.PassphrasePath)
+}
+
+// mTLSServer generates the necessary certificates and tls.Config for a mTLS
+// server. If agentPassphrase is given, it'll encrypt the agent's client
+// certificate key.
+// It returns the *tls.Config to be used with httptest.NewUnstartedServer,
+// the agentRootPair, agentChildPair, fleetRootPathPair, fleetCertPathPair.
+// Theirs Cert and Key values are the path to the respective certificate and
+// certificate key in PEM format.
+func mTLSServer(t *testing.T, agentPassphrase string) (
+	*tls.Config, certutil.Pair, certutil.Pair, certutil.Pair, certutil.Pair) {
+
+	dir := t.TempDir()
+
+	// generate certificates
+	agentRootPair, agentCertPair, err := certutil.NewRootAndChildCerts()
+	require.NoError(t, err, "could not create agent's root CA and child certificate")
+
+	// encrypt keys if needed
+	if agentPassphrase != "" {
+		agentChildDERKey, _ := pem.Decode(agentCertPair.Key)
+		require.NoError(t, err, "could not create tls.Certificates from child certificate")
+
+		encPem, err := x509.EncryptPEMBlock( //nolint:staticcheck // we need to drop support for this, but while we don't, it needs to be tested.
+			rand.Reader,
+			"EC PRIVATE KEY",
+			agentChildDERKey.Bytes,
+			[]byte(agentPassphrase),
+			x509.PEMCipherAES128)
+		require.NoError(t, err, "failed encrypting agent child certificate key block")
+
+		agentCertPair.Key = pem.EncodeToMemory(encPem)
+	}
+
+	agentRootPathPair := savePair(t, dir, "agent_ca", agentRootPair)
+	agentCertPathPair := savePair(t, dir, "agent_cert", agentCertPair)
+
+	fleetRootPair, fleetChildPair, err := certutil.NewRootAndChildCerts()
+	require.NoError(t, err, "could not create fleet-server's root CA and child certificate")
+	fleetRootPathPair := savePair(t, dir, "fleet_ca", fleetRootPair)
+	fleetCertPathPair := savePair(t, dir, "fleet_cert", fleetChildPair)
+
+	// configure server's TLS
+	fleetRootCertPool := x509.NewCertPool()
+	fleetRootCertPool.AppendCertsFromPEM(fleetRootPair.Cert)
+	cert, err := tls.X509KeyPair(fleetChildPair.Cert, fleetChildPair.Key)
+	require.NoError(t, err, "could not create tls.Certificates from child certificate")
+
+	agentRootCertPool := x509.NewCertPool()
+	agentRootCertPool.AppendCertsFromPEM(agentRootPair.Cert)
+
+	cfg := &tls.Config{
+		RootCAs:      fleetRootCertPool,
+		Certificates: []tls.Certificate{cert},
+		ClientCAs:    agentRootCertPool,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+	}
+
+	return cfg, agentRootPathPair, agentCertPathPair, fleetRootPathPair, fleetCertPathPair
+}
+
+// savePair saves the key pair on {dest}/{name}.pem and {dest}/{name}_key.pem
+func savePair(t *testing.T, dest string, name string, pair certutil.Pair) certutil.Pair {
+	certPath := filepath.Join(dest, name+".pem")
+	err := os.WriteFile(certPath, pair.Cert, 0o600)
+	require.NoErrorf(t, err, "could not save %s certificate", name)
+
+	keyPath := filepath.Join(dest, name+"_key.pem")
+	err = os.WriteFile(keyPath, pair.Key, 0o600)
+	require.NoErrorf(t, err, "could not save %s certificate key", name)
+
+	return certutil.Pair{
+		Cert: []byte(certPath),
+		Key:  []byte(keyPath),
+	}
 }

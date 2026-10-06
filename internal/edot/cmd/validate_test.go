@@ -52,7 +52,7 @@ func TestValidateCommand(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
-			err := validateOtelConfig(context.Background(), tc.ConfigPaths)
+			err := validateOtelConfig(context.Background(), tc.ConfigPaths, nil)
 
 			if tc.ExpectingErr {
 				require.Error(t, err)

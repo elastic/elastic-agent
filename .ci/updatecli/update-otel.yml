@@ -13,6 +13,7 @@ scms:
       token: '{{ requiredEnv "GITHUB_TOKEN" }}'
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       commitusingapi: true
+      singleBranch: true
 
 sources:
   current_core_beta:
@@ -72,6 +73,7 @@ actions:
       automerge: false
       labels:
       - automation
+      - dependencies
       - skip-changelog
       - "Team:Elastic-Agent-Control-Plane"
       description: |

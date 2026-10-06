@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"sync"
 	"testing"
@@ -34,6 +36,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
+	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	noopacker "github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -62,7 +65,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -87,7 +90,7 @@ func TestPolicyChange(t *testing.T) {
 		}
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, nullStore, newStateStoreMock(), ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, ack)
 		require.NoError(t, err)
@@ -122,7 +125,7 @@ func TestPolicyAcked(t *testing.T) {
 		mockSaver := newStateStoreMock()
 		// Test default FF value
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
 
 		err := handler.Handle(context.Background(), action, tacker)
 		require.NoError(t, err)
@@ -151,7 +154,7 @@ func TestPolicyAcked(t *testing.T) {
 		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
 		handler.disableAckFn = func() bool { return false }
 
 		err := handler.Handle(context.Background(), action, tacker)
@@ -181,7 +184,7 @@ func TestPolicyAcked(t *testing.T) {
 		mockSaver := newStateStoreMock()
 
 		cfg := configuration.DefaultConfiguration()
-		handler := NewPolicyChangeHandler(log, agentInfo, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
+		handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, nullStore, mockSaver, ch, defaultLogLevelSet(t))
 		handler.disableAckFn = func() bool { return true }
 
 		err := handler.Handle(context.Background(), action, tacker)
@@ -1309,6 +1312,243 @@ func (c *captureStore) Save(r io.Reader) error {
 	return nil
 }
 
+func TestPolicyChangeHandler_handlePolicyChange_LoggingOutputChanges(t *testing.T) {
+	tests := []struct {
+		name string
+		// fallback is the value used when Fleet does not set the field.
+		fallback map[string]interface{}
+		// current is the value the agent is using before the policy change.
+		current map[string]interface{}
+		// policy is the value sent by Fleet.
+		policy map[string]interface{}
+		// want is the value expected after applying the policy.
+		want map[string]interface{}
+		// wantReExec says whether the change requires an agent restart.
+		wantReExec bool
+		// replay runs the same policy again using the persisted configuration.
+		replay bool
+	}{
+		{
+			name: "level-only policy preserves fallback to_files",
+			fallback: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.level": "debug",
+			},
+			want: map[string]interface{}{
+				"agent.logging.level": "debug",
+			},
+			wantReExec: false,
+		},
+		{
+			name: "changing agent to_files triggers re-exec",
+			fallback: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "explicit agent to_files=false triggers re-exec",
+			fallback: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			want: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "changing agent files.path triggers re-exec",
+			fallback: map[string]interface{}{
+				"agent.logging.files.path": "/baseline",
+			},
+			current: map[string]interface{}{
+				"agent.logging.files.path": "/baseline",
+			},
+			policy: map[string]interface{}{
+				"agent.logging.files.path": "/fleet",
+			},
+			want: map[string]interface{}{
+				"agent.logging.files.path": "/fleet",
+			},
+			wantReExec: true,
+		},
+		{
+			name: "replaying agent to_files policy does not re-exec",
+			fallback: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			wantReExec: false,
+			replay:     true,
+		},
+		{
+			name: "removing agent to_files restores fallback value",
+			fallback: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.to_files": true,
+			},
+			policy: map[string]interface{}{}, // empty policy
+			want: map[string]interface{}{
+				"agent.logging.to_files": false,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "changing event_data.to_files triggers re-exec",
+			fallback: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			wantReExec: true,
+		},
+		{
+			name: "replaying event_data.to_files policy does not re-exec",
+			fallback: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			policy: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			want: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			wantReExec: false,
+			replay:     true,
+		},
+		{
+			name: "removing event_data.to_files restores fallback value",
+			fallback: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			current: map[string]interface{}{
+				"agent.logging.event_data.to_files": true,
+			},
+			policy: map[string]interface{}{},
+			want: map[string]interface{}{
+				"agent.logging.event_data.to_files": false,
+			},
+			wantReExec: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			log, _ := loggertest.New(t.Name())
+			fallbackConfig, err := configuration.NewFromConfig(config.MustNewConfigFrom(test.fallback))
+			require.NoError(t, err)
+
+			currentConfig, err := configuration.NewFromConfig(config.MustNewConfigFrom(test.current))
+			require.NoError(t, err)
+
+			wantLevel := logp.InfoLevel
+			if level, ok := test.policy["agent.logging.level"].(string); ok {
+				require.NoError(t, wantLevel.Unpack(level))
+			}
+
+			runPolicyChange := func(currentConfig *configuration.Configuration, wantReExec bool) *configuration.Configuration {
+				t.Helper()
+
+				logLevelSetter := newMockLogLevelSetter(t)
+				logLevelSetter.EXPECT().SetLogLevel(mock.Anything, &wantLevel).Return(nil).Once()
+				if wantReExec {
+					logLevelSetter.EXPECT().ReExec(mock.Anything).Return().Once()
+				}
+
+				store := &captureStore{}
+				h := &PolicyChangeHandler{
+					log:                   log,
+					agentInfo:             &info.AgentInfo{},
+					config:                currentConfig,
+					fallbackConfig:        fallbackConfig,
+					store:                 store,
+					runtimeLogLevelSetter: logLevelSetter,
+				}
+
+				err := h.handlePolicyChange(t.Context(), config.MustNewConfigFrom(test.policy), nil)
+				require.NoError(t, err)
+				if wantReExec {
+					logLevelSetter.AssertNumberOfCalls(t, "ReExec", 1)
+				} else {
+					logLevelSetter.AssertNotCalled(t, "ReExec", mock.Anything)
+				}
+				assertLoggingOutputsEqual(t, h.config, test.want)
+
+				persistedRaw, err := config.NewConfigFrom(store.saved)
+				require.NoError(t, err)
+				persisted, err := configuration.NewFromConfig(persistedRaw)
+				require.NoError(t, err)
+				assertLoggingOutputsEqual(t, persisted, test.want)
+				return persisted
+			}
+
+			runs := 1
+			if test.replay {
+				runs = 2
+			}
+			for run := 0; run < runs; run++ {
+				wantReExec := test.wantReExec && run == 0
+				currentConfig = runPolicyChange(currentConfig, wantReExec)
+			}
+		})
+	}
+}
+
+func assertLoggingOutputsEqual(t *testing.T, cfg *configuration.Configuration, want map[string]interface{}) {
+	t.Helper()
+	got := map[string]interface{}{
+		"agent.logging.level":                cfg.Settings.LoggingConfig.Level.String(),
+		"agent.logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
+		"agent.logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,
+		"agent.logging.event_data.to_files":  cfg.Settings.EventLoggingConfig.ToFiles,
+		"agent.logging.event_data.to_stderr": cfg.Settings.EventLoggingConfig.ToStderr,
+		"agent.logging.files.path":           cfg.Settings.LoggingConfig.Files.Path,
+	}
+	for field, expected := range want {
+		assert.Equal(t, expected, got[field], field)
+	}
+}
+
 func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 	agentInfo := &info.AgentInfo{}
 
@@ -1354,10 +1594,9 @@ func TestFleetToReaderPersistsLoggingOutputFlags(t *testing.T) {
 		}))
 		require.NoError(t, err)
 
-		assert.False(t, h.applyLoggingConfigChange(policyWithSameLogging, &logger.Config{
-			ToStderr: true,
-			ToFiles:  false,
-		}),
+		loggingConfig := &logger.Config{ToStderr: true, ToFiles: false}
+		_, needsReExec := h.buildConfigPatch(policyWithSameLogging, nil, nil, loggingConfig)
+		assert.False(t, needsReExec,
 			"after re-exec + reload the same policy must not be detected as a logging change, which would cause an infinite re-exec loop")
 	})
 }
@@ -1367,6 +1606,19 @@ func defaultLogLevelSet(t *testing.T) *mockLogLevelSetter {
 	logLevelSetter := newMockLogLevelSetter(t)
 	logLevelSetter.EXPECT().SetLogLevel(mock.Anything, &defaultLogLevel).Return(nil).Once()
 	return logLevelSetter
+}
+
+// configPatchFrom reads a configPatch-shaped snapshot from a full configuration.
+// It is the reverse of configWithPatch and commitConfig, used to verify that
+// those functions cover every field in configPatch.
+func configPatchFrom(cfg *configuration.Configuration) configPatch {
+	return configPatch{
+		eventLogging:    *cfg.Settings.EventLoggingConfig,
+		logging:         *cfg.Settings.LoggingConfig,
+		fleetClient:     cfg.Fleet.Client,
+		monitoringHTTP:  cfg.Settings.MonitoringConfig.HTTP,
+		monitoringPprof: cfg.Settings.MonitoringConfig.Pprof,
+	}
 }
 
 // mockStateStore implements the package-local stateStore interface to spy on
@@ -1395,12 +1647,176 @@ func (m *mockStateStore) SetAckToken(s string) {
 
 func (m *mockStateStore) Action() fleetapi.Action {
 	args := m.Called()
-	return args.Get(0).(fleetapi.Action)
+	a, _ := args.Get(0).(fleetapi.Action)
+	return a
+}
+
+func (m *mockStateStore) SaveAction(a fleetapi.Action) error {
+	args := m.Called(a)
+	return args.Error(0)
 }
 
 func newStateStoreMock() *mockStateStore {
 	s := &mockStateStore{}
-	s.On("SetAction", mock.Anything).Return().Once()
-	s.On("Save").Return(nil).Once()
+	s.On("SaveAction", mock.Anything).Return(nil).Once()
 	return s
+}
+
+// errorStore is a storage.Store that always returns an error from Save.
+type errorStore struct{ err error }
+
+func (e *errorStore) Save(_ io.Reader) error { return e.err }
+
+func TestPolicyChangeStateStoreSaveFail(t *testing.T) {
+	log, _ := logger.New("", false)
+	agentInfo := &info.AgentInfo{}
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	tacker := &testAcker{}
+
+	// Policy sets a non-default log level so the non-mutation assertion below
+	// is meaningful: if commitConfig ran, h.config.Settings.LoggingConfig.Level
+	// would change from the default to debug.
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "abc123",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"agent.logging.level": "debug"}},
+	}
+
+	failStore := &mockStateStore{}
+	failStore.On("SaveAction", action).Return(errors.New("injected disk error")).Once()
+
+	debugLevel := logp.DebugLevel
+	logLevelSetter := newMockLogLevelSetter(t)
+	logLevelSetter.EXPECT().SetLogLevel(mock.Anything, &debugLevel).Return(nil).Once()
+
+	cfg := configuration.DefaultConfiguration()
+	handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, &storage.NullStore{}, failStore, ch, logLevelSetter)
+	original := configPatchFrom(handler.config)
+
+	err := handler.Handle(context.Background(), action, tacker)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to persist policy action to state store")
+	assert.Empty(t, ch, "policyChange must not be queued when state store write fails")
+	assert.Empty(t, tacker.Items(), "Fleet must not be ACKed when state store write fails")
+	assert.Equal(t, original, configPatchFrom(handler.config), "h.config must be unchanged when state store write fails")
+	failStore.AssertExpectations(t)
+}
+
+func TestPolicyChangeSaveConfigFail(t *testing.T) {
+	log, _ := logger.New("", false)
+	agentInfo := &info.AgentInfo{}
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	tacker := &testAcker{}
+
+	// Policy sets a non-default log level so the non-mutation assertion below
+	// is meaningful: if commitConfig ran, h.config.Settings.LoggingConfig.Level
+	// would change from the default to debug.
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "def456",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"agent.logging.level": "debug"}},
+	}
+
+	// saveConfig is written before stateStore, so when saveConfig fails the
+	// stateStore is never touched — no SaveAction calls expected.
+	untouchedStore := &mockStateStore{}
+	failFleetStore := &errorStore{err: errors.New("injected fleet.enc write error")}
+
+	debugLevel := logp.DebugLevel
+	logLevelSetter := newMockLogLevelSetter(t)
+	logLevelSetter.EXPECT().SetLogLevel(mock.Anything, &debugLevel).Return(nil).Once()
+
+	cfg := configuration.DefaultConfiguration()
+	handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, failFleetStore, untouchedStore, ch, logLevelSetter)
+	original := configPatchFrom(handler.config)
+
+	err := handler.Handle(context.Background(), action, tacker)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to persist policy config")
+	assert.Empty(t, ch, "policyChange must not be queued when fleet.enc write fails")
+	assert.Empty(t, tacker.Items(), "Fleet must not be ACKed when fleet.enc write fails")
+	assert.Equal(t, original, configPatchFrom(handler.config), "h.config must be unchanged when fleet.enc write fails")
+	untouchedStore.AssertExpectations(t)
+}
+
+func TestConfigPatchCompleteness(t *testing.T) {
+	// Field count guard: update this number when adding fields to configPatch,
+	// and update configPatchFrom, configWithPatch, and commitConfig to match.
+	assert.Equal(t, 5, reflect.TypeOf(configPatch{}).NumField(),
+		"configPatch has new fields — update configPatchFrom, configWithPatch, and commitConfig")
+
+	cfg := configuration.DefaultConfiguration()
+	h := &PolicyChangeHandler{config: cfg}
+
+	// Use values that differ from the defaults so the round-trip and non-mutation
+	// assertions below are meaningful (equal values would pass even with bugs).
+	altHTTP := &monitoringCfg.MonitoringHTTPConfig{Host: "1.2.3.4", Port: 1234}
+	altPprof := &monitoringCfg.PprofConfig{Enabled: true}
+	patch := configPatch{
+		eventLogging:    logger.Config{ToStderr: true, ToFiles: false},
+		logging:         logger.Config{ToStderr: false, ToFiles: true},
+		fleetClient:     remote.Config{Host: "https://fleet.example.com"},
+		monitoringHTTP:  altHTTP,
+		monitoringPprof: altPprof,
+	}
+	// configWithPatch: every patch field must appear in the returned config.
+	// Non-mutation of h.config is verified by TestConfigWithPatchDoesNotMutateConfig.
+	got := h.configWithPatch(patch)
+	assert.Equal(t, patch, configPatchFrom(got),
+		"configWithPatch must copy all configPatch fields into the returned configuration")
+
+	// commitConfig round-trip: every field in patch must be written to h.config.
+	h.commitConfig(patch)
+	assert.Equal(t, patch, configPatchFrom(h.config),
+		"commitConfig must write all configPatch fields into h.config")
+}
+
+func TestConfigWithPatchDoesNotMutateConfig(t *testing.T) {
+	// Serialize h.config before and after calling configWithPatch with a patch
+	// that differs in every field. Any shared-pointer aliasing that lets the
+	// patch write through to h.config will produce a different YAML output.
+	// This catches mutations at any nesting depth, not just the five fields
+	// tracked by configPatch.
+	cfg := configuration.DefaultConfiguration()
+	cfg.Fleet.Client.Host = "http://original.fleet.example.com"
+	cfg.Settings.MonitoringConfig.HTTP.Host = "0.0.0.0"
+
+	h := &PolicyChangeHandler{config: cfg}
+
+	before, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+
+	patch := configPatch{
+		eventLogging:    logger.Config{ToStderr: true},
+		logging:         logger.Config{ToFiles: true},
+		fleetClient:     remote.Config{Host: "http://new.fleet.example.com"},
+		monitoringHTTP:  &monitoringCfg.MonitoringHTTPConfig{Host: "1.2.3.4", Port: 1234},
+		monitoringPprof: &monitoringCfg.PprofConfig{Enabled: true},
+	}
+	h.configWithPatch(patch)
+
+	after, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+	assert.Equal(t, string(before), string(after),
+		"configWithPatch must not mutate h.config — check for shallow-copy pointer aliasing")
+}
+
+func TestPolicyChangeNilStateStore(t *testing.T) {
+	log, _ := logger.New("", false)
+	agentInfo := &info.AgentInfo{}
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "nil-store",
+		ActionType: "POLICY_CHANGE",
+		Data:       fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{"k": "v"}},
+	}
+	cfg := configuration.DefaultConfiguration()
+	handler := NewPolicyChangeHandler(log, agentInfo, nil, cfg, &storage.NullStore{}, nil, ch, defaultLogLevelSet(t))
+	require.NoError(t, handler.Handle(context.Background(), action, noopacker.New()))
+	assert.Len(t, ch, 1, "policyChange must be queued when stateStore is nil")
 }

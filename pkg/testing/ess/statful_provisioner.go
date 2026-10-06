@@ -66,6 +66,10 @@ func (p *StatefulProvisioner) Name() string {
 	return ProvisionerStateful
 }
 
+func (p *StatefulProvisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationRemote
+}
+
 func (p *StatefulProvisioner) SetLogger(l common.Logger) {
 	p.logger = l
 	p.client.SetLogger(l)

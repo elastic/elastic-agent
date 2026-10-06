@@ -113,11 +113,11 @@ message UpgradeRequest {
   // this version field.
   string version = 1;
 
-  // (Optional) Use a different source URI than configured.
+  // (Optional) Ordered list of source URIs for retrieving upgrade artifacts
   //
-  // If provided the upgrade process will use the provided sourceURI instead of the configured
-  // sourceURI in the configuration.
-  string sourceURI = 2;
+  // If provided the upgrade process will use the provided sources instead of the configured
+  // sources in the configuration.
+  repeated string sources = 2;
 
   // (Optional) Overrides predefined behavior for agent package verification.
   //

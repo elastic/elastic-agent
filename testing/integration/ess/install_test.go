@@ -14,6 +14,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -22,11 +23,11 @@ import (
 	"time"
 
 	"github.com/schollz/progressbar/v3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
-	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
@@ -537,6 +538,8 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 	if customUsername != "" {
 		pt := progressbar.NewOptions(-1)
 		_, err := install.EnsureUserAndGroup(customUsername, customGroup, pt, true)
+		_ = pt.Finish()
+		_ = pt.Exit()
 		require.NoError(t, err)
 	}
 
@@ -581,7 +584,7 @@ func testInstallWithoutBasePathWithCustomUser(ctx context.Context, t *testing.T,
 
 func testComponentsPresence(ctx context.Context, fixture *atesting.Fixture, requiredComponents []componentPresenceDefinition, unwantedComponents []componentPresenceDefinition) func(*testing.T) {
 	return func(t *testing.T) {
-		componentsDir, err := aTesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
+		componentsDir, err := atesting.FindComponentsDir(fixture.AgentDataDir(), fixture.Version())
 		require.NoError(t, err)
 
 		componentsPaths := func(component string) []string {
@@ -880,4 +883,101 @@ func randStr(length int) string {
 	}
 
 	return string(runes)
+}
+
+// Regression test for elastic-agent/issues/15626
+func TestInstalledServiceWithoutUserProfile(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Windows},
+		},
+	})
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(15*time.Minute))
+	defer cancel()
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+	require.NoError(t, fixture.Prepare(ctx))
+
+	config := `
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+inputs: []
+agent.monitoring.enabled: false
+`
+	require.NoError(t, fixture.Configure(ctx, []byte(config)))
+
+	profileListKey := `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\S-1-5-18`
+
+	backup := filepath.Join(t.TempDir(), "profilelist-s-1-5-18.reg")
+	out, err := exec.CommandContext(ctx, "reg", "export", profileListKey, backup, "/y").CombinedOutput()
+	require.NoError(t, err, "failed to export ProfileList key: %s", out)
+	defer func() {
+		out, err := exec.CommandContext(t.Context(), "reg", "import", backup).CombinedOutput()
+		require.NoError(t, err, "failed to restore ProfileList, key : %s", out)
+	}()
+
+	// Remove profile path value so LocalSystem has no resolvable profile.
+	out, err = exec.CommandContext(ctx, "reg", "delete", profileListKey, "/v", "ProfileImagePath", "/f").CombinedOutput()
+	require.NoError(t, err, "failed to delete ProfileImagePath: %s", out)
+	out, err = exec.CommandContext(ctx, "reg", "query", profileListKey, "/v", "ProfileImagePath").CombinedOutput()
+	require.Error(t, err, "ProfileImagePath must be absent for this test to be valid: %s", out)
+
+	opts := atesting.InstallOpts{
+		Privileged:     true,
+		Force:          true,
+		NonInteractive: true,
+	}
+	out, err = fixture.Install(ctx, &opts)
+	if err != nil {
+		t.Logf("install output: %s", out)
+		require.NoError(t, err)
+	}
+
+	checks := &installtest.CheckOpts{
+		Privileged:    opts.Privileged,
+		TargetVersion: fixture.Version(),
+		TopPath:       installtest.DefaultTopPath(),
+	}
+	require.NoError(t, installtest.CheckSuccess(ctx, fixture, opts.BasePath, checks))
+	fixture.PostUninstallHook(func(t *testing.T) {
+		require.NoError(t, installtest.CheckUninstallSuccess(checks))
+	})
+
+	t.Cleanup(func() {
+		if t.Failed() {
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute) //nolint:forbidigo // t.Context() is cancelled by cleanup time
+			defer cleanupCancel()
+
+			serviceOutput, err := exec.CommandContext(cleanupCtx, "sc", "query", paths.ServiceName()).CombinedOutput() //nolint:gosec // G204: service name is not user input
+			if err != nil {
+				t.Logf("sc query failed: %v: %s", err, serviceOutput)
+			} else {
+				t.Logf("Service state:\n%s\n", serviceOutput)
+			}
+
+			logs, err := fixture.Exec(cleanupCtx, []string{"logs", "-n", "20", "--exclude-events"})
+			if err != nil {
+				t.Logf("failed to fetch final logs inside cleanup: %v: %s", err, logs)
+				return
+			}
+			t.Logf("Logs:\n%s\n", string(logs))
+		}
+	})
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, fixture.IsHealthy(ctx))
+	}, 3*time.Minute, 5*time.Second, "agent did not become healthy on first startup")
+
+	require.NoError(t, fixture.ExecRestart(ctx), "daemon restart failed")
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.NoError(c, fixture.IsHealthy(ctx))
+	}, 3*time.Minute, 5*time.Second, "agent did not become healthy after restart")
 }
