@@ -912,11 +912,8 @@ func CrossBuild(ctx context.Context) error {
 func PackageAgentCore(ctx context.Context) {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
-	cfg := mage.SettingsFromContext(ctx)
 	mg.CtxDeps(ctx, CrossBuild)
 
-<<<<<<< HEAD
-=======
 	cfg := devtools.SettingsFromContext(ctx)
 
 	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
@@ -928,11 +925,6 @@ func PackageAgentCore(ctx context.Context) {
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
 
-	fmt.Println("--- Build elastic-agent-core")
-	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuild, CrossBuild, Build.WindowsArchiveRootBinary)
-
-	fmt.Println("--- Package elastic-agent-core")
->>>>>>> 6055fc3 (Split packaging steps for integration tests (#16923))
 	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		panic(err)

@@ -268,7 +268,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-<<<<<<< HEAD
       - label: ":package: amd64: OTEL_COMPONENT Containers"
         key: packaging-containers-amd64-otel-component
         env:
@@ -299,13 +298,6 @@ steps:
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
 
-  - label: "Triggering Integration tests"
-    command: "buildkite-agent pipeline upload .buildkite/bk.integration.pipeline.yml"
-    plugins:
-    - *sparse_checkout_plugin
-
-=======
->>>>>>> 6055fc3 (Split packaging steps for integration tests (#16923))
   ## PRs
   - label: "Triggering custom FIPS integration tests"
     if: build.pull_request.id != null
