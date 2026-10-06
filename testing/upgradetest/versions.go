@@ -293,7 +293,9 @@ func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedS
 	}
 
 	for _, v := range upgradeableVersions {
-		if v.Prerelease() != "" || v.BuildMetadata() != "" {
+		// Accept plain GA releases and IAR versions (independent artifact releases with build
+		// metadata matching ^build\d{12}), consistent with findRequiredVersions.
+		if v.Prerelease() != "" || (v.BuildMetadata() != "" && !v.IsIndependentRelease()) {
 			continue
 		}
 		if v.Major() == current.Major() && v.Minor() < current.Minor() {

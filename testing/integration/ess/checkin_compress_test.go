@@ -33,7 +33,7 @@ import (
 // The agent will use a proxy when communicating with fleet-server; the proxy verifies that the Content-Encoding: gzip header is set on at least one checkin request
 func TestCheckinCompress(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
@@ -117,7 +117,7 @@ func isAgentCheckinRequest(r *http.Request) bool {
 // confirming that compression: none survived enrollment.
 func TestEnrollPreservesCheckinConfig(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
