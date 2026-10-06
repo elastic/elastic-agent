@@ -1,6 +1,12 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 #
 # Spike for observability-robots#5246 (ingest-dev#3042, phase A): probe what Orka macOS VMs offer.
+env:
+  # Orka images have no git mirror: a full clone is ~500 MiB and takes several minutes
+  BUILDKITE_GIT_CLONE_FLAGS: "-v --depth 1"
+  BUILDKITE_GIT_FETCH_FLAGS: "-v --prune --depth 1"
+  BUILDKITE_GIT_CLEAN_FLAGS: "-ffxdq"
+
 steps:
   - group: "Orka macOS probe"
     steps:
