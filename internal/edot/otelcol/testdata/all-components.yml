@@ -263,7 +263,6 @@ service:
         - otlp
         - nop
         - elasticapmintake
-        - elasticmonitoringreceiver
         - azure_event_hub
         - awscloudwatch
         - verifier
@@ -320,6 +319,7 @@ service:
         - zookeeper
         - azure_event_hub
         - awscloudwatch
+        - elasticmonitoringreceiver
 
     metrics/aggregated:
       receivers:
