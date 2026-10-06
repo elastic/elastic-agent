@@ -61,7 +61,6 @@ common:
       elastic/vault-github-token#v0.2.1:
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
-<<<<<<< HEAD
     - "default"
     - "fleet"
     - "fleet-endpoint-security"
@@ -75,25 +74,8 @@ common:
     - "upgrade"
     - "upgrade-flavor"
     - "upgrade-rollback"
-  # Variants/Groups for the Linux AMD64 ITs
-  - linux_deb_variants: &linux_deb_variants
-=======
-      - "default"
-      - "fleet"
-      - "fleet-endpoint-security"
-      - "fleet-endpoint-security-mtls"
-      - "fleet-privileged"
-      - "fleet-proxy"
-      - "fleet-upgrade"
-      - "install-uninstall"
-      - "standalone-upgrade"
-      - "standalone-upgrade-unprivileged"
-      - "upgrade"
-      - "upgrade-flavor"
-      - "upgrade-rollback"
   # Variants/Groups for the Linux AMD64 ITs (tar.gz package)
   - linux_variants: &linux_variants
->>>>>>> 6055fc3 (Split packaging steps for integration tests (#16923))
     - container
     - default
     - fleet
