@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261002164714-668de5814701
+Version: v7.0.0-alpha2.0.20261005212453-ceeefbf800f8
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -62168,11 +62168,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/azure-sdk-for-go/sdk/internal
-Version: v1.12.0
+Version: v1.13.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/azure-sdk-for-go/sdk/internal@v1.12.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/azure-sdk-for-go/sdk/internal@v1.13.0/LICENSE.txt:
 
 MIT License
 
