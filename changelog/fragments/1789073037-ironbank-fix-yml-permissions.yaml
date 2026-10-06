@@ -1,5 +1,0 @@
-kind: bug-fix
-
-summary: Fix Ironbank Dockerfile to restore module yml file permissions to 0644 after broad 0666 chmod.
-
-component: elastic-agent
