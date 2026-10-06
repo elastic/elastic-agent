@@ -150,7 +150,7 @@ CI and local checks enforce the following (details in [.golangci.yml](./.golangc
 
 ## Documentation
 
-When a change adds or edits a published doc page, read `docs-authoring` (`.agents/skills/docs-authoring`) and `docs/contributing-docs.md` before writing. The skill holds the rules that apply in every docs repository. The page holds the Elastic Agent facts: where the docset lives, which branch publishes, and which sections are generated.
+When a change adds or edits a published doc page, read `docs-authoring` (`.agents/skills/docs-authoring`) before writing. Read `docs/contributing-docs.md` for where these docs live, which branch publishes them, and which sections are generated.
 
 ## Contribution hygiene
 
