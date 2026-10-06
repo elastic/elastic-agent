@@ -141,7 +141,7 @@ receivers:
     protocol: rfc5424
   elasticmonitoringreceiver:
   verifier:
-    cloud_connector_id: "test-cc-001"
+    identity_federation_id: "test-cc-001"
     verification_id: "test-verify-001"
     policies:
       - policy_id: "policy-001"
