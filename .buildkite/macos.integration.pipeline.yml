@@ -1,25 +1,41 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
 #
 # Spike for observability-robots#5246 (ingest-dev#3042, phase A): probe what Orka macOS VMs offer.
-env:
-  # Orka images have no git mirror: a full clone is ~500 MiB and takes several minutes
-  BUILDKITE_GIT_CLONE_FLAGS: "-v --depth 1"
-  BUILDKITE_GIT_FETCH_FLAGS: "-v --prune --depth 1"
-  BUILDKITE_GIT_CLEAN_FLAGS: "-ffxdq"
+#
+# Orka images have no git mirror (/opt/git-mirrors) and BUILDKITE_GIT_CLONE_FLAGS from the pipeline env is
+# not honored there, so the default checkout is a full ~500 MiB clone that takes minutes. Skip it and fetch
+# only the commit under test.
+common:
+  - shallow_checkout: &shallow_checkout |
+      set -euo pipefail
+      echo "~~~ Shallow checkout of $${BUILDKITE_COMMIT}"
+      start=$$(date +%s)
+      mkdir -p src && cd src
+      git init -q
+      git remote add origin https://github.com/elastic/elastic-agent.git
+      git fetch -q --depth 1 origin "$${BUILDKITE_COMMIT}"
+      git checkout -q FETCH_HEAD
+      echo "checkout seconds: $$(( $$(date +%s) - start ))"
 
 steps:
   - group: "Orka macOS probe"
     steps:
       - label: "probe macos 15 arm64 (generic-base-15-arm-002)"
-        command: .buildkite/scripts/macos_probe.sh
+        skip_checkout: true
+        command:
+          - *shallow_checkout
+          - .buildkite/scripts/macos_probe.sh
         agents:
           provider: orka
           imagePrefix: generic-base-15-arm-002
         timeout_in_minutes: 30
 
       - label: "probe macos 27 arm64 (endpoint-macos-27-arm)"
-        command: .buildkite/scripts/macos_probe.sh
+        skip_checkout: true
         soft_fail: true
+        command:
+          - *shallow_checkout
+          - .buildkite/scripts/macos_probe.sh
         agents:
           provider: orka
           imagePrefix: endpoint-macos-27-arm
