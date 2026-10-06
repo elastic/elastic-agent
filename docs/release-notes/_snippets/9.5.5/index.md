@@ -1,5 +1,9 @@
 ## 9.5.5 [elastic-agent-release-notes-9.5.5]
 
+::::{important} 
+The 9.5.5 release contains fixes for potential security vulnerabilities. For details, go to [security announcements](https://discuss.elastic.co/c/announcements/security-announcements/31).
+::::
+
 _This release also includes: [Breaking changes](/release-notes/breaking-changes.md#elastic-agent-9.5.5-breaking-changes)._
 
 
