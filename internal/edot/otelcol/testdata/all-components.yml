@@ -186,6 +186,7 @@ receivers:
     password: guest
   memcached:
     endpoint: localhost:11211
+    transport: udp
   couchdb:
     endpoint: http://localhost:5984
   oracledb:
