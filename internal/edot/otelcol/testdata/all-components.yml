@@ -27,7 +27,7 @@ extensions:
   awslogs_encoding/elbaccess:
     format: elbaccess
   azure_auth:
-    managed_identity:
+    use_default: true
   azure_encoding:
   awscredentialsprovider:
     credentials:
