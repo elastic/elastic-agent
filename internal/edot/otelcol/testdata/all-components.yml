@@ -244,6 +244,7 @@ service:
     - azure_auth
     - azure_encoding
     - oauth2client
+    - awscredentialsprovider
   pipelines:
     logs:
       exporters:
