@@ -215,11 +215,16 @@ func (p *provisioner) setup(ctx context.Context, instanceName, kubernetesVersion
 			return "", "", fmt.Errorf("creating Infrastructure object: %w", err)
 		}
 
-		// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/250 is fixed.
 		if microShiftImage == imagesByKubernetesMinor["1.35"] {
+			// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/250 is fixed.
 			if _, err := p.containerExecOutput(ctx, containerName, nil,
 				"/bin/sh", "-c", "cp /usr/share/containers/registries.d/*.yaml /etc/containers/registries.d/"); err != nil {
 				return "", "", fmt.Errorf("copying registries.d files: %w", err)
+			}
+			// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/252 is fixed.
+			if _, err := p.containerExecOutput(ctx, containerName, nil,
+				"/bin/sh", "-c", "cat /usr/share/containers/storage.conf.d/*.conf /usr/share/containers/storage.rootful.conf.d/*.conf > /etc/containers/storage.conf && systemctl restart crio"); err != nil {
+				return "", "", fmt.Errorf("writing storage.conf: %w", err)
 			}
 		}
 	}
