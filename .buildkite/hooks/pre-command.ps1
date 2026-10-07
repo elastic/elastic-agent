@@ -55,12 +55,11 @@ if ($env:BUILDKITE_PLUGINS -like "*oblt-aws-auth*") {
     $env:CACHEPROG_S3_REGION = "us-east-1"
     $env:CACHEPROG_S3_PREFIX = "cacheprog-poc"
     $env:CACHEPROG_S3_EXPIRATION = "24h"
-    # Use a persistent sibling of GOCACHE so objects survive across builds on
-    # the same agent. Falls back to a job-scoped temp dir if GOCACHE is unset.
-    $gocache = $env:GOCACHE
-    if (-not $gocache) { $gocache = (go env GOCACHE 2>$null) }
-    if ($gocache -and $gocache -ne "off") {
-      $env:CACHEPROG_ROOT_DIRECTORY = "${gocache}-cacheprog"
+    # Persistent per-user dir so objects survive across builds on the same
+    # agent. Must be a single absolute path, otherwise cacheprog silently falls
+    # back to a separate temp dir per process.
+    if ($env:LOCALAPPDATA) {
+      $env:CACHEPROG_ROOT_DIRECTORY = Join-Path $env:LOCALAPPDATA "cacheprog-poc"
     } else {
       $env:CACHEPROG_ROOT_DIRECTORY = Join-Path $dir "disk"
     }

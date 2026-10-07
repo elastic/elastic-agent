@@ -94,13 +94,17 @@ setup_cacheprog() {
   # a bucket lifecycle rule; the Expires header alone doesn't delete anything.
   export CACHEPROG_S3_PREFIX="cacheprog-poc"
   export CACHEPROG_S3_EXPIRATION="24h"
-  # Use a persistent sibling of GOCACHE so objects survive across builds on the
-  # same agent. Separate from GOCACHE itself to avoid interfering with Go's own
-  # cache GC (cacheprog has no pruning; the agent recycle bounds disk growth).
-  # Falls back to a job-scoped temp dir if GOCACHE is unset or off.
-  local gocache_dir="${GOCACHE:-$(go env GOCACHE 2>/dev/null)}"
-  if [[ -n "${gocache_dir}" && "${gocache_dir}" != "off" ]]; then
-    export CACHEPROG_ROOT_DIRECTORY="${gocache_dir}-cacheprog"
+  # Persistent per-user dir so objects survive across builds on the same agent
+  # (cacheprog has no pruning; agent recycling bounds the growth). It must be a
+  # single absolute path, otherwise cacheprog silently falls back to a separate
+  # temp dir per process. Don't derive it from `go env GOCACHE`: in this hook
+  # the asdf shim prints extra lines on stdout.
+  local cache_base="${XDG_CACHE_HOME:-${HOME:-}/.cache}"
+  if [[ "${os}" == "darwin" ]]; then
+    cache_base="${HOME:-}/Library/Caches"
+  fi
+  if [[ "${cache_base}" == /* ]]; then
+    export CACHEPROG_ROOT_DIRECTORY="${cache_base}/cacheprog-poc"
   else
     export CACHEPROG_ROOT_DIRECTORY="${dir}/disk"
   fi
