@@ -57,6 +57,7 @@ jq -r --arg t "$TEST" '.[] | select(.test_name | endswith(" " + $t))
 - `test_name` is `"<go package> <TestName[/subtest]>"`.
 - `tags["build.url"]` is the exact build. **`tags["build.job_id"]` is the "Aggregate test reports" job** (it uploads results to Test Engine; it has no test artifacts) — don't use it as the job.
 - The run JSON itself (`…/runs/<run-uuid>`) also has `build_id` (the build UUID) and `commit_sha`, but no build number.
+- `failed_executions` returns many rows per run (duplicates with different `created_at`): reduce with `| sort -u`. Auto-filed issues often list several Examples but carry one Run; dedupe the Run URLs before looping.
 - Process every Run link, not just the first: different examples are often different builds, branches or platforms, and some may have expired.
 - `created_at` on a failed execution is when results were uploaded (after the job ends), not when the test failed. Match the issue's `**Time:**` against job `started_at`/`finished_at`.
 - `tags` carry no OS/arch/branch. Get the platform from the job name, or from package names in the stacktrace (e.g. `elastic-agent-<v>-windows-arm64.zip`).
@@ -94,6 +95,7 @@ jq -r '.jobs[] | select(.type=="script" and (.state=="failed" or .retried==true)
   bk job log <job-id> -p <slug> -b <n> 2>/dev/null | perl -pe 's/\e_(bk;t=\d+\a)?//g; s/\e\[[0-9;]*[A-Za-z]//g' > job.log
   grep -aE -- "FAIL:( [^ ]+)? $TEST \(" job.log; grep -aE 'DONE [0-9]+ tests' job.log
   ```
+- In a large build (~50+ failed or retried jobs) don't guess: fetch each candidate's log and count which contain `--- FAIL: <Test>` (loop in the worked example). The first attempt is not always the interesting one — retries can fail where first attempts passed, which points at stack state that changed during the build.
 - **If the retry failed the same way too**, the test probably fails every time on that platform. That is a strong classification clue: look for a platform-specific cause before timing or flakiness.
 
 ## Finding other occurrences

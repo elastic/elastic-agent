@@ -117,6 +117,7 @@ Discrepancies between *adjacent* layers are some of the strongest signals — th
 | Test name or subtest mentions `otel`/`process`/`compare`, or logs show `Deferring … until … instances stop` | **runtime switch** (L1) — the old instance must stop before the new one starts; check the transition, then each runtime separately |
 | Endpoint / Elastic Defend / tamper protection / uninstall token; group `fleet-endpoint-security`; `endpoint` component | **L1 ↔ Endpoint service** — install/uninstall/upgrade lifecycle, check-ins, proxied actions; Endpoint's own log and diagnostics |
 | A process-mode beat exits, or misses check-ins (`Failed: pid '…' exited with code …`) | **L1 ↔ beat process** |
+| Agent healthy, but the test finds **0 documents** and the agent logs `events were dropped` / output errors | **not an agent layer** — the backing stack (Elasticsearch rejecting writes: shard limit, disk watermark, auth). Read `logs/*/events/` in the bundle for the status and reason; worked example: [examples/shared-stack-shard-limit.md](examples/shared-stack-shard-limit.md) |
 | `Condition never satisfied` on a Fleet/Kibana-side gate (`IsPolicyRevision`, agent document, Fleet status) rather than on agent behaviour | **probably the test** — check the gate against the flake taxonomy (step 6e) before blaming the agent |
 
 **Skip this step** when the failure is clearly outside the agent — e.g. the install command itself failed, the VM or package manager misbehaved, ESS/Fleet provisioning failed, or a runtime dependency is missing on the platform. Say so and go to step 6 with the no-bundle path.
@@ -129,6 +130,7 @@ Otherwise, **ask the user**: state your hypothesis (one sentence) and use `AskUs
 - **L4 — beat** — beat code, embedded in a receiver or running as its own process.
 - **Endpoint service** — Elastic Endpoint's lifecycle as driven by the agent, plus Endpoint's own log.
 - **All / unknown** — partition all layers, hunt cross-layer discrepancies. Default for ambiguous symptoms.
+- **Not the agent** — the environment (backing stack, CI host, package manager) or the test itself. Use when the evidence already shows the agent behaved correctly.
 
 `AskUserQuestion` takes at most four options: offer the three most plausible layers for the runtimes involved (no L2/L3 for a process-mode beat; Endpoint service only when Endpoint is installed) plus **All / unknown**.
 
@@ -191,11 +193,16 @@ Structure (details in [references/rca-playbook.md](references/rca-playbook.md)):
 
 Cite the Buildkite build and job URLs, the issue, source files (`<file>:<line>`), and bundle paths so the user can click through. Mention which occurrence you analyzed if it isn't the one in the issue.
 
+## Example
+
+[examples/shared-stack-shard-limit.md](examples/shared-stack-shard-limit.md) walks a complete RCA (an auto-filed issue where the agent was healthy and the shared Elasticsearch stack rejected writes): the report, the commands that produced each piece of evidence, and the pitfalls on the way. Read it once to calibrate the depth and format expected.
+
 ## House rules
 
 - **Validate every download.** A file with the right name is not the right file until it parses.
 - **Never invent build numbers, job IDs, or artifact paths.** If an artifact is missing, say so and explain the likely reason (expired, never uploaded, failure before upload).
 - **"Listed" ≠ available.** The Buildkite API lists artifacts whose GCS objects have expired.
+- **Say what was proven and what was inferred.** If you opened two bundles out of ten affected jobs, the report says so.
 - **Don't re-implement the diagnostics skill's triage.** Invoke it; cite its findings.
 - **Distinguish test flakiness from agent bugs from infra.** A timing-sensitive `Eventually` with too-short timeout is a test bug. A consistent state-machine deadlock is an agent bug. A package-manager lock or cloud quota error is infra. Say which you think it is.
 - **Stop at root cause + next step.** Do not write code or open PRs. The user will follow up if they want a fix.

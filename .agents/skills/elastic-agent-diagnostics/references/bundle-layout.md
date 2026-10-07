@@ -61,6 +61,8 @@ logs/
     elastic-agent-watcher-<YYYYMMDD>[-N].ndjson    # upgrade watcher log
     elastic-agent-metrics.ndjson                   # periodic agent metrics
     components/                                    # per-component log files, when present
+    events/
+      elastic-agent-event-log-<YYYYMMDD>.ndjson    # per-event output log: why the output (e.g. Elasticsearch) rejected or dropped events — status codes and reasons
   services/
     endpoint-*.log                                 # Elastic Endpoint's own log (ECS JSON, nested fields) — when Endpoint is installed
 ```

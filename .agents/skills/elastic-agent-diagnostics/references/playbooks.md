@@ -182,6 +182,16 @@ jq -r 'select((.message // "") | test("failed to build pipelines|error found dur
   | "\(.["@timestamp"]) \(.["log.level"]) \(.message[:300])"' "$BUNDLE_DIR"/logs/*/*.ndjson | sort | head -20
 ```
 
+### Why were events dropped or rejected?
+
+The agent log only says `Failed to index N events … events were dropped!`. The reason (HTTP status and Elasticsearch error) is in the events log:
+
+```bash
+grep -aoE 'status=[0-9]+\): .{0,200}' "$BUNDLE_DIR"/logs/*/events/*.ndjson | sed -E 's/[0-9a-f]{8}-[0-9a-f-]{27}/<id>/g' | sort | uniq -c | sort -rn | head
+```
+
+Common reasons: `maximum normal shards open` (cluster shard cap — infra), `401`/`403` (revoked or wrong credentials — e.g. after unenroll), mapping/`illegal_argument_exception` (data or template problem).
+
 ### Errors with timestamps and origin (best for triage)
 
 ```bash
