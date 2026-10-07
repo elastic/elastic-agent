@@ -14,7 +14,7 @@ The collector itself is always a subprocess on current versions (the in-process 
 
 ## Which runtime a beat input gets
 
-There is an ongoing migration from process to otel; defaults differ by agent version, so check the bundle's `version.txt` and read the code at the build's commit when it matters. On main (`DefaultRuntimeConfig`, `pkg/component/component.go`):
+There is an ongoing migration from process to otel; defaults differ by agent version (dynamic inputs below are one example), so check the bundle's `version.txt` and read the code at the build's commit when it matters. On main (`DefaultRuntimeConfig`, `pkg/component/component.go`):
 
 - `filebeat`, `metricbeat`, `auditbeat`, `osquerybeat`, `packetbeat` inputs default to **otel**; `heartbeat` defaults to **process**. The global default is `process`.
 - Beat receiver behaviour and the settings are documented in [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) (note: its defaults text lags main; `DefaultRuntimeConfig` is authoritative). Agent self-monitoring has its own switch, `agent.monitoring._runtime_experimental` (default `otel`; env `AGENT_MONITORING_RUNTIME_EXPERIMENTAL`).
@@ -22,7 +22,7 @@ There is an ongoing migration from process to otel; defaults differ by agent ver
 - Overrides, highest precedence first: an input's own `_runtime_experimental: otel|process` → `agent.internal.runtime.output.<type>` → `agent.internal.runtime.<beat>.<input type>` → `agent.internal.runtime.<beat>.default` → `agent.internal.runtime.default`. Because `<beat>.default` is set to `otel`, setting only the global `default: process` does **not** move those beats back to process. Look for these keys in `computed-config.yaml` / `pre-config.yaml`.
 - **Automatic fallback to process** when the component can't run in otel, logged by the coordinator:
   - `otel runtime is not supported for component <id>, switching to process runtime, reason: …` — e.g. an unsupported output type (only elasticsearch, logstash, kafka are supported) or unsupported output options (elasticsearch `indices`, `loadbalance: false`, …).
-  - `Component <id> uses dynamic variable providers, switching to <runtime> runtime` — only when `agent.internal.runtime.dynamic_inputs` is configured to force a runtime (off by default); see [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) §"Dynamic Inputs".
+  - `Component <id> uses dynamic variable providers, switching to <runtime> runtime` (warn) — a component with inputs rendered from a dynamic provider (kubernetes, docker, `local_dynamic`; flagged *dynamic*, always) is moved to another runtime, because every change to it reloads the collector config, which is expensive. Whether this happens depends on the **version**: `agent.internal.runtime.dynamic_inputs` defaults to `process` in 9.3, 9.4 and 9.5 (**on by default**: dynamic components run as beat processes), and is empty on main / 9.6 since #15536 (2026-07-15; dynamic components stay otel). Resolution is per beat and input type, like `agent.internal.runtime`; `static_variables` can exempt inputs whose variables never change. Read `DefaultRuntimeConfig` at the build's commit, and see [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) §"Dynamic Inputs" (it doesn't state the default).
   - For monitoring: `otel runtime is not supported for monitoring output, switching to process runtime, reason: …`.
 
 ## Telling the runtime from a bundle
