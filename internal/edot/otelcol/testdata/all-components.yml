@@ -109,6 +109,9 @@ receivers:
   docker_stats:
   azure_event_hub:
     connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
+    blob_checkpoint_store:
+      connection: DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=c3VwZXJTZWNyZXQxMjM0;EndpointSuffix=core.windows.net
+      container_name: checkpoints
   awss3:
     starttime: "2024-01-01 01:00"
     endtime: "2024-01-02"
