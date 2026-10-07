@@ -565,6 +565,7 @@ func New(
 		FleetState:     fleetState,
 		FleetMessage:   fleetMessage,
 		LogLevel:       logLevel,
+		Tags:           agentInfo.GetTags(),
 		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
@@ -1311,7 +1312,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
 					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
 					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),
-					Tags:             c.agentInfo.GetTags(),
+					Tags:             c.State().Tags,
 					Metadata:         meta,
 				}
 				o, err := yaml.Marshal(output)

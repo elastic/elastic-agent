@@ -155,7 +155,6 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 		},
 		LogLevelPolicy:   "info",
 		LogLevelOverride: "trace",
-		tags:             []string{"tag1", "tag2"},
 		meta: &ecsmeta.ECSMeta{
 			Elastic: &ecsmeta.ElasticECSMeta{
 				Agent: &ecsmeta.AgentECSMeta{
@@ -177,7 +176,9 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 				Platform: "darwin",
 			},
 		},
-	}}
+	},
+		stateBroadcaster: broadcaster.New(State{Tags: []string{"tag1", "tag2"}}, 0, 0),
+	}
 
 	expected := `
 headers:

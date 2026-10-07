@@ -228,6 +228,7 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
+	s.Tags = slices.Clone(c.state.Tags)
 	s.UpgradeDetails = c.state.UpgradeDetails
 	s.PolicyApplied = c.state.PolicyApplied
 	if len(c.state.PolicyConfiguredActionTypes) > 0 {

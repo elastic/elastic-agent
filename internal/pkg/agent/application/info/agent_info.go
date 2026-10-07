@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"sync"
 
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -77,8 +76,7 @@ type AgentInfo struct {
 	// output created by this agent (see component.toIntermediate).
 	esHeaders map[string]string
 
-	tagsMu sync.RWMutex
-	tags   []string
+	tags []string
 }
 
 // for unit testing
@@ -166,18 +164,12 @@ func (i *AgentInfo) SetLogLevelOverride(ctx context.Context, level string) error
 
 // GetTags returns the tags that identify this agent.
 func (i *AgentInfo) GetTags() []string {
-	i.tagsMu.RLock()
-	defer i.tagsMu.RUnlock()
-
 	return slices.Clone(i.tags)
 }
 
 // SetTags updates the agent tags, trimming spaces and removing duplicates.
 func (i *AgentInfo) SetTags(tags []string) {
-	normalized := NormalizeTags(tags)
-	i.tagsMu.Lock()
-	defer i.tagsMu.Unlock()
-	i.tags = normalized
+	i.tags = NormalizeTags(tags)
 }
 
 // ReloadID reloads agent info ID from configuration file.
