@@ -99,6 +99,7 @@ steps:
         depends_on: [packaging-darwin-arm64, macos-smoke-ess]
         soft_fail: true
         env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
           TEST_RUN: "^TestEnrollReplaceToken$"
         command: .buildkite/scripts/macos_smoke.sh default
         artifact_paths:
@@ -117,6 +118,7 @@ steps:
         depends_on: [packaging-darwin-arm64, macos-smoke-ess]
         soft_fail: true
         env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
           TEST_RUN: "^TestStandaloneUpgrade$"
         command: .buildkite/scripts/macos_smoke.sh standalone-upgrade
         artifact_paths:
