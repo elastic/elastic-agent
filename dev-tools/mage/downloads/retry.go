@@ -7,7 +7,7 @@ package downloads
 import (
 	"time"
 
-	backoff "github.com/cenkalti/backoff/v4"
+	backoff "github.com/cenkalti/backoff/v7"
 )
 
 // timeoutFactor a multiplier for the max timeout when doing backoff retries.

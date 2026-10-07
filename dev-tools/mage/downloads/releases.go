@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/Jeffail/gabs/v2"
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 )
 
 // DownloadURLResolver interface to resolve URLs for downloadable artifacts
