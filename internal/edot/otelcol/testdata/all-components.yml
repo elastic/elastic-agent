@@ -5,9 +5,9 @@ exporters:
       - http://localhost:9200
   file:
     path: /tmp/file-exporter-output.json
-  otlp:
+  otlp_grpc:
     endpoint: localhots:4317
-  otlphttp:
+  otlp_http:
     endpoint: https://localhost.com:4318
   nop:
   logstash:
@@ -24,7 +24,7 @@ extensions:
         key: X-Scope-OrgID
         from_context: tenant_id
         default_value: Org-ID
-  awslogs_encoding/elbaccess:
+  aws_logs_encoding/elbaccess:
     format: elbaccess
   azure_auth:
     use_default: true
@@ -46,7 +46,7 @@ processors:
         key: key1
         value: value1
   batch:
-  cumulativetodelta:
+  cumulative_to_delta:
   elasticinframetrics:
   filter:
   resource:
@@ -54,7 +54,7 @@ processors:
       - action: insert
         key: key1
         value: value1
-  resourcedetection:
+  resource_detection:
   transform:
   memory_limiter/processor:
     check_interval: 1s
@@ -65,19 +65,19 @@ processors:
     rate: 1
     burst: 1
   tail_sampling:
-  logdedup:
+  log_dedup:
   beat:
 
 receivers:
   nop:
-  filelog:
+  file_log:
     include:
       - /filelog/path
   otlp:
     protocols:
       grpc:
       http:
-  httpcheck:
+  http_check:
     targets:
       - endpoint: http://localhost:80
         method: GET
@@ -119,8 +119,8 @@ receivers:
       s3_bucket: 'test'
       s3_prefix: 'test'
     encodings:
-      - extension: awslogs_encoding/elbaccess
-  awscloudwatch:
+      - extension: aws_logs_encoding/elbaccess
+  aws_cloudwatch:
     credentials_provider: awscredentialsprovider
     region: us-east-1
     logs:
@@ -135,7 +135,7 @@ receivers:
       queries:
         - namespace: AWS/Lambda
           metric_name: Invocations
-  prometheusremotewrite:
+  prometheus_remote_write:
     endpoint: 0.0.0.0:9090
   statsd:
     endpoint: localhost:8125
@@ -160,7 +160,7 @@ receivers:
           value_type: int
         scalar_oids:
           - oid: ".1.3.6.1.2.1.1.8.0"
-  azuremonitor:
+  azure_monitor:
     subscription_ids:
       - 00000000-0000-0000-0000-000000000000
     cloud: AzureCloud
@@ -172,7 +172,7 @@ receivers:
   # exercise starting every configured receiver, so a trivial config isn't
   # practical here (no ADC available in unit-test/CI environments). This
   # mirrors the iis/sqlserver exclusions from elastic/elastic-agent#9344.
-  kafkametrics:
+  kafka_metrics:
     brokers: [localhost:9092]
     protocol_version: 2.0.0
     scrapers:
@@ -210,7 +210,7 @@ receivers:
     endpoint: localhost:2181
 
 connectors:
-  spanmetrics:
+  span_metrics:
     histogram:
       explicit:
         buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
@@ -242,7 +242,7 @@ service:
     - memory_limiter
     - health_check
     - headers_setter
-    - awslogs_encoding/elbaccess
+    - aws_logs_encoding/elbaccess
     - azure_auth
     - azure_encoding
     - oauth2client
@@ -254,23 +254,23 @@ service:
         - debug
         - elasticsearch
         - file
-        - otlp
+        - otlp_grpc
       processors:
         - attributes
         - batch
         - filter
         - resource
-        - resourcedetection
+        - resource_detection
         - transform
         - memory_limiter/processor
-        - logdedup
+        - log_dedup
       receivers:
-        - filelog
+        - file_log
         - otlp
         - nop
         - elasticapmintake
         - azure_event_hub
-        - awscloudwatch
+        - aws_cloudwatch
         - verifier
         - syslog
 
@@ -290,30 +290,30 @@ service:
       exporters:
         - nop
         - debug
-        - otlp
+        - otlp_grpc
       processors:
         - attributes
         - batch
-        - cumulativetodelta
+        - cumulative_to_delta
         - elasticinframetrics
         - filter
         - resource
-        - resourcedetection
+        - resource_detection
         - transform
       receivers:
         - nop
         - otlp
-        - httpcheck
-        - spanmetrics
+        - http_check
+        - span_metrics
         - prometheus
         - elasticapmintake
         - apache
         - mysql
         - postgresql
-        - prometheusremotewrite
+        - prometheus_remote_write
         - snmp
-        - azuremonitor
-        - kafkametrics
+        - azure_monitor
+        - kafka_metrics
         - statsd
         - haproxy
         - mongodb
@@ -324,7 +324,7 @@ service:
         - vcenter
         - zookeeper
         - azure_event_hub
-        - awscloudwatch
+        - aws_cloudwatch
         - elasticmonitoringreceiver
 
     metrics/aggregated:
@@ -333,23 +333,23 @@ service:
       processors:
       exporters:
         - debug
-        - otlp
+        - otlp_grpc
 
     traces:
       exporters:
         - nop
         - debug
         - elasticsearch
-        - otlp
-        - otlphttp
-        - spanmetrics
+        - otlp_grpc
+        - otlp_http
+        - span_metrics
         - elasticapm
       processors:
         - attributes
         - batch
         - filter
         - resource
-        - resourcedetection
+        - resource_detection
         - transform
         - elasticapm
       receivers:
