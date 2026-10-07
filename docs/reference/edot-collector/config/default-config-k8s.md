@@ -77,7 +77,7 @@ The Gateway Collector configuration comprises the pipelines for data enrichment 
 
 ### Managed OTLP Endpoint
 
-With the managed OTLP Endpoint, the Gateway Collector configuration pipes all the data from the [`OTLP`] receiver through a [`batch`] processor before the data is being exported through `OTLP` to the managed endpoint.
+With the managed OTLP endpoint, the Gateway Collector receives data through the [`OTLP`] receiver and exports it to the managed endpoint through OTLP exporters. The exporters batch data in their sending queues using `sending_queue.batch`.
 
 With this scenario there's no need to do any Elastic-specific enrichment in your Kubernetes cluster, as all of that happens behind the managed OTLP endpoint.
 
