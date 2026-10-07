@@ -185,6 +185,8 @@ receivers:
   mongodb:
     hosts:
       - endpoint: localhost:27017
+    direct_connection: true
+    timeout: 1s
   rabbitmq:
     endpoint: http://localhost:15672
     username: guest
