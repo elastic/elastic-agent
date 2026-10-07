@@ -99,14 +99,10 @@ steps:
         depends_on: [packaging-darwin-arm64, macos-smoke-ess]
         soft_fail: true
         env:
-          BUILDKITE_SKIP_CHECKOUT: "true"
-          BUILDKITE_GIT_SUBMODULES: "false"
           TEST_RUN: "^TestEnrollReplaceToken$"
-        command:
-          - *shallow_checkout
-          - .buildkite/scripts/macos_smoke.sh default
+        command: .buildkite/scripts/macos_smoke.sh default
         artifact_paths:
-          - src/build/**
+          - build/**
         agents:
           provider: orka
           imagePrefix: endpoint-macos-27-arm
@@ -121,14 +117,10 @@ steps:
         depends_on: [packaging-darwin-arm64, macos-smoke-ess]
         soft_fail: true
         env:
-          BUILDKITE_SKIP_CHECKOUT: "true"
-          BUILDKITE_GIT_SUBMODULES: "false"
           TEST_RUN: "^TestStandaloneUpgrade$"
-        command:
-          - *shallow_checkout
-          - .buildkite/scripts/macos_smoke.sh standalone-upgrade
+        command: .buildkite/scripts/macos_smoke.sh standalone-upgrade
         artifact_paths:
-          - src/build/**
+          - build/**
         agents:
           provider: orka
           imagePrefix: endpoint-macos-27-arm
