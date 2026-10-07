@@ -208,10 +208,19 @@ func (p *provisioner) setup(ctx context.Context, instanceName, kubernetesVersion
 		if err := p.installOpenShiftCRDs(ctx, c, repoDir); err != nil {
 			return "", "", fmt.Errorf("installing OpenShift CRDs: %w", err)
 		}
+
 		// MicroShift does not create the Infrastructure/cluster object that identifies
 		// an OpenShift cluster, used by otel_helm_test.go tests.
 		if err := p.createInfrastructureObject(ctx, c, instanceName); err != nil {
 			return "", "", fmt.Errorf("creating Infrastructure object: %w", err)
+		}
+
+		// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/250 is fixed.
+		if microShiftImage == imagesByKubernetesMinor["1.35"] {
+			if _, err := p.containerExecOutput(ctx, containerName, nil,
+				"/bin/sh", "-c", "cp /usr/share/containers/registries.d/*.yaml /etc/containers/registries.d/"); err != nil {
+				return "", "", fmt.Errorf("copying registries.d files: %w", err)
+			}
 		}
 	}
 	p.logger.Logf("microshift: cluster %s is ready", instanceName)
