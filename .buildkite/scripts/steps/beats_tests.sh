@@ -3,7 +3,7 @@ set -euo pipefail
 
 #=========================
 # NOTE: This entire script is a temporary hack until we have buildkite set up on the beats repo.
-# until then, we need some kind of serverless integration tests, hence this script, which just clones the beats repo,
+# until then, we need some kind of serverless integration tests, hence this script, which just builds the beats checked out in the beats submodule,
 # and runs the serverless integration suite against different beats
 # After buildkite is set up on beats, this file/PR should be reverted.
 #==========================
@@ -14,12 +14,17 @@ STACK_PROVISIONER="${1:-"serverless"}"
 # We don't want any metadata from .package-version in these tests
 export USE_PACKAGE_VERSION=false
 
+# Build the beats pinned by the submodule, not the tip of a beats branch. The latter can be on a different version than
+# the one the integration runner expects, which fails the build confusingly. With the submodule, a mismatch after a
+# version bump shows up in the bump PR itself.
+BEATS_DIR="$(pwd)/beats"
+
 run_test_for_beat(){
     export GOFLAGS='-buildvcs=false'
     local beat_name=$1
 
     #build
-    export WORKSPACE="/tmp/beats-build/beats/x-pack/${beat_name}"
+    export WORKSPACE="${BEATS_DIR}/x-pack/${beat_name}"
     pushd $WORKSPACE
     whoami
     ls -la
@@ -28,7 +33,7 @@ run_test_for_beat(){
     popd
 
     #run
-    export AGENT_BUILD_DIR="/tmp/beats-build/beats/x-pack/${beat_name}/build/distributions"
+    export AGENT_BUILD_DIR="${BEATS_DIR}/x-pack/${beat_name}/build/distributions"
     export WORKSPACE=$(pwd)
 
     set +e
@@ -41,15 +46,6 @@ run_test_for_beat(){
 #run mage before setup, since this will install go and mage
 #the setup scripts will do a few things that assume we're running out of elastic-agent and will break things for beats, so run before we do actual setup
 mage -l
-
-# mkdir -p build
-# cd build
-mkdir -p /tmp/beats-build
-pushd /tmp/beats-build
-
-BEATS_BRANCH="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:-${BUILDKITE_BRANCH}}"
-git clone --depth=1 --branch "${BEATS_BRANCH}" git@github.com:elastic/beats.git
-popd
 
 # export WORKSPACE=beats/x-pack/metricbeat
 
