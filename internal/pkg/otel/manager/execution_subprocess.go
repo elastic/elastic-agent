@@ -66,6 +66,10 @@ func newSubprocessExecution(collectorPath string, healthCheckExtensionID string,
 		// by the exporter instance (e.g. separating the monitoring exporter from general inputs),
 		// matching the behavior of other Collector telemetry metrics like queue state.
 		fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelElasticsearchExporterTelemetryFeature),
+		// Enable profiles signal support unconditionally so that a profiles pipeline can be
+		// added to a running collector via a hot config update: the gate can only be applied
+		// as a launch argument, so it cannot be turned on for an already-running subprocess.
+		fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature),
 	}
 	if enablePartialReload {
 		// Enable partial receiver reload so a receiver-only config change restarts
@@ -136,9 +140,6 @@ func (r *subprocessExecution) startCollector(
 
 	// set collector args and add --config flag with the stdingob:stdin URI
 	collectorArgs := append(r.collectorArgs, fmt.Sprintf("--%s=%s", OtelSupervisedLoggingLevelFlagName, collectorLevel))
-	if hasProfilesPipeline(cfg) {
-		collectorArgs = append(collectorArgs, fmt.Sprintf("--%s=%s", OtelFeatureGatesFlagName, OtelProfilingSupportFeature))
-	}
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
 	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
 	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
