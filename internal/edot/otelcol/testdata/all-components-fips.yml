@@ -39,6 +39,8 @@ processors:
     spike_limit_mib: 800
   elasticapm:
   ratelimit:
+    rate: 1
+    burst: 1
   tail_sampling:
   beat:
 
@@ -62,7 +64,7 @@ receivers:
   docker_stats:
   elasticmonitoringreceiver:
   verifier:
-    cloud_connector_id: "test-cc-001"
+    identity_federation_id: "test-cc-001"
     verification_id: "test-verify-001"
     policies:
       - policy_id: "policy-001"
@@ -119,7 +121,6 @@ service:
       receivers:
         - filelog
         - otlp
-        - elasticmonitoringreceiver
         - verifier
 
     metrics:
@@ -139,6 +140,7 @@ service:
         - otlp
         - httpcheck
         - spanmetrics
+        - elasticmonitoringreceiver
 
     metrics/aggregated:
       receivers:
