@@ -536,11 +536,10 @@ func (a *ActionRestart) MarshalMap() (map[string]interface{}, error) {
 // are removed), and failures before that point are acknowledged with the error
 // set so Fleet learns the uninstall did not complete.
 type ActionUninstall struct {
-	ActionID         string              `json:"id" yaml:"id" mapstructure:"id"`
-	ActionType       string              `json:"type" yaml:"type" mapstructure:"type"`
-	ActionStartTime  string              `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
-	ActionExpiration string              `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
-	Data             ActionUninstallData `json:"data,omitempty" yaml:"data,omitempty" mapstructure:"-"`
+	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType       string `json:"type" yaml:"type" mapstructure:"type"`
+	ActionStartTime  string `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
+	ActionExpiration string `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
 	// Signature is the action signature (JSON key "signed"). It is exposed via the
 	// Signed() method so the action satisfies the signed-action contract used by
 	// in-agent signature verification.
@@ -553,16 +552,6 @@ type ActionUninstall struct {
 // to be verified in-agent (see internal/pkg/agent/protection).
 func (a *ActionUninstall) Signed() *Signed {
 	return a.Signature
-}
-
-// ActionUninstallData carries the UNINSTALL action payload.
-type ActionUninstallData struct {
-	// UninstallToken is the uninstall token required to uninstall a tamper-protected
-	// (Elastic Defend) agent. Fleet includes it in the action so the detached
-	// uninstaller can pass it to the uninstall sub-command. Because it is part of
-	// the action's signed payload it cannot be tampered with while keeping a valid
-	// signature.
-	UninstallToken string `json:"uninstall_token,omitempty" yaml:"uninstall_token,omitempty" mapstructure:"-"`
 }
 
 func (a *ActionUninstall) String() string {

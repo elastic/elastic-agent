@@ -322,14 +322,15 @@ func TestActionUninstallUnmarshalJSON(t *testing.T) {
 		assert.ErrorIs(t, err, ErrNoExpiration)
 	})
 
-	t.Run("UNINSTALL carries the uninstall token in data", func(t *testing.T) {
-		p := []byte(`[{"id":"testid","type":"UNINSTALL","data":{"uninstall_token":"secret-token"}}]`)
+	t.Run("UNINSTALL ignores any data (no payload fields)", func(t *testing.T) {
+		// The UNINSTALL action carries no data fields; a data attribute, if any,
+		// is ignored. The action must still unmarshal cleanly.
+		p := []byte(`[{"id":"testid","type":"UNINSTALL","data":{"ignored":"value"}}]`)
 		a := &Actions{}
 		require.NoError(t, a.UnmarshalJSON(p))
 
-		action, ok := (*a)[0].(*ActionUninstall)
+		_, ok := (*a)[0].(*ActionUninstall)
 		require.True(t, ok, "unable to cast action to ActionUninstall")
-		assert.Equal(t, "secret-token", action.Data.UninstallToken)
 	})
 
 	t.Run("UNINSTALL carries the Fleet-provided start time", func(t *testing.T) {

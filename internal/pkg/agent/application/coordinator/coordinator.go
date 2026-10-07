@@ -819,12 +819,10 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 	if action != nil && action.ActionID != "" {
 		args = append(args, "--"+UninstallFleetAckActionIDFlag, action.ActionID)
 	}
-	// Pass the uninstall token (if the action carries one) so a tamper-protected
-	// (Elastic Defend) agent can be uninstalled. The token is part of the action's
-	// signed payload, so it is verified before we get here.
-	if action != nil && action.Data.UninstallToken != "" {
-		args = append(args, "--uninstall-token", action.Data.UninstallToken)
-	}
+	// No --uninstall-token is passed: a tamper-protected (Elastic Defend) agent
+	// is uninstalled by handling the preceding UNENROLL action, which removes
+	// Endpoint. By the time the UNINSTALL action runs Endpoint is already gone,
+	// so the uninstaller does not need the token to remove it.
 
 	cmd := uninstallCmd(executable, args...)
 	// The uninstall sub-command refuses to run from within the install

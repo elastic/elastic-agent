@@ -14,7 +14,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -30,8 +29,8 @@ type uninstallCoordinator interface {
 }
 
 // Uninstall is a handler for the UNINSTALL action. It performs the checks that
-// can still be recovered from (expiry, capability, tamper protection) and, when
-// they pass, hands off to the coordinator which spawns a detached uninstaller.
+// can still be recovered from (signature, expiry) and, when they pass, hands off
+// to the coordinator which spawns a detached uninstaller.
 //
 // The success path is NOT acknowledged here: the uninstall is terminal, so the
 // detached uninstaller acknowledges the action to Fleet at the point of no
@@ -43,18 +42,16 @@ type Uninstall struct {
 	agentInfo info.Agent
 	coord     uninstallCoordinator
 
-	tamperProtectionFn func() bool // allows to inject the flag for tests, defaults to features.TamperProtection
-	nowFn              func() time.Time
+	nowFn func() time.Time
 }
 
 // NewUninstall creates a new Uninstall handler.
 func NewUninstall(log *logger.Logger, agentInfo info.Agent, coord uninstallCoordinator) *Uninstall {
 	return &Uninstall{
-		log:                log,
-		agentInfo:          agentInfo,
-		coord:              coord,
-		tamperProtectionFn: features.TamperProtection,
-		nowFn:              time.Now,
+		log:       log,
+		agentInfo: agentInfo,
+		coord:     coord,
+		nowFn:     time.Now,
 	}
 }
 
@@ -106,27 +103,10 @@ func (h *Uninstall) Handle(ctx context.Context, a fleetapi.Action, ack acker.Ack
 		return h.ackNow(ctx, ack, action)
 	}
 
-	// Under tamper protection, Endpoint needs to receive the signed UNINSTALL
-	// action so it can uncontain itself before the agent is removed. Mirrors the
-	// UNENROLL flow.
-	if h.tamperProtectionFn() {
-		state := h.coord.State()
-		ucs := findMatchingUnitsByActionType(state, a.Type())
-		if len(ucs) > 0 {
-			if err := notifyUnitsOfProxiedAction(ctx, h.log, action, ucs, h.coord.PerformAction); err != nil {
-				// The uninstaller is not started, so it will not acknowledge the
-				// action. Ack the failure now so Fleet does not keep redelivering an
-				// action that will never uninstall; the agent stays installed.
-				action.Err = err
-				if aerr := h.ackNow(ctx, ack, action); aerr != nil {
-					return errors.Join(err, aerr)
-				}
-				return err
-			}
-		} else {
-			h.log.Debugf("No components running for %v action type", a.Type())
-		}
-	}
+	// The UNINSTALL action is not proxied to Endpoint. A tamper-protected
+	// (Elastic Defend) agent is uninstalled by handling the preceding UNENROLL
+	// action, which removes Endpoint; by the time this action runs Endpoint is
+	// already gone, so there is nothing to notify.
 
 	if err := h.coord.Uninstall(ctx, action); err != nil {
 		// The uninstaller never started, so it will not acknowledge the action.

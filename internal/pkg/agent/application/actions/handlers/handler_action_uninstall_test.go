@@ -27,7 +27,6 @@ func TestActionUninstallHandler(t *testing.T) {
 	t.Run("wrong action type", func(t *testing.T) {
 		coord := &fakeUninstallCoordinator{}
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		err := h.Handle(t.Context(), &fleetapi.ActionSettings{}, &fakeAcker{})
 		require.Error(t, err)
@@ -43,7 +42,6 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack := &fakeAcker{}
 
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
 		coord.AssertCalled(t, "Uninstall", mock.Anything, action)
@@ -67,7 +65,6 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack.On("Commit", mock.Anything).Return(nil)
 
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
 		require.Error(t, action.Err, "expired action should carry an error for the ack")
@@ -89,7 +86,6 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack.On("Commit", mock.Anything).Return(nil)
 
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
 		require.Error(t, action.Err, "malformed expiration should carry an error for the ack")
@@ -109,7 +105,6 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack.On("Commit", mock.Anything).Return(nil)
 
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		err := h.Handle(t.Context(), action, ack)
 		require.ErrorIs(t, err, uninstallErr)
@@ -130,7 +125,6 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack.On("Commit", mock.Anything).Return(nil)
 
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
 		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
@@ -147,28 +141,11 @@ func TestActionUninstallHandler(t *testing.T) {
 
 		ack := &fakeAcker{}
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return false }
 
 		err := h.Handle(t.Context(), action, ack)
 		require.ErrorIs(t, err, protection.ErrNotSigned)
 		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
 		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
-	})
-
-	t.Run("tamper protection proxies action to endpoint", func(t *testing.T) {
-		action := &fleetapi.ActionUninstall{ActionID: "u-tp", ActionType: fleetapi.ActionTypeUninstall}
-
-		coord := &fakeUninstallCoordinator{}
-		// No proxied units configured, so State() is enough and no PerformAction happens.
-		coord.On("State").Return(coordinator.State{})
-		coord.On("Uninstall", mock.Anything, action).Return(nil)
-
-		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		h.tamperProtectionFn = func() bool { return true }
-
-		require.NoError(t, h.Handle(t.Context(), action, &fakeAcker{}))
-		coord.AssertCalled(t, "State")
-		coord.AssertCalled(t, "Uninstall", mock.Anything, action)
 	})
 }
 

@@ -3103,39 +3103,6 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		}
 	})
 
-	t.Run("passes --uninstall-token when the action carries one", func(t *testing.T) {
-		top := paths.Top()
-		tmpTop := t.TempDir()
-		paths.SetTop(tmpTop)
-		t.Cleanup(func() { paths.SetTop(top) })
-		require.NoError(t, os.WriteFile(
-			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
-
-		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
-
-		var gotArgs []string
-		restore := overrideUninstallCmd(func(_ string, args ...string) *exec.Cmd {
-			gotArgs = args
-			return noopUninstallCmd()
-		})
-		defer restore()
-
-		tokenAction := &fleetapi.ActionUninstall{
-			ActionID:   "u-token",
-			ActionType: fleetapi.ActionTypeUninstall,
-			Data:       fleetapi.ActionUninstallData{UninstallToken: "secret-token"},
-		}
-
-		coord := &Coordinator{
-			overrideStateChan: make(chan *coordinatorOverrideState, 2),
-			specs:             linuxSpecs,
-			logger:            logp.NewLogger("testing"),
-		}
-		require.NoError(t, coord.Uninstall(ctx, tokenAction))
-
-		assert.Contains(t, gotArgs, "--uninstall-token")
-		assert.Contains(t, gotArgs, "secret-token")
-	})
 }
 
 // overrideUninstallCmd swaps the package-level uninstallCmd for tests and returns

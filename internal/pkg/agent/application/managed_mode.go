@@ -6,7 +6,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -261,18 +260,10 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	})
 
 	// Reject an UNINSTALL action with a missing/invalid signature on receipt so it
-	// is never scheduled into the grace-period queue. On success, apply the signed
-	// payload over the action's mutable outer data so the uninstall token used by
-	// the detached uninstaller is the signed one and cannot be tampered with.
+	// is never scheduled into the grace-period queue.
 	m.dispatcher.SetUninstallSignatureVerifier(func(a *fleetapi.ActionUninstall) error {
-		signed, err := protection.VerifyActionSignature(a, m.coord.Protection().SignatureValidationKey, m.agentInfo.AgentID())
-		if err != nil {
+		if _, err := protection.VerifyActionSignature(a, m.coord.Protection().SignatureValidationKey, m.agentInfo.AgentID()); err != nil {
 			return err
-		}
-		if signed != nil {
-			if err := json.Unmarshal(signed, &a.Data); err != nil {
-				return fmt.Errorf("failed to apply signed uninstall action data: %w", err)
-			}
 		}
 		return nil
 	})
