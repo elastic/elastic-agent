@@ -1235,7 +1235,7 @@ func TestPolicyChangeHandler_handlePolicyChange_TagsAreAppliedAndPersisted(t *te
 		"agent.tags": []string{"tag1", "tag2", " tag1 "},
 		"agent.features.include_tags_in_events.enabled": true,
 	})
-	err := h.handlePolicyChange(context.Background(), cfg, nil)
+	err := h.handlePolicyChange(t.Context(), cfg, nil)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
