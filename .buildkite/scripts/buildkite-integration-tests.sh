@@ -19,7 +19,9 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-if [ "$TEST_SUDO" == "true" ]; then
+# On macOS (Orka) the toolchain is installed for the build user and sudo keeps HOME/PATH, so there is
+# nothing to re-initialize and no /opt/buildkite-agent layout.
+if [ "$TEST_SUDO" == "true" ] && [ "$(uname -s)" != "Darwin" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
   export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
   export PATH="$ASDF_DATA_DIR/bin:$ASDF_DATA_DIR/shims:$PATH"
@@ -28,7 +30,9 @@ if [ "$TEST_SUDO" == "true" ]; then
 fi
 
 # Make sure that all tools are installed
-retry 3 asdf install
+if [ "$(uname -s)" != "Darwin" ]; then
+  retry 3 asdf install
+fi
 
 echo "~~~ Running integration tests as $USER"
 
