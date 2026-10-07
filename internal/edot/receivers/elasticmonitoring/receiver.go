@@ -6,6 +6,7 @@ package elasticmonitoring
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -20,6 +21,7 @@ import (
 type monitoringReceiver struct {
 	logger   *zap.Logger
 	config   *Config
+	started  atomic.Bool
 	consumer consumer.Metrics
 
 	runCtx context.Context
@@ -52,6 +54,7 @@ func createReceiver(
 }
 
 func (mr *monitoringReceiver) Start(_ context.Context, _ component.Host) error {
+	mr.started.Store(true)
 	go func() {
 		defer close(mr.done)
 		mr.run()
@@ -61,6 +64,10 @@ func (mr *monitoringReceiver) Start(_ context.Context, _ component.Host) error {
 
 func (mr *monitoringReceiver) Shutdown(ctx context.Context) error {
 	mr.cancel()
+	if !mr.started.Load() {
+		// Start was never called, so there is no run loop to wait for.
+		return nil
+	}
 	// Wait for the run loop to stop, but return immediately if the context
 	// is cancelled.
 	select {
