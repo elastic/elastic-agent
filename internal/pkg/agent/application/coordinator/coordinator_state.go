@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/component"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -43,6 +44,16 @@ type State struct {
 	Collector *status.AggregateStatus
 
 	UpgradeDetails *details.Details `yaml:"upgrade_details,omitempty"`
+
+	// PolicyApplied is true once the agent has received and processed at least
+	// one policy. Before this point Components may be empty even if the policy
+	// includes components.
+	PolicyApplied bool `yaml:"policy_applied"`
+
+	// PolicyConfiguredActionTypes maps each action type to the IDs of components in
+	// the current policy that are configured to handle it. Unlike Components, this
+	// includes components that have not yet emitted a runtime state update.
+	PolicyConfiguredActionTypes map[string][]string `yaml:"policy_configured_action_types,omitempty"`
 }
 
 type coordinatorOverrideState struct {
@@ -217,6 +228,13 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
 	s.UpgradeDetails = c.state.UpgradeDetails
+	s.PolicyApplied = c.state.PolicyApplied
+	if len(c.state.PolicyConfiguredActionTypes) > 0 {
+		s.PolicyConfiguredActionTypes = make(map[string][]string, len(c.state.PolicyConfiguredActionTypes))
+		for typ, ids := range c.state.PolicyConfiguredActionTypes {
+			s.PolicyConfiguredActionTypes[typ] = append([]string(nil), ids...)
+		}
+	}
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
 	if c.state.Collector != nil {
@@ -249,8 +267,13 @@ func (c *Coordinator) generateReportableState() (s State) {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
 	} else if c.actionsErr != nil {
-		s.State = agentclient.Failed
-		s.Message = fmt.Sprintf("Actions: %s", c.actionsErr.Error())
+		if errors.IsRecoverable(c.actionsErr) {
+			s.State = agentclient.Degraded
+			s.Message = fmt.Sprintf("Actions degraded: %s", c.actionsErr.Error())
+		} else {
+			s.State = agentclient.Failed
+			s.Message = fmt.Sprintf("Actions failed: %s", c.actionsErr.Error())
+		}
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())

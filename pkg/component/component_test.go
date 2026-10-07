@@ -5,7 +5,7 @@
 package component
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/go-ucfg"
 
-	"github.com/go-viper/mapstructure/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -3550,17 +3549,7 @@ func TestFlattenedDataStreamIsolatedUnits(t *testing.T) {
 
 func makeMapStructureErr(t *testing.T) error {
 	t.Helper()
-
-	jsonStr := `{ "meta": [] }`
-
-	var data map[string]interface{}
-	err := json.Unmarshal([]byte(jsonStr), &data)
-	require.NoError(t, err)
-
-	var output struct {
-		Meta struct{} `mapstructure:"meta"`
-	}
-	return mapstructure.Decode(data, &output)
+	return errors.New("'meta' expected a map or struct, got \"slice\"")
 }
 
 func TestComponent_WorkDir(t *testing.T) {

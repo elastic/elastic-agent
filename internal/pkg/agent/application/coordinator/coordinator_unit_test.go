@@ -693,6 +693,67 @@ inputs:
 	}
 }
 
+func TestCoordinatorPolicyAppliedNotSetOnComponentModelError(t *testing.T) {
+	// PolicyApplied must only become true once a policy has been successfully
+	// turned into a component model. If generateComponentModel fails, callers
+	// relying on PolicyApplied (e.g. the upgrade action handler waiting for
+	// Endpoint to appear) must keep waiting for a usable policy instead of
+	// concluding no component is configured.
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	agentInfo, err := info.NewAgentInfo(t.Context(), false)
+	require.NoError(t, err)
+
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+	coord := &Coordinator{
+		logger: logger,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		runtimeMgr:         &fakeRuntimeManager{},
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		ast:                emptyAST(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
+	}
+
+	// Invalid EQL condition makes generateComponentModel fail.
+	cfg := config.MustNewConfigFrom(`
+inputs:
+  - type: filestream
+    condition: invalidExpression
+`)
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	require.Error(t, coord.componentModelErr)
+	assert.False(t, coord.state.PolicyApplied, "PolicyApplied must stay false when component model generation fails")
+	<-stateChan // drain the Failed state update
+
+	// A subsequent valid policy should succeed and set PolicyApplied.
+	cfg = config.MustNewConfigFrom("")
+	cfgChange = &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.componentModelErr)
+	assert.True(t, coord.state.PolicyApplied, "PolicyApplied must be set once a policy is applied successfully")
+}
+
 func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it generates the right component model and sends it to the
