@@ -10,6 +10,7 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	undefined     = "undefined"
 	basic         = "basic"
 	ubi           = "ubi"
@@ -18,6 +19,21 @@ const (
 	completeWolfi = "complete-wolfi"
 	cloud         = "cloud"
 	service       = "service"
+=======
+	undefined          = "undefined"
+	basic              = "basic"
+	ubi                = "ubi"
+	wolfi              = "wolfi"
+	complete           = "complete"
+	completeWolfi      = "complete-wolfi"
+	ironbank           = "ironbank"
+	cloud              = "cloud"
+	service            = "service"
+	edotCollector      = "elastic-otel-collector"
+	slim               = "slim"
+	edotCollectorWolfi = "elastic-otel-collector-wolfi"
+	slimWolfi          = "slim-wolfi"
+>>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
 )
 
 // DockerVariant defines the docker variant to build.
@@ -31,6 +47,7 @@ const (
 	Wolfi
 	WolfiComplete
 	Complete
+	Ironbank
 	Cloud
 	Service
 )
@@ -50,6 +67,8 @@ func (typ DockerVariant) String() string {
 		return completeWolfi
 	case Complete:
 		return complete
+	case Ironbank:
+		return ironbank
 	case Cloud:
 		return cloud
 	case Service:
@@ -79,6 +98,8 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = WolfiComplete
 	case complete:
 		*typ = Complete
+	case ironbank:
+		*typ = Ironbank
 	case cloud:
 		*typ = Cloud
 	case service:

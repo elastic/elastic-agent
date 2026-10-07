@@ -1,3 +1,17 @@
+{{- /*
+This template renders two Dockerfiles:
+  - the one submitted to Ironbank (mage ironbank), built by the DoD Ironbank
+    pipeline at https://repo1.dso.mil/dsop, and
+  - the public CI variant (public_build, mage package), built on the public UBI
+    image because the Ironbank registry needs privileged access.
+
+Ironbank has strict Dockerfile requirements, e.g. ADD is prohibited (use COPY;
+external resources such as tinit and jq are declared in
+hardening_manifest.yaml.tmpl and supplied by the pipeline). A violation only
+surfaces as a failed build in the dso.mil GitLab repo, so keep this file
+Ironbank-compatible: public_build branches may differ only in where the files
+come from. See https://docs-ironbank.dso.mil/hardening/dockerfile-requirements/
+*/ -}}
 ################################################################################
 # Build stage 0
 # Extract Elastic Agent and make various file manipulations.
@@ -8,6 +22,13 @@ ARG BASE_TAG=10.2
 
 FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG} as prep_files
 
+{{ if .public_build -}}
+ARG ELASTIC_PRODUCT=elastic-agent
+
+RUN mkdir /usr/share/${ELASTIC_PRODUCT}
+WORKDIR /usr/share/${ELASTIC_PRODUCT}
+COPY --chown=1000:0 beat .
+{{ else -}}
 ARG ELASTIC_STACK={{ agent_package_version }}
 ARG ELASTIC_PRODUCT=elastic-agent
 ARG OS_AND_ARCH=linux-x86_64
@@ -17,6 +38,7 @@ WORKDIR /usr/share/${ELASTIC_PRODUCT}
 COPY --chown=1000:0 ${ELASTIC_PRODUCT}-${ELASTIC_STACK}-${OS_AND_ARCH}.tar.gz  .
 RUN tar --strip-components=1 -zxf ${ELASTIC_PRODUCT}-${ELASTIC_STACK}-${OS_AND_ARCH}.tar.gz \
   && rm  ${ELASTIC_PRODUCT}-${ELASTIC_STACK}-${OS_AND_ARCH}.tar.gz
+{{- end }}
 
 # Support arbitrary user ids
 # Ensure that group permissions are the same as user permissions.
@@ -41,7 +63,11 @@ FROM ${BASE_REGISTRY}/${BASE_IMAGE}:${BASE_TAG}
 
 ARG ELASTIC_PRODUCT=elastic-agent
 
+{{ if .public_build -}}
+COPY beat/LICENSE.txt /licenses/elastic-${ELASTIC_PRODUCT}
+{{- else -}}
 COPY LICENSE /licenses/elastic-${ELASTIC_PRODUCT}
+{{- end }}
 
 # Add a dumb init process
 COPY tinit /tinit
@@ -95,7 +121,11 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
 COPY jq /usr/local/bin
 RUN chown root:root /usr/local/bin/jq && chmod 0755 /usr/local/bin/jq
 
+{{ if .public_build -}}
+COPY docker-entrypoint /usr/local/bin/docker-entrypoint
+{{ else -}}
 COPY config/docker-entrypoint /usr/local/bin/docker-entrypoint
+{{ end -}}
 RUN chmod 755 /usr/local/bin/docker-entrypoint
 
 USER ${ELASTIC_PRODUCT}

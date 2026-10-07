@@ -634,6 +634,7 @@ shared:
     <<: *agent_docker_spec
     docker_variant: 'complete-wolfi'
 
+<<<<<<< HEAD
   # Deb/RPM spec for community beats.
   - &deb_rpm_spec
     <<: *common
@@ -803,6 +804,23 @@ shared:
       /Library/Application Support/{{.BeatVendor}}/{{.BeatName}}/LICENSE.txt:
         source: '{{ repo.RootDir }}/dev-tools/licenses/APACHE-LICENSE-2.0.txt'
         mode: 0644
+=======
+  - &agent_docker_ironbank_spec
+    <<: *agent_docker_spec
+    docker_variant: 'ironbank'
+    extra_vars:
+      dockerfile: '../ironbank/Dockerfile.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      # The Ironbank base image needs privileged registry access, so CI builds
+      # this variant on the public UBI image instead. tinit and jq are added to
+      # the build context from hardening_manifest.yaml.tmpl by the Package mage
+      # target.
+      public_build: 'true'
+      build_args: 'BASE_REGISTRY=registry.access.redhat.com,BASE_IMAGE=ubi10/ubi'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+>>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
 
   #
   # License modifiers for the Elastic License
@@ -1419,6 +1437,259 @@ specs:
             symlink: true
             mode: 0755
 
+<<<<<<< HEAD
+=======
+    ######## Docker images #########
+
+    #### UBI-minimal-based images ####
+    # Complete image gets a 'complete' variant for synthetics and other large
+    # packages too big to fit in the main image
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *docker_ubi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_complete_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *agent_docker_ironbank_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_wolfi_complete_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *docker_ubi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_complete_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_wolfi_complete_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *docker_ubi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+        docker_variant: 'ubi'
+
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *docker_ubi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+        docker_variant: 'ubi'
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *docker_ubi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *docker_ubi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    #### wolfi-based ####
+    #### Slim docker images ####
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_ubi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_slim_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_ubi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_slim_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_slim_wolfi_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_slim_wolfi_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    #### EDOT collector docker images ####
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_ubi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_edot_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_ubi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_edot_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_edot_wolfi_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_edot_wolfi_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    #### Cloud specific docker images ####
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *agent_cloud_docker_spec
+        # The cloud image is always based on Wolfi
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_cloud_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *agent_cloud_docker_spec
+        # The cloud image is always based on Wolfi
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_cloud_spec
+        <<: *elastic_license_for_binaries
+    #### End Cloud specific docker images ####
+
+    #### Service specific docker images ####
+    - os: linux
+      arch: amd64
+      types: [ docker ]
+      spec:
+        <<: *agent_cloud_docker_spec
+        # The service image is always based on Wolfi
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_cloud_spec
+        <<: *agent_docker_service_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [ docker ]
+      spec:
+        <<: *agent_cloud_docker_spec
+        # The service image is always based on Wolfi
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_cloud_spec
+        <<: *agent_docker_service_spec
+        <<: *elastic_license_for_binaries
+    #### End Service specific docker images ####
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *docker_wolfi_spec
+        <<: *docker_builder_spec
+        <<: *agent_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: arm64
+      types: [docker]
+      spec:
+        <<: *docker_wolfi_arm_spec
+        <<: *docker_builder_arm_spec
+        <<: *agent_docker_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    ######## End Docker images ########
+
+>>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
     ######## Start FIPS Specs ########
     - os: linux
       types: [tgz]

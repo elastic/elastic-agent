@@ -63,6 +63,11 @@ var (
 	otelSamplesFilePattern      = regexp.MustCompile(`otel_samples/.+[^/]$`)
 	otelCollectorSpecPattern    = regexp.MustCompile(`elastic-otel-collector\.spec\.yml$`)
 	endpointResourcesZipPattern = regexp.MustCompile(`endpoint-security-resources\.zip$`)
+<<<<<<< HEAD
+=======
+	cloudDefendPattern          = regexp.MustCompile(`/cloud-defend(\.spec\.yml)?$`)
+	componentYmlPattern         = regexp.MustCompile(`usr/share/elastic-agent/data/elastic-agent-[^/]+/components/.+\.yml$`)
+>>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -386,7 +391,19 @@ func checkNpcapNotices(pkg, file string, contents io.Reader) error {
 	return nil
 }
 
+<<<<<<< HEAD
 func checkDocker(t *testing.T, file string, fipsPackage bool) {
+=======
+func checkDocker(t *testing.T, file string, fipsPackage bool) (string, int64) {
+	if strings.Contains(file, "elastic-otel-collector") {
+		return checkEdotCollectorDocker(t, file)
+	}
+
+	if strings.Contains(file, "-ironbank-") {
+		return checkIronbankDocker(t, file)
+	}
+
+>>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
 	p, info, err := readDocker(t, file, true)
 	if err != nil {
 		t.Errorf("error reading file %v: %v", file, err)
@@ -413,6 +430,25 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
+}
+
+// checkIronbankDocker verifies the Ironbank variant. Its Dockerfile broadly
+// relaxes permissions under data/ and then has to restore the component .yml
+// files to 0644; the agent refuses to start if they stay group/world writable.
+func checkIronbankDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(t, file, true)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkRequiredFilePermissions(t, p, componentYmlPattern, os.FileMode(0644))
+
+	// Image labels are supplied by Ironbank from the hardening manifest, so
+	// there is no version label to derive the name from.
+	return "elastic-agent-ironbank", info.Size
 }
 
 func checkCompleteDocker(t *testing.T, file string) {

@@ -215,8 +215,34 @@ func (b *dockerBuilder) dockerBuild() (string, error) {
 		tag = tag + tagSuffix
 	}
 
+<<<<<<< HEAD
 	args = append(args, "-t", tag, b.buildDir)
 	return tag, sh.Run("docker", args...)
+=======
+	args = append(args,
+		"-t", mainTag,
+	)
+	// build_args is a comma-separated list of KEY=VALUE docker build arguments.
+	if buildArgs := b.ExtraVars["build_args"]; buildArgs != "" {
+		for _, buildArg := range strings.Split(buildArgs, ",") {
+			args = append(args, "--build-arg", buildArg)
+		}
+	}
+	extraTags := []string{}
+	for _, tag := range b.ExtraTags {
+		extraTag := fmt.Sprintf("%s:%s", b.imageName, tag)
+		if tagSuffix != "" {
+			extraTag = extraTag + tagSuffix
+		}
+		extraTags = append(extraTags, extraTag)
+	}
+	for _, t := range extraTags {
+		args = append(args, "-t", t)
+	}
+	args = append(args, b.buildDir)
+
+	return mainTag, extraTags, sh.Run("docker", args...)
+>>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
 }
 
 func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtraArgs ...map[string]interface{}) error {
