@@ -12,12 +12,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-<<<<<<< HEAD
-	"crypto/sha512"
-=======
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
->>>>>>> bd586cb (Add integration test for Ironbank Dockerfile yml file permissions (#16584))
 	"encoding/json"
 	"errors"
 	"fmt"
