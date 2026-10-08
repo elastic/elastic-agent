@@ -35,16 +35,12 @@ func TestValidateCommand(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.Name, func(t *testing.T) {
 			err := validateOtelConfig(context.Background(), tc.ConfigPaths, components.Default())
-<<<<<<< HEAD
-			require.Equal(t, tc.ExpectingErr, err != nil)
-=======
 
 			if tc.ExpectingErr {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
 		})
 	}
 }

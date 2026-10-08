@@ -188,12 +188,6 @@ extensions:
   - name: azure_auth
     stability:
       extension: Alpha
-<<<<<<< HEAD
-=======
-  - name: cgroup_runtime
-    stability:
-      extension: Alpha
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
   - name: file_storage
     stability:
       extension: Beta

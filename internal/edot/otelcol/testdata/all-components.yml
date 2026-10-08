@@ -22,11 +22,6 @@ extensions:
         key: X-Scope-OrgID
         from_context: tenant_id
         default_value: Org-ID
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-  aws_logs_encoding/elbaccess:
-    format: elbaccess
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
   azure_auth:
     use_default: true
   azure_encoding:
@@ -52,17 +47,7 @@ processors:
     check_interval: 1s
     limit_mib: 4000
     spike_limit_mib: 800
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
   elastictrace:
-=======
-  elasticapm:
-  ratelimit:
-    rate: 1
-    burst: 1
-  tail_sampling:
-  log_dedup:
-  beat:
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
 
 receivers:
   nop:
@@ -89,128 +74,11 @@ receivers:
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
   azuremonitor:
-=======
-  elasticapmintake:
-  akamai_siem:
-    endpoint: https://akab-placeholder.luna.akamaiapis.net
-    config_ids: "12345"
-    authentication:
-      client_token: placeholder-client-token
-      client_secret: placeholder-client-secret
-      access_token: placeholder-access-token
-  apache:
-  mysql:
-  postgresql:
-    username: test
-    password: test
-  docker_stats:
-  azure_event_hub:
-    connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
-    blob_checkpoint_store:
-      connection: DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=c3VwZXJTZWNyZXQxMjM0;EndpointSuffix=core.windows.net
-      container_name: checkpoints
-  awss3:
-    starttime: "2024-01-01 01:00"
-    endtime: "2024-01-02"
-    s3downloader:
-      s3_bucket: 'test'
-      s3_prefix: 'test'
-    encodings:
-      - extension: aws_logs_encoding/elbaccess
-  aws_cloudwatch:
-    credentials_provider: awscredentialsprovider
-    region: us-east-1
-    logs:
-      initial_lookback: 1h
-      poll_interval: 1m
-      groups:
-        autodiscover:
-          limit: 1
-    metrics:
-      collection_interval: 5m
-      period: 5m
-      queries:
-        - namespace: AWS/Lambda
-          metric_name: Invocations
-  prometheus_remote_write:
-    endpoint: 0.0.0.0:9090
-  statsd:
-    endpoint: localhost:8125
-  syslog:
-    tcp:
-      listen_address: 127.0.0.1:54526
-    protocol: rfc5424
-  elasticmonitoringreceiver:
-  verifier:
-    identity_federation_id: "test-cc-001"
-    verification_id: "test-verify-001"
-    policies:
-      - policy_id: "policy-001"
-        integrations:
-          - policy_template: "cloudtrail"
-            package_name: "aws"
-  snmp:
-    metrics:
-      snmp.uptime:
-        unit: s
-        gauge:
-          value_type: int
-        scalar_oids:
-          - oid: ".1.3.6.1.2.1.1.8.0"
-  azure_monitor:
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
     subscription_ids:
       - 00000000-0000-0000-0000-000000000000
     cloud: AzureCloud
     credentials: default_credentials
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-  # googlecloudmonitoring is intentionally omitted from this fixture (see
-  # internal/edot/otelcol/components/default.go for its registration): its
-  # Start() eagerly calls google.FindDefaultCredentials, which errors out
-  # without real GCP Application Default Credentials. This fixture is used to
-  # exercise starting every configured receiver, so a trivial config isn't
-  # practical here (no ADC available in unit-test/CI environments). This
-  # mirrors the iis/sqlserver exclusions from elastic/elastic-agent#9344.
-  kafka_metrics:
-    brokers: [localhost:9092]
-    protocol_version: 2.0.0
-    scrapers:
-      - brokers
-      - topics
-      - consumers
-    collection_interval: 60s
-  haproxy:
-    endpoint: http://localhost:8404/stats
-  mongodb:
-    hosts:
-      - endpoint: localhost:27017
-    direct_connection: true
-    timeout: 1s
-  rabbitmq:
-    endpoint: http://localhost:15672
-    username: guest
-    password: guest
-  memcached:
-    endpoint: localhost:11211
-    transport: udp
-  couchdb:
-    endpoint: http://localhost:5984
-    username: guest
-    password: guest
-  oracledb:
-    datasource: oracle://otel:password@localhost:1521/orcl
-  vcenter:
-    endpoint: https://vcenter.example.com
-    username: test
-    password: test
-    tls:
-      insecure_skip_verify: true
-  zookeeper:
-    endpoint: localhost:2181
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
 
 connectors:
   span_metrics:
@@ -245,16 +113,8 @@ service:
     - memory_limiter
     - health_check
     - headers_setter
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
     - azure_auth
     - azure_encoding
-=======
-    - aws_logs_encoding/elbaccess
-    - azure_auth
-    - azure_encoding
-    - oauth2client
-    - awscredentialsprovider
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
   pipelines:
     logs:
       exporters:
@@ -271,22 +131,10 @@ service:
         - resource_detection
         - transform
         - memory_limiter/processor
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-        - log_dedup
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
       receivers:
         - file_log
         - otlp
         - nop
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-        - elasticapmintake
-        - azure_event_hub
-        - aws_cloudwatch
-        - verifier
-        - syslog
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
 
     logs/forward_receive:
       receivers:
@@ -320,30 +168,7 @@ service:
         - http_check
         - span_metrics
         - prometheus
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
         - azuremonitor
-=======
-        - elasticapmintake
-        - apache
-        - mysql
-        - postgresql
-        - prometheus_remote_write
-        - snmp
-        - azure_monitor
-        - kafka_metrics
-        - statsd
-        - haproxy
-        - mongodb
-        - rabbitmq
-        - memcached
-        - couchdb
-        - oracledb
-        - vcenter
-        - zookeeper
-        - azure_event_hub
-        - aws_cloudwatch
-        - elasticmonitoringreceiver
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
 
     metrics/aggregated:
       receivers:

@@ -37,16 +37,7 @@ processors:
     check_interval: 1s
     limit_mib: 4000
     spike_limit_mib: 800
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components-fips.yml
   elastictrace:
-=======
-  elasticapm:
-  ratelimit:
-    rate: 1
-    burst: 1
-  tail_sampling:
-  beat:
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components-fips.yml
 
 receivers:
   file_log:
@@ -65,19 +56,6 @@ receivers:
     protocols:
       grpc:
   zipkin:
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components-fips.yml
-=======
-  docker_stats:
-  elasticmonitoringreceiver:
-  verifier:
-    identity_federation_id: "test-cc-001"
-    verification_id: "test-verify-001"
-    policies:
-      - policy_id: "policy-001"
-        integrations:
-          - policy_template: "cloudtrail"
-            package_name: "aws"
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components-fips.yml
 
 connectors:
   span_metrics:
@@ -128,10 +106,6 @@ service:
       receivers:
         - file_log
         - otlp
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components-fips.yml
-=======
-        - verifier
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components-fips.yml
 
     metrics:
       exporters:
@@ -150,7 +124,6 @@ service:
         - otlp
         - http_check
         - span_metrics
-        - elasticmonitoringreceiver
 
     metrics/aggregated:
       receivers:
