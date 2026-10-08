@@ -504,7 +504,7 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionRestart{},
-		handlers.NewRestart(m.log, m.coord, m.stateStore),
+		handlers.NewRestart(m.log, m.agentInfo, m.coord, m.stateStore),
 	)
 
 	m.dispatcher.MustRegister(

@@ -16,46 +16,50 @@ import (
 	"go.opentelemetry.io/collector/receiver/receivertest"
 )
 
-// The collector calls Shutdown on every component when startup fails, even on
-// components whose Start was never called. Shutdown must not block in that case.
-func TestShutdownWithoutStart(t *testing.T) {
-	rcv := newTestReceiver(t)
-	shutdownWithin(t, rcv, 5*time.Second)
-}
-
-func TestStartThenShutdown(t *testing.T) {
-	rcv := newTestReceiver(t)
-	require.NoError(t, rcv.Start(t.Context(), componenttest.NewNopHost()))
-	shutdownWithin(t, rcv, 5*time.Second)
-
-	// The run loop must have exited.
-	select {
-	case <-rcv.done:
-	default:
-		t.Fatal("run loop still running after Shutdown")
-	}
-}
-
 func newTestReceiver(t *testing.T) *monitoringReceiver {
 	t.Helper()
 	cfg := createDefaultConfig().(*Config)
-	cfg.Interval = time.Hour // keep the run loop idle during the test
-	rcv, err := createReceiver(t.Context(), receivertest.NewNopSettings(NewFactory().Type()), cfg, consumertest.NewNop())
+	cfg.Interval = time.Hour
+	r, err := createReceiver(t.Context(), receivertest.NewNopSettings(receivertest.NopType), cfg, consumertest.NewNop())
 	require.NoError(t, err)
-	return rcv.(*monitoringReceiver)
+	return r.(*monitoringReceiver)
 }
 
-// shutdownWithin fails the test if Shutdown doesn't return within the timeout.
-// Shutdown is given a background context so the test verifies that the receiver
-// itself unblocks, rather than relying on context cancellation.
-func shutdownWithin(t *testing.T, rcv *monitoringReceiver, timeout time.Duration) {
-	t.Helper()
+// Shutdown must return promptly even if Start was never called. The collector
+// calls Shutdown on every component in the graph when startup fails, including
+// those whose Start was never reached, and it does so with a context that is
+// not cancelled.
+func TestShutdownWithoutStart(t *testing.T) {
+	r := newTestReceiver(t)
+
 	done := make(chan error, 1)
-	go func() { done <- rcv.Shutdown(context.Background()) }()
+	go func() { done <- r.Shutdown(context.Background()) }()
+
 	select {
 	case err := <-done:
 		require.NoError(t, err)
-	case <-time.After(timeout):
-		t.Fatal("Shutdown did not return")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Shutdown blocked when Start was never called")
+	}
+}
+
+func TestStartShutdown(t *testing.T) {
+	r := newTestReceiver(t)
+	require.NoError(t, r.Start(t.Context(), componenttest.NewNopHost()))
+
+	done := make(chan error, 1)
+	go func() { done <- r.Shutdown(context.Background()) }()
+
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Shutdown did not complete after Start")
+	}
+
+	select {
+	case <-r.done:
+	default:
+		t.Fatal("run loop did not exit after Shutdown")
 	}
 }
