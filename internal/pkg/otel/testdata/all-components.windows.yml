@@ -1,3 +1,0 @@
-exporters:
-  file:
-    path: ${env:TMP}\file-exporter-output.json
