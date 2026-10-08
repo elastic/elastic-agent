@@ -47,7 +47,7 @@ type NetworkTrafficRunner struct {
 
 func TestNetworkTraffic(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -55,9 +55,9 @@ func TestNetworkTraffic(t *testing.T) {
 			{Type: define.Linux},
 			{Type: define.Windows},
 		},
-		// The network_traffic Fleet integration relies on packetbeat, which
-		// has no windows/arm64 build, so the agent component never reaches
-		// HEALTHY on this combination.
+		// Packetbeat cannot load wpcap.dll on windows/arm64 because npcap is
+		// bundled only in the windows/amd64 package.
+		// TODO: remove this skip when https://github.com/elastic/elastic-agent/issues/17044 is resolved.
 		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 

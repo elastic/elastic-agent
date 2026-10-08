@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -441,6 +442,9 @@ type Coordinator struct {
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
 
+	// renderCache reuses the rendered inputs of the previous refresh for the (input, vars)
+	// pairs that did not change. It is reset whenever ast changes.
+	renderCache *transpiler.RenderCache
 	// expectedConfigCache reuses the unit configurations of the previous refresh for the
 	// units whose configuration did not change.
 	expectedConfigCache *component.ExpectedConfigCache
@@ -561,6 +565,7 @@ func New(
 		FleetState:     fleetState,
 		FleetMessage:   fleetMessage,
 		LogLevel:       logLevel,
+		Tags:           agentInfo.GetTags(),
 		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
@@ -608,6 +613,7 @@ func New(
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
 		canReExec:        reexec.CanReExec,
 
+		renderCache:         transpiler.NewRenderCache(),
 		expectedConfigCache: component.NewExpectedConfigCache(),
 	}
 	// Setup communication channels for any non-nil components. This pattern
@@ -1299,12 +1305,14 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelRuntime  string            `yaml:"log_level"`
 					LogLevelPolicy   string            `yaml:"log_level_policy"`
 					LogLevelOverride string            `yaml:"log_level_override"`
+					Tags             []string          `yaml:"tags,omitempty"`
 					Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
 				}{
 					Headers:          c.agentInfo.Headers(),
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
 					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
 					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),
+					Tags:             c.State().Tags,
 					Metadata:         meta,
 				}
 				o, err := yaml.Marshal(output)
@@ -1838,8 +1846,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 	c.currentCfg = currentCfg
 
-	// check if log level has changed for standalone elastic-agent
-	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
+	// Standalone mode has no dedicated notification channel unlike managed mode,
+	// so the log level is read from the policy config on each reload.
 	if c.agentInfo.IsStandalone() {
 		ll := currentCfg.Settings.LoggingConfig.Level
 		if ll != c.state.LogLevel {
@@ -1849,6 +1857,13 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 			logger.SetLevel(ll)
 			c.logger.Infof("log level changed to %s", ll.String())
 		}
+	}
+
+	// Both modes read tags from the policy config so no dedicated notification channel is needed.
+	tags := info.NormalizeTags(currentCfg.Settings.Tags)
+	if !slices.Equal(tags, c.state.Tags) {
+		c.setTags(tags)
+		c.logger.Infof("tags changed to %v", tags)
 	}
 
 	return c.refreshComponentModel(ctx)
@@ -1901,6 +1916,7 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	c.renderCache.Reset()
 	return nil
 }
 
@@ -2096,6 +2112,8 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		Components: c.componentModel,
 		Signed:     signed,
 	}
+	c.state.PolicyConfiguredActionTypes = policyConfiguredActionTypes(c.componentModel)
+	c.state.PolicyApplied = true
 
 	c.logger.Info("Updating running component model")
 	if c.logger.IsDebug() {
@@ -2387,13 +2405,16 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	var renderedInputInfo map[string]transpiler.RenderedInputInfo
+	var renderedInputs *transpiler.RenderedInputs
 	if ok {
-		var renderedInputs transpiler.Node
-		renderedInputs, renderedInputInfo, err = transpiler.RenderInputs(inputs, c.vars)
+		renderedInputs, err = transpiler.RenderInputsCached(inputs, c.vars, c.renderCache)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		renderedInputInfo = renderedInputs.Info
+		// the rendered inputs are added to the map form of the policy below, straight from
+		// the render cache, instead of being converted from the tree on every refresh
+		err = transpiler.Insert(ast, transpiler.NewList(nil), "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
@@ -2416,6 +2437,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	cfg, err := ast.Map()
 	if err != nil {
 		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	if renderedInputs != nil {
+		cfg["inputs"] = renderedInputs.Maps()
 	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
@@ -2636,6 +2660,22 @@ func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
 		unitMap[c.ID] = c
 	}
 	return unitMap
+}
+
+// policyConfiguredActionTypes returns a map from action type to the IDs of components
+// in comps that handle it. Derived from the component spec rather than runtime state,
+// so it includes components that have not yet started.
+func policyConfiguredActionTypes(comps []component.Component) map[string][]string {
+	result := make(map[string][]string)
+	for _, comp := range comps {
+		if comp.InputSpec == nil {
+			continue
+		}
+		for _, typ := range comp.InputSpec.Spec.ProxiedActions {
+			result[typ] = append(result[typ], comp.ID)
+		}
+	}
+	return result
 }
 
 func convertComponentListToMap(compList []component.Component) map[string]component.Component {

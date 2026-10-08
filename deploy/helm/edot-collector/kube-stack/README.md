@@ -38,8 +38,8 @@ The OpenTelemetry components deployed within the `Gateway` Deployment collectors
 
 Exporters:
 
-- **Metrics** (`metrics` pipeline): exported via the [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) to Elasticsearch's native OTLP endpoint (`<elastic_endpoint>/_otlp`).
-- **Logs, Traces, and aggregated APM metrics**: exported via the [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md).
+- **Metrics** (`metrics` and `metrics/aggregated-otel-metrics` pipelines): exported via the [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) to Elasticsearch's native OTLP endpoint (`<elastic_endpoint>/_otlp`).
+- **Logs and Traces**: exported via the [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md).
 
 ### Auto-instrumentation
 
@@ -113,6 +113,17 @@ $ helm upgrade --install --namespace opentelemetry-operator-system \
     --values ./openshift/values.yaml \
     --set crds.installOtel=false \
     --set opentelemetry-operator.enabled=false \
+    --version 0.16.0
+```
+
+By default, the daemon collector runs as root (UID 0) to read the host files. The [`./openshift/rootless-values.yaml`](./openshift/rootless-values.yaml) file runs the daemon collector as non-root. An init container changes the permissions of `/var/lib/otelcol` on the node, so the collector can save the filelog checkpoints. To run the daemon collector as non-root, apply the file after the OpenShift values file:
+
+```shell
+$ helm upgrade --install --namespace opentelemetry-operator-system \
+  opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+    --values ./values.yaml \
+    --values ./openshift/values.yaml \
+    --values ./openshift/rootless-values.yaml \
     --version 0.16.0
 ```
 
