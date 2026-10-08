@@ -85,6 +85,9 @@ steps:
 
       - label: "Start ESS stack"
         key: macos-smoke-ess
+        env:
+          # wave 1 runs 9 groups, 2 at a time: keep the stack longer than the 4h default
+          ESS_EXPIRE_HOURS: "10"
         command: .buildkite/scripts/steps/ess_start_oblt-cli.sh
         agents:
           image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
@@ -94,46 +97,39 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
 
-      - label: "smoke macos 27 arm64: enroll"
-        key: macos-smoke-enroll
+      # Wave 1: groups without special privileges. At most 2 Orka VMs at a time.
+      - label: "macos 27 arm64: {{matrix}}"
+        key: macos-wave1
+        matrix:
+          - default
+          - fleet
+          - fleet-privileged
+          - install-uninstall
+          - upgrade
+          - upgrade-flavor
+          - upgrade-rollback
+          - fleet-upgrade
+          - fleet-proxy
         depends_on: [packaging-darwin-arm64, macos-smoke-ess]
         soft_fail: true
+        concurrency: 2
+        concurrency_group: "elastic-agent-macos-integration/orka-wave1"
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-          TEST_RUN: "^TestEnrollReplaceToken$"
-        command: .buildkite/scripts/macos_smoke.sh default
+        command: .buildkite/scripts/macos_smoke.sh {{matrix}}
         artifact_paths:
           - build/**
         agents:
           provider: orka
           imagePrefix: endpoint-macos-27-arm
-        timeout_in_minutes: 60
-        plugins:
-          - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
-
-      - label: "smoke macos 27 arm64: standalone upgrade"
-        key: macos-smoke-upgrade
-        depends_on: [packaging-darwin-arm64, macos-smoke-ess]
-        soft_fail: true
-        env:
-          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-          TEST_RUN: "^TestStandaloneUpgrade$"
-        command: .buildkite/scripts/macos_smoke.sh standalone-upgrade
-        artifact_paths:
-          - build/**
-        agents:
-          provider: orka
-          imagePrefix: endpoint-macos-27-arm
-        timeout_in_minutes: 90
+        timeout_in_minutes: 120
         plugins:
           - *google_oidc_observability_plugin
           - *oblt_cli_plugin
           - *vault_github_token
 
       - label: "ESS stack cleanup"
-        depends_on: [macos-smoke-enroll, macos-smoke-upgrade]
+        depends_on: [macos-wave1]
         allow_dependency_failure: true
         command: .buildkite/scripts/steps/ess_cleanup_all.sh
         agents:
