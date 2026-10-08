@@ -44,8 +44,17 @@ receivers:
 exporters:
   otlphttp:
     headers:
-      Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
+      Authorization: "ApiKey ${env:ELASTIC_CLOUD_CONNECTED_MODE_API_KEY}"
     endpoint: ${env:AUTOOPS_OTEL_URL}
+    sending_queue:
+      batch:
+        flush_timeout: 11s
+        min_size: 1048576 # 1 MiB uncompressed
+        max_size: 4194304 # 4 MiB uncompressed
+        sizer: bytes
+      block_on_overflow: true
+      enabled: true
+      queue_size: 52428800 # 50 MiB uncompressed
 
 service:
   pipelines:

@@ -42,7 +42,7 @@ receivers:
 exporters:
   otlp_http:
     headers:
-      Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
+      Authorization: "ApiKey ${env:ELASTIC_CLOUD_CONNECTED_MODE_API_KEY}"
     endpoint: ${env:AUTOOPS_OTEL_URL}
     sending_queue:
       batch:
