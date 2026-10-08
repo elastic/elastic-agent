@@ -237,11 +237,7 @@ service:
     - aws_logs_encoding/elbaccess
     - azure_auth
     - azure_encoding
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-    - oauth2client
     - awscredentialsprovider
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
   pipelines:
     logs:
       exporters:
