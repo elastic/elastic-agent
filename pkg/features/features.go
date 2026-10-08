@@ -30,6 +30,10 @@ const defaultDefaultProcessors = true
 // 9.4 - disabled (plaintext config)
 const defaultEncryptedConfig = false
 
+// The default value for the include tags in events feature flag.
+// 9.6 - disabled
+const defaultIncludeTagsInEvents = false
+
 var (
 	current = Flags{
 		tamperProtection:  defaultTamperProtection,
@@ -50,6 +54,7 @@ type Flags struct {
 	disablePolicyChangeAcks bool
 	defaultProcessors       bool
 	encryptedConfig         bool
+	includeTagsInEvents     bool
 }
 
 type cfg struct {
@@ -70,6 +75,9 @@ type cfg struct {
 			EncryptedConfig *struct {
 				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
 			} `json:"encrypted_config" yaml:"encrypted_config" config:"encrypted_config"`
+			IncludeTagsInEvents *struct {
+				Enabled bool `json:"enabled" yaml:"enabled" config:"enabled"`
+			} `json:"include_tags_in_events,omitempty" yaml:"include_tags_in_events,omitempty" config:"include_tags_in_events,omitempty"`
 		} `json:"features" yaml:"features" config:"features"`
 	} `json:"agent" yaml:"agent" config:"agent"`
 }
@@ -107,6 +115,13 @@ func (f *Flags) EncryptedConfig() bool {
 	defer f.mu.RUnlock()
 
 	return f.encryptedConfig
+}
+
+func (f *Flags) IncludeTagsInEvents() bool {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+
+	return f.includeTagsInEvents
 }
 
 func (f *Flags) AsProto() *proto.Features {
@@ -183,6 +198,13 @@ func (f *Flags) setEncryptedConfig(newValue bool) {
 	defer f.mu.Unlock()
 
 	f.encryptedConfig = newValue
+}
+
+func (f *Flags) setIncludeTagsInEvents(newValue bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.includeTagsInEvents = newValue
 }
 
 // setSource preserves the original agent.features subtree so consumers can
@@ -279,6 +301,12 @@ func Parse(policy any) (*Flags, error) {
 		flags.setEncryptedConfig(defaultEncryptedConfig)
 	}
 
+	if parsedFlags.Agent.Features.IncludeTagsInEvents != nil {
+		flags.setIncludeTagsInEvents(parsedFlags.Agent.Features.IncludeTagsInEvents.Enabled)
+	} else {
+		flags.setIncludeTagsInEvents(defaultIncludeTagsInEvents)
+	}
+
 	if err := flags.setSource(c); err != nil {
 		return nil, fmt.Errorf("error creating feature flags source: %w", err)
 	}
@@ -304,6 +332,7 @@ func Apply(c *config.Config) error {
 	current.setDisablePolicyChangeAcks(parsed.DisablePolicyChangeAcks())
 	current.setDefaultProcessors(parsed.DefaultProcessors())
 	current.setEncryptedConfig(parsed.EncryptedConfig())
+	current.setIncludeTagsInEvents(parsed.IncludeTagsInEvents())
 	return err
 }
 
@@ -329,4 +358,9 @@ func DefaultProcessors() bool {
 
 func EncryptedConfig() bool {
 	return current.EncryptedConfig()
+}
+
+// IncludeTagsInEvents reports if the agent tags must be attached to collected events.
+func IncludeTagsInEvents() bool {
+	return current.IncludeTagsInEvents()
 }
