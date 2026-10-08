@@ -36,7 +36,7 @@ common:
 
 steps:
   - group: "Orka macOS probe"
-    if: build.env("MACOS_SMOKE") != "true"
+    if: build.env("MACOS_SMOKE") != "true" && build.env("MACOS_DIAG") != "true"
     steps:
       - label: "probe macos 15 arm64 (generic-base-15-arm-002)"
         env:
@@ -65,7 +65,7 @@ steps:
 
   # Smoke ITs on macOS (enroll + standalone upgrade against an ESS stack). Run with MACOS_SMOKE=true.
   - group: "Orka macOS smoke ITs"
-    if: build.env("MACOS_SMOKE") == "true"
+    if: build.env("MACOS_SMOKE") == "true" || build.env("MACOS_DIAG") == "true"
     steps:
       - label: ":package: darwin/arm64: tar.gz"
         key: packaging-darwin-arm64
@@ -85,6 +85,7 @@ steps:
 
       - label: "Start ESS stack"
         key: macos-smoke-ess
+        if: build.env("MACOS_DIAG") != "true"
         env:
           # wave 1 runs 9 groups, 2 at a time: keep the stack longer than the 4h default
           ESS_EXPIRE_HOURS: "10"
@@ -100,6 +101,7 @@ steps:
       # Wave 1: groups without special privileges. At most 2 Orka VMs at a time.
       - label: "macos 27 arm64: {{matrix}}"
         key: macos-wave1
+        if: build.env("MACOS_DIAG") != "true"
         matrix:
           - default
           - fleet
@@ -128,7 +130,24 @@ steps:
           - *oblt_cli_plugin
           - *vault_github_token
 
+      # Read-only diagnostics of the launchd log modes and the keychain agent key. Run with MACOS_DIAG=true.
+      - label: "macos 27 arm64: diagnostics"
+        key: macos-diag
+        if: build.env("MACOS_DIAG") == "true"
+        depends_on: [packaging-darwin-arm64]
+        soft_fail: true
+        command: .buildkite/scripts/macos_diag.sh
+        artifact_paths:
+          - build/macos-diag.txt
+        agents:
+          provider: orka
+          imagePrefix: endpoint-macos-27-arm
+        timeout_in_minutes: 60
+        plugins:
+          - *google_oidc_observability_plugin
+
       - label: "ESS stack cleanup"
+        if: build.env("MACOS_DIAG") != "true"
         depends_on: [macos-wave1]
         allow_dependency_failure: true
         command: .buildkite/scripts/steps/ess_cleanup_all.sh
