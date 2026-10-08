@@ -154,7 +154,7 @@ exporters:
     sending_queue:
       enabled: true
       sizer: bytes
-      queue_size: 50000000 # 50MB uncompressed
+      queue_size: 50_000_000 # 50MB uncompressed
       block_on_overflow: true
       batch:
         flush_timeout: 1s
@@ -187,6 +187,10 @@ service:
 ```
 
 Data from OTel SDKs stays in separate `fromsdk` pipelines without processors, so that the [`resourcedetection`] processor enriches only the locally collected platform logs and host metrics.
+
+:::{note}
+The component names in this example apply to recent {{agent}} versions. Earlier versions might not include a component, or might use a different name for it. To check which {{agent}} version added each embedded component, refer to [Components included in {{agent}}](/reference/edot-collector/components.md).
+:::
 
 The Agent mode configuration needs no [`elasticsearch`] exporter and none of the `elasticapm` or [`elasticinframetrics`] components, because enrichment and the authenticated export to Elastic happen in Gateway mode. To configure the receiving side, refer to [Gateway mode](#gateway-mode).
 
