@@ -19,6 +19,7 @@ import (
 	filecopy "github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -71,6 +72,7 @@ var (
 type artifactDownloadHandler interface {
 	downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
+	withFleetTransport(fleetTransport httpcommon.HTTPTransportSettings)
 }
 type unpackHandler interface {
 	unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error)
@@ -170,11 +172,13 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 		u.log.Debug("client nil, resetting Fleet Server URI")
 		u.fleetServerURI = ""
 		u.artifactDownloader.withFleetServerURI("")
+		u.artifactDownloader.withFleetTransport(httpcommon.HTTPTransportSettings{})
 	}
 
 	u.fleetServerURI = c.URI()
 	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
 	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
+	u.artifactDownloader.withFleetTransport(c.Transport())
 }
 
 // Reload reloads the artifact configuration for the upgrader.
