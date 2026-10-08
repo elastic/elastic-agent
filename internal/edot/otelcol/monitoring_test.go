@@ -30,15 +30,6 @@ func TestMonitoringReceiver(t *testing.T) {
 	cfg := `receivers:
   elasticmonitoringreceiver:
     interval: 1s
-<<<<<<< HEAD
-=======
-processors:
-  elasticmonitoringprocessor:
-    exporter_names:
-      elasticsearch/1: elasticsearch/1
-connectors:
-  elasticmonitoringconnector: {}
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
 exporters:
   elasticsearch/1:
     endpoints:
@@ -63,13 +54,6 @@ exporters:
 
 service:
   pipelines:
-<<<<<<< HEAD
-=======
-    metrics:
-      receivers: [elasticmonitoringreceiver]
-      processors: [elasticmonitoringprocessor]
-      exporters: [elasticmonitoringconnector]
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
     logs:
       receivers: [elasticmonitoringreceiver]
       exporters:
@@ -89,7 +73,7 @@ service:
 		// If we've already failed this event once, succeed on retry
 		if _, alreadyFailed := failedEvents[timestamp]; alreadyFailed {
 			// Check if this is a beat.stats event and we have enough events processed
-			if _, ok := curEvent["beat.stats.libbeat.pipeline.queue.max_events"]; ok && eventCount > 3 {
+			if ok, _ := curEvent.HasKey("beat.stats"); ok && eventCount > 3 {
 				monitoringReceived <- curEvent
 				return http.StatusOK
 			}
@@ -166,15 +150,6 @@ func TestMonitoringReceiverRequestLevelErrors(t *testing.T) {
 	cfg := `receivers:
   elasticmonitoringreceiver:
     interval: 1s
-<<<<<<< HEAD
-=======
-processors:
-  elasticmonitoringprocessor:
-    exporter_names:
-      elasticsearch/1: elasticsearch/1
-connectors:
-  elasticmonitoringconnector: {}
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
 exporters:
   elasticsearch/1:
     endpoints:
@@ -200,13 +175,6 @@ exporters:
 
 service:
   pipelines:
-<<<<<<< HEAD
-=======
-    metrics:
-      receivers: [elasticmonitoringreceiver]
-      processors: [elasticmonitoringprocessor]
-      exporters: [elasticmonitoringconnector]
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
     logs:
       receivers: [elasticmonitoringreceiver]
       exporters:
@@ -222,7 +190,7 @@ service:
 		var curEvent mapstr.M
 		require.NoError(t, json.Unmarshal(event, &curEvent))
 
-		if _, ok := curEvent["beat.stats.libbeat.pipeline.queue.max_events"]; ok {
+		if ok, _ := curEvent.HasKey("beat.stats"); ok {
 			// Only capture after the startup event and first interval event have been processed,
 			// so the captured event reflects cumulative metrics from both prior deliveries.
 			if ingestedDocsCount >= 2 {

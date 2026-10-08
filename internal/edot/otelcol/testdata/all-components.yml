@@ -91,14 +91,6 @@ receivers:
     username: test
     password: test
   docker_stats:
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-  azure_event_hub:
-    connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
-    blob_checkpoint_store:
-      connection: DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=c3VwZXJTZWNyZXQxMjM0;EndpointSuffix=core.windows.net
-      container_name: checkpoints
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
   awss3:
     starttime: "2024-01-01 01:00"
     endtime: "2024-01-02"
@@ -106,28 +98,8 @@ receivers:
       s3_bucket: 'test'
       s3_prefix: 'test'
     encodings:
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-      - extension: awslogs_encoding/elbaccess
-  prometheusremotewrite:
-=======
       - extension: aws_logs_encoding/elbaccess
-  aws_cloudwatch:
-    credentials_provider: awscredentialsprovider
-    region: us-east-1
-    logs:
-      initial_lookback: 1h
-      poll_interval: 1m
-      groups:
-        autodiscover:
-          limit: 1
-    metrics:
-      collection_interval: 5m
-      period: 5m
-      queries:
-        - namespace: AWS/Lambda
-          metric_name: Invocations
   prometheus_remote_write:
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
     endpoint: 0.0.0.0:9090
   statsd:
     endpoint: localhost:8125
@@ -153,18 +125,7 @@ receivers:
       - 00000000-0000-0000-0000-000000000000
     cloud: AzureCloud
     credentials: default_credentials
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-  kafkametrics:
-=======
-  # googlecloudmonitoring is intentionally omitted from this fixture (see
-  # internal/edot/otelcol/components/default.go for its registration): its
-  # Start() eagerly calls google.FindDefaultCredentials, which errors out
-  # without real GCP Application Default Credentials. This fixture is used to
-  # exercise starting every configured receiver, so a trivial config isn't
-  # practical here (no ADC available in unit-test/CI environments). This
-  # mirrors the iis/sqlserver exclusions from elastic/elastic-agent#9344.
   kafka_metrics:
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
     brokers: [localhost:9092]
     protocol_version: 2.0.0
     scrapers:
@@ -237,11 +198,6 @@ service:
     - aws_logs_encoding/elbaccess
     - azure_auth
     - azure_encoding
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-    - oauth2client
-    - awscredentialsprovider
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
   pipelines:
     logs:
       exporters:
@@ -264,12 +220,7 @@ service:
         - otlp
         - nop
         - elasticapmintake
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
         - elasticmonitoringreceiver
-=======
-        - azure_event_hub
-        - aws_cloudwatch
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
         - verifier
 
     logs/forward_receive:
@@ -321,12 +272,6 @@ service:
         - oracledb
         - vcenter
         - zookeeper
-<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.yml
-=======
-        - azure_event_hub
-        - aws_cloudwatch
-        - elasticmonitoringreceiver
->>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.yml
 
     metrics/aggregated:
       receivers:
