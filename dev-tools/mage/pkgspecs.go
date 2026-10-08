@@ -224,22 +224,13 @@ func collectMergedMappingKeys(node *yaml.Node) map[string]*yaml.Node {
 		if src.Kind != yaml.MappingNode {
 			return
 		}
+		// Explicit keys of src must win over src's own nested merge sources, so
+		// handle them in a first pass and recurse into merges afterwards.
 		for i := 0; i < len(src.Content)-1; i += 2 {
 			keyNode := src.Content[i]
 			valNode := src.Content[i+1]
 
 			if keyNode.Tag == "!!merge" {
-				// Recurse into merge key sources.
-				switch valNode.Kind {
-				case yaml.AliasNode:
-					visit(valNode.Alias, offset+1)
-				case yaml.SequenceNode:
-					for idx, item := range valNode.Content {
-						if item.Kind == yaml.AliasNode {
-							visit(item.Alias, offset+idx+1)
-						}
-					}
-				}
 				continue
 			}
 
@@ -270,6 +261,24 @@ func collectMergedMappingKeys(node *yaml.Node) map[string]*yaml.Node {
 						resolvedVal.Content[j],
 						resolvedVal.Content[j+1],
 					)
+				}
+			}
+		}
+
+		// Second pass: recurse into src's own merge sources.
+		for i := 0; i < len(src.Content)-1; i += 2 {
+			if src.Content[i].Tag != "!!merge" {
+				continue
+			}
+			valNode := src.Content[i+1]
+			switch valNode.Kind {
+			case yaml.AliasNode:
+				visit(valNode.Alias, offset+1)
+			case yaml.SequenceNode:
+				for idx, item := range valNode.Content {
+					if item.Kind == yaml.AliasNode {
+						visit(item.Alias, offset+idx+1)
+					}
 				}
 			}
 		}
