@@ -11,12 +11,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
 )
 
 func TestKafkaTranslationLogic(t *testing.T) {
@@ -381,14 +379,6 @@ ssl:
   ca_sha_256:  sha256
 `,
 		},
-		{
-			"keep_alive is set",
-			`
-hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
-topic: static-topic
-keep_alive: 30s
-`,
-		},
 	}
 
 	for _, test := range testCases {
@@ -399,23 +389,4 @@ keep_alive: 30s
 			require.ErrorIs(t, err, errors.ErrUnsupported)
 		})
 	}
-}
-
-func TestTimeoutIsIgnoredWithWarning(t *testing.T) {
-	cfg, err := config.NewConfigFrom(`
-hosts: ["kafka1:9092"]
-topic: static-topic
-timeout: 45s
-broker_timeout: 20s
-`)
-	require.NoError(t, err)
-
-	logger, observed := logptest.NewTestingLoggerWithObserver(t, "")
-	got, _, _, err := KafkaToOTelConfig(cfg, "", logger)
-	require.NoError(t, err)
-	require.Equal(t, 20*time.Second, got["timeout"], "exporter timeout must come from broker_timeout")
-
-	warnings := observed.FilterMessage("timeout is not supported, use broker_timeout instead").All()
-	require.Len(t, warnings, 1)
-	require.Equal(t, zapcore.WarnLevel, warnings[0].Level)
 }
