@@ -309,6 +309,11 @@ func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir strin
 }
 
 func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, minInterval time.Duration) {
+	if !IsUpgradeable() {
+		log.Info("Elastic Agent is not upgradable, won't start rollback cleaner")
+		return
+	}
+
 	log.Info("starting periodically cleaning rollbacks")
 	timer := time.NewTimer(minInterval)
 	for {

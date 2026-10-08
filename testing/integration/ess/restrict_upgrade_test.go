@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	agentLogDirectory                 = "/var/log/elastic-agent"
-	periodicRollbackCleanupStartupLog = "starting periodically cleaning rollbacks"
+	agentLogDirectory                  = "/var/log/elastic-agent"
+	periodicRollbackCleanupDisabledLog = "Elastic Agent is not upgradable, won't start rollback cleaner"
 )
 
 func assertPeriodicRollbackCleanupNotStarted(t *testing.T, ctx context.Context, fixture *atesting.Fixture) {
@@ -56,6 +56,10 @@ func assertPeriodicRollbackCleanupNotStarted(t *testing.T, ctx context.Context, 
 	).CombinedOutput()
 	require.NoError(t, err, "failed to read Elastic Agent logs: %s", logs)
 	require.NotEmpty(t, logs, "Elastic Agent did not write an agent log after restart")
-	require.NotContains(t, string(logs), periodicRollbackCleanupStartupLog,
-		"periodic rollback cleanup started for an unupgradable Elastic Agent")
+	require.Contains(
+		t,
+		string(logs),
+		periodicRollbackCleanupDisabledLog,
+		"Elastic Agent did not report that rollback cleanup is disabled",
+	)
 }

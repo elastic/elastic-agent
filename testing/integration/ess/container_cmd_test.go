@@ -224,11 +224,11 @@ func TestContainerCMD(t *testing.T) {
 		t.Fatalf("Elastic Agent exited with error: %s", err)
 	}
 
-	require.NotContains(
+	require.Contains(
 		t,
 		agentOutput.String(),
-		periodicRollbackCleanupStartupLog,
-		"periodic rollback cleanup started for an unupgradable Elastic Agent",
+		periodicRollbackCleanupDisabledLog,
+		"Elastic Agent did not report that rollback cleanup is disabled",
 	)
 }
 
