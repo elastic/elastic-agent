@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -38,6 +39,8 @@ type Sender interface {
 	) (*http.Response, error)
 
 	URI() string
+
+	Transport() httpcommon.HTTPTransportSettings
 }
 
 const defaultFleetApiVersion = api.DefaultFleetAPIVersion
