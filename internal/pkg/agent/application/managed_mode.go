@@ -202,6 +202,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		policyChanger.AddSetter(m.fleetAcker)
 
 		for _, cs := range m.initialClientSetters {
+			cs.SetClient(m.client)
 			policyChanger.AddSetter(cs)
 		}
 	} else {
