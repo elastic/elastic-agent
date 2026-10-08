@@ -787,11 +787,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261006192722-fd0a2d1c0822
+Version: v7.0.0-alpha2.0.20261007213625-e50c8b1d2270
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261006192722-fd0a2d1c0822/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261007213625-e50c8b1d2270/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -12485,11 +12485,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/bigquery@v1.85
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/compute
-Version: v1.70.0
+Version: v1.71.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute@v1.70.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute@v1.71.0/LICENSE:
 
 
                                  Apache License
@@ -14181,11 +14181,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/redis@v1.26.0/
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/storage
-Version: v1.68.0
+Version: v1.69.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/storage@v1.68.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/storage@v1.69.0/LICENSE:
 
 
                                  Apache License
@@ -20681,11 +20681,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/apache/thrift
-Version: v0.24.0
+Version: v0.25.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/apache/thrift@v0.24.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/apache/thrift@v0.25.0/LICENSE:
 
 
                                  Apache License
@@ -20897,13 +20897,6 @@ The Apache Thrift software includes a number of subcomponents with
 separate copyright notices and license terms. Your use of the source
 code for the these subcomponents is subject to the terms and
 conditions of the following licenses.
-
---------------------------------------------------
-Portions of the following files are licensed under the MIT License:
-
-  lib/erl/src/Makefile.am
-
-Please see doc/otp-base-license.txt for the full terms of this license.
 
 --------------------------------------------------
 For the aclocal/ax_boost_base.m4 and contrib/fb303/aclocal/ax_boost_base.m4 components:
@@ -48722,11 +48715,11 @@ Contents of probable licence file $GOMODCACHE/github.com/googleapis/enterprise-c
 
 --------------------------------------------------------------------------------
 Dependency : github.com/googleapis/gax-go/v2
-Version: v2.23.0
+Version: v2.26.2
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/googleapis/gax-go/v2@v2.23.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/googleapis/gax-go/v2@v2.26.2/LICENSE:
 
 Copyright 2016, Google Inc.
 All rights reserved.
@@ -106510,11 +106503,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : google.golang.org/genproto
-Version: v0.0.0-20260519071638-aa98bba5eb94
+Version: v0.0.0-20260715232425-e75dac1f907d
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-20260519071638-aa98bba5eb94/LICENSE:
+Contents of probable licence file $GOMODCACHE/google.golang.org/genproto@v0.0.0-20260715232425-e75dac1f907d/LICENSE:
 
 
                                  Apache License
