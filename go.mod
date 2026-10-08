@@ -14,7 +14,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261006192722-fd0a2d1c0822
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261007213625-e50c8b1d2270
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.47.0
@@ -119,7 +119,7 @@ require (
 	cloud.google.com/go/auth v0.24.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.3.0 // indirect
 	cloud.google.com/go/bigquery v1.85.0 // indirect
-	cloud.google.com/go/compute v1.70.0 // indirect
+	cloud.google.com/go/compute v1.71.0 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	cloud.google.com/go/iam v1.14.0 // indirect
 	cloud.google.com/go/longrunning v1.3.0 // indirect
@@ -127,7 +127,7 @@ require (
 	cloud.google.com/go/pubsub v1.51.1 // indirect
 	cloud.google.com/go/pubsub/v2 v2.7.0 // indirect
 	cloud.google.com/go/redis v1.26.0 // indirect
-	cloud.google.com/go/storage v1.68.0 // indirect
+	cloud.google.com/go/storage v1.69.0 // indirect
 	code.cloudfoundry.org/go-diodes v0.0.0-20190809170250-f77fb823c7ee // indirect
 	code.cloudfoundry.org/go-loggregator v7.4.0+incompatible // indirect
 	code.cloudfoundry.org/gofileutils v0.0.0-20170111115228-4d0c80011a0f // indirect
@@ -194,7 +194,7 @@ require (
 	github.com/antchfx/xpath v1.3.8 // indirect
 	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/apache/thrift v0.24.0 // indirect
+	github.com/apache/thrift v0.25.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
@@ -401,7 +401,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.18 // indirect
-	github.com/googleapis/gax-go/v2 v2.23.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.26.2 // indirect
 	github.com/gophercloud/gophercloud/v2 v2.13.0 // indirect
 	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
@@ -791,7 +791,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.290.0 // indirect
-	google.golang.org/genproto v0.0.0-20260519071638-aa98bba5eb94 // indirect
+	google.golang.org/genproto v0.0.0-20260715232425-e75dac1f907d // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260803160001-6ac0973c030d // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
