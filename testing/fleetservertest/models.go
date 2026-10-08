@@ -167,7 +167,12 @@ type Action struct {
 	// The timeout value (in seconds) for actions with type `INPUT_ACTION`.
 	Timeout int64 `json:"timeout,omitempty" yaml:"timeout"`
 
-	Signed ActionSignature `json:"signed,omitempty" yaml:"signed"`
+	// Signed is a pointer so that an unsigned action omits the `signed` field on
+	// the wire, matching the real Fleet Server (which uses *ActionSignature with
+	// omitempty). A value type here would serialize an empty `"signed":{...}` for
+	// every action, which the agent would treat as a (malformed) signature and
+	// reject once it verifies signatures (e.g. RESTART, MIGRATE).
+	Signed *ActionSignature `json:"signed,omitempty" yaml:"signed"`
 }
 
 // ActionSignature - Optional action signing data.
