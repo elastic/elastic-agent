@@ -18,6 +18,7 @@ import (
 
 	api "github.com/elastic/fleet-server/pkg/api"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
@@ -867,4 +868,8 @@ func (s sender) Send(
 
 func (s sender) URI() string {
 	return s.url + s.path
+}
+
+func (s sender) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{}
 }

@@ -44,6 +44,7 @@ type artifactDownloader struct {
 	log            *logger.Logger
 	settings       *artifact.Config
 	fleetServerURI string
+	fleetTransport httpcommon.HTTPTransportSettings
 	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
 	retryTimeout   time.Duration
 	totalTimeout   time.Duration
@@ -66,6 +67,10 @@ func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artif
 
 func (a *artifactDownloader) withFleetServerURI(fleetServerURI string) {
 	a.fleetServerURI = fleetServerURI
+}
+
+func (a *artifactDownloader) withFleetTransport(fleetTransport httpcommon.HTTPTransportSettings) {
+	a.fleetTransport = fleetTransport
 }
 
 func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
@@ -230,7 +235,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 					continue
 				}
 
-				if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
+				if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, a.fleetServerURI, a.fleetTransport, pgpBytes...); err != nil {
 					e := fmt.Errorf("verification failed for %s: %w", src, err)
 					a.log.Debugf("%v", e)
 					if !errors.IsNetworkError(err) {
