@@ -1,0 +1,28 @@
+exporters:
+  file:
+<<<<<<< HEAD:internal/pkg/otel/testdata/all-components.windows.yml
+    path: ${env:TMP}\file-exporter-output.json
+=======
+    path: ${env:TMP}\file-exporter-output.json
+receivers:
+  windows_event_log:
+    channel: "Application"
+  windows_perf_counters:
+    perfcounters:
+      - object: Memory
+        counters:
+          - name: Committed Bytes
+            metric: bytes.committed
+service:
+  pipelines:
+    logs/windows:
+      receivers:
+        - windows_event_log
+      exporters:
+        - nop
+    metrics/windows:
+      receivers:
+        - windows_perf_counters
+      exporters:
+        - nop
+>>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084)):internal/edot/otelcol/testdata/all-components.windows.yml

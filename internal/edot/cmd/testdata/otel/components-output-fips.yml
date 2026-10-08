@@ -8,17 +8,17 @@ receivers:
       logs: Alpha
       metrics: Undefined
       traces: Undefined
-  - name: filelog
+  - name: file_log
     stability:
       logs: Beta
       metrics: Undefined
       traces: Undefined
-  - name: hostmetrics
+  - name: host_metrics
     stability:
       logs: Development
       metrics: Beta
       traces: Undefined
-  - name: httpcheck
+  - name: http_check
     stability:
       logs: Undefined
       metrics: Alpha
@@ -33,12 +33,12 @@ receivers:
       logs: Beta
       metrics: Beta
       traces: Undefined
-  - name: k8sobjects
+  - name: k8s_objects
     stability:
       logs: Beta
       metrics: Undefined
       traces: Undefined
-  - name: kubeletstats
+  - name: kubelet_stats
     stability:
       logs: Undefined
       metrics: Beta
@@ -89,7 +89,7 @@ processors:
       logs: Alpha
       metrics: Alpha
       traces: Alpha
-  - name: k8sattributes
+  - name: k8s_attributes
     stability:
       logs: Beta
       metrics: Beta
@@ -104,7 +104,7 @@ processors:
       logs: Beta
       metrics: Beta
       traces: Beta
-  - name: resourcedetection
+  - name: resource_detection
     stability:
       logs: Beta
       metrics: Beta
@@ -130,17 +130,17 @@ exporters:
       logs: Alpha
       metrics: Alpha
       traces: Alpha
-  - name: loadbalancing
+  - name: load_balancing
     stability:
       logs: Beta
       metrics: Development
       traces: Beta
-  - name: otlp
+  - name: otlp_grpc
     stability:
       logs: Beta
       metrics: Stable
       traces: Stable
-  - name: otlphttp
+  - name: otlp_http
     stability:
       logs: Beta
       metrics: Stable
@@ -157,7 +157,7 @@ connectors:
       traces-to-logs: Undefined
       traces-to-metrics: Undefined
       traces-to-traces: Alpha
-  - name: spanmetrics
+  - name: span_metrics
     stability:
       logs-to-logs: Undefined
       logs-to-metrics: Undefined
@@ -180,6 +180,12 @@ connectors:
       traces-to-metrics: Development
       traces-to-traces: Undefined
 extensions:
+<<<<<<< HEAD
+=======
+  - name: cgroup_runtime
+    stability:
+      extension: Alpha
+>>>>>>> 6edfcdb (test: fix EDOT Collector tests (#17084))
   - name: file_storage
     stability:
       extension: Beta
