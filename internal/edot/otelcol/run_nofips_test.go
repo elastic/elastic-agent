@@ -48,8 +48,8 @@ func TestStartCollector(t *testing.T) {
 				assert.Eventually(t, func() bool {
 					return otelcol.StateRunning == collector.GetState()
 				}, 10*time.Second, 200*time.Millisecond)
+				collector.Shutdown()
 			}
-			collector.Shutdown()
 			wg.Wait()
 			assert.Equal(t, otelcol.StateClosed, collector.GetState())
 		})
