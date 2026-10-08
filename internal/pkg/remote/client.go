@@ -264,6 +264,11 @@ func (c *Client) URI() string {
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
 }
 
+// Transport returns the HTTP transport settings of the remote.
+func (c *Client) Transport() httpcommon.HTTPTransportSettings {
+	return c.config.Transport
+}
+
 // newClient creates a new API client.
 func newClient(
 	log *logger.Logger,

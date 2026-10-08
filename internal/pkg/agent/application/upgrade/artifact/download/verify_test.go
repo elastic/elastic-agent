@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/testing/proxytest"
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -319,7 +321,7 @@ func TestVerify(t *testing.T) {
 					fileName + ".asc":    signature,
 				})
 
-				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 				require.NoError(t, err)
 				assert.FileExists(t, artifactPath)
 				assert.FileExists(t, artifactPath+".sha512")
@@ -333,7 +335,7 @@ func TestVerify(t *testing.T) {
 					fileName + ".sha512": []byte(strings.Repeat("0", 128) + " " + fileName),
 				})
 
-				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 				var checksumErr *ChecksumMismatchError
 				require.ErrorAs(t, err, &checksumErr)
 			},
@@ -347,7 +349,7 @@ func TestVerify(t *testing.T) {
 					fileName + ".asc":    []byte("not a valid signature"),
 				})
 
-				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 				var invalidSigErr *InvalidSignatureError
 				require.ErrorAs(t, err, &invalidSigErr)
 			},
@@ -362,7 +364,7 @@ func TestVerify(t *testing.T) {
 
 				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 				defer cancel()
-				err := Verify(ctx, fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(ctx, fx.log, fx.config, pgpKey, srcURI, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 				require.ErrorContains(t, err, "could not get .asc file")
 			},
 		},
@@ -436,7 +438,7 @@ func TestVerifySkipsUnreachableRemotePGP(t *testing.T) {
 	require.NoError(t, os.WriteFile(artifactPath+".sha512", []byte(fmt.Sprintf("%x %s", sha512.Sum512(content), fileName)), 0o644))
 
 	log, obs := loggertest.New(t.Name())
-	err := Verify(t.Context(), log, &artifact.Config{}, pgpKey, "file://"+srcPath, artifactPath, false,
+	err := Verify(t.Context(), log, &artifact.Config{}, pgpKey, "file://"+srcPath, artifactPath, false, "", httpcommon.HTTPTransportSettings{},
 		PgpSourceURIPrefix+"http://127.0.0.1:2874/path/does/not/exist")
 	require.NoError(t, err)
 	require.Equal(t, 1, obs.FilterMessageSnippet("Skipped remote PGP located at").Len())
@@ -457,7 +459,7 @@ func TestVerifyFailsWhenDefaultPGPKeyDoesNotMatch(t *testing.T) {
 	require.NoError(t, os.WriteFile(artifactPath+".sha512", []byte(fmt.Sprintf("%x %s", sha512.Sum512(content), fileName)), 0o644))
 
 	log, _ := loggertest.New(t.Name())
-	err := Verify(t.Context(), log, &artifact.Config{}, release.PGP(), "file://"+srcPath, artifactPath, false)
+	err := Verify(t.Context(), log, &artifact.Config{}, release.PGP(), "file://"+srcPath, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 	require.Error(t, err)
 	assert.NoFileExists(t, artifactPath+".asc")
 }
@@ -507,7 +509,7 @@ func TestVerifyRemoteRetriesSignatureFetch(t *testing.T) {
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI, artifactPath, defaultFileOps()))
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI+".sha512", artifactPath+".sha512", defaultFileOps()))
 
-	err := Verify(t.Context(), log, config, pub, srcURI, artifactPath, false)
+	err := Verify(t.Context(), log, config, pub, srcURI, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 	require.NoError(t, err)
 	require.Equal(t, 3, ascRequests)
 }
@@ -575,7 +577,52 @@ func TestVerifyRemoteWithProxy(t *testing.T) {
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI, artifactPath, defaultFileOps()))
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI+".sha512", artifactPath+".sha512", defaultFileOps()))
 
-	err = Verify(t.Context(), log, config, pub, srcURI, artifactPath, false)
+	err = Verify(t.Context(), log, config, pub, srcURI, artifactPath, false, "", httpcommon.HTTPTransportSettings{})
 	require.NoError(t, err)
 	require.Equal(t, 0, directRequests)
+}
+
+func TestFetchPGPKeysWithFleetProxy(t *testing.T) {
+	fleetPGP := []byte("fleet-pgp-key")
+	fleetServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(fleetPGP)
+	}))
+	defer fleetServer.Close()
+
+	var fleetProxyRequests int
+	fleetProxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fleetProxyRequests++
+		dst, err := (&net.Dialer{}).DialContext(r.Context(), "tcp", r.Host)
+		if err != nil {
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		defer dst.Close()
+		src, _, err := http.NewResponseController(w).Hijack()
+		if err != nil {
+			return
+		}
+		defer src.Close()
+		_, _ = src.Write([]byte("HTTP/1.1 200 Connection established\r\n\r\n"))
+		go func() { _, _ = io.Copy(dst, src) }()
+		_, _ = io.Copy(src, dst)
+	}))
+	defer fleetProxy.Close()
+
+	fleetProxyURL, err := url.Parse(fleetProxy.URL)
+	require.NoError(t, err)
+
+	fleetTransport := httpcommon.HTTPTransportSettings{
+		Proxy: httpcommon.HTTPClientProxySettings{
+			URL: (*httpcommon.ProxyURI)(fleetProxyURL),
+		},
+		TLS: &tlscommon.Config{VerificationMode: tlscommon.VerifyNone},
+	}
+
+	log, _ := loggertest.New(t.Name())
+	fleetSource := PgpSourceURIPrefix + fleetServer.URL + fmt.Sprintf(fleetUpgradeFallbackPGPFormat, 1, 2, 3)
+	keys, err := FetchPGPKeys(log, &artifact.Config{}, nil, true, fleetServer.URL, fleetTransport, []string{fleetSource})
+	require.NoError(t, err)
+	require.Equal(t, [][]byte{fleetPGP}, keys)
+	require.Equal(t, 1, fleetProxyRequests)
 }

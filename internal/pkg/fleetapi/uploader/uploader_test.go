@@ -18,6 +18,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 )
 
 type mockBackoff struct {
@@ -50,6 +52,10 @@ func (m *mockSender) Send(ctx context.Context, method, path string, params url.V
 func (m *mockSender) URI() string {
 	args := m.Called()
 	return args.String(0)
+}
+
+func (m *mockSender) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{}
 }
 
 func Test_retrySender_Send(t *testing.T) {

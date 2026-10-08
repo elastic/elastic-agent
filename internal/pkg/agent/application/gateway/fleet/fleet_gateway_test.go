@@ -26,6 +26,7 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -68,6 +69,10 @@ func (t *testingClient) Send(
 
 func (t *testingClient) URI() string {
 	return "http://localhost"
+}
+
+func (t *testingClient) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{}
 }
 
 func (t *testingClient) Answer(fn clientCallbackFunc) <-chan struct{} {
