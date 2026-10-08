@@ -6,19 +6,26 @@
 # - enhancement: extends functionality but does not break or fix existing behavior
 # - feature: new functionality
 # - known-issue: problems that we are aware of in a given version
-# - security: impacts on the security of a product or a user’s deployment.
+# - security: impacts on the security of a product or a user's deployment.
 # - upgrade: important information for someone upgrading from a prior version
 # - other: does not fit into any of the other categories
 kind: enhancement
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Enable kafka exporter and receiver in FIPS builds
+summary: Enable service.profilesSupport feature gate for all executions
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-# description:
+description: |
+  The `service.profilesSupport` feature gate can only be applied as a subprocess
+  launch argument. When `profiling_otel` was added to a policy for an already-running
+  fleet-managed agent, the manager was pushing the new config as a live update to the
+  existing collector process, which had not been launched with the gate and would
+  fatally reject the profiles pipeline. The gate is now enabled unconditionally at
+  collector subprocess startup, so it no longer depends on the config present at
+  launch time.
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
