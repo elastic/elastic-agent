@@ -77,6 +77,12 @@ extraEnvs:
         name: {{ $agentName }}-autoops
         key: autoops-token
 
+  - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: {{ $agentName }}-autoops
+        key: cloud-connected-mode-api-key
+
   - name: AUTOOPS_OTEL_URL
     valueFrom:
       secretKeyRef:
@@ -113,14 +119,6 @@ extraEnvs:
         name: {{ $agentName }}-autoops
         key: es-password
   {{- end }}
-
-{{- if $.Values.autoOps.elastic_cloud_connected_mode_api_key }}
-  - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: {{ $agentName }}-autoops
-        key: cloud-connected-mode-api-key
-{{- end }}
 
 {{- if $.Values.autoOps.elastic_cloud_connected_mode_api_url }}
   - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL
