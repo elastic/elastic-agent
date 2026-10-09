@@ -34,6 +34,16 @@
   },
   "packageRules": [
     {
+      "description": "Major updates: only on main and the last branch of the previous major (baseBranchPatterns are maintained by the update-renovate-branches workflow, which also rewrites this rule)",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
+    {
       "description": "Go modules: schedule, labels, PR limit, branch prefix, and post-update tidy",
       "matchManagers": [
         "gomod"
