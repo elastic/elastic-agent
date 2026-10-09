@@ -9,8 +9,8 @@
 // The kubernetes dynamic provider renders the container-logs input once per
 // container it discovers, because the input's paths, ids and processors are
 // templated with ${kubernetes.*} variable references. That costs one filestream
-// input (and one registry entry) per container, and re-renders the whole
-// component model on every pod event.
+// input per container (registry entries are per file, not per input), and
+// re-renders the whole component model on every pod event.
 //
 // This package strips those variable references before AST rendering so the
 // input renders exactly once, and adds an add_kubernetes_metadata processor to
@@ -136,16 +136,14 @@ func RewriteContainerLogInputs(m map[string]interface{}, globInput bool, log *lo
 		}
 		if globInput {
 			rewriteContainerLogInput(inputMap)
-			if log != nil {
-				inputID, _ := inputMap["id"].(string)
-				log.Infof(
-					"Automatically collapsed kubernetes container-log input %q into a single "+
-						"glob filestream input. To suppress this message, update your Fleet "+
-						"integration to the latest version or update your standalone manifest "+
-						"to use the recommended Kubernetes container-logs configuration.",
-					inputID,
-				)
-			}
+			inputID, _ := inputMap["id"].(string)
+			log.Infof(
+				"Automatically collapsed kubernetes container-log input %q into a single "+
+					"glob filestream input. To suppress this message, update your Fleet "+
+					"integration to the latest version or update your standalone manifest "+
+					"to use the recommended Kubernetes container-logs configuration.",
+				inputID,
+			)
 			continue
 		}
 		markContainerLogTakeOver(inputMap)
@@ -173,7 +171,7 @@ func containerLogStreamConfidence(input, stream map[string]interface{}) (contain
 	// contributes a bonus rather than short-circuiting to certainty.
 	if pkg, ok := nestedString(input, "meta", "package", "name"); ok && pkg == fleetPackageName {
 		score += packageSignalScore
-		signals = append(signals, "meta.package.name=kubernetes (Fleet-managed)")
+		signals = append(signals, "meta.package.name=kubernetes")
 	}
 
 	// Path signals — check every path in the stream.
@@ -291,6 +289,39 @@ func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logge
 
 	inputID, _ := input["id"].(string)
 
+	// The rewrite collapses per-container dynamic inputs — those whose paths or
+	// ids contain ${kubernetes.*} variable references injected by the kubernetes
+	// provider. A fully static input (no such references) was never templated by
+	// the provider and must not be rewritten: its paths are already fixed globs,
+	// and rewriting it would only add unnecessary processing.
+	hasKubernetesVarRef := k8sVarPattern.MatchString(inputID)
+	if !hasKubernetesVarRef {
+		for _, stream := range streams {
+			streamMap, ok := stream.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			if id, _ := streamMap["id"].(string); k8sVarPattern.MatchString(id) {
+				hasKubernetesVarRef = true
+				break
+			}
+			if pathList, ok := streamMap["paths"].([]interface{}); ok {
+				for _, p := range pathList {
+					if pathStr, ok := p.(string); ok && k8sVarPattern.MatchString(pathStr) {
+						hasKubernetesVarRef = true
+						break
+					}
+				}
+			}
+			if hasKubernetesVarRef {
+				break
+			}
+		}
+	}
+	if !hasKubernetesVarRef {
+		return false
+	}
+
 	for _, stream := range streams {
 		streamMap, ok := stream.(map[string]interface{})
 		if !ok {
@@ -299,6 +330,12 @@ func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logge
 		if _, hasCondition := streamMap["condition"]; hasCondition {
 			return false
 		}
+		procs, _ := streamMap["processors"].([]interface{})
+		for _, proc := range procs {
+			if processorHasUntransformableKubernetesVarRef(proc) {
+				return false
+			}
+		}
 
 		score, signals := containerLogStreamConfidence(input, streamMap)
 		streamID, _ := streamMap["id"].(string)
@@ -306,7 +343,7 @@ func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logge
 		if score < suspectedConfidence {
 			return false
 		}
-		if score < highConfidence && log != nil {
+		if score < highConfidence {
 			log.Warnf(
 				"applying kubernetes container-log glob rewrite to stream %q in input %q "+
 					"with low confidence (score %d/%d); verify this is the container-logs integration. "+
@@ -447,19 +484,13 @@ func filterVarProcessors(raw interface{}) (kept []interface{}, annotations []str
 		if referencesVar {
 			if transformed, ok := transformAddFieldsToFieldCopies(processor); ok {
 				kept = append(kept, transformed...)
-			} else if processorHasNonAnnotationKubernetesVarRef(processor) {
-				// Has non-annotation ${kubernetes.*} refs that we cannot transform.
-				// Keep the processor: context provider variable references
-				// (${host.*}, ${env.*}, …) are resolved by the AST to a single
-				// value. Kubernetes dynamic provider references are left for the
-				// AST to handle on a best-effort basis — better than silently
-				// dropping the processor or reverting the entire input to
-				// per-container mode.
-				kept = append(kept, processor)
 			}
 			// Processors whose only kubernetes references are annotation refs are
 			// dropped here; add_kubernetes_metadata publishes those annotations via
 			// include_annotations so dropping the original processor is correct.
+			// Processors with non-annotation kubernetes vars in untransformable
+			// locations are never reached here: isRewritableContainerLogInput
+			// rejects those inputs before rewriteContainerLogInput is called.
 			continue
 		}
 		kept = append(kept, processor)
@@ -584,6 +615,40 @@ func processorHasNonAnnotationKubernetesVarRef(processor interface{}) bool {
 	return found
 }
 
+// processorHasUntransformableKubernetesVarRef reports whether the processor
+// has a non-annotation ${kubernetes.*} reference in a location we cannot
+// transform. For add_fields processors the fields map is excluded since those
+// field values are handled by transformAddFieldsToFieldCopies; everything else
+// (the outer processor map, e.g. when:, and any non-fields config inside
+// add_fields) must not reference kubernetes variables. For all other processor
+// types the entire processor is checked.
+func processorHasUntransformableKubernetesVarRef(processor interface{}) bool {
+	processorMap, ok := processor.(map[string]interface{})
+	if !ok {
+		return false
+	}
+	if addFieldsCfg, ok := processorMap["add_fields"].(map[string]interface{}); ok {
+		for k, v := range processorMap {
+			if k == "add_fields" {
+				continue
+			}
+			if processorHasNonAnnotationKubernetesVarRef(v) {
+				return true
+			}
+		}
+		for k, v := range addFieldsCfg {
+			if k == "fields" {
+				continue
+			}
+			if processorHasNonAnnotationKubernetesVarRef(v) {
+				return true
+			}
+		}
+		return false
+	}
+	return processorHasNonAnnotationKubernetesVarRef(processor)
+}
+
 // isExactNonAnnotationKubernetesVarRef reports whether s is entirely a single
 // ${kubernetes.*} variable reference that is NOT an annotation reference.
 // Mixed or templated strings (surrounding text, multiple refs) return false.
@@ -616,6 +681,8 @@ func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool
 		return nil, false
 	}
 	target, _ := addFieldsCfg["target"].(string)
+	_, hasTarget := addFieldsCfg["target"]
+	when := processorMap["when"]
 
 	// Iterate in sorted key order for a stable config hash.
 	keys := make([]string, 0, len(fields))
@@ -657,20 +724,27 @@ func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool
 
 	var result []interface{}
 	if len(staticFields) > 0 {
-		result = append(result, map[string]interface{}{
-			"add_fields": map[string]interface{}{
-				"target": target,
-				"fields": staticFields,
-			},
-		})
+		addFieldsBody := map[string]interface{}{"fields": staticFields}
+		if hasTarget {
+			addFieldsBody["target"] = target
+		}
+		p := map[string]interface{}{"add_fields": addFieldsBody}
+		if when != nil {
+			p["when"] = when
+		}
+		result = append(result, p)
 	}
-	result = append(result, map[string]interface{}{
+	p := map[string]interface{}{
 		"copy_fields": map[string]interface{}{
 			"fields":         copySpecs,
 			"fail_on_error":  false,
 			"ignore_missing": true,
 		},
-	})
+	}
+	if when != nil {
+		p["when"] = when
+	}
+	result = append(result, p)
 	return result, true
 }
 

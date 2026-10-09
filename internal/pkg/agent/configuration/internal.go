@@ -6,6 +6,7 @@ package configuration
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -38,8 +39,10 @@ func DefaultInternalConfig() *InternalConfig {
 	// every startup mode, including the Helm hybrid mode that starts via
 	// `elastic-agent run`.
 	globInput := true
-	if v, ok := os.LookupEnv(containerLogsGlobInputEnvVar); ok && strings.TrimSpace(v) != "" {
-		globInput = !strings.EqualFold(strings.TrimSpace(v), "false")
+	if v, ok := os.LookupEnv(containerLogsGlobInputEnvVar); ok {
+		if b, err := strconv.ParseBool(strings.TrimSpace(v)); err == nil {
+			globInput = b
+		}
 	}
 	return &InternalConfig{
 		Runtime: component.DefaultRuntimeConfig(),

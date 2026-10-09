@@ -10,6 +10,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -88,7 +90,7 @@ inputs:
 
 func TestRewriteContainerLogInputs_ChartPolicy(t *testing.T) {
 	m := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(m, true, nil)
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
 	input := m["inputs"].([]interface{})[0].(map[string]interface{})
 	stream := input["streams"].([]interface{})[0].(map[string]interface{})
@@ -171,7 +173,7 @@ inputs:
               fields:
                 myfield: '${kubernetes.container.name}'
 `)
-	RewriteContainerLogInputs(m, true, nil)
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
 	stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
 	processors := stream["processors"].([]interface{})
@@ -222,15 +224,12 @@ inputs:
 	})
 }
 
-// TestRewriteContainerLogInputs_UntransformableProcessorsKept covers the
-// requirement that processors which cannot be automatically translated for the
-// glob-input context are kept as-is rather than silently dropped or reverting
-// the whole input to per-container mode. Context provider variable references
-// (${host.*}, ${env.*}, …) will be resolved by the AST to a single value.
-// Dynamic provider references that cannot be converted are left for the AST to
-// handle on a best-effort basis.
-func TestRewriteContainerLogInputs_UntransformableProcessorsKept(t *testing.T) {
-	m := mustConfig(t, `
+// TestRewriteContainerLogInputs_UntransformableK8sVarDisqualifiesInput verifies
+// that a stream with a non-annotation ${kubernetes.*} reference in an
+// untransformable location (e.g. add_tags tags, a non-fields add_fields key,
+// any non-add_fields processor) causes the whole input to be left unchanged.
+func TestRewriteContainerLogInputs_UntransformableK8sVarDisqualifiesInput(t *testing.T) {
+	const cfg = `
 inputs:
   - id: filestream-container-logs
     type: filestream
@@ -248,31 +247,86 @@ inputs:
               target: host
               fields:
                 name: '${host.name}'
+`
+	before := mustConfig(t, cfg)
+	after := mustConfig(t, cfg)
+	RewriteContainerLogInputs(after, true, logp.NewNopLogger())
+	assert.Equal(t, before, after, "input with untransformable kubernetes var must not be rewritten")
+}
+
+// TestRewriteContainerLogInputs_KubernetesVarInWhenDisqualifiesInput verifies
+// that a ${kubernetes.*} reference inside a processor's when: condition
+// disqualifies the input from the glob rewrite.
+func TestRewriteContainerLogInputs_KubernetesVarInWhenDisqualifiesInput(t *testing.T) {
+	const cfg = `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+        processors:
+          - add_fields:
+              target: labels
+              fields:
+                app: '${kubernetes.labels.app}'
+            when:
+              equals:
+                host.name: '${kubernetes.pod.name}'
+`
+	before := mustConfig(t, cfg)
+	after := mustConfig(t, cfg)
+	RewriteContainerLogInputs(after, true, logp.NewNopLogger())
+	assert.Equal(t, before, after, "input with kubernetes var in when: must not be rewritten")
+}
+
+// TestRewriteContainerLogInputs_StaticWhenCarriedToGeneratedProcessors verifies
+// that a static when: condition on an add_fields processor is forwarded to
+// the copy_fields (and residual add_fields) processors generated in its place.
+func TestRewriteContainerLogInputs_StaticWhenCarriedToGeneratedProcessors(t *testing.T) {
+	m := mustConfig(t, `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+        processors:
+          - add_fields:
+              target: labels
+              fields:
+                app: '${kubernetes.labels.app}'
+                env: production
+            when:
+              equals:
+                host.os.type: linux
 `)
-	RewriteContainerLogInputs(m, true, nil)
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
 	stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
 	processors := stream["processors"].([]interface{})
 
-	// [0] add_kubernetes_metadata, [1] add_tags (kept as-is), [2] add_fields (kept as-is)
+	// [0] add_kubernetes_metadata, [1] residual add_fields (env:production), [2] copy_fields (app)
 	require.Len(t, processors, 3)
 
-	t.Run("glob input is still applied (paths and id rewritten)", func(t *testing.T) {
-		assert.Equal(t, []interface{}{"/var/log/containers/*.log"}, stream["paths"])
-		assert.Equal(t, "kubernetes-container-logs", stream["id"])
+	wantWhen := map[string]interface{}{"equals": map[string]interface{}{"host.os.type": "linux"}}
+
+	t.Run("residual add_fields carries when", func(t *testing.T) {
+		pm := processors[1].(map[string]interface{})
+		assert.Equal(t, wantWhen, pm["when"])
 	})
 
-	t.Run("untransformable add_tags kept as-is", func(t *testing.T) {
-		addTags, ok := processors[1].(map[string]interface{})["add_tags"].(map[string]interface{})
-		require.True(t, ok)
-		assert.Equal(t, []interface{}{"${kubernetes.labels.app}"}, addTags["tags"])
-	})
-
-	t.Run("context provider var in add_fields kept as-is", func(t *testing.T) {
-		addFields, ok := processors[2].(map[string]interface{})["add_fields"].(map[string]interface{})
-		require.True(t, ok)
-		fields := addFields["fields"].(map[string]interface{})
-		assert.Equal(t, "${host.name}", fields["name"])
+	t.Run("copy_fields carries when", func(t *testing.T) {
+		pm := processors[2].(map[string]interface{})
+		assert.Equal(t, wantWhen, pm["when"])
 	})
 }
 
@@ -290,7 +344,7 @@ inputs:
           dataset: kubernetes.container_logs
           type: logs
 `)
-	RewriteContainerLogInputs(m, true, nil)
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
 	input := m["inputs"].([]interface{})[0].(map[string]interface{})
 	stream := input["streams"].([]interface{})[0].(map[string]interface{})
@@ -388,7 +442,7 @@ inputs:
 		t.Run(name, func(t *testing.T) {
 			before := mustConfig(t, policy)
 			after := mustConfig(t, policy)
-			RewriteContainerLogInputs(after, true, nil)
+			RewriteContainerLogInputs(after, true, logp.NewNopLogger())
 			assert.Equal(t, before, after)
 		})
 	}
@@ -406,7 +460,7 @@ func TestRewriteContainerLogInputs_MalformedConfig(t *testing.T) {
 	for name, policy := range testcases {
 		t.Run(name, func(t *testing.T) {
 			m := mustConfig(t, policy)
-			assert.NotPanics(t, func() { RewriteContainerLogInputs(m, true, nil) })
+			assert.NotPanics(t, func() { RewriteContainerLogInputs(m, true, logp.NewNopLogger()) })
 		})
 	}
 }
@@ -616,12 +670,12 @@ func TestIsRewritableContainerLogInput_NonMapStream(t *testing.T) {
 			"not-a-map", // stream entry is a plain string, not a map
 		},
 	}
-	assert.False(t, isRewritableContainerLogInput(input, nil))
+	assert.False(t, isRewritableContainerLogInput(input, logp.NewNopLogger()))
 }
 
 // TestIsRewritableContainerLogInput_SuspectedWithLogger covers the Warnf branch:
-// a stream that scores in [suspectedConfidence, highConfidence) with a real
-// logger attached triggers a warning.
+// a stream that scores in [suspectedConfidence, highConfidence) triggers a
+// warning and is still considered eligible.
 func TestIsRewritableContainerLogInput_SuspectedWithLogger(t *testing.T) {
 	// exact dataset (30) + stream ID prefix (15) + stream ID k8s var (10) = 55 → suspected
 	input := map[string]interface{}{
@@ -634,10 +688,14 @@ func TestIsRewritableContainerLogInput_SuspectedWithLogger(t *testing.T) {
 			},
 		},
 	}
-	log := logp.NewLogger("test")
-	// Must be eligible (score ≥ suspectedConfidence) and emit a warning.
-	assert.True(t, isRewritableContainerLogInput(input, log),
-		"suspected-confidence input must still be eligible")
+	core, logs := observer.New(zap.WarnLevel)
+	log, err := logp.NewZapLogger(zap.New(core))
+	require.NoError(t, err)
+
+	eligible := isRewritableContainerLogInput(input, log)
+	assert.True(t, eligible, "suspected-confidence input must still be eligible")
+	assert.Equal(t, 1, logs.Len(), "expected exactly one warning to be emitted")
+	assert.Contains(t, logs.All()[0].Message, "low confidence", "warning must mention low confidence")
 }
 
 // TestMarkContainerLogTakeOver_NonStringID covers the branch where a stream's
@@ -674,6 +732,32 @@ func TestMarkContainerLogTakeOver_StaticID(t *testing.T) {
 	assert.False(t, hasTakeOver, "static id must not get a take_over annotation")
 }
 
+// TestRewriteContainerLogInputs_LeavesStaticPathInputAlone verifies that an
+// input whose paths and ids contain no ${kubernetes.*} variable references is
+// never rewritten, even when it otherwise looks like a container-log stream
+// (matching dataset and a kubelet log path). Such inputs were never produced
+// by the kubernetes dynamic provider and must be left untouched; in particular,
+// ** glob patterns in their paths must not be collapsed to *.
+func TestRewriteContainerLogInputs_LeavesStaticPathInputAlone(t *testing.T) {
+	const cfg = `
+inputs:
+  - id: k8s-static-ingestion
+    type: filestream
+    streams:
+      - id: k8s-static-ingestion
+        data_stream:
+          type: logs
+          dataset: kubernetes.container_logs
+        paths:
+          - /var/log/pods/**/*.log
+        prospector.scanner.symlinks: true
+`
+	before := mustConfig(t, cfg)
+	after := mustConfig(t, cfg)
+	RewriteContainerLogInputs(after, true, logp.NewNopLogger())
+	assert.Equal(t, before, after, "static-path input (no kubernetes vars) must not be rewritten")
+}
+
 // TestRewriteContainerLogInputs_LeavesNonContainerLogKubernetesInputAlone
 // verifies that an input from the kubernetes Fleet package whose streams are
 // not container logs (e.g. audit logs) is left completely unchanged. The
@@ -697,7 +781,7 @@ inputs:
 `
 	before := mustConfig(t, policy)
 	after := mustConfig(t, policy)
-	RewriteContainerLogInputs(after, true, nil)
+	RewriteContainerLogInputs(after, true, logp.NewNopLogger())
 	assert.Equal(t, before, after, "non-container-log kubernetes input must not be rewritten")
 }
 
@@ -739,6 +823,36 @@ func TestIncludedAnnotations_NonList(t *testing.T) {
 	assert.Nil(t, includedAnnotations(map[string]interface{}{
 		"include_annotations": "not-a-list",
 	}))
+}
+
+// TestTransformAddFieldsToFieldCopies_NoTargetOmittedFromResidual verifies that
+// when an add_fields processor has no target key, the residual add_fields also
+// has no target key (not "target: """). Beats treats a missing target as root
+// placement and "target: """ as a "fields" subkey.
+func TestTransformAddFieldsToFieldCopies_NoTargetOmittedFromResidual(t *testing.T) {
+	processor := map[string]interface{}{
+		"add_fields": map[string]interface{}{
+			// no "target" key — fields go to event root
+			"fields": map[string]interface{}{
+				"pod": "${kubernetes.pod.name}",
+				"env": "production",
+			},
+		},
+	}
+	result, ok := transformAddFieldsToFieldCopies(processor)
+	require.True(t, ok)
+	require.Len(t, result, 2)
+
+	// residual add_fields (for the static "env" field)
+	residual := result[0].(map[string]interface{})["add_fields"].(map[string]interface{})
+	assert.NotContains(t, residual, "target", "target must be absent, not empty string")
+	assert.Equal(t, map[string]interface{}{"env": "production"}, residual["fields"])
+
+	// copy_fields destination must be bare key (no "." prefix)
+	copyFields := result[1].(map[string]interface{})["copy_fields"].(map[string]interface{})
+	specs := copyFields["fields"].([]interface{})
+	require.Len(t, specs, 1)
+	assert.Equal(t, "pod", specs[0].(map[string]interface{})["to"])
 }
 
 // TestTransformAddFieldsToFieldCopies_NotAMap covers the branch where the
@@ -794,11 +908,11 @@ func splitLines(s string) []string {
 
 func TestRewriteContainerLogInputs_Idempotent(t *testing.T) {
 	once := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(once, true, nil)
+	RewriteContainerLogInputs(once, true, logp.NewNopLogger())
 
 	twice := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(twice, true, nil)
-	RewriteContainerLogInputs(twice, true, nil)
+	RewriteContainerLogInputs(twice, true, logp.NewNopLogger())
+	RewriteContainerLogInputs(twice, true, logp.NewNopLogger())
 
 	assert.Equal(t, once, twice)
 }
@@ -888,14 +1002,14 @@ func TestRewriteContainerLogInputs_CollapsesRendering(t *testing.T) {
 		"without the rewrite the provider renders one input per container")
 
 	withRewrite := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(withRewrite, true, nil)
+	RewriteContainerLogInputs(withRewrite, true, logp.NewNopLogger())
 	assert.Equal(t, 1, renderInputCount(withRewrite),
 		"after the rewrite the input renders once regardless of container count")
 }
 
 func TestRewriteContainerLogInputs_TakeOverWhenEnabled(t *testing.T) {
 	m := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(m, true, nil)
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
 	input := m["inputs"].([]interface{})[0].(map[string]interface{})
 	stream := input["streams"].([]interface{})[0].(map[string]interface{})
@@ -911,7 +1025,7 @@ func TestRewriteContainerLogInputs_TakeOverWhenEnabled(t *testing.T) {
 func TestRewriteContainerLogInputs_TakeOverWhenDisabled(t *testing.T) {
 	m := mustConfig(t, chartContainerLogsPolicy)
 	before := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(m, false, nil)
+	RewriteContainerLogInputs(m, false, logp.NewNopLogger())
 
 	input := m["inputs"].([]interface{})[0].(map[string]interface{})
 	stream := input["streams"].([]interface{})[0].(map[string]interface{})
@@ -939,11 +1053,11 @@ func TestRewriteContainerLogInputs_TakeOverWhenDisabled(t *testing.T) {
 // every file from the start.
 func TestRewriteContainerLogInputs_TakeOverRoundTrip(t *testing.T) {
 	enabled := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(enabled, true, nil)
+	RewriteContainerLogInputs(enabled, true, logp.NewNopLogger())
 	enabledStream := enabled["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
 
 	disabled := mustConfig(t, chartContainerLogsPolicy)
-	RewriteContainerLogInputs(disabled, false, nil)
+	RewriteContainerLogInputs(disabled, false, logp.NewNopLogger())
 	disabledStream := disabled["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
 
 	assert.Equal(t, true, enabledStream["take_over"].(map[string]interface{})["from_any_id"],
@@ -972,7 +1086,7 @@ inputs:
           from_ids:
             - a-policy-configured-id
 `)
-	RewriteContainerLogInputs(m, true, nil)
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
 	stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
 	takeOver := stream["take_over"].(map[string]interface{})
@@ -1000,7 +1114,7 @@ inputs:
 `
 			before := mustConfig(t, policy)
 			after := mustConfig(t, policy)
-			RewriteContainerLogInputs(after, globInput, nil)
+			RewriteContainerLogInputs(after, globInput, logp.NewNopLogger())
 			assert.Equal(t, before, after)
 		})
 	}
@@ -1021,7 +1135,7 @@ inputs:
 `
 	before := mustConfig(t, policy)
 	after := mustConfig(t, policy)
-	RewriteContainerLogInputs(after, false, nil)
+	RewriteContainerLogInputs(after, false, logp.NewNopLogger())
 	assert.Equal(t, before, after)
 }
 
@@ -1067,7 +1181,7 @@ inputs:
 		for _, globInput := range []bool{true, false} {
 			t.Run(fmt.Sprintf("%s/globInput=%t", name, globInput), func(t *testing.T) {
 				m := mustConfig(t, policy)
-				RewriteContainerLogInputs(m, globInput, nil)
+				RewriteContainerLogInputs(m, globInput, logp.NewNopLogger())
 
 				stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
 				takeOver, isMap := stream["take_over"].(map[string]interface{})
@@ -1112,14 +1226,14 @@ func observedProviders(t *testing.T, m map[string]interface{}) map[string]bool {
 func TestRewriteContainerLogInputs_StopsObservingKubernetesProvider(t *testing.T) {
 	t.Run("observed while the per-container inputs remain", func(t *testing.T) {
 		m := mustConfig(t, chartContainerLogsPolicy)
-		RewriteContainerLogInputs(m, false, nil)
+		RewriteContainerLogInputs(m, false, logp.NewNopLogger())
 		assert.True(t, observedProviders(t, m)["kubernetes"],
 			"the per-container inputs resolve ${kubernetes.*}, so the provider must run")
 	})
 
 	t.Run("not observed once collapsed", func(t *testing.T) {
 		m := mustConfig(t, chartContainerLogsPolicy)
-		RewriteContainerLogInputs(m, true, nil)
+		RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 		providers := observedProviders(t, m)
 		assert.False(t, providers["kubernetes"],
 			"no ${kubernetes.*} reference should survive the rewrite, so the provider must not be started: observed %v", providers)
@@ -1137,7 +1251,7 @@ func TestRewriteContainerLogInputs_StopsObservingKubernetesProvider(t *testing.T
         paths:
           - /var/log/containers/*${kubernetes.hints.container_id}.log
 `)
-		RewriteContainerLogInputs(m, true, nil)
+		RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 		assert.True(t, observedProviders(t, m)["kubernetes"],
 			"hints inputs stay per-container, so the provider must keep running for them")
 	})

@@ -1828,9 +1828,10 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// policy change costs one parse; reporting its error stays where it was, to
 	// keep the ordering of everything in between unchanged.
 	currentCfg, currentCfgErr := configuration.NewFromConfig(cfg)
-	if currentCfgErr == nil {
-		k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput, c.logger)
+	if currentCfgErr != nil {
+		return fmt.Errorf("invalid configuration: %w", currentCfgErr)
 	}
+	k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput, c.logger)
 
 	err = c.generateAST(cfg, m)
 	c.setConfigError(err)
@@ -1851,9 +1852,6 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 	c.setProtection(protectionConfig)
 
-	if currentCfgErr != nil {
-		return fmt.Errorf("invalid configuration: %w", currentCfgErr)
-	}
 	c.currentCfg = currentCfg
 
 	// check if log level has changed for standalone elastic-agent

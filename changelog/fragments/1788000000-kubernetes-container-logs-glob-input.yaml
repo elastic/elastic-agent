@@ -25,6 +25,11 @@ description: >
   pod starts or stops. Existing read positions are preserved, so no logs are
   re-read or missed.
 
+  Known behavior change: the `container.image.name` field now contains the fully
+  qualified image reference including registry and tag (e.g.
+  `docker.io/library/nginx:latest`) instead of the short name previously reported
+  by the per-container filestream input (e.g. `nginx`).
+
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
 
