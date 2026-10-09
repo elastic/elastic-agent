@@ -16,7 +16,6 @@ scms:
       branch: '{{ .scm.branch }}'
       force: false
       submodules: false
-      singleBranch: true
 
 actions:
   elastic-agent:

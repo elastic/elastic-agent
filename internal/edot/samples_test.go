@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap/zapcore"
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
+	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 )
 
 func TestSamples(t *testing.T) {
@@ -28,7 +29,6 @@ func TestSamples(t *testing.T) {
 	t.Setenv("ELASTIC_OTLP_ENDPOINT", "http://localhost:4318")
 	t.Setenv("AUTOOPS_ES_URL", "http://localhost:9200")
 	t.Setenv("AUTOOPS_TOKEN", "token")
-	t.Setenv("AUTOOPS_TEMP_RESOURCE_ID", "temp")
 	t.Setenv("AUTOOPS_OTEL_URL", "http://localhost:4318")
 
 	// Enable service.profilesSupport featuregate to test the profiling samples.
@@ -52,7 +52,7 @@ func TestSamples(t *testing.T) {
 }
 
 func testSample(t *testing.T, configFile string) {
-	settings := edotOtelCol.NewSettings("test", []string{configFile})
+	settings := edotOtelCol.NewSettings("test", []string{configFile}, edotOtelCol.WithComponents(components.Default()))
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
 		// TODO: Replace with observer core. Right now, it results in a race condition.
 		return zapcore.NewNopCore()
