@@ -31,8 +31,23 @@ jobs:
           MATRIX: ${{ steps.generator.outputs.matrix }}
         run: |
           branches=$(printf '%s' "$MATRIX" | jq -c '[.include[].branch]')
-          jq --argjson branches "$branches" '.baseBranchPatterns = $branches' \
-            renovate.json > renovate.json.new
+
+          # Major updates are allowed only on main and the newest branch of the
+          # previous major (e.g. 8.19 while main/9.x are the latest major).
+          versions=$(jq -r '.[] | select(test("^[0-9]+\\.[0-9]+$"))' <<< "$branches")
+          latest_major=$(cut -d. -f1 <<< "$versions" | sort -n | tail -n1)
+          previous_major_last=$(grep "^$((latest_major - 1))\." <<< "$versions" | sort -V | tail -n1 || true)
+
+          allowed="main"
+          if [ -n "$previous_major_last" ]; then
+            allowed="main|${previous_major_last//./\\.}"
+          fi
+
+          jq --argjson branches "$branches" --arg allowed "$allowed" '
+            .baseBranchPatterns = $branches
+            | (.packageRules[] | select(.description | startswith("Major updates:")) | .matchBaseBranches)
+              = ["!/^(" + $allowed + ")$/"]
+          ' renovate.json > renovate.json.new
           mv renovate.json.new renovate.json
 
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
@@ -41,7 +56,7 @@ jobs:
           commit-message: "[Automation] Update Renovate baseBranches to current active branches"
           title: "[Automation] Update Renovate baseBranches to current active branches"
           body: |
-            Updates `baseBranches` in `renovate.json` to match the current set of active release branches queried from the Elastic release schedule.
+            Updates `baseBranchPatterns` in `renovate.json` to match the current set of active release branches queried from the Elastic release schedule, and the branches on which major updates are allowed (`main` and the last branch of the previous major).
           branch: update-renovate-branches
           base: main
           delete-branch: true

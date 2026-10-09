@@ -1,0 +1,8 @@
+kind: feature
+summary: Add OpenShift support to the Helm chart
+description: |
+  The elastic-agent Helm chart now supports OpenShift. The chart detects
+  OpenShift and creates the SecurityContextConstraints and RBAC objects that the
+  agent needs to run on OpenShift. The `agent.unprivileged` value can be
+  configured to run the agent with least-privilege permissions.
+component: elastic-agent

@@ -1,0 +1,8 @@
+kind: feature
+summary: Add OpenShift support to the Kustomize manifests
+description: |
+  The elastic-agent standalone Kustomize manifests now have an OpenShift overlay
+  in `deploy/kubernetes/elastic-agent-kustomize/openshift/default`. The overlay
+  creates the SecurityContextConstraints and RBAC objects that the agent and
+  kube-state-metrics need to run on OpenShift.
+component: elastic-agent
