@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 
+	securityv1 "github.com/openshift/api/security/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -29,6 +30,7 @@ func LoadFromYAML(reader *bufio.Reader) ([]k8s.Object, error) {
 		return nil, fmt.Errorf("failed to add clientsetscheme: %w", err)
 	}
 	k8sScheme.AddKnownTypes(schema.GroupVersion{Group: "agent.k8s.elastic.co", Version: "v1alpha1"}, &v1alpha1.Agent{})
+	k8sScheme.AddKnownTypes(securityv1.GroupVersion, &securityv1.SecurityContextConstraints{})
 
 	var objects []k8s.Object
 	decoder := serializer.NewCodecFactory(k8sScheme).UniversalDeserializer()
