@@ -21,3 +21,15 @@ changelog/fragments/
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
+<<<<<<< HEAD
+=======
+/internal/edot/samples/darwin/autoops_es*.yml @elastic/opex
+/internal/edot/samples/linux/autoops_es*.yml @elastic/opex
+/internal/edot/samples/windows/autoops_es*.yml @elastic/opex
+/internal/edot/receivers/verifierreceiver @elastic/cloud-services
+/deploy/helm/elastic-agent/templates/integrations/_auto_ops @elastic.opex
+
+
+# Agentic workflow client triggers (elastic/oblt-aw distribution)
+/.github/workflows/trigger-obs-aw-* @elastic/observablt-ci
+>>>>>>> 6fd5757 (ci: CODEOWNERS for oblt-aw trigger clients (#17110))
