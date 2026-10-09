@@ -16,7 +16,6 @@ import (
 	"strings"
 
 	"github.com/magefile/mage/mg"
-	"github.com/magefile/mage/sh"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
@@ -36,6 +35,11 @@ type GoTestArgs struct {
 	JUnitReportFile     string            // File to write a JUnit XML test report to.
 	CoverageProfileFile string            // Test coverage profile file (enables -cover).
 	Output              io.Writer         // Write stderr and stdout to Output if set
+	// WorkDir is the directory "go test" runs in. Leave empty to run from the
+	// repository root. Set it to the root of a nested Go module (for example
+	// internal/edot) to test that module. OutputFile, JUnitReportFile
+	// and CoverageProfileFile stay relative to the repository root regardless of WorkDir.
+	WorkDir string
 }
 
 func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
@@ -69,6 +73,16 @@ func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
 // all unit tests. We tag unit test files with '!integration'.
 func DefaultGoTestUnitArgs(cfg *Settings) GoTestArgs {
 	return makeGoTestArgs(cfg, "Unit")
+}
+
+var EdotModuleDir = filepath.Join("internal", "edot")
+
+// DefaultGoTestUnitEdotArgs returns a default set of arguments for running all
+// unit tests of the internal/edot module.
+func DefaultGoTestUnitEdotArgs(cfg *Settings) GoTestArgs {
+	args := makeGoTestArgs(cfg, "Unit EDOT")
+	args.WorkDir = EdotModuleDir
+	return args
 }
 
 // DefaultGoTestIntegrationArgs returns a default set of arguments for running
@@ -120,6 +134,21 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	mg.Deps(InstallGoTestTools)
 
 	fmt.Println(">> go test:", params.LogName, "Testing")
+
+	if params.WorkDir != "" {
+		// The output files are relative to the repository root, but gotestsum
+		// and "go test" will run inside WorkDir, so resolve them first.
+		var err error
+		if params.OutputFile, err = absIfSet(params.OutputFile); err != nil {
+			return err
+		}
+		if params.JUnitReportFile, err = absIfSet(params.JUnitReportFile); err != nil {
+			return err
+		}
+		if params.CoverageProfileFile, err = absIfSet(params.CoverageProfileFile); err != nil {
+			return err
+		}
+	}
 
 	// We use gotestsum to drive the tests and produce a junit report.
 	// The tool runs `go test -json` in order to produce a structured log which makes it easier
@@ -202,6 +231,7 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	fmt.Println(">> ARGS:", params.LogName, "Command:", "gotestsum", strings.Join(args, " "))
 
 	goTest := makeCommand(ctx, params.Env, "gotestsum", args...)
+	goTest.Dir = params.WorkDir
 	// Wire up the outputs.
 	var outputs []io.Writer
 	if params.Output != nil {
@@ -249,10 +279,15 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 	if params.CoverageProfileFile != "" {
 		htmlCoverReport = strings.TrimSuffix(params.CoverageProfileFile,
 			filepath.Ext(params.CoverageProfileFile)) + ".html"
-		coverToHTML := sh.RunCmd("go", "tool", "cover",
+		// "go tool cover" resolves the source files of the packages in the
+		// profile through the module it is invoked from, so it must run in
+		// the same directory as "go test" did.
+		coverToHTML := makeCommand(ctx, nil, "go", "tool", "cover",
 			"-html="+params.CoverageProfileFile,
 			"-o", htmlCoverReport)
-		if err = coverToHTML(); err != nil {
+		coverToHTML.Dir = params.WorkDir
+		coverToHTML.Stdout = os.Stdout
+		if err = coverToHTML.Run(); err != nil {
 			return fmt.Errorf("failed to write HTML code coverage report: %w", err)
 		}
 	}
@@ -265,6 +300,18 @@ func GoTest(ctx context.Context, params GoTestArgs) error {
 
 	fmt.Println(">> go test:", params.LogName, "Test Passed")
 	return nil
+}
+
+// absIfSet returns path as an absolute path, or "" unchanged.
+func absIfSet(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve %q to an absolute path: %w", path, err)
+	}
+	return abs, nil
 }
 
 func makeCommand(ctx context.Context, env map[string]string, cmd string, args ...string) *exec.Cmd {

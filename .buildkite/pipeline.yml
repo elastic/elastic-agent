@@ -343,6 +343,123 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+  # Run unit tests in the EDOT Collector module, selected by GO_MODULE_DIR.
+  - group: "Unit tests - EDOT"
+    key: "unit-tests-edot"
+    steps:
+      - label: "EDOT unit tests - Ubuntu 22.04"
+        key: "unit-tests-edot-2204"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - fips140=only Ubuntu 22.04"
+        key: "unit-tests-edot-2204-fips140-only"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Ubuntu 22.04 ARM64"
+        key: "unit-tests-edot-2204-arm64"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+          diskSizeGb: 200
+          instanceType: "m6g.xlarge"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Windows 2022"
+        key: "unit-tests-edot-win2022"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - macOS 15 ARM"
+        key: "unit-tests-edot-macos-15-arm"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-base-15-arm-002
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
@@ -377,6 +494,16 @@ steps:
       - step: "unit-tests-win2022-fips140-only"
         allow_failure: true
       - step: "unit-tests-win11-arm64-fips140-only"
+        allow_failure: true
+      - step: "unit-tests-edot-2204"
+        allow_failure: true
+      - step: "unit-tests-edot-2204-fips140-only"
+        allow_failure: true
+      - step: "unit-tests-edot-2204-arm64"
+        allow_failure: true
+      - step: "unit-tests-edot-win2022"
+        allow_failure: true
+      - step: "unit-tests-edot-macos-15-arm"
         allow_failure: true
 
   - group: "K8s tests"
