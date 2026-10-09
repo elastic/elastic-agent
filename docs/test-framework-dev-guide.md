@@ -164,8 +164,6 @@ share similar leavers as the packaging process.
  - `SNAPSHOT=true|false`: Use snapshot build when running Kubernetes
    tests.
 
- - `BUILD_AGENT=true|false`: Build the agent for the current platform before running.
-
  - `INSTANCE_PROVISIONER`: Sets the provisioner used to create
    instances, possible values are:
      - `gcloud`: Uses the `gcloud` CLI to create VMs on GCP, if not set, that's the default.

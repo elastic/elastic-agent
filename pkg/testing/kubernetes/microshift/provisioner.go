@@ -61,6 +61,8 @@ const (
 // apiPort is the container port that serves the Kubernetes API.
 var apiPort = network.MustParsePort("6443/tcp")
 
+// imagesByKubernetesMinor maps a Kubernetes minor version to the MicroShift image
+// that runs it. The images come from https://github.com/microshift-io/microshift/releases
 var imagesByKubernetesMinor = map[string]string{
 	"1.33": "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
 	"1.34": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
