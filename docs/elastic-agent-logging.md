@@ -81,6 +81,8 @@ The functions responsible for collecting logs during diagnostics, all in
 `zipLogsWithPath` always appends the `/logs` to whatever path it
 receives.
 
+The layout of the whole bundle is described in [diagnostics.md](./diagnostics.md).
+
 ## Total footprint
 Given the two log outputs and their default log rotation policies, the
 Elastic-Agent needs about 210Mb (20Mb x 7 + 10Mb x 7 = 210Mb) of disk

@@ -543,6 +543,10 @@ When an integration test fails the testing fixture will try its best to automati
 information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
 automatically transfer any collected diagnostics from the instance back to the running host. The results of the
 diagnostic collection are placed in `build/diagnostics`.
+Each bundle is named `<TestName>-<timestamp>-diagnostics.zip`, with `/` in subtest names replaced by `-`. The test name is
+the one the fixture was created with (`Fixture.FileNamePrefix`), which for suite-style tests can be the parent test.
+A test that runs several agents, for example Fleet Server and the agent under test, produces one bundle per agent.
+See [diagnostics.md](./diagnostics.md) for what is in a bundle.
 
 #### Gather diagnostics manually
 In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
@@ -598,6 +602,39 @@ to write tests using the integration and E2E testing framework. Also look at
 the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
+
+### Writing stable tests
+
+The tests run on real VMs against a stack shared by all CI jobs, on hosts that differ in speed, distro and load. A test
+that passes locally can flake weeks later, so keep these in mind:
+
+- **Poll what you assert.** Wait for the value the assertion needs, not a weaker proxy: a file existing is not it having
+  content, and a successful Kibana policy update is not the agent having applied it (wait for the applied revision
+  with `tools.IsMinPolicyRevision`, using the revision returned by the update and comparing with `>=`).
+- **Read agent-local state locally.** The agent's document in Fleet only advances on check-in, which a test can't
+  force. If the value is in `elastic-agent status` (`Fixture.ExecStatus`), poll that.
+- **Budgets need headroom over the intervals that bound them.** Fleet Server's check-in long poll is 5 minutes by
+  default, so a wait for a Fleet-reported change must be longer than that. An outer context must exceed the sum of
+  the serial waits inside it.
+- **Assert on the `*assert.CollectT` inside `EventuallyWithT`**, not on the outer `t`, otherwise the first transient
+  error fails the test instead of being retried. Don't call `require` or `assert` on `t` from a goroutine that can
+  outlive the test, and use `t.Context()` rather than `context.Background()` so waits respect the test deadline.
+- **Produce your own data and filter on it.** Don't wait for ambient events (audit, network traffic) the test did not
+  cause, and filter Elasticsearch queries on values the test controls (namespace, tag, a generated message). Capture
+  a `@timestamp` lower bound *before* the action that produces the document.
+- **Don't assert exact counts of live data** (documents, components). Retries, restarts and runtime switches change
+  them. Use thresholds or poll until stable.
+- **Don't assume the runtime.** Beats may run as processes or as receivers in the collector. Set the runtime explicitly
+  when the test depends on it, see [hybrid-agent-beats-receivers.md](./hybrid-agent-beats-receivers.md).
+- **Don't assert a healthy agent when the config breaks something on purpose.** An unreachable output makes the agent
+  degraded at a nondeterministic moment. Use `integration.StartMockES` for a placeholder output, or
+  `Fixture.IsHealthyOrDegradedFromOutput`.
+- **Isolate from other tests.** Use `info.Namespace` for data, give cluster-global Elasticsearch objects test-specific
+  names, avoid fixed ports, and don't modify shared Fleet objects such as `fleet-default-output` on the shared stack.
+  Register cleanup with `t.Cleanup` so it also runs on failure, so a failed test doesn't leave an installed agent behind.
+- **Use the fixture.** Install and manage the agent with `Fixture` (`Install`, `Configure`, `Exec`) instead of
+  starting the binary by hand, so diagnostics are collected on failure.
+- **Skips** link an issue, come after `define.Require`, and are limited to the affected platform or version.
 
 ### Test group
 

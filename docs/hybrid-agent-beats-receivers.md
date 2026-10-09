@@ -98,6 +98,27 @@ agent:
         kafka: process # Force all inputs using the kafka output to use the process runtime
 ```
 
+### Runtime precedence and automatic fallback
+
+For each input the runtime is the first one set in this list (highest precedence first):
+
+1. the input's own `_runtime_experimental: otel|process`
+2. `agent.internal.runtime.output.<output type>`, when that output is enabled
+3. `agent.internal.runtime.<beat>.<input type>`
+4. `agent.internal.runtime.<beat>.default`
+5. `agent.internal.runtime.default`
+
+Because most Beats have a Beat-level default of `otel`, setting only the global `default: process` does not move them
+back to the process runtime. See `RuntimeManagerForInputType` in `pkg/component/component.go`.
+
+Even when `otel` is selected, the Elastic Agent falls back to the `process` runtime for components that cannot run in
+the collector, and logs why (`maybeOverrideRuntimeForComponent` in
+`internal/pkg/agent/application/coordinator/coordinator.go`):
+
+- `otel runtime is not supported for component <id>, switching to process runtime, reason: ...`: for example an output
+  type other than `elasticsearch`, `logstash` or `kafka`, or unsupported output options.
+- `Component <id> uses dynamic variable providers, switching to <runtime> runtime`: see [Dynamic Inputs](#dynamic-inputs).
+
 ### Dynamic Inputs
 
 Inputs rendered from a [dynamic variable provider](https://www.elastic.co/docs/reference/fleet/dynamic-input-configuration)
@@ -149,6 +170,22 @@ input's dynamic provider are taken into account; variables of context providers 
 
 Running the Elastic Agent with `agent.logging.level: debug` logs the dynamic provider and the resolved provider
 variables for every rendered input, along with the inputs that were excluded by `static_variables`.
+
+### Runtime switches
+
+Changing the runtime of a running component, for example by changing `agent.internal.runtime` in the policy, moves it
+between the collector and a Beat process. The old instance has to stop before the new one starts, otherwise both would
+collect the same data. The coordinator therefore defers the update of the new runtime until the old instances are
+stopped, and queues newer component models while a transition is in progress. It logs:
+
+- `Deferring OTel components until process instances stop` (or `Deferring runtime components until OTel instances stop`
+  for the opposite direction)
+- `Component "<id>" stopped, N remaining before deferred update`
+- `Runtime transition timeout exceeded, force-applying deferred manager updates`: the old instance did not stop within
+  `transitionTimeout` (the process stop timeout plus 3 seconds), so the update is applied anyway.
+
+Duplicated or missing data around a switch is often the transition itself, with both instances or neither briefly
+collecting.
 
 ### Configuration Translation Overrides
 
