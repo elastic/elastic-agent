@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix Ironbank Dockerfile to make the elastic-otel-collector component executable (0755) after the broad 0666 chmod.
+component: elastic-agent
