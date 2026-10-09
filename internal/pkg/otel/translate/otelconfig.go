@@ -445,7 +445,8 @@ func getReceiversConfigForComponent(
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
 	}
 
-	sharedConfig["management.otel"] = managementConfigForReceiver(info)
+	// indicate that beat receivers are managed by the elastic-agent
+	sharedConfig["management.otel.enabled"] = true
 
 	if receiverFeatures := beatReceiverFeatures(comp); len(receiverFeatures) > 0 {
 		sharedConfig["features"] = receiverFeatures
@@ -758,27 +759,6 @@ func resolveStreamID(streamID string, streamSource map[string]any, unitID string
 		return id
 	}
 	return fmt.Sprintf("%s-%d", unitID, index)
-}
-
-// managementConfigForReceiver indicates that beat receivers are managed by the
-// elastic-agent and passes the agent information they would otherwise get over
-// the control protocol, which they don't use.
-// The mode is a string rather than the proto enum, whose zero value is MANAGED.
-func managementConfigForReceiver(info info.Agent) map[string]any {
-	mode := "managed"
-	if info.IsStandalone() {
-		mode = "standalone"
-	}
-	return map[string]any{
-		"enabled": true,
-		"agent": map[string]any{
-			"id":           info.AgentID(),
-			"version":      info.Version(),
-			"snapshot":     info.Snapshot(),
-			"mode":         mode,
-			"unprivileged": info.Unprivileged(),
-		},
-	}
 }
 
 func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component) ([]receiverInput, error) {
