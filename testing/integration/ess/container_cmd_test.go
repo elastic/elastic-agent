@@ -17,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"text/template"
 	"time"
@@ -120,7 +121,7 @@ func prepareAgentCMD(
 	}
 
 	t.Cleanup(func() {
-		if cmd.Process != nil {
+		if cmd.Process != nil && cmd.ProcessState == nil {
 			t.Log(">> cleaning up: killing the Elastic-Agent process")
 			if err := cmd.Process.Kill(); err != nil {
 				t.Fatalf("could not kill Elastic-Agent process: %s", err)
@@ -213,6 +214,21 @@ func TestContainerCMD(t *testing.T) {
 		5*time.Minute, time.Second,
 		"Elastic-Agent did not report healthy. Agent status error: \"%v\", Agent logs\n%s",
 		err, agentOutput,
+	)
+
+	if err := cmd.Process.Signal(syscall.SIGINT); err != nil {
+		t.Fatalf("cannot send signal: %s", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		t.Fatalf("Elastic Agent exited with error: %s", err)
+	}
+
+	require.Contains(
+		t,
+		agentOutput.String(),
+		periodicRollbackCleanupDisabledLog,
+		"Elastic Agent did not report that rollback cleanup is disabled",
 	)
 }
 
