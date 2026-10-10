@@ -600,6 +600,18 @@ shared:
         source: '{{ repo.RootDir }}/NOTICE-fips.txt'
         mode: 0644
 
+  - &agent_darwin_binary_fips_spec
+    <<: *common_fips
+    <<: *elastic_agent_fips_components
+    files:
+      <<: *agent_darwin_binary_files
+      <<: *agent_unpacked_components_files
+      <<: *agent_otel_collector_binary_spec
+      <<: *metricbeat_lightweight_module
+      NOTICE.txt:
+        source: '{{ repo.RootDir }}/NOTICE-fips.txt'
+        mode: 0644
+
   - &agent_darwin_binary_spec
     <<: *common
     <<: *elastic_agent_components
@@ -1211,6 +1223,20 @@ specs:
         files:
           '{{.BeatName}}{{.BinaryExt}}':
             source: data/{{.BeatName}}-{{ core_commit_short }}/{{.BeatName}}{{.BinaryExt}}
+            symlink: true
+            mode: 0755
+
+    - os: darwin
+      types: [tgz]
+      spec:
+        <<: *agent_darwin_binary_fips_spec
+        <<: *elastic_license_for_binaries
+        files:
+          'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent':
+            template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
+            mode: 0755
+          '{{.BeatName}}{{.BinaryExt}}':
+            source: data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
             symlink: true
             mode: 0755
 
