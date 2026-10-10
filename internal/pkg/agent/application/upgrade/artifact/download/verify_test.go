@@ -319,7 +319,7 @@ func TestVerify(t *testing.T) {
 					fileName + ".asc":    signature,
 				})
 
-				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(t.Context(), fx.log, fx.config, pgpKey, artifactPath, srcURI, artifactPath, false)
 				require.NoError(t, err)
 				assert.FileExists(t, artifactPath)
 				assert.FileExists(t, artifactPath+".sha512")
@@ -333,7 +333,7 @@ func TestVerify(t *testing.T) {
 					fileName + ".sha512": []byte(strings.Repeat("0", 128) + " " + fileName),
 				})
 
-				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(t.Context(), fx.log, fx.config, pgpKey, artifactPath, srcURI, artifactPath, false)
 				var checksumErr *ChecksumMismatchError
 				require.ErrorAs(t, err, &checksumErr)
 			},
@@ -347,7 +347,7 @@ func TestVerify(t *testing.T) {
 					fileName + ".asc":    []byte("not a valid signature"),
 				})
 
-				err := Verify(t.Context(), fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(t.Context(), fx.log, fx.config, pgpKey, artifactPath, srcURI, artifactPath, false)
 				var invalidSigErr *InvalidSignatureError
 				require.ErrorAs(t, err, &invalidSigErr)
 			},
@@ -362,7 +362,7 @@ func TestVerify(t *testing.T) {
 
 				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 				defer cancel()
-				err := Verify(ctx, fx.log, fx.config, pgpKey, srcURI, artifactPath, false)
+				err := Verify(ctx, fx.log, fx.config, pgpKey, artifactPath, srcURI, artifactPath, false)
 				require.ErrorContains(t, err, "could not get .asc file")
 			},
 		},
@@ -410,8 +410,8 @@ func TestVerify(t *testing.T) {
 								require.NoError(t, os.WriteFile(filepath.Join(srcDir, name), body, 0o644))
 							}
 							srcPath := filepath.Join(srcDir, fileName)
-							require.NoError(t, copyFile(log, srcPath, artifactPath, defaultFileOps()))
-							require.NoError(t, copyFile(log, srcPath+".sha512", artifactPath+".sha512", defaultFileOps()))
+							require.NoError(t, copyFile(srcPath, artifactPath, defaultFileOps()))
+							require.NoError(t, copyFile(srcPath+".sha512", artifactPath+".sha512", defaultFileOps()))
 							return "file://" + srcPath, artifactPath
 						},
 					})
@@ -436,7 +436,7 @@ func TestVerifySkipsUnreachableRemotePGP(t *testing.T) {
 	require.NoError(t, os.WriteFile(artifactPath+".sha512", []byte(fmt.Sprintf("%x %s", sha512.Sum512(content), fileName)), 0o644))
 
 	log, obs := loggertest.New(t.Name())
-	err := Verify(t.Context(), log, &artifact.Config{}, pgpKey, "file://"+srcPath, artifactPath, false,
+	err := Verify(t.Context(), log, &artifact.Config{}, pgpKey, artifactPath, "file://"+srcPath, artifactPath, false,
 		PgpSourceURIPrefix+"http://127.0.0.1:2874/path/does/not/exist")
 	require.NoError(t, err)
 	require.Equal(t, 1, obs.FilterMessageSnippet("Skipped remote PGP located at").Len())
@@ -457,7 +457,7 @@ func TestVerifyFailsWhenDefaultPGPKeyDoesNotMatch(t *testing.T) {
 	require.NoError(t, os.WriteFile(artifactPath+".sha512", []byte(fmt.Sprintf("%x %s", sha512.Sum512(content), fileName)), 0o644))
 
 	log, _ := loggertest.New(t.Name())
-	err := Verify(t.Context(), log, &artifact.Config{}, release.PGP(), "file://"+srcPath, artifactPath, false)
+	err := Verify(t.Context(), log, &artifact.Config{}, release.PGP(), artifactPath, "file://"+srcPath, artifactPath, false)
 	require.Error(t, err)
 	assert.NoFileExists(t, artifactPath+".asc")
 }
@@ -507,7 +507,7 @@ func TestVerifyRemoteRetriesSignatureFetch(t *testing.T) {
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI, artifactPath, defaultFileOps()))
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI+".sha512", artifactPath+".sha512", defaultFileOps()))
 
-	err := Verify(t.Context(), log, config, pub, srcURI, artifactPath, false)
+	err := Verify(t.Context(), log, config, pub, artifactPath, srcURI, artifactPath, false)
 	require.NoError(t, err)
 	require.Equal(t, 3, ascRequests)
 }
@@ -575,7 +575,7 @@ func TestVerifyRemoteWithProxy(t *testing.T) {
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI, artifactPath, defaultFileOps()))
 	require.NoError(t, download(t.Context(), log, config, upgradeDetails, nil, srcURI+".sha512", artifactPath+".sha512", defaultFileOps()))
 
-	err = Verify(t.Context(), log, config, pub, srcURI, artifactPath, false)
+	err = Verify(t.Context(), log, config, pub, artifactPath, srcURI, artifactPath, false)
 	require.NoError(t, err)
 	require.Equal(t, 0, directRequests)
 }

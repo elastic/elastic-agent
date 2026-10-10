@@ -42,14 +42,6 @@ func defaultFileOps() FileOps {
 }
 
 func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops FileOps) (err error) {
-	defer func() {
-		if err != nil {
-			if removeErr := os.Remove(targetPath); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Warnf("failed to cleanup %s: %v", targetPath, removeErr)
-			}
-		}
-	}()
-
 	if client == nil {
 		client, err = config.Client(
 			httpcommon.WithAPMHTTPInstrumentation(),
@@ -68,7 +60,7 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 		return errors.New(err, fmt.Sprintf("building request %s failed", sourceURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	targetFile, err := ops.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	targetFile, err := ops.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return goerrors.Join(errors.New(fmt.Sprintf("creating %s failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath)), err)
 	}
@@ -104,29 +96,25 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 	dp := newDownloadProgressReporter(sourceURI, config.Timeout, fileSize, observers...)
 	dp.Report(ctx)
 
-	_, err = ops.CopyFile(targetFile, io.TeeReader(resp.Body, dp))
+	written, err := ops.CopyFile(targetFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
 		reportedErr := err
-		if upgradeErrors.IsDiskSpaceError(err) {
-			reportedErr = upgradeErrors.ErrInsufficientDiskSpace
+		if upgradeErrors.IsDiskSpaceLowError(err) {
+			reportedErr = upgradeErrors.DiskSpaceLowError{}
 		}
 		dp.ReportFailed(reportedErr)
 		return goerrors.Join(errors.New(fmt.Sprintf("copying %s to %s failed", sourceURI, targetPath), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
+	}
+	if err := targetFile.Truncate(written); err != nil {
+		dp.ReportFailed(err)
+		return errors.New(err, fmt.Sprintf("truncating %s to downloaded size failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 	dp.ReportComplete()
 
 	return nil
 }
 
-func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops FileOps) (err error) {
-	defer func() {
-		if err != nil {
-			if removeErr := os.Remove(targetPath); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Warnf("failed to cleanup %s: %v", targetPath, removeErr)
-			}
-		}
-	}()
-
+func copyFile(sourcePath string, targetPath string, ops FileOps) (err error) {
 	sourcePath = strings.TrimPrefix(sourcePath, "file://")
 
 	sourceInfo, err := os.Stat(sourcePath)
@@ -148,14 +136,18 @@ func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops File
 	}
 	defer sourceFile.Close()
 
-	targetFile, err := ops.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	targetFile, err := ops.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("creating %s file failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 	defer targetFile.Close()
 
-	if _, err = ops.CopyFile(targetFile, sourceFile); err != nil {
+	written, err := ops.CopyFile(targetFile, sourceFile)
+	if err != nil {
 		return err
+	}
+	if err := targetFile.Truncate(written); err != nil {
+		return errors.New(err, fmt.Sprintf("truncating %s to copied size failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 
 	return nil
@@ -163,7 +155,7 @@ func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops File
 
 func Fetch(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source, targetPath string, ops FileOps) (err error) {
 	if IsLocal(source) {
-		err = copyFile(log, source, targetPath, ops)
+		err = copyFile(source, targetPath, ops)
 	} else {
 		err = download(ctx, log, config, upgradeDetails, nil, source, targetPath, ops)
 	}

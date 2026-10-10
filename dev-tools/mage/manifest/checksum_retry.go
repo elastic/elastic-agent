@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/magefile/mage/mg"
@@ -38,7 +39,7 @@ func downloadArtifactWithChecksum(ctx context.Context, fetch fetchFunc, artifact
 			return fmt.Errorf("downloading artifact: %w", err)
 		}
 
-		err := artifactdownload.VerifyChecksum(sha512.New(), artifactPath, shaPath)
+		err := artifactdownload.VerifyChecksum(sha512.New(), artifactPath, shaPath, filepath.Base(artifactPath))
 		if err == nil {
 			return nil
 		}
