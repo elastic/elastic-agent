@@ -10,6 +10,11 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      # Adding this plugin to a step also enables the S3-backed Go build cache
+      # (GOCACHEPROG), see .buildkite/scripts/setup-cacheprog.sh.
+      elastic/oblt-aws-auth#v0.2.0:
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
@@ -66,6 +71,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - Ubuntu 22.04 with requirefips build tag"
         key: "unit-tests-2204-fips-tag"
@@ -88,6 +94,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - fips140=only Ubuntu 22.04"
         key: "unit-tests-2204-fips140-only"
@@ -110,6 +117,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - Ubuntu 22.04 ARM64"
         key: "unit-tests-2204-arm64"
@@ -131,6 +139,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - Windows 2022"
         key: "unit-tests-win2022"
@@ -153,6 +162,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - Windows 2016"
         key: "unit-tests-win2016"
@@ -178,6 +188,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - fips140=only Windows 2022"
         key: "unit-tests-win2022-fips140-only"
@@ -202,6 +213,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
   - group: "macOS tests"
     key: "macos-unit-tests"
@@ -223,6 +235,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
@@ -244,6 +257,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
   - group: "Desktop Windows tests"
     key: "extended-windows"
@@ -269,6 +283,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - Windows 11"
         key: "unit-tests-win11"
@@ -296,6 +311,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - Windows 11 arm64"
         key: "unit-tests-win11-arm64"
@@ -318,6 +334,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: "Unit tests - fips140=only Windows 11 arm64"
         key: "unit-tests-win11-arm64-fips140-only"
@@ -342,6 +359,7 @@ steps:
             allowed: true
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
   - label: ":junit: Junit annotate"
     agents:
