@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -99,6 +100,11 @@ func (r *retrySender) Send(ctx context.Context, method, path string, params url.
 // URI calls the underlying Sender's URI method.
 func (r *retrySender) URI() string {
 	return r.c.URI()
+}
+
+// Transport calls the underlying Sender's Transport method.
+func (r *retrySender) Transport() httpcommon.HTTPTransportSettings {
+	return r.c.Transport()
 }
 
 // Client provides methods to upload a file to ES through fleet-server.

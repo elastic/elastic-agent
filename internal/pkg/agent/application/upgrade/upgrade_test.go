@@ -1045,6 +1045,7 @@ type mockArtifactDownloader struct {
 	returnError       error
 	returnArchivePath string
 	fleetServerURI    string
+	fleetTransport    httpcommon.HTTPTransportSettings
 }
 
 func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
@@ -1053,6 +1054,10 @@ func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target ar
 
 func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
 	m.fleetServerURI = fleetServerURI
+}
+
+func (m *mockArtifactDownloader) withFleetTransport(fleetTransport httpcommon.HTTPTransportSettings) {
+	m.fleetTransport = fleetTransport
 }
 
 type mockUnpacker struct {
@@ -1972,6 +1977,10 @@ func (m *mockSender) Send(ctx context.Context, method, path string, params url.V
 func (m *mockSender) URI() string {
 	return "mockURI"
 }
+
+func (m *mockSender) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{Timeout: time.Second}
+}
 func TestSetClient(t *testing.T) {
 	log, _ := loggertest.New("test")
 	upgrader := &Upgrader{
@@ -1981,4 +1990,5 @@ func TestSetClient(t *testing.T) {
 
 	upgrader.SetClient(&mockSender{})
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
+	require.Equal(t, httpcommon.HTTPTransportSettings{Timeout: time.Second}, upgrader.artifactDownloader.(*mockArtifactDownloader).fleetTransport)
 }
