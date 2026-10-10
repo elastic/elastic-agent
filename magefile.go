@@ -602,6 +602,17 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	return devtools.GoTest(ctx, params)
 }
 
+// UnitEdot runs all the unit tests of the internal/edot module (the EDOT Collector).
+// internal/edot is a separate Go module, so Test.Unit does not reach its tests.
+// Honours the same env vars as Test.Unit (RACE_DETECTOR, TEST_COVERAGE, FIPS);
+// results are written to build/TEST-go-unit_edot.*.
+func (Test) UnitEdot(ctx context.Context) error {
+	mg.Deps(Prepare.Env)
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitEdotArgs(cfg)
+	return devtools.GoTest(ctx, params)
+}
+
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)

@@ -48,3 +48,31 @@ jobs:
 
       - name: mage unitTest
         run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+
+  unit-tests-edot:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, xcode-27]
+    name: macos-unit-tests-edot (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: .go-version
+
+      - name: Install make
+        run: |
+          brew install make
+          export PATH="/usr/local/opt/make/libexec/gnubin:$PATH"
+
+      - name: Install mage
+        run: make mage
+
+      - name: mage test:unitEdot
+        run: RACE_DETECTOR=true TEST_COVERAGE=true mage test:unitEdot
