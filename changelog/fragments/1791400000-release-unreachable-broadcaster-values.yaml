@@ -1,0 +1,5 @@
+kind: enhancement
+summary: Reduce agent memory use by releasing component states that no broadcaster subscriber can receive
+description: |
+  The coordinator's state Broadcaster kept the last published values alive in its ring buffer even when no subscriber could still receive them. These values are now cleared, which lowers live heap for agents running many units.
+component: elastic-agent

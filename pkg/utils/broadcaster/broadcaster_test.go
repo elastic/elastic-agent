@@ -373,3 +373,26 @@ func (b *Broadcaster[T]) withOneIteration(callback func()) {
 	callback()
 	wg.Wait()
 }
+
+func TestBufferReleasesValuesNoSubscriberCanReceive(t *testing.T) {
+	// zero marks a released buffer slot
+	b := new(1, 4, 0)
+	b.handleNewInput(2)
+	b.updateListeners()
+	assert.Equal(t, []int{0, 2, 0, 0, 0}, b.buffer, "without subscribers only the current value should be kept")
+
+	b = new(1, 4, 0)
+	b.handleNewSubscriber(subscribeRequest[int]{ctx: context.Background(), listenerChan: make(chan int), bufferLen: 4})
+	for v := 2; v <= 4; v++ {
+		b.handleNewInput(v)
+		b.updateListeners()
+	}
+	assert.Equal(t, []int{1, 2, 3, 4, 0}, b.buffer, "values the subscriber hasn't read should be kept")
+
+	b.advanceSubscriber(0)
+	b.advanceSubscriber(0)
+	assert.Equal(t, []int{0, 0, 3, 4, 0}, b.buffer, "values the subscriber has read should be released")
+
+	b.removeSubscriber(0)
+	assert.Equal(t, []int{0, 0, 0, 4, 0}, b.buffer, "the current value should be kept")
+}
