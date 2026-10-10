@@ -23,8 +23,10 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/useragent"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -35,6 +37,7 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -504,6 +507,10 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
+	if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
+		return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
+	}
+
 	// if the otel log level is unset, use the most verbose level across agent and all units
 	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
 	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
@@ -550,6 +557,48 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 			"extensions": []any{"elastic_diagnostics"},
 		},
 	}))
+}
+
+func injectHeaderSetterExtension(config *confmap.Conf, agentInfo info.Agent) error {
+	extensionName := fmt.Sprintf("%s/%s", "headers_setter", translate.OtelNamePrefix)
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			extensionName: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"action": "upsert",
+						"key":    "User-Agent",
+						"value":  generateUserAgent(agentInfo),
+					},
+				},
+			},
+		},
+		"service": map[string]any{
+			"extensions": []any{extensionName},
+		},
+	}))
+}
+
+// generateUserAgent builds the User-Agent the same way libbeat's Beat.GenerateUserAgent does.
+func generateUserAgent(agentInfo info.Agent) string {
+	// A standalone Elastic Agent maps to "Unmanaged": in libbeat's terms, "Standalone"
+	// means a Beat that is not running under Elastic Agent at all.
+	mode := useragent.AgentManagementModeManaged
+	if agentInfo.IsStandalone() {
+		mode = useragent.AgentManagementModeUnmanaged
+	}
+
+	unprivileged := useragent.AgentUnprivilegedModePrivileged
+	if agentInfo.Unprivileged() {
+		unprivileged = useragent.AgentUnprivilegedModeUnprivileged
+	}
+
+	var uaOpts []string
+	if fbfeatures.IsElasticsearchStateStoreEnabled() {
+		uaOpts = append(uaOpts, "agentless")
+	}
+
+	return useragent.UserAgentWithBeatTelemetry("Agent", agentInfo.Version(), mode, unprivileged, release.FIPSDistribution(), uaOpts...)
 }
 
 func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
