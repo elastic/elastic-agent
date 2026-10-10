@@ -77,3 +77,12 @@ updatecli apply \
     --config .ci/updatecli/bump-edot-images.yml \
     --values .ci/updatecli/values.d/scm.yml
 ```
+
+## Go Version Update Automation
+
+The Go bump automation creates its required changelog fragment automatically.
+The `bump-golang` workflow installs `elastic-agent-changelog-tool` in the
+workspace `bin` directory and adds that directory to `PATH`. The Updatecli
+shell target then runs `.ci/scripts/create-go-update-changelog.sh` to create
+a `changelog/fragments/*-update-go-to-<go-version>.yaml` fragment with an
+enhancement entry for Elastic Agent.

@@ -120,3 +120,19 @@ targets:
       content: 'go {{ source "latestGoVersion" }}'
       file: internal/edot/go.mod
       matchpattern: 'go \d+.\d+.\d+'
+  create-go-changelog-fragment:
+    name: "Create Go bump changelog fragment"
+    dependson:
+      - update-go-version
+      - update-version.asciidoc
+      - update-gomod-full-version
+      - update-wrapper-windows-archive-gomod-full-version
+      - update-edot-gomod-full-version
+    kind: shell
+    scmid: githubConfig
+    disablesourceinput: true
+    spec:
+      command: '.ci/scripts/create-go-update-changelog.sh {{ source "latestGoVersion" }}'
+      environments:
+        - name: PATH
+        - name: HOME
