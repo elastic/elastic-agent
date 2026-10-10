@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
 	"github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver/internal/verifier"
 )
 
@@ -75,13 +76,13 @@ type IdentityFederationConfig struct {
 // set by the agentless controller.
 func (cfg *IdentityFederationConfig) LoadFromEnv() {
 	if cfg.IDTokenFile == "" {
-		cfg.IDTokenFile = os.Getenv("CLOUD_CONNECTORS_ID_TOKEN_FILE")
+		cfg.IDTokenFile = os.Getenv(identityfederation.AWSIDTokenFileEnvVar)
 	}
 	if cfg.GlobalRoleARN == "" {
-		cfg.GlobalRoleARN = os.Getenv("CLOUD_CONNECTORS_GLOBAL_ROLE")
+		cfg.GlobalRoleARN = os.Getenv(identityfederation.AWSGlobalRoleARNEnvVar)
 	}
 	if cfg.CloudResourceID == "" {
-		cfg.CloudResourceID = os.Getenv("CLOUD_RESOURCE_ID")
+		cfg.CloudResourceID = os.Getenv(identityfederation.AWSCloudResourceIDEnvVar)
 	}
 }
 
