@@ -125,9 +125,8 @@ The repo contains **multiple Go modules**; use **`mage tidy`** to keep `go.mod` 
 ### Lint Commands
 
 ```bash
-mage fmt             # formats source code (.go and .py) and adds license headers.
-mage format:all      # format automatically all the codes.
-mage format:license  # applies the right license header.
+mage fmt               # formats source code (.go and .py) and adds license headers.
+mage addLicenseHeaders # adds license headers without formatting imports.
 ```
 
 ### Rules enforced by tooling
@@ -148,6 +147,10 @@ CI and local checks enforce the following (details in [.golangci.yml](./.golangc
 - **Docs structure:** **`mage check:all`** includes validation that files expected by docs generation exist (`Check.DocsFiles` in magefile).
 - **Go toolchain:** Version pinned in [.go-version](./.go-version).
 - **FIPS:** The codebase supports FIPS-oriented builds and tests (for example **`mage test:fIPSOnlyUnit`**, `requirefips` build tag). Crypto-related changes should remain compatible with FIPS expectations where applicable.
+
+## Documentation
+
+For changes that affect published documentation or documentation generation, use the `docs-authoring` skill (`.agents/skills/docs-authoring/SKILL.md`).
 
 ## Contribution hygiene
 
@@ -176,6 +179,7 @@ Unless instructed otherwise, always add the `backport-active-all` label to the p
 ## Further documentation
 
 - [README.md](./README.md) — setup, packaging, dependency hygiene
+- [docs/contributing-docs.md](./docs/contributing-docs.md) — where the published docs live and how generated sections are updated
 - [docs/architecture.md](./docs/architecture.md) — architecture overview
 - [docs/component-specs.md](./docs/component-specs.md) — component spec format
 - [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md) — integration tests

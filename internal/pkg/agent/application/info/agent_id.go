@@ -33,6 +33,7 @@ const (
 type persistentAgentInfo struct {
 	ID               string                                 `json:"id" yaml:"id" config:"id"`
 	Headers          map[string]string                      `json:"headers" yaml:"headers" config:"headers"`
+	Tags             []string                               `json:"tags,omitempty" yaml:"tags,omitempty" config:"tags,omitempty"`
 	LogLevel         string                                 `json:"logging.level,omitempty" yaml:"logging.level,omitempty" config:"logging.level,omitempty"`
 	LogLevelOverride string                                 `json:"logging.level_override,omitempty" yaml:"logging.level_override,omitempty" config:"logging.level_override,omitempty"`
 	MonitoringHTTP   *monitoringConfig.MonitoringHTTPConfig `json:"monitoring.http,omitempty" yaml:"monitoring.http,omitempty" config:"monitoring.http,omitempty"`

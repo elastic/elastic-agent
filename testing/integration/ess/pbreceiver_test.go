@@ -33,7 +33,11 @@ func TestPbReceiverSubcomponentStatus(t *testing.T) {
 			{Type: define.Darwin},
 			{Type: define.Windows},
 		},
-		Stack: nil,
+		// Packetbeat cannot load wpcap.dll on windows/arm64 because npcap is
+		// bundled only in the windows/amd64 package.
+		// TODO: remove this skip when https://github.com/elastic/elastic-agent/issues/17044 is resolved.
+		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
+		Stack:  nil,
 	})
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)

@@ -1,0 +1,24 @@
+exporters:
+  file:
+    path: ${env:TMP}\file-exporter-output.json
+receivers:
+  windows_event_log:
+    channel: "Application"
+  windows_perf_counters:
+    perfcounters:
+      - object: Memory
+        counters:
+          - name: Committed Bytes
+            metric: bytes.committed
+service:
+  pipelines:
+    logs/windows:
+      receivers:
+        - windows_event_log
+      exporters:
+        - nop
+    metrics/windows:
+      receivers:
+        - windows_perf_counters
+      exporters:
+        - nop
