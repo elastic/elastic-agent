@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -15,6 +16,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +31,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/google/go-cmp/cmp"
@@ -274,6 +277,27 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 	}
 }
 
+// dialConnInfoServer attempts a single connection to the connection-info server at
+// cisAddr. The caller is responsible for closing a non-nil returned connection.
+func dialConnInfoServer(ctx context.Context, cisAddr string) (net.Conn, error) {
+	if runtime.GOOS != "windows" {
+		parsedCISAddr, err := url.Parse(cisAddr)
+		if err != nil {
+			return nil, err
+		}
+		dialCtx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		return (&net.Dialer{}).DialContext(dialCtx, "unix", parsedCISAddr.Host+parsedCISAddr.Path)
+	}
+
+	pipeAddr := cisAddr
+	if strings.HasPrefix(pipeAddr, "npipe:///") {
+		path := strings.TrimPrefix(pipeAddr, "npipe:///")
+		pipeAddr = `\\.\pipe\` + path
+	}
+	return npipe.Dial(pipeAddr)("", "")
+}
+
 // TestCISKeepsRunningOnNonFatalExitCodeFromStart tests that the connection info
 // server keeps running when starting a service component results in a non-fatal
 // exit code.
@@ -340,9 +364,6 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	cisAddr, err := getConnInfoServerAddress(runtime.GOOS, true, cisPort, cisSocket)
 	require.NoError(t, err)
 
-	parsedCISAddr, err := url.Parse(cisAddr)
-	require.NoError(t, err)
-
 	// First, wait for the warning log message indicating the runtime continued
 	// past the non-fatal install failure. Filtering the observer (rather than
 	// draining it with TakeAll) means the assertion does not race with the
@@ -357,19 +378,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	// return ERROR_PIPE_BUSY between Accept calls; the conn is closed each
 	// attempt to avoid leaking client-side pipe handles.
 	require.Eventuallyf(t, func() bool {
-		var conn net.Conn
-		if runtime.GOOS != "windows" {
-			dialCtx, cancelDial := context.WithTimeout(ctx, time.Second)
-			conn, err = (&net.Dialer{}).DialContext(dialCtx, "unix", parsedCISAddr.Host+parsedCISAddr.Path)
-			cancelDial()
-		} else {
-			if strings.HasPrefix(cisAddr, "npipe:///") {
-				path := strings.TrimPrefix(cisAddr, "npipe:///")
-				cisAddr = `\\.\pipe\` + path
-			}
-			conn, err = npipe.Dial(cisAddr)("", "")
-		}
-
+		conn, err := dialConnInfoServer(ctx, cisAddr)
 		if err != nil {
 			t.Logf("Connection info server is not running: %v", err)
 			return false
@@ -604,4 +613,199 @@ func mockEndpointBinary(t *testing.T, exitCode int) string {
 	require.NoError(t, err)
 
 	return outPath
+}
+
+// TestConnInfoServerClosedDuringInstall verifies that the connection-info server (CIS)
+// does not accept connections while the installer for a service component is running,
+// and becomes reachable only once the installer completes successfully.
+//
+// Regression: PR #9313 opened the CIS before running the installer. A still-running old
+// service (e.g. the previous Endpoint version) could dial in while the new version was
+// still installing, be adopted as HEALTHY, and receive a policy update that interfered
+// with the upgrade (SDH-854). This test exercises the real connInfoServer and address,
+// not a mock, so it directly verifies the open/close ordering rather than the drain
+// logic (see TestStaleCheckinDrainedOnInstallRetry for that).
+func TestConnInfoServerClosedDuringInstall(t *testing.T) {
+	log, _ := loggertest.New("test")
+	const cisPort = 9995
+	const cisSocket = ".tciclosed.sock"
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   cisPort,
+		CSocket: cisSocket,
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+
+	var startOnce sync.Once
+	installStarted := make(chan struct{})
+	releaseInstall := make(chan struct{})
+	firstCall := true // first call is always check; subsequent calls are install
+
+	service.executeServiceCommandImpl = func(ctx context.Context, _ *logger.Logger, _ string, _ *component.ServiceOperationsCommandSpec) error {
+		if firstCall {
+			firstCall = false
+			return errors.New("service not installed") // check fails → install is triggered
+		}
+		startOnce.Do(func() { close(installStarted) })
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-releaseInstall:
+		}
+		return nil // install succeeds
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := newMockCommunicator("")
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	go func() { _ = service.Run(ctx, comm) }()
+
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	select {
+	case <-installStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not start within timeout")
+	}
+
+	cisAddr, err := getConnInfoServerAddress(runtime.GOOS, true, cisPort, cisSocket)
+	require.NoError(t, err)
+
+	// While the installer is still running, the CIS must not exist yet: this is the
+	// core guarantee of the ordering fix, and the reason the old service can no
+	// longer be adopted mid-install.
+	_, dialErr := dialConnInfoServer(ctx, cisAddr)
+	require.Error(t, dialErr, "connection-info server must not accept connections while the installer is running")
+
+	close(releaseInstall)
+
+	// Once the installer completes successfully, the CIS should come up and accept
+	// connections.
+	require.Eventually(t, func() bool {
+		conn, err := dialConnInfoServer(ctx, cisAddr)
+		if err != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
+	}, 30*time.Second, 100*time.Millisecond, "connection info server did not accept a connection after install completed")
+}
+
+// TestStaleCheckinDrainedOnInstallRetry verifies that a checkin left over from a
+// previous connection-info server (CIS) instance is drained and discarded rather
+// than adopted, before a failed install is retried.
+//
+// This does not exercise the CIS open/close ordering itself (see
+// TestConnInfoServerClosedDuringInstall for that): it injects the stale checkin
+// directly into the communicator channel to isolate the drain logic, which matters
+// on a retry where a previous CIS instance had already accepted a connection and
+// queued a checkin before this attempt's cisStop() tore it down.
+func TestStaleCheckinDrainedOnInstallRetry(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9996,
+		CSocket: ".testraceinstall.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	// Long retry delay so the automatic retry doesn't interfere with the assertion window.
+	service.serviceRestartDelay = 30 * time.Second
+
+	var startOnce, doneOnce sync.Once
+	installStarted := make(chan struct{})
+	installDone := make(chan struct{})
+	firstCall := true // first call is always check; subsequent calls are install
+
+	service.executeServiceCommandImpl = func(ctx context.Context, _ *logger.Logger, _ string, _ *component.ServiceOperationsCommandSpec) error {
+		if firstCall {
+			firstCall = false
+			return errors.New("service not installed") // check fails → install is triggered
+		}
+		startOnce.Do(func() { close(installStarted) })
+		defer doneOnce.Do(func() { close(installDone) })
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		return errors.New("install failed") // simulate exit 284
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	comm := newMockCommunicator("")
+
+	statesCh := make(chan ComponentState, 50)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-service.ch:
+				select {
+				case statesCh <- s:
+				default:
+				}
+			}
+		}
+	}()
+
+	go func() { _ = service.Run(ctx, comm) }()
+
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	select {
+	case <-installStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not start within timeout")
+	}
+
+	// Simulate the old service reconnecting to the CIS mid-install.
+	// In production this happens because the old service is still running as a
+	// system service and reconnects when the new agent opens the named pipe.
+	comm.ch <- &proto.CheckinObserved{}
+
+	select {
+	case <-installDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not complete within timeout")
+	}
+
+	// The old service's checkin must be drained and discarded, never processed.
+	// If the runtime adopts it as HEALTHY the fix is not in effect.
+	require.Never(t, func() bool {
+		select {
+		case s := <-statesCh:
+			return s.State == client.UnitStateHealthy
+		default:
+			return false
+		}
+	}, 500*time.Millisecond, 10*time.Millisecond,
+		"old service was incorrectly adopted as HEALTHY while the installer was running")
 }
