@@ -67,6 +67,7 @@ var (
 	endpointResourcesZipPattern = regexp.MustCompile(`endpoint-security-resources\.zip$`)
 	cloudDefendPattern          = regexp.MustCompile(`/cloud-defend(\.spec\.yml)?$`)
 	componentYmlPattern         = regexp.MustCompile(`usr/share/elastic-agent/data/elastic-agent-[^/]+/components/.+\.yml$`)
+	otelCollectorBinaryPattern  = regexp.MustCompile(`usr/share/elastic-agent/data/elastic-agent-[^/]+/components/elastic-otel-collector$`)
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -534,7 +535,8 @@ func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
 
 // checkIronbankDocker verifies the Ironbank variant. Its Dockerfile broadly
 // relaxes permissions under data/ and then has to restore the component .yml
-// files to 0644; the agent refuses to start if they stay group/world writable.
+// files to 0644 (the agent refuses to start if they stay group/world writable)
+// and the elastic-otel-collector binary to 0755 (it cannot be executed otherwise).
 func checkIronbankDocker(t *testing.T, file string) (string, int64) {
 	p, info, err := readDocker(t, file, true)
 	if err != nil {
@@ -545,6 +547,7 @@ func checkIronbankDocker(t *testing.T, file string) (string, int64) {
 	checkDockerEntryPoint(t, p, info)
 	checkDockerUser(t, p, info, *rootUserContainer)
 	checkRequiredFilePermissions(t, p, componentYmlPattern, os.FileMode(0644))
+	checkRequiredFilePermissions(t, p, otelCollectorBinaryPattern, os.FileMode(0755))
 
 	// Image labels are supplied by Ironbank from the hardening manifest, so
 	// there is no version label to derive the name from.

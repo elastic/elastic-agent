@@ -105,6 +105,7 @@ RUN find /usr/share//elastic-agent/data -type d -exec chmod 0777 {} \; && \
     find /usr/share//elastic-agent/data -type f -exec chmod 0666 {} \; && \
     chmod 0755 /usr/share//elastic-agent/data/elastic-agent-*/elastic-agent && \
     chmod 0755 /usr/share//elastic-agent/data/elastic-agent-*/components/*beat && \
+    chmod 0755 /usr/share//elastic-agent/data/elastic-agent-*/components/elastic-otel-collector && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/osquery* || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/apm-server || true) && \
     (chmod 0755 /usr/share/elastic-agent/data/elastic-agent-*/components/cloud-defend || true) && \
