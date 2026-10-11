@@ -396,3 +396,76 @@ func TestBufferReleasesValuesNoSubscriberCanReceive(t *testing.T) {
 	b.removeSubscriber(0)
 	assert.Equal(t, []int{0, 0, 0, 4, 0}, b.buffer, "the current value should be kept")
 }
+
+// subscribeForTest adds a subscriber with the given bufferLen directly, without
+// the run loop.
+func subscribeForTest(b *Broadcaster[int], bufferLen int) {
+	b.handleNewSubscriber(subscribeRequest[int]{ctx: context.Background(), listenerChan: make(chan int), bufferLen: bufferLen})
+}
+
+func publishForTest(b *Broadcaster[int], values ...int) {
+	for _, v := range values {
+		b.handleNewInput(v)
+		b.updateListeners()
+	}
+}
+
+func TestBufferReleasesValuesAfterWraparound(t *testing.T) {
+	// zero marks a released buffer slot; the buffer has 5 slots
+	b := new(1, 4, 0)
+	publishForTest(b, 2, 3, 4, 5, 6, 7, 8)
+	assert.Equal(t, []int{0, 0, 8, 0, 0}, b.buffer, "without subscribers only the current value should be kept after wrapping")
+
+	b = new(1, 4, 0)
+	subscribeForTest(b, 4)
+	publishForTest(b, 2, 3, 4, 5, 6, 7, 8)
+	assert.Equal(t, []int{6, 7, 8, 4, 5}, b.buffer, "unread values should be kept, newer values overwrite the oldest slots")
+
+	// Releasing a value must not clear a slot that has been reused by a newer value.
+	for _, want := range [][]int{
+		{6, 7, 8, 0, 5},
+		{6, 7, 8, 0, 0},
+		{0, 7, 8, 0, 0},
+		{0, 0, 8, 0, 0},
+		{0, 0, 8, 0, 0}, // the subscriber has caught up, the current value stays
+	} {
+		b.advanceSubscriber(0)
+		assert.Equal(t, want, b.buffer)
+	}
+}
+
+func TestBufferReleasesValuesMultipleSubscribers(t *testing.T) {
+	b := new(1, 4, 0)
+	subscribeForTest(b, 4)
+	subscribeForTest(b, 4)
+	publishForTest(b, 2, 3, 4)
+	assert.Equal(t, []int{1, 2, 3, 4, 0}, b.buffer)
+
+	b.advanceSubscriber(0)
+	b.advanceSubscriber(0)
+	assert.Equal(t, []int{1, 2, 3, 4, 0}, b.buffer, "the slowest subscriber should keep its values alive")
+
+	b.advanceSubscriber(1)
+	assert.Equal(t, []int{0, 2, 3, 4, 0}, b.buffer)
+	b.advanceSubscriber(1)
+	assert.Equal(t, []int{0, 0, 3, 4, 0}, b.buffer, "values are released as the slowest subscriber advances")
+
+	// The first subscriber catches up completely, the second still holds 3 and 4.
+	b.advanceSubscriber(0)
+	b.advanceSubscriber(0)
+	assert.Equal(t, []int{0, 0, 3, 4, 0}, b.buffer)
+
+	b.removeSubscriber(1)
+	assert.Equal(t, []int{0, 0, 0, 4, 0}, b.buffer, "removing the slowest subscriber should release what only it could receive")
+}
+
+func TestBufferReleasesValuesBeyondSubscriberBufferLen(t *testing.T) {
+	b := new(1, 4, 0)
+	subscribeForTest(b, 1)
+	publishForTest(b, 2, 3, 4)
+	assert.Equal(t, []int{0, 0, 3, 4, 0}, b.buffer,
+		"a subscriber with bufferLen 1 can only receive the last two values, older ones should be released even if unread")
+
+	b.advanceSubscriber(0)
+	assert.Equal(t, []int{0, 0, 0, 4, 0}, b.buffer)
+}
