@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Deletes stale branches: no open PR with the branch as its head, last commit older than
 # STALE_MONTHS months, not protected, not the default branch, and not matching a release
-# version pattern (N.N, N.x, N.N.N, release/*).
+# version pattern (N.N, N.x, release/*).
 #
 # Env: GH_TOKEN, REPO (owner/name), STALE_MONTHS (default 24), DRY_RUN (default true)
 set -euo pipefail
@@ -37,7 +37,7 @@ BRANCHES="$(gh api graphql --paginate \
     }
   }' --jq '.data.repository.refs.nodes[] | [.name, .target.committedDate, (.branchProtectionRule != null)] | @tsv')"
 
-RELEASE_RE='^([0-9]+\.([0-9]+|x)(\.[0-9]+)?|release/.*)$'
+RELEASE_RE='^([0-9]+\.([0-9]+|x)|release/.*)$'
 deleted=0
 while IFS=$'\t' read -r branch date protected; do
   [[ -z "${branch}" ]] && continue
