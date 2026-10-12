@@ -2,9 +2,9 @@ exporters:
   file:
     path: ${env:TMP}\file-exporter-output.json
 receivers:
-  windowseventlog:
+  windows_event_log:
     channel: "Application"
-  windowsperfcounters:
+  windows_perf_counters:
     perfcounters:
       - object: Memory
         counters:
@@ -14,11 +14,11 @@ service:
   pipelines:
     logs/windows:
       receivers:
-        - windowseventlog
+        - windows_event_log
       exporters:
         - nop
     metrics/windows:
       receivers:
-        - windowsperfcounters
+        - windows_perf_counters
       exporters:
         - nop

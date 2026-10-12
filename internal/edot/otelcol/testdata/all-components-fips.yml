@@ -5,9 +5,9 @@ exporters:
       - http://localhost:9200
   file:
     path: /tmp/file-exporter-output.json
-  otlp:
+  otlp_grpc:
     endpoint: localhots:4317
-  otlphttp:
+  otlp_http:
     endpoint: https://localhost.com:4318
 
 extensions:
@@ -23,7 +23,7 @@ processors:
         key: key1
         value: value1
   batch:
-  cumulativetodelta:
+  cumulative_to_delta:
   elasticinframetrics:
   filter:
   resource:
@@ -31,7 +31,7 @@ processors:
       - action: insert
         key: key1
         value: value1
-  resourcedetection:
+  resource_detection:
   transform:
   memory_limiter/processor:
     check_interval: 1s
@@ -39,18 +39,20 @@ processors:
     spike_limit_mib: 800
   elasticapm:
   ratelimit:
+    rate: 1
+    burst: 1
   tail_sampling:
   beat:
 
 receivers:
-  filelog:
+  file_log:
     include:
       - /filelog/path
   otlp:
     protocols:
       grpc:
       http:
-  httpcheck:
+  http_check:
     targets:
       - endpoint: http://localhost:80
         method: GET
@@ -62,7 +64,7 @@ receivers:
   docker_stats:
   elasticmonitoringreceiver:
   verifier:
-    cloud_connector_id: "test-cc-001"
+    identity_federation_id: "test-cc-001"
     verification_id: "test-verify-001"
     policies:
       - policy_id: "policy-001"
@@ -71,7 +73,7 @@ receivers:
             package_name: "aws"
 
 connectors:
-  spanmetrics:
+  span_metrics:
     histogram:
       explicit:
         buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
@@ -107,38 +109,38 @@ service:
         - debug
         - elasticsearch
         - file
-        - otlp
+        - otlp_grpc
       processors:
         - attributes
         - batch
         - filter
         - resource
-        - resourcedetection
+        - resource_detection
         - transform
         - memory_limiter/processor
       receivers:
-        - filelog
+        - file_log
         - otlp
-        - elasticmonitoringreceiver
         - verifier
 
     metrics:
       exporters:
         - debug
-        - otlp
+        - otlp_grpc
       processors:
         - attributes
         - batch
-        - cumulativetodelta
+        - cumulative_to_delta
         - elasticinframetrics
         - filter
         - resource
-        - resourcedetection
+        - resource_detection
         - transform
       receivers:
         - otlp
-        - httpcheck
-        - spanmetrics
+        - http_check
+        - span_metrics
+        - elasticmonitoringreceiver
 
     metrics/aggregated:
       receivers:
@@ -146,22 +148,22 @@ service:
       processors:
       exporters:
         - debug
-        - otlp
+        - otlp_grpc
 
     traces:
       exporters:
         - debug
         - elasticsearch
-        - otlp
-        - otlphttp
-        - spanmetrics
+        - otlp_grpc
+        - otlp_http
+        - span_metrics
         - elasticapm
       processors:
         - attributes
         - batch
         - filter
         - resource
-        - resourcedetection
+        - resource_detection
         - transform
         - elasticapm
       receivers:
