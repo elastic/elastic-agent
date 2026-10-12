@@ -14,8 +14,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 )
 
-func newXXHashDigest() *xxhash.Digest { return xxhash.New() }
-
 // heapInUse forces two GC cycles and returns HeapInuse bytes.
 func heapInUse() uint64 {
 	runtime.GC()
@@ -214,7 +212,7 @@ func benchmarkRenderCacheSteadyState(b *testing.B, nInputs, nPods int, keepRende
 	// Re-render every input against every vars set and store the *Dict back on the entry,
 	// which is exactly what the cache would have held without the nil'ing change.
 	if keepRendered {
-		hasher := newXXHashDigest()
+		hasher := xxhash.New()
 		for _, vars := range allVars {
 			for i, node := range inputNodes {
 				dict, ok := node.(*Dict)
