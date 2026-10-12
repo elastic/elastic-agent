@@ -1837,7 +1837,9 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	// keep the ordering of everything in between unchanged.
 	currentCfg, currentCfgErr := configuration.NewFromConfig(cfg)
 	if currentCfgErr != nil {
-		return fmt.Errorf("invalid configuration: %w", currentCfgErr)
+		err = fmt.Errorf("invalid configuration: %w", currentCfgErr)
+		c.setConfigError(err)
+		return err
 	}
 	k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput, c.logger)
 
