@@ -43,19 +43,19 @@ func createReceiver(
 ) (receiver.Logs, error) {
 	cfg := baseCfg.(*Config)
 
-	runCtx, cancel := context.WithCancel(context.Background())
-
 	return &monitoringReceiver{
 		logger:   set.Logger,
 		config:   cfg,
 		consumer: consumer,
-		runCtx:   runCtx,
-		cancel:   cancel,
 		done:     make(chan struct{}),
 	}, nil
 }
 
-func (mr *monitoringReceiver) Start(ctx context.Context, _ component.Host) error {
+func (mr *monitoringReceiver) Start(_ context.Context, _ component.Host) error {
+	runCtx, cancel := context.WithCancel(context.Background())
+	mr.runCtx = runCtx
+	mr.cancel = cancel
+
 	go func() {
 		defer close(mr.done)
 		mr.run()
@@ -64,6 +64,10 @@ func (mr *monitoringReceiver) Start(ctx context.Context, _ component.Host) error
 }
 
 func (mr *monitoringReceiver) Shutdown(ctx context.Context) error {
+	if mr.cancel == nil {
+		return nil
+	}
+
 	mr.cancel()
 	// Wait for the run loop to stop, but return immediately if the context
 	// is cancelled.
