@@ -194,6 +194,88 @@ func TestRenderInputsCached(t *testing.T) {
 	assert.Equal(t, original, toInterface(inputs))
 }
 
+// TestRenderInputsCachedCorrectness verifies that the memory optimization of clearing
+// entry.rendered in put() does not affect the Maps() output. It compares the uncached and
+// cached paths — including on a second call that reads from cache — and checks that each
+// of the three input-removal paths (unresolved variable, false condition, all streams
+// removed by conditions) produces the same absent result in both paths.
+func TestRenderInputsCachedCorrectness(t *testing.T) {
+	// Build inputs that exercise all three removal paths in renderInput:
+	//   1. ErrNoMatch: variable doesn't exist in any vars set
+	//   2. false condition on the input itself: entire dict is nil'd by Apply
+	//   3. all streams removed by conditions: hadStreams && getStreams == nil
+	//   4. a normal input that always renders, to verify the positive case
+	ast, err := NewAST(map[string]interface{}{
+		"inputs": []interface{}{
+			map[string]interface{}{"id": "normal", "type": "log", "paths": []interface{}{"/var/log/app.log"}},
+			map[string]interface{}{"id": "unresolved-var", "type": "log", "paths": []interface{}{"${missing.var}"}},
+			map[string]interface{}{"id": "false-condition", "type": "log", "condition": "${var.flag} == 'off'", "paths": []interface{}{"/var/log/cond.log"}},
+			map[string]interface{}{
+				"id":   "all-streams-removed",
+				"type": "log",
+				"streams": []interface{}{
+					map[string]interface{}{"paths": []interface{}{"/var/log/s1.log"}, "condition": "${var.flag} == 'off'"},
+					map[string]interface{}{"paths": []interface{}{"/var/log/s2.log"}, "condition": "${var.flag} == 'off'"},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	inputs, ok := Lookup(ast, "inputs")
+	require.True(t, ok)
+
+	// var.flag="on" so conditions "== 'off'" evaluate to false, triggering removal.
+	ctxVars, err := NewVars("", map[string]interface{}{"var": map[string]interface{}{"flag": "on"}}, nil, "var")
+	require.NoError(t, err)
+	ctxVars.SetCacheKey("ctx")
+	vars := []*Vars{ctxVars}
+
+	// Uncached path: nil cache → entry.rendered is never nilled.
+	uncached, err := RenderInputsCached(inputs, vars, nil)
+	require.NoError(t, err)
+	uncachedMaps := uncached.Maps()
+
+	// First cached call: entries are created and stored (entry.rendered is nilled in put()).
+	cache := NewRenderCache()
+	firstCached, err := RenderInputsCached(inputs, vars, cache)
+	require.NoError(t, err)
+	firstCachedMaps := firstCached.Maps()
+
+	// Second cached call: entries are served from cache (entry.rendered stays nil).
+	secondCached, err := RenderInputsCached(inputs, vars, cache)
+	require.NoError(t, err)
+	secondCachedMaps := secondCached.Maps()
+
+	// All three paths must produce the same single "normal" input.
+	require.Len(t, uncachedMaps, 1, "uncached: only 'normal' survives")
+	require.Len(t, firstCachedMaps, 1, "first cached call: only 'normal' survives")
+	require.Len(t, secondCachedMaps, 1, "second cached call: only 'normal' survives")
+
+	assert.Equal(t, uncachedMaps, firstCachedMaps, "first cached call must match uncached output")
+	assert.Equal(t, uncachedMaps, secondCachedMaps, "second cached call (from cache) must match uncached output")
+
+	// Verify by ID that each removal path produced the expected result.
+	for _, label := range []string{"uncached", "first-cached", "second-cached"} {
+		var maps []interface{}
+		switch label {
+		case "uncached":
+			maps = uncachedMaps
+		case "first-cached":
+			maps = firstCachedMaps
+		case "second-cached":
+			maps = secondCachedMaps
+		}
+		ids := make(map[string]bool, len(maps))
+		for _, m := range maps {
+			ids[m.(map[string]interface{})["id"].(string)] = true
+		}
+		assert.True(t, ids["normal"], "%s: normal input must be rendered", label)
+		assert.False(t, ids["unresolved-var"], "%s: input with unresolved variable must be removed", label)
+		assert.False(t, ids["false-condition"], "%s: input with false condition must be removed", label)
+		assert.False(t, ids["all-streams-removed"], "%s: input with all streams removed must be absent", label)
+	}
+}
+
 func TestApplySharesUnchangedNodes(t *testing.T) {
 	ast, err := NewAST(map[string]interface{}{
 		"static": map[string]interface{}{"b": "value", "list": []interface{}{"x", 1}},
