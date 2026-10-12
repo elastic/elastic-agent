@@ -144,9 +144,6 @@ type Check mg.Namespace
 // Prepare tasks related to bootstrap the environment or get information about the environment.
 type Prepare mg.Namespace
 
-// Format automatically format the code.
-type Format mg.Namespace
-
 // Demo runs agent out of container.
 type Demo mg.Namespace
 
@@ -216,7 +213,7 @@ func (Dev) RegenerateMocks() error {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.SerialDeps(Format.License, devtools.Format)
+	mg.SerialDeps(devtools.Format)
 	return nil
 }
 
@@ -531,17 +528,6 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 func (Test) Coverage() error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
-}
-
-// All format automatically all the codes.
-func (Format) All() {
-	mg.SerialDeps(Format.License)
-}
-
-// License applies the right license header.
-func (Format) License() error {
-	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", "Elastic")
 }
 
 // AssembleDarwinUniversal merges the darwin/amd64 and darwin/arm64 into a single
@@ -912,8 +898,18 @@ func CrossBuild(ctx context.Context) error {
 func PackageAgentCore(ctx context.Context) {
 	start := time.Now()
 	defer func() { fmt.Println("packageAgentCore ran for", time.Since(start)) }()
-	cfg := mage.SettingsFromContext(ctx)
 	mg.CtxDeps(ctx, CrossBuild)
+
+	cfg := devtools.SettingsFromContext(ctx)
+
+	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
+	// docker) is selected the core build would produce nothing, causing
+	// extractAgentCoreForPackage to fail. Add TarGz so the core archive is always
+	// built regardless of which final package types were requested.
+	if !cfg.IsPackageTypeSelected(devtools.TarGz) {
+		cfg = cfg.WithAddedPackageType(devtools.TarGz)
+		ctx = devtools.ContextWithSettings(ctx, cfg)
+	}
 
 	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
@@ -932,7 +928,7 @@ func Config(ctx context.Context) error {
 }
 
 // ControlProto generates pkg/agent/control/proto module.
-func ControlProto() error {
+func ControlProto(ctx context.Context) error {
 	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v2/cproto", "--go_opt=paths=source_relative",
@@ -949,8 +945,10 @@ func ControlProto() error {
 		return err
 	}
 
-	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
-	return nil
+	if err := devtools.AddLicenseHeaders(devtools.SettingsFromContext(ctx)); err != nil {
+		return err
+	}
+	return devtools.GoImports()
 }
 
 func BuildPGP() error {
