@@ -13,6 +13,8 @@ Config input for container logs
 {{- define "elasticagent.kubernetes.config.container_logs.input" -}}
 {{- $singleInput := dig "single_input" true .Values.kubernetes.containers.logs -}}
 {{- $rotated := .Values.kubernetes.containers.logs.rotated_logs -}}
+{{- /* The kubernetes provider only discovers pods in its configured namespace, scope the glob the same way. */ -}}
+{{- $providerNamespace := dig "providers" "kubernetes" "namespace" "" .Values.agent.presets.perNode -}}
 - id: filestream-container-logs
   type: filestream
   data_stream:
@@ -24,10 +26,18 @@ Config input for container logs
     {{- if $rotated }}
     compression: auto
     paths:
+      {{- if $providerNamespace }}
+      - '/var/log/pods/{{ $providerNamespace }}_*/*/*.log*'
+      {{- else }}
       - '/var/log/pods/*/*/*.log*'
+      {{- end }}
     {{- else }}
     paths:
+      {{- if $providerNamespace }}
+      - '/var/log/containers/*_{{ $providerNamespace }}_*.log'
+      {{- else }}
       - '/var/log/containers/*.log'
+      {{- end }}
     {{- end }}
     take_over:
       enabled: true

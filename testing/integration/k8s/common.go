@@ -700,6 +700,10 @@ type ESResponse struct {
 		Hits     []any `json:"hits"`
 	} `json:"hits"`
 	Aggregations struct {
+		// MaxTimestamp is the max @timestamp (epoch millis), 0 when there are no documents.
+		MaxTimestamp struct {
+			Value float64 `json:"value"`
+		} `json:"max_timestamp"`
 		FilesCount struct {
 			DocCountErrorUpperBound int `json:"doc_count_error_upper_bound"`
 			SumOtherDocCount        int `json:"sum_other_doc_count"`
