@@ -46,6 +46,9 @@ type RenderedInputs struct {
 func (r *RenderedInputs) Node() Node {
 	nodes := make([]Node, 0, len(r.entries))
 	for _, entry := range r.entries {
+		if entry.rendered == nil {
+			panic("RenderedInputs.Node called on a cached result; use Maps() instead")
+		}
 		nodes = append(nodes, entry.rendered)
 	}
 	return NewList(nodes)

@@ -178,6 +178,18 @@ func TestRenderInputsCached(t *testing.T) {
 		assert.Equal(t, toInterface(rendered.Node()), rendered.Maps())
 	})
 
+	t.Run("cached results have Maps but not Node", func(t *testing.T) {
+		cache := NewRenderCache()
+		rendered, err := RenderInputsCached(inputs, vars, cache)
+		require.NoError(t, err)
+		require.Len(t, rendered.Maps(), 3)
+		for _, m := range rendered.Maps() {
+			assert.NotNil(t, m, "cached Maps() must not return nil entries")
+		}
+		assert.Panics(t, func() { rendered.Node() },
+			"Node() on cached results should panic since rendered is cleared in put()")
+	})
+
 	// the inputs being rendered are never modified
 	assert.Equal(t, original, toInterface(inputs))
 }
