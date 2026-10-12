@@ -46,26 +46,16 @@ func createReceiver(
 	return &monitoringReceiver{
 		logger:   set.Logger,
 		config:   cfg,
-<<<<<<< HEAD
 		consumer: consumer,
-		runCtx:   runCtx,
-		cancel:   cancel,
-=======
-		consumer: next,
->>>>>>> ce9ecaa (Fix monitoring receiver deadlock when Shutdown is called before start (#17027))
 		done:     make(chan struct{}),
 	}, nil
 }
 
-<<<<<<< HEAD
-func (mr *monitoringReceiver) Start(ctx context.Context, _ component.Host) error {
-=======
 func (mr *monitoringReceiver) Start(_ context.Context, _ component.Host) error {
 	runCtx, cancel := context.WithCancel(context.Background())
 	mr.runCtx = runCtx
 	mr.cancel = cancel
 
->>>>>>> ce9ecaa (Fix monitoring receiver deadlock when Shutdown is called before start (#17027))
 	go func() {
 		defer close(mr.done)
 		mr.run()
