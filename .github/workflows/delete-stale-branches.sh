@@ -3,11 +3,11 @@
 # STALE_MONTHS months, not protected, not the default branch, and not matching a release
 # version pattern (N.N, N.x, N.N.N, release/*).
 #
-# Env: GH_TOKEN, REPO (owner/name), STALE_MONTHS (default 12), DRY_RUN (default true)
+# Env: GH_TOKEN, REPO (owner/name), STALE_MONTHS (default 24), DRY_RUN (default true)
 set -euo pipefail
 
 REPO="${REPO:?REPO is required}"
-STALE_MONTHS="${STALE_MONTHS:-12}"
+STALE_MONTHS="${STALE_MONTHS:-24}"
 DRY_RUN="${DRY_RUN:-true}"
 OWNER="${REPO%%/*}"
 NAME="${REPO##*/}"
