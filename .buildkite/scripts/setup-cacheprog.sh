@@ -84,6 +84,22 @@ setup_cacheprog() {
   printf '#!/bin/sh\nunset GODEBUG\nAUTOMEMLIMIT=off exec "%s" "$@" 2>>"%s"\n' "${bin}" "${log}" >"${wrapper}"
   chmod +x "${wrapper}"
 
+  # The golang-crossbuild containers started by mage (see
+  # dev-tools/mage/crossbuild.go) get this directory mounted at /cacheprog, so
+  # the wrapper and log use container paths. The log and the local object dir
+  # must be writable by whichever user the container runs as.
+  if [[ "${os}" == "linux" ]]; then
+    local container_wrapper="${dir}/cacheprog-wrapper-container"
+    printf '#!/bin/sh\nunset GODEBUG\nAUTOMEMLIMIT=off exec /cacheprog/cacheprog "$@" 2>>/cacheprog/cacheprog-container.log\n' >"${container_wrapper}"
+    chmod +x "${container_wrapper}"
+    chmod a+rx "${bin}"
+    touch "${dir}/cacheprog-container.log"
+    chmod 666 "${dir}/cacheprog-container.log"
+    mkdir -p "${dir}/disk-container"
+    chmod 777 "${dir}/disk-container"
+    export CACHEPROG_CROSSBUILD_DIR="${dir}"
+  fi
+
   export GOCACHEPROG="${wrapper}"
   export CI_CACHEPROG_LOG="${log}"
   export CACHEPROG_REMOTE_STORAGE_TYPE="s3"
