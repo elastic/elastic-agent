@@ -1,3 +1,26 @@
 exporters:
   file:
     path: ${env:TMP}\file-exporter-output.json
+<<<<<<< HEAD
+=======
+receivers:
+  windows_event_log:
+    channel: "Application"
+  windows_perf_counters:
+    perfcounters:
+      - object: Memory
+        counters:
+          - name: Committed Bytes
+service:
+  pipelines:
+    logs/windows:
+      receivers:
+        - windows_event_log
+      exporters:
+        - nop
+    metrics/windows:
+      receivers:
+        - windows_perf_counters
+      exporters:
+        - nop
+>>>>>>> 72e76ba (test: fix EDOT tests on Windows (#17151))
