@@ -324,7 +324,7 @@
                                 },
                                 "single_input": {
                                     "type": "boolean",
-                                    "description": "Use a single filestream input with a glob path for all container logs. Set to false to use one input per container.",
+                                    "description": "Use a single filestream input with a glob path for all container logs. Set to false to use one input per container. Not supported with dynamic provider variables (${kubernetes.*}, ${docker.*}) in the logs vars, kubernetes.namespace or kubernetes.onboardingID.",
                                     "default": true
                                 },
                                 "vars": {

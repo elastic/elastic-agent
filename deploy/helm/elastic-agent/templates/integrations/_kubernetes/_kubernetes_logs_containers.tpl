@@ -13,6 +13,21 @@ Config input for container logs
 {{- define "elasticagent.kubernetes.config.container_logs.input" -}}
 {{- $singleInput := dig "single_input" true .Values.kubernetes.containers.logs -}}
 {{- $rotated := .Values.kubernetes.containers.logs.rotated_logs -}}
+{{- if $singleInput -}}
+{{- /*
+The agent renders an input once per container for each dynamic provider variable it references, but only
+renames the outer input id. The stream id of the single input would then be duplicated, which filestream rejects.
+*/ -}}
+{{- $userValues := dict
+      "kubernetes.containers.logs.vars" (toYaml (dig "vars" (dict) .Values.kubernetes.containers.logs))
+      "kubernetes.namespace" (toString .Values.kubernetes.namespace)
+      "kubernetes.onboardingID" (toString (default "" .Values.kubernetes.onboardingID)) -}}
+{{- range $name, $value := $userValues -}}
+{{- if regexMatch "\\$\\{\\s*(kubernetes|docker)\\." $value -}}
+{{- fail (printf "%s references a dynamic provider variable (${kubernetes.*} or ${docker.*}), which is not supported with kubernetes.containers.logs.single_input=true. Set kubernetes.containers.logs.single_input=false to use one input per container." $name) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- /* The kubernetes provider only discovers pods in its configured namespace, scope the glob the same way. */ -}}
 {{- $providerNamespace := dig "providers" "kubernetes" "namespace" "" .Values.agent.presets.perNode -}}
 - id: filestream-container-logs
