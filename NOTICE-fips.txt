@@ -2753,11 +2753,11 @@ Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.56.1/L
 
 --------------------------------------------------------------------------------
 Dependency : github.com/moby/moby/client
-Version: v0.6.1
+Version: v0.6.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.6.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.6.2/LICENSE:
 
 
                                  Apache License
@@ -32871,11 +32871,11 @@ Apache License
 
 --------------------------------------------------------------------------------
 Dependency : github.com/docker/go-connections
-Version: v0.8.1
+Version: v0.8.2
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/docker/go-connections@v0.8.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/docker/go-connections@v0.8.2/LICENSE:
 
 
                                  Apache License
@@ -84730,11 +84730,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/pprof
-Version: v0.0.0-20261005154351-639476b4d215
+Version: v0.0.0-20261008003335-7bae8d8c4c9e
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20261005154351-639476b4d215/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20261008003335-7bae8d8c4c9e/LICENSE:
 
 
                                  Apache License
