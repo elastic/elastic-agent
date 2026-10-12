@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -31,6 +32,8 @@ type Upgrade struct {
 
 	tamperProtectionFn           func() bool                                                                                                                            // allows to inject the flag for tests, defaults to features.TamperProtection
 	notifyUnitsOfProxiedActionFn func(ctx context.Context, log *logp.Logger, action dispatchableAction, ucs []unitWithComponent, performAction performActionFunc) error // allows to inject the function for tests, defaults to notifyUnitsOfProxiedAction
+	endpointWaitTimeout          time.Duration                                                                                                                          // how long to wait for endpoint to appear in coordinator state; overrideable in tests
+	endpointPollInterval         time.Duration                                                                                                                          // how often to poll coordinator state while waiting; overrideable in tests
 }
 
 // NewUpgrade creates a new Upgrade handler.
@@ -40,6 +43,8 @@ func NewUpgrade(log *logger.Logger, coord upgradeCoordinator) *Upgrade {
 		coord:                        coord,
 		tamperProtectionFn:           features.TamperProtection,
 		notifyUnitsOfProxiedActionFn: notifyUnitsOfProxiedAction,
+		endpointWaitTimeout:          2 * time.Minute,
+		endpointPollInterval:         2 * time.Second,
 	}
 }
 
@@ -64,25 +69,11 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		coordinator.WithRollback(action.Data.Rollback),
 	}
 	if h.tamperProtectionFn() {
-		// Find inputs that want to receive UPGRADE action
-		// Endpoint needs to receive a signed UPGRADE action in order to be able to uncontain itself
-		state := h.coord.State()
-		ucs := findMatchingUnitsByActionType(state, a.Type())
-		if len(ucs) > 0 {
-			h.log.Debugf("Found %d components running for %v action type", len(ucs), a.Type())
-			uOpts = append(uOpts, coordinator.WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
-				log.Debugf("handlerUpgrade: proxy/dispatch action '%+v'", a)
-				err := h.notifyUnitsOfProxiedActionFn(ctx, log, action, ucs, h.coord.PerformAction)
-				log.Debugf("handlerUpgrade: after action dispatched '%+v', err: %v", a, err)
-				if err != nil {
-					return fmt.Errorf("failed to notify units of proxied action: %w", err)
-				}
-				return nil
-			}))
-		} else {
-			// Log and continue
-			h.log.Debugf("No components running for %v action type", a.Type())
-		}
+		// Deferred to the pre-upgrade callback so component discovery runs after
+		// the policy is guaranteed to have been applied.
+		uOpts = append(uOpts, coordinator.WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
+			return h.notifyEndpointOfUpgrade(ctx, log, action)
+		}))
 	}
 
 	go func() {
@@ -98,6 +89,55 @@ func (h *Upgrade) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 		}
 	}()
 	return nil
+}
+
+// notifyEndpointOfUpgrade waits for a component that handles the given action type
+// to appear in coordinator state, then dispatches the action so the component can
+// lift tamper protection before the installer runs. If no such component is found
+// within endpointWaitTimeout the upgrade proceeds without notification.
+func (h *Upgrade) notifyEndpointOfUpgrade(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, h.endpointWaitTimeout)
+	defer cancel()
+
+	ticker := time.NewTicker(h.endpointPollInterval)
+	defer ticker.Stop()
+
+	for {
+		state := h.coord.State()
+
+		if state.PolicyApplied {
+			expected := expectedComponentsForActionType(state, action.Type())
+			if len(expected) == 0 {
+				// Policy is applied and no component handles this action type.
+				log.Debugf("handlerUpgrade: no component configured for %v action type; skipping tamper-protection notification", action.Type())
+				return nil
+			}
+			ucs := findMatchingUnitsByActionType(state, action.Type())
+			if allComponentsReady(ucs, expected) {
+				log.Debugf("handlerUpgrade: dispatching %v action to %d component(s)", action.Type(), len(expected))
+				// Use the parent ctx, not timeoutCtx: the notifier derives its own
+				// retry timeout, and it should get the full budget regardless of how
+				// long we spent polling for the component to appear.
+				if err := h.notifyUnitsOfProxiedActionFn(ctx, log, action, ucs, h.coord.PerformAction); err != nil {
+					return fmt.Errorf("failed to notify components of upgrade action: %w", err)
+				}
+				return nil
+			}
+			// Some expected components not yet ready — wait.
+		}
+
+		select {
+		case <-timeoutCtx.Done():
+			if ctx.Err() != nil {
+				// Parent context cancelled — propagate so the coordinator can abort.
+				return ctx.Err()
+			}
+			// Our wait budget expired; proceed and let the installer surface the failure.
+			logUpgradeNotifyTimeout(log, state, action.Type())
+			return nil
+		case <-ticker.C:
+		}
+	}
 }
 
 // ackActions Acks all the actions in bkgActions, and deletes entries from bkgActions.

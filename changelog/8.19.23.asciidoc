@@ -1,0 +1,51 @@
+// begin 8.19.23 relnotes
+
+[[release-notes-8.19.23]]
+==  8.19.23
+
+Review important information about the  8.19.23 release.
+
+
+
+[discrete]
+[[breaking-changes-8.19.23]]
+=== Breaking changes
+
+Breaking changes can prevent your application from optimal operation and
+performance. Before you upgrade, review the breaking changes, then mitigate the
+impact to your application.
+
+// TODO: add details and impact
+
+[discrete]
+[[breaking-https://github.com/elastic/elastic-agent/pull/16745]]
+.The k8s_attributes processor in Elastic Agent configured as an OTel Collector now emits stable Kubernetes semantic convention attribute names. https://github.com/elastic/elastic-agent/pull/16745[#16745] 
+[%collapsible]
+====
+The OTel Collector Contrib `k8s_attributes` processor was promoted to v1.0.0 (stable) in v0.161.0.
+As part of this, the `processor.k8sattributes.EmitV1K8sConventions` and
+`processor.k8sattributes.DontEmitV0K8sConventions` feature gates moved from alpha to beta and are
+enabled by default. The processor now emits stable semantic convention attribute names
+(for example, singular `k8s.pod.label.*`, `k8s.pod.annotation.*`, `k8s.node.label.*`, `k8s.namespace.label.*`)
+and no longer emits the legacy plural forms (for example, `k8s.pod.labels.*`, `k8s.pod.annotations.*`).
+For more information, refer to https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/k8sattributesprocessor/README.md#semantic-conventions-compatibility[Semantic Conventions Compatibility].
+====
+
+
+[discrete]
+[[new-features-8.19.23]]
+=== New features
+
+The 8.19.23 release adds the following new and notable features.
+
+* Add regression test for Kubernetes metrics RBAC deadlock. https://github.com/elastic/elastic-agent/pull/15900[#15900] https://github.com/elastic/elastic-agent/issues/15666[#15666]
+
+[discrete]
+[[enhancements-8.19.23]]
+=== Enhancements
+
+* Update Go to 1.26.8. https://github.com/elastic/elastic-agent/pull/16490[#16490] 
+* Update OTel Collector components to v0.161.0. https://github.com/elastic/elastic-agent/pull/16745[#16745] 
+* Do not install manpages and docs in Docker image. https://github.com/elastic/elastic-agent/pull/16763[#16763] 
+
+// end 8.19.23 relnotes
