@@ -40,10 +40,21 @@ type State struct {
 
 	Components []runtime.ComponentComponentState `yaml:"components"`
 	LogLevel   logp.Level                        `yaml:"log_level"`
+	Tags       []string                          `yaml:"tags,omitempty"`
 
 	Collector *status.AggregateStatus
 
 	UpgradeDetails *details.Details `yaml:"upgrade_details,omitempty"`
+
+	// PolicyApplied is true once the agent has received and processed at least
+	// one policy. Before this point Components may be empty even if the policy
+	// includes components.
+	PolicyApplied bool `yaml:"policy_applied"`
+
+	// PolicyConfiguredActionTypes maps each action type to the IDs of components in
+	// the current policy that are configured to handle it. Unlike Components, this
+	// includes components that have not yet emitted a runtime state update.
+	PolicyConfiguredActionTypes map[string][]string `yaml:"policy_configured_action_types,omitempty"`
 }
 
 type coordinatorOverrideState struct {
@@ -217,7 +228,15 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
+	s.Tags = slices.Clone(c.state.Tags)
 	s.UpgradeDetails = c.state.UpgradeDetails
+	s.PolicyApplied = c.state.PolicyApplied
+	if len(c.state.PolicyConfiguredActionTypes) > 0 {
+		s.PolicyConfiguredActionTypes = make(map[string][]string, len(c.state.PolicyConfiguredActionTypes))
+		for typ, ids := range c.state.PolicyConfiguredActionTypes {
+			s.PolicyConfiguredActionTypes[typ] = append([]string(nil), ids...)
+		}
+	}
 	s.Components = make([]runtime.ComponentComponentState, len(c.state.Components))
 	copy(s.Components, c.state.Components)
 	if c.state.Collector != nil {
@@ -295,6 +314,14 @@ func (c *Coordinator) setFleetState(state agentclient.State, message string) {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setLogLevel(logLevel logp.Level) {
 	c.state.LogLevel = logLevel
+	c.stateNeedsRefresh = true
+}
+
+// setTags updates the agent tags and broadcasts the change.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setTags(tags []string) {
+	c.agentInfo.SetTags(tags)
+	c.state.Tags = tags
 	c.stateNeedsRefresh = true
 }
 

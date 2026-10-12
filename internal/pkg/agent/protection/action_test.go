@@ -304,3 +304,103 @@ func TestValidateAction(t *testing.T) {
 		})
 	}
 }
+
+func TestVerifyActionSignature(t *testing.T) {
+	pk, pubK, err := genKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A different key, used to produce a signature that does not validate against pubK.
+	otherPk, _, err := genKeys()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unsignedAction := getTestAction(t, []byte(testAction), nil)
+	signedAction := getTestAction(t, []byte(testAction), pk)
+	wrongKeyAction := getTestAction(t, []byte(testAction), otherPk)
+
+	// Expiration carried by testAction's signed envelope.
+	const testExpiration = "2023-03-13T15:38:32.446Z"
+
+	tests := []struct {
+		name           string
+		action         fleetapi.ActionApp
+		validationKey  []byte
+		agentID        string
+		wantNil        bool   // expect (nil, nil): accepted with no verified fields
+		wantExpiration string // expected VerifiedAction.Expiration on success
+		wantErr        error
+	}{
+		{
+			name:          "unsigned action, no key configured is accepted with no verified fields",
+			action:        unsignedAction,
+			validationKey: nil,
+			agentID:       testAgentID,
+			wantNil:       true,
+		},
+		{
+			name:          "unsigned action, key configured is rejected",
+			action:        unsignedAction,
+			validationKey: pubK,
+			agentID:       testAgentID,
+			wantErr:       ErrNotSigned,
+		},
+		{
+			name:           "signed and valid action returns the verified fields",
+			action:         signedAction,
+			validationKey:  pubK,
+			agentID:        testAgentID,
+			wantExpiration: testExpiration,
+		},
+		{
+			name:          "signed action with non-matching agent id is rejected",
+			action:        signedAction,
+			validationKey: pubK,
+			agentID:       "ab09109b-c6c7-4fba-8e11-6c0b6636f985",
+			wantErr:       ErrNonMatchingAgentID,
+		},
+		{
+			name:          "signed action with an invalid signature is rejected",
+			action:        wrongKeyAction,
+			validationKey: pubK,
+			agentID:       testAgentID,
+			wantErr:       ErrInvalidSignature,
+		},
+		{
+			name:           "signed action, no key configured is parsed but not cryptographically verified",
+			action:         signedAction,
+			validationKey:  nil,
+			agentID:        testAgentID,
+			wantExpiration: testExpiration,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			verified, err := VerifyActionSignature(&tc.action, tc.validationKey, tc.agentID)
+
+			diff := cmp.Diff(tc.wantErr, err, cmpopts.EquateErrors())
+			if diff != "" {
+				t.Fatal(diff)
+			}
+			if tc.wantErr != nil {
+				return
+			}
+
+			if tc.wantNil {
+				if verified != nil {
+					t.Fatalf("expected nil verified action, got %+v", verified)
+				}
+				return
+			}
+
+			if verified == nil {
+				t.Fatal("expected a verified action, got nil")
+			}
+			if verified.Expiration != tc.wantExpiration {
+				t.Fatalf("expected expiration %q, got %q", tc.wantExpiration, verified.Expiration)
+			}
+		})
+	}
+}

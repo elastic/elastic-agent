@@ -1,0 +1,361 @@
+exporters:
+  debug:
+  elasticsearch:
+    endpoints:
+      - http://localhost:9200
+  file:
+    path: /tmp/file-exporter-output.json
+  otlp_grpc:
+    endpoint: localhots:4317
+  otlp_http:
+    endpoint: https://localhost.com:4318
+  nop:
+  logstash:
+    hosts: ["localhost:5044"]
+
+extensions:
+  health_check:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 100
+  headers_setter:
+    headers:
+      - action: insert
+        key: X-Scope-OrgID
+        from_context: tenant_id
+        default_value: Org-ID
+  aws_logs_encoding/elbaccess:
+    format: elbaccess
+  azure_auth:
+    use_default: true
+  azure_encoding:
+  awscredentialsprovider:
+    credentials:
+      access_key_id: tom 
+      secret_access_key: tom
+      session_token: dG9tCg==
+  oauth2client:
+    client_id: someclientid
+    client_secret: someclientsecret
+    token_url: https://example.com/oauth2/default/v1/token
+
+processors:
+  attributes:
+    actions:
+      - action: insert
+        key: key1
+        value: value1
+  batch:
+  cumulative_to_delta:
+  elasticinframetrics:
+  filter:
+  resource:
+    attributes:
+      - action: insert
+        key: key1
+        value: value1
+  resource_detection:
+  transform:
+  memory_limiter/processor:
+    check_interval: 1s
+    limit_mib: 4000
+    spike_limit_mib: 800
+  elasticapm:
+  ratelimit:
+    rate: 1
+    burst: 1
+  tail_sampling:
+  log_dedup:
+  beat:
+
+receivers:
+  nop:
+  file_log:
+    include:
+      - /filelog/path
+  otlp:
+    protocols:
+      grpc:
+      http:
+  http_check:
+    targets:
+      - endpoint: http://localhost:80
+        method: GET
+    collection_interval: 10s
+  jaeger:
+    protocols:
+      grpc:
+  zipkin:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 5s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+  elasticapmintake:
+  akamai_siem:
+    endpoint: https://akab-placeholder.luna.akamaiapis.net
+    config_ids: "12345"
+    authentication:
+      client_token: placeholder-client-token
+      client_secret: placeholder-client-secret
+      access_token: placeholder-access-token
+  apache:
+  mysql:
+  postgresql:
+    username: test
+    password: test
+  docker_stats:
+  azure_event_hub:
+    connection: Endpoint=sb://namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=superSecret1234=;EntityPath=hubName
+    blob_checkpoint_store:
+      connection: DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;AccountKey=c3VwZXJTZWNyZXQxMjM0;EndpointSuffix=core.windows.net
+      container_name: checkpoints
+  awss3:
+    starttime: "2024-01-01 01:00"
+    endtime: "2024-01-02"
+    s3downloader:
+      s3_bucket: 'test'
+      s3_prefix: 'test'
+    encodings:
+      - extension: aws_logs_encoding/elbaccess
+  aws_cloudwatch:
+    credentials_provider: awscredentialsprovider
+    region: us-east-1
+    logs:
+      initial_lookback: 1h
+      poll_interval: 1m
+      groups:
+        autodiscover:
+          limit: 1
+    metrics:
+      collection_interval: 5m
+      period: 5m
+      queries:
+        - namespace: AWS/Lambda
+          metric_name: Invocations
+  prometheus_remote_write:
+    endpoint: 0.0.0.0:9090
+  statsd:
+    endpoint: localhost:8125
+  syslog:
+    tcp:
+      listen_address: 127.0.0.1:54526
+    protocol: rfc5424
+  elasticmonitoringreceiver:
+  verifier:
+    identity_federation_id: "test-cc-001"
+    verification_id: "test-verify-001"
+    policies:
+      - policy_id: "policy-001"
+        integrations:
+          - policy_template: "cloudtrail"
+            package_name: "aws"
+  snmp:
+    metrics:
+      snmp.uptime:
+        unit: s
+        gauge:
+          value_type: int
+        scalar_oids:
+          - oid: ".1.3.6.1.2.1.1.8.0"
+  azure_monitor:
+    subscription_ids:
+      - 00000000-0000-0000-0000-000000000000
+    cloud: AzureCloud
+    credentials: default_credentials
+  # googlecloudmonitoring is intentionally omitted from this fixture (see
+  # internal/edot/otelcol/components/default.go for its registration): its
+  # Start() eagerly calls google.FindDefaultCredentials, which errors out
+  # without real GCP Application Default Credentials. This fixture is used to
+  # exercise starting every configured receiver, so a trivial config isn't
+  # practical here (no ADC available in unit-test/CI environments). This
+  # mirrors the iis/sqlserver exclusions from elastic/elastic-agent#9344.
+  kafka_metrics:
+    brokers: [localhost:9092]
+    protocol_version: 2.0.0
+    scrapers:
+      - brokers
+      - topics
+      - consumers
+    collection_interval: 60s
+  haproxy:
+    endpoint: http://localhost:8404/stats
+  mongodb:
+    hosts:
+      - endpoint: localhost:27017
+    direct_connection: true
+    timeout: 1s
+  rabbitmq:
+    endpoint: http://localhost:15672
+    username: guest
+    password: guest
+  memcached:
+    endpoint: localhost:11211
+    transport: udp
+  couchdb:
+    endpoint: http://localhost:5984
+    username: guest
+    password: guest
+  oracledb:
+    datasource: oracle://otel:password@localhost:1521/orcl
+  vcenter:
+    endpoint: https://vcenter.example.com
+    username: test
+    password: test
+    tls:
+      insecure_skip_verify: true
+  zookeeper:
+    endpoint: localhost:2181
+
+connectors:
+  span_metrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+    exemplars:
+      enabled: true
+    exclude_dimensions: ['status.code']
+    dimensions_cache_size: 1000
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+    metrics_flush_interval: 15s
+    metrics_expiration: 5m
+    events:
+      enabled: true
+      dimensions:
+        - name: exception.type
+        - name: exception.message
+    resource_metrics_key_attributes:
+      - service.name
+      - telemetry.sdk.language
+      - telemetry.sdk.name
+  elasticapm:
+  forward:
+
+service:
+  extensions:
+    - memory_limiter
+    - health_check
+    - headers_setter
+    - aws_logs_encoding/elbaccess
+    - azure_auth
+    - azure_encoding
+    - oauth2client
+    - awscredentialsprovider
+  pipelines:
+    logs:
+      exporters:
+        - nop
+        - debug
+        - elasticsearch
+        - file
+        - otlp_grpc
+      processors:
+        - attributes
+        - batch
+        - filter
+        - resource
+        - resource_detection
+        - transform
+        - memory_limiter/processor
+        - log_dedup
+      receivers:
+        - file_log
+        - otlp
+        - nop
+        - elasticapmintake
+        - azure_event_hub
+        - aws_cloudwatch
+        - verifier
+        - syslog
+
+    logs/forward_receive:
+      receivers:
+        - nop
+      exporters:
+        - forward
+
+    logs/forward_export:
+      receivers:
+        - forward
+      exporters:
+        - nop
+
+    metrics:
+      exporters:
+        - nop
+        - debug
+        - otlp_grpc
+      processors:
+        - attributes
+        - batch
+        - cumulative_to_delta
+        - elasticinframetrics
+        - filter
+        - resource
+        - resource_detection
+        - transform
+      receivers:
+        - nop
+        - otlp
+        - http_check
+        - span_metrics
+        - prometheus
+        - elasticapmintake
+        - apache
+        - mysql
+        - postgresql
+        - prometheus_remote_write
+        - snmp
+        - azure_monitor
+        - kafka_metrics
+        - statsd
+        - haproxy
+        - mongodb
+        - rabbitmq
+        - memcached
+        - couchdb
+        - oracledb
+        - vcenter
+        - zookeeper
+        - azure_event_hub
+        - aws_cloudwatch
+        - elasticmonitoringreceiver
+
+    metrics/aggregated:
+      receivers:
+        - elasticapm
+      processors:
+      exporters:
+        - debug
+        - otlp_grpc
+
+    traces:
+      exporters:
+        - nop
+        - debug
+        - elasticsearch
+        - otlp_grpc
+        - otlp_http
+        - span_metrics
+        - elasticapm
+      processors:
+        - attributes
+        - batch
+        - filter
+        - resource
+        - resource_detection
+        - transform
+        - elasticapm
+      receivers:
+        - nop
+        - otlp
+        - jaeger
+        - zipkin
+        - elasticapmintake
+        - azure_event_hub

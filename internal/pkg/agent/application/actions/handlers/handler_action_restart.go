@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -22,6 +24,9 @@ type restartCoordinator interface {
 	// Restart re-executes the agent. The action is acknowledged on the next
 	// startup, not here.
 	Restart(ctx context.Context, action *fleetapi.ActionRestart) error
+	// Protection returns the agent's tamper-protection configuration, including
+	// the key used to verify signed actions.
+	Protection() protection.Config
 }
 
 // restartStateStore is the subset of the state store used by the Restart handler.
@@ -37,6 +42,7 @@ type restartStateStore interface {
 // has actually completed.
 type Restart struct {
 	log        *logger.Logger
+	agentInfo  info.Agent
 	coord      restartCoordinator
 	stateStore restartStateStore
 
@@ -45,9 +51,10 @@ type Restart struct {
 }
 
 // NewRestart creates a new Restart handler.
-func NewRestart(log *logger.Logger, coord restartCoordinator, stateStore restartStateStore) *Restart {
+func NewRestart(log *logger.Logger, agentInfo info.Agent, coord restartCoordinator, stateStore restartStateStore) *Restart {
 	return &Restart{
 		log:                log,
+		agentInfo:          agentInfo,
 		coord:              coord,
 		stateStore:         stateStore,
 		tamperProtectionFn: features.TamperProtection,
@@ -61,6 +68,28 @@ func (h *Restart) Handle(ctx context.Context, a fleetapi.Action, ack acker.Acker
 	action, ok := a.(*fleetapi.ActionRestart)
 	if !ok {
 		return fmt.Errorf("invalid type, expected ActionRestart and received %T", a)
+	}
+
+	// Verify the action signature before restarting. When a signature validation
+	// key is configured (tamper protection), the action must be signed and valid;
+	// a missing or invalid signature rejects the action so the agent is not
+	// restarted. The error is returned (not acked) so a potentially tampered action
+	// is not acknowledged, mirroring the MIGRATE handler.
+	verified, err := protection.VerifyActionSignature(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID())
+	if err != nil {
+		return fmt.Errorf("restart action %s rejected: signature verification failed: %w", action.ActionID, err)
+	}
+
+	// For a signed action, the expiration is only trustworthy when it comes from
+	// the verified signed envelope: the signature covers the signed payload, not
+	// the action's outer JSON. Trusting the outer expiration would let an attacker
+	// strip or extend it on an otherwise valid, expired signed action and have the
+	// handler treat it as unexpired. Overwrite the outer value with the verified
+	// one so the expiry check below operates on signed data. When the action is
+	// unsigned (no key configured) verified is nil and the outer expiration is
+	// used as-is.
+	if verified != nil {
+		action.ActionExpiration = verified.Expiration
 	}
 
 	// Do not restart if the action is expired or carries an invalid expiration.
