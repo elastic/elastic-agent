@@ -38,4 +38,4 @@ fi
 echo "~~~ Building test binaries"
 mage build:integrationTestBinaries
 
-sudo -E env "PATH=${PATH}" "HOME=${HOME}" .buildkite/scripts/buildkite-integration-tests.sh "${GROUP_NAME}" true
+sudo -E .buildkite/scripts/buildkite-integration-tests.sh "${GROUP_NAME}" true
