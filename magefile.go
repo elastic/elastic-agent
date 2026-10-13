@@ -2329,7 +2329,6 @@ func (Integration) Check() error {
 	return errors.Join(
 		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
-		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -2471,12 +2470,26 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	}
 
 	// render elastic-agent-standalone kustomize
-	kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"))
-	if err != nil {
-		return fmt.Errorf("failed to render kustomize: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
-		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	for _, kustomize := range []struct {
+		overlay []string
+		target  string
+	}{
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizePath,
+		},
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "openshift", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizeOpenShiftPath,
+		},
+	} {
+		kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join(kustomize.overlay...))
+		if err != nil {
+			return fmt.Errorf("failed to render kustomize %q: %w", filepath.Join(kustomize.overlay...), err)
+		}
+		if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", kustomize.target), kustomizeYaml, 0o644); err != nil {
+			return fmt.Errorf("failed to write %q: %w", kustomize.target, err)
+		}
 	}
 
 	return nil
@@ -3020,28 +3033,6 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(devtools.InstallGoTestTools)
 }
 
-// TestBeatServerless runs beats-oriented serverless tests
-func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
-
-	if cfg.IntegrationTest.AgentBuildDir == "" {
-		cfg = cfg.WithAgentBuildDir(beatBuildPath)
-	}
-
-	// a bit of bypass logic; run as serverless by default
-	switch cfg.IntegrationTest.StackProvisioner {
-	case "":
-		cfg = cfg.WithStackProvisioner("serverless")
-	case "stateful":
-		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
-	}
-
-	cfg = cfg.WithTestBinaryName(beatname)
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
-}
-
 // TestForResourceLeaks runs the integration tests defined in testing/integration/leak
 func (i Integration) TestForResourceLeaks(ctx context.Context) error {
 	return i.testForResourceLeaks(ctx, false, "")
@@ -3402,13 +3393,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
 	}
 
-	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
-	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
-	binaryName := cfg.IntegrationTest.BinaryName
-	if binaryName == "" {
-		binaryName = "elastic-agent"
-	}
-
 	repoDir := cfg.IntegrationTest.RepoPath
 	if repoDir == "" {
 		repoDir = "."
@@ -3434,7 +3418,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		Timestamp:      timestamp,
 		TestFlags:      goTestFlags,
 		ExtraEnv:       extraEnv,
-		BinaryName:     binaryName,
 	}
 
 	r, err := runner.NewRunner(runnerCfg, instanceProvisioner, stackProvisioner, batches...)
