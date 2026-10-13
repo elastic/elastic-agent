@@ -28,3 +28,17 @@ fi
 buildkite-agent meta-data set "${METADATA_PREFIX}cluster-name" "${CLUSTER_NAME}"
 
 preinstall_fleet_packages
+
+# Optional: publish the stack credentials as build meta-data for steps that cannot run oblt-cli themselves
+# (the Orka macOS jobs: their GitHub token from job start expires during the >1h git clone, so the oblt-cli
+# plugin hook fails). Same approach as ess_start.sh; the cluster is ephemeral and the steps are in this build.
+if [[ "${ESS_PUBLISH_ENV:-false}" == "true" ]]; then
+  echo "~~~ Publishing ESS stack credentials as build meta-data"
+  while IFS='=' read -r name value; do
+    case "${name}" in
+      ELASTICSEARCH_* | KIBANA_* | FLEET_SERVER_* | INTEGRATIONS_SERVER_*)
+        buildkite-agent meta-data set --redacted-vars='' "macos-ess.${name}" "${value}"
+        ;;
+    esac
+  done < <(env)
+fi
