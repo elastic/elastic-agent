@@ -400,22 +400,6 @@ steps:
     plugins:
     - *sparse_checkout_plugin
 
-  # Trigger for pull requests - Serverless Beats Tests
-  # this should help detecting issues earlier in the development cycle
-  - label: "Trigger Serverless Beats Tests"
-    if: build.pull_request.id != null
-    trigger: "beats-agent-serverless-tests"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
-      env:
-        BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-    if_changed:
-      include:
-        - .buildkite/serverless.beats.tests.yml
-        - .buildkite/scripts/steps/beats_tests.sh
-        - .buildkite/hooks/pre-command
-
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"

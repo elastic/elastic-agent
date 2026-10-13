@@ -49,7 +49,6 @@ type Fixture struct {
 	logOutput       bool
 	allowErrs       bool
 	connectTimout   time.Duration
-	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
 	fipsArtifact    bool
@@ -111,6 +110,19 @@ func WithLogOutput() FixtureOpt {
 	}
 }
 
+<<<<<<< HEAD
+=======
+// WithCmdOutput configures a writer that receives a combined copy of stdout and
+// stderr from the spawned process started by Run/RunOtelWithClient.
+// Writes from the stdout and stderr goroutines are serialized internally so the
+// supplied writer does not need to be safe for concurrent use.
+func WithCmdOutput(w io.Writer) FixtureOpt {
+	return func(f *Fixture) {
+		f.cmdOutput = w
+	}
+}
+
+>>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // WithAllowErrors instructs the fixture to allow the Elastic Agent to log errors.
 // By default, the Fixture will not allow the Elastic Agent to log any errors, logging any error
 // will result on the Fixture to kill the Elastic Agent and report it as an error.
@@ -125,13 +137,6 @@ func WithAllowErrors() FixtureOpt {
 func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	return func(f *Fixture) {
 		f.connectTimout = timeout
-	}
-}
-
-// WithBinaryName sets the name of the binary under test, in cases where tests aren't being run against elastic-agent
-func WithBinaryName(name string) FixtureOpt {
-	return func(f *Fixture) {
-		f.binaryName = name
 	}
 }
 
@@ -178,8 +183,6 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		architecture:    runtime.GOARCH,
 		packageFormat:   pkgFormat,
 		connectTimout:   15 * time.Second,
-		// default to elastic-agent, can be changed by a set FixtureOpt below
-		binaryName: "elastic-agent",
 	}
 	for _, o := range opts {
 		o(f)
@@ -349,6 +352,7 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	return nil
 }
 
+<<<<<<< HEAD
 // RunBeat runs the given given beat
 // the beat will run until an error, or the given timeout is reached
 func (f *Fixture) RunBeat(ctx context.Context) error {
@@ -429,6 +433,8 @@ func (f *Fixture) RunBeat(ctx context.Context) error {
 	}
 }
 
+=======
+>>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // RunProcess runs the given given process
 // the process will run until an error, or the given timeout is reached
 func RunProcess(t *testing.T,
@@ -527,9 +533,6 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
 	}
 
-	if f.binaryName != "elastic-agent" {
-		return errors.New("Run() can only be used with elastic-agent, use RunBeat()")
-	}
 	if f.installed {
 		return errors.New("fixture is installed; cannot be run")
 	}
@@ -584,7 +587,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
 	if err != nil {
-		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
+		return fmt.Errorf("failed to spawn elastic-agent: %w", err)
 	}
 
 	if shouldWatchState {
@@ -1023,11 +1026,7 @@ func (f *Fixture) binaryPath() string {
 	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
 		workDir = "/usr/bin"
 	}
-	defaultBin := "elastic-agent"
-	if f.binaryName != "" {
-		defaultBin = f.binaryName
-	}
-	binary := filepath.Join(workDir, defaultBin)
+	binary := filepath.Join(workDir, "elastic-agent")
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}
