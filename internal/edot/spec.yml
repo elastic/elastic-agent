@@ -274,7 +274,6 @@ inputs:
     description: "Synthetics Browser Monitor"
     platforms: *platforms
     outputs: *outputs
-    # Single receiver for the whole component, see synthetics/http.
     single_receiver: true
     command: &heartbeat_command
       restart_monitoring_period: 5s
