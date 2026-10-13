@@ -89,6 +89,7 @@ steps:
         env:
           # wave 1 runs 9 groups, 2 at a time: keep the stack longer than the 4h default
           ESS_EXPIRE_HOURS: "10"
+          ESS_PUBLISH_ENV: "true"
         command: .buildkite/scripts/steps/ess_start_oblt-cli.sh
         agents:
           image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
@@ -126,9 +127,8 @@ steps:
           imagePrefix: endpoint-macos-27-arm
         timeout_in_minutes: 120
         plugins:
+          # no oblt-cli / vault-github-token plugins here: their GitHub token expires during the long Orka clone
           - *google_oidc_observability_plugin
-          - *oblt_cli_plugin
-          - *vault_github_token
 
       # Read-only diagnostics of the launchd log modes and the keychain agent key. Run with MACOS_DIAG=true.
       - label: "macos 27 arm64: diagnostics"

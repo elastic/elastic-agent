@@ -22,4 +22,20 @@ JANITOR_PID=$!
 trap 'kill "${JANITOR_PID}" 2>/dev/null || true' EXIT
 
 export ASDF_MAGE_VERSION="${ASDF_MAGE_VERSION:-1.14.0}"
-.buildkite/scripts/steps/integration_tests_oblt-cli.sh "${GROUP_NAME}" true
+
+# The ESS credentials come from the meta-data published by the ESS step: oblt-cli (and its GitHub token) cannot
+# be used here, the token from job start has expired after the long git clone.
+echo "~~~ Loading ESS stack credentials from build meta-data"
+for key in $(buildkite-agent meta-data keys | grep '^macos-ess\.'); do
+  name="${key#macos-ess.}"
+  export "${name}=$(buildkite-agent meta-data get "${key}")"
+done
+if [[ -z "${ELASTICSEARCH_HOST:-}" ]]; then
+  echo "ELASTICSEARCH_HOST is not set: no ESS credentials in meta-data" >&2
+  exit 1
+fi
+
+echo "~~~ Building test binaries"
+mage build:integrationTestBinaries
+
+sudo -E env "PATH=${PATH}" "HOME=${HOME}" .buildkite/scripts/buildkite-integration-tests.sh "${GROUP_NAME}" true
