@@ -63,6 +63,12 @@ var (
 	otelSamplesFilePattern      = regexp.MustCompile(`otel_samples/.+[^/]$`)
 	otelCollectorSpecPattern    = regexp.MustCompile(`elastic-otel-collector\.spec\.yml$`)
 	endpointResourcesZipPattern = regexp.MustCompile(`endpoint-security-resources\.zip$`)
+<<<<<<< HEAD
+=======
+	cloudDefendPattern          = regexp.MustCompile(`/cloud-defend(\.spec\.yml)?$`)
+	componentYmlPattern         = regexp.MustCompile(`usr/share/elastic-agent/data/elastic-agent-[^/]+/components/.+\.yml$`)
+	otelCollectorBinaryPattern  = regexp.MustCompile(`usr/share/elastic-agent/data/elastic-agent-[^/]+/components/elastic-otel-collector$`)
+>>>>>>> 0d99fab ([bugfix] Update Ironbank Dockerfile to restore `0755` on `elastic-otel-collector` (#17118))
 
 	licenseFiles = []string{"LICENSE.txt", "NOTICE.txt"}
 )
@@ -413,6 +419,86 @@ func checkDocker(t *testing.T, file string, fipsPackage bool) {
 	if strings.Contains(file, "-complete") {
 		checkCompleteDocker(t, file)
 	}
+<<<<<<< HEAD
+=======
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+func dockerName(file string, labels map[string]string) (string, error) {
+	version, found := labels["version"]
+	if !found {
+		return "", errors.New("version label not found")
+	}
+
+	parts := strings.Split(file, "/")
+	if len(parts) == 0 {
+		return "", errors.New("failed to get file name parts")
+	}
+
+	lastPart := parts[len(parts)-1]
+	versionIdx := strings.Index(lastPart, version)
+	if versionIdx < 0 {
+		return "", fmt.Errorf("version not found in nam %q", file)
+	}
+	return lastPart[:versionIdx-1], nil
+}
+
+func checkEdotCollectorDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(t, file, true)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerLabels(t, p, info, file)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkRequiredFilePermissions(t, p, configFilePattern, os.FileMode(0644))
+	checkRequiredFilePermissions(t, p, otelcolScriptPattern, os.FileMode(0755))
+	checkManifestPermissionsWithMode(t, p, os.FileMode(0644))
+	checkFilePermissions(t, p, otelSamplesFilePattern, expectedManifestMode)
+	checkFilePermissions(t, p, otelCollectorSpecPattern, expectedManifestMode)
+	checkFilePermissions(t, p, endpointResourcesZipPattern, expectedManifestMode)
+	checkModulesPresent(t, "", p)
+	checkModulesDPresent(t, "", p)
+	checkLicensesPresent(t, "licenses/", p)
+
+	name, err := dockerName(file, info.Config.Labels)
+	if err != nil {
+		t.Errorf("error constructing docker name: %v", err)
+		return "", -1
+	}
+
+	return name, info.Size
+}
+
+// checkIronbankDocker verifies the Ironbank variant. Its Dockerfile broadly
+// relaxes permissions under data/ and then has to restore the component .yml
+// files to 0644 (the agent refuses to start if they stay group/world writable)
+// and the elastic-otel-collector binary to 0755 (it cannot be executed otherwise).
+func checkIronbankDocker(t *testing.T, file string) (string, int64) {
+	p, info, err := readDocker(t, file, true)
+	if err != nil {
+		t.Errorf("error reading file %v: %v", file, err)
+		return "", -1
+	}
+
+	checkDockerEntryPoint(t, p, info)
+	checkDockerUser(t, p, info, *rootUserContainer)
+	checkRequiredFilePermissions(t, p, componentYmlPattern, os.FileMode(0644))
+	checkRequiredFilePermissions(t, p, otelCollectorBinaryPattern, os.FileMode(0755))
+
+	// Image labels are supplied by Ironbank from the hardening manifest, so
+	// there is no version label to derive the name from.
+	return "elastic-agent-ironbank", info.Size
+>>>>>>> 0d99fab ([bugfix] Update Ironbank Dockerfile to restore `0755` on `elastic-otel-collector` (#17118))
 }
 
 func checkCompleteDocker(t *testing.T, file string) {
