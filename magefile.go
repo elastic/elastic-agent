@@ -2296,7 +2296,6 @@ func (Integration) Check() error {
 	return errors.Join(
 		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
-		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -2992,6 +2991,7 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(devtools.InstallGoTestTools)
 }
 
+<<<<<<< HEAD
 // TestBeatServerless runs beats-oriented serverless tests
 func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -3013,6 +3013,8 @@ func (Integration) TestBeatServerless(ctx context.Context, beatname string) erro
 	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
 }
 
+=======
+>>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // TestForResourceLeaks runs the integration tests defined in testing/integration/leak
 func (i Integration) TestForResourceLeaks(ctx context.Context) error {
 	return i.testForResourceLeaks(ctx, false, "")
@@ -3369,13 +3371,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
 	}
 
-	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
-	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
-	binaryName := cfg.IntegrationTest.BinaryName
-	if binaryName == "" {
-		binaryName = "elastic-agent"
-	}
-
 	repoDir := cfg.IntegrationTest.RepoPath
 	if repoDir == "" {
 		repoDir = "."
@@ -3401,7 +3396,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		Timestamp:      timestamp,
 		TestFlags:      goTestFlags,
 		ExtraEnv:       extraEnv,
-		BinaryName:     binaryName,
 	}
 
 	r, err := runner.NewRunner(runnerCfg, instanceProvisioner, stackProvisioner, batches...)
