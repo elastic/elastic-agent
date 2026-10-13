@@ -418,6 +418,7 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
+<<<<<<< HEAD
   name: beats-agent-serverless-tests
   description: "Beats serverless tests from elastic-agent repository"
   links:
@@ -460,6 +461,8 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Resource
 metadata:
+=======
+>>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
   name: buildkite-pipeline-elastic-agent-version-bump
   description: Buildkite Pipeline for Elastic Agent Version Bump
   links:
