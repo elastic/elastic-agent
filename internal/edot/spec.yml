@@ -306,9 +306,6 @@ inputs:
     description: "Synthetics HTTP Monitor"
     platforms: *platforms
     outputs: *outputs
-    # Run all monitors of the component in one receiver. A receiver is a full
-    # Beat, so one receiver per monitor costs hundreds of KB each, which
-    # dominates memory with thousands of monitors.
     single_receiver: true
     command: *heartbeat_command
   - name: synthetics/icmp
