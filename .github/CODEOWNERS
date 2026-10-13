@@ -21,3 +21,7 @@ changelog/fragments/
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /internal/pkg/agent/application/configuration_embed_changed_test.go @elastic/cloudbeat
 /internal/pkg/composable/providers/kubernetes @elastic/elastic-agent-control-plane
+
+
+# Agentic workflow client triggers (elastic/oblt-aw distribution)
+/.github/workflows/trigger-obs-aw-* @elastic/observablt-ci
