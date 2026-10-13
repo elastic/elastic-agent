@@ -29,8 +29,6 @@ func (RhelRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger c
 		return fmt.Errorf("failed to run 'dnf group install \"Development Tools\"': %w (stdout: %s, stderr: %s)", err, stdOut, errOut)
 	}
 
-<<<<<<< HEAD
-=======
 	// Disable background package managers to prevent RPM lock contention
 	// during tests. The dnf-makecache timer periodically refreshes package
 	// metadata and holds the RPM database lock while doing so, which causes
@@ -48,7 +46,6 @@ func (RhelRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger c
 		_, _, _ = sshClient.Exec(ctx, "sudo", []string{"systemctl", "disable", "--now", unit}, nil)
 	}
 
->>>>>>> 5ea1c36 (ci: stop dnf-automatic services to avoid RPM lock contention on RHEL 8 (#17158))
 	// install golang
 	logger.Logf("Install golang %s (%s)", goVersion, arch)
 	goCtx, goCancel := context.WithTimeout(ctx, 20*time.Minute)
