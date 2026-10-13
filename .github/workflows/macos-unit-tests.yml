@@ -2,8 +2,7 @@ name: macos-unit-tests
 
 on:
   workflow_dispatch:
-  # Temporary disabled for PRs
-  # pull_request:
+  pull_request:
   push:
     branches:
       - main
@@ -21,7 +20,12 @@ concurrency:
 
 jobs:
   unit-tests:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, xcode-27]
+    name: macos-unit-tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7

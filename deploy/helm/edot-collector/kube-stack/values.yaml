@@ -670,7 +670,7 @@ collectors:
             processors: []
             exporters:
               - debug
-              - elasticsearch/otel
+              - otlp_http/ingest_metrics
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
