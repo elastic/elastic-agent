@@ -49,7 +49,6 @@ type Fixture struct {
 	logOutput       bool
 	allowErrs       bool
 	connectTimout   time.Duration
-	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
 	fipsArtifact    bool
@@ -128,13 +127,6 @@ func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	}
 }
 
-// WithBinaryName sets the name of the binary under test, in cases where tests aren't being run against elastic-agent
-func WithBinaryName(name string) FixtureOpt {
-	return func(f *Fixture) {
-		f.binaryName = name
-	}
-}
-
 // WithRunLength sets the total time the binary will run
 func WithRunLength(run time.Duration) FixtureOpt {
 	return func(f *Fixture) {
@@ -178,8 +170,6 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		architecture:    runtime.GOARCH,
 		packageFormat:   pkgFormat,
 		connectTimout:   15 * time.Second,
-		// default to elastic-agent, can be changed by a set FixtureOpt below
-		binaryName: "elastic-agent",
 	}
 	for _, o := range opts {
 		o(f)
@@ -349,86 +339,6 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	return nil
 }
 
-// RunBeat runs the given given beat
-// the beat will run until an error, or the given timeout is reached
-func (f *Fixture) RunBeat(ctx context.Context) error {
-	if f.binaryName == "elastic-agent" {
-		return errors.New("RunBeat() can't be run against elastic-agent")
-	}
-
-	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		f.t.Fatal("Context passed to Fixture.RunBeat() has no deadline set.")
-	}
-
-	var err error
-	err = f.EnsurePrepared(ctx)
-	if err != nil {
-		return fmt.Errorf("error preparing beat: %w", err)
-	}
-
-	var logProxy Logger
-	if f.logOutput {
-		logProxy = f.t
-	}
-	stdOut := newLogWatcher(logProxy)
-	stdErr := newLogWatcher(logProxy)
-	args := []string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}
-
-	args = append(args, f.additionalArgs...)
-
-	proc, err := process.Start(
-		f.binaryPath(),
-		process.WithContext(ctx),
-		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-	if err != nil {
-		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
-	}
-
-	procWaitCh := proc.Wait()
-	killProc := func() {
-		_ = proc.Kill()
-		<-procWaitCh
-	}
-
-	var doneChan <-chan time.Time
-	if f.runLength != 0 {
-		doneChan = time.After(f.runLength)
-	}
-
-	stopping := false
-	for {
-		select {
-		case <-ctx.Done():
-			killProc()
-			return ctx.Err()
-		case ps := <-procWaitCh:
-			if stopping {
-				return nil
-			}
-			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
-		case err := <-stdOut.Watch():
-			if !f.allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case err := <-stdErr.Watch():
-			if !f.allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case <-doneChan:
-			if !stopping {
-				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
-			}
-		}
-	}
-}
-
 // RunProcess runs the given given process
 // the process will run until an error, or the given timeout is reached
 func RunProcess(t *testing.T,
@@ -527,9 +437,6 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		f.t.Fatal("Context passed to Fixture.Run() has no deadline set.")
 	}
 
-	if f.binaryName != "elastic-agent" {
-		return errors.New("Run() can only be used with elastic-agent, use RunBeat()")
-	}
 	if f.installed {
 		return errors.New("fixture is installed; cannot be run")
 	}
@@ -584,7 +491,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		process.WithArgs(args),
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
 	if err != nil {
-		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
+		return fmt.Errorf("failed to spawn elastic-agent: %w", err)
 	}
 
 	if shouldWatchState {
@@ -1023,11 +930,7 @@ func (f *Fixture) binaryPath() string {
 	if f.packageFormat == "deb" || f.packageFormat == "rpm" {
 		workDir = "/usr/bin"
 	}
-	defaultBin := "elastic-agent"
-	if f.binaryName != "" {
-		defaultBin = f.binaryName
-	}
-	binary := filepath.Join(workDir, defaultBin)
+	binary := filepath.Join(workDir, "elastic-agent")
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}

@@ -52,8 +52,6 @@ function Invoke-Retry
 Invoke-Retry { go install gotest.tools/gotestsum }
 gotestsum --version
 
-$env:TEST_BINARY_NAME = "elastic-agent"
-
 if (-not $env:AGENT_VERSION)
 {
     if (Test-Path .package-version)

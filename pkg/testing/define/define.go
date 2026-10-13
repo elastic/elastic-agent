@@ -93,36 +93,31 @@ func Version() string {
 // NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), false, opts...)
+	return newFixtureFromLocalBuild(t, version, false, opts...)
 }
 
 // NewFixtureFromLocalFIPSBuild returns a new FIPS-capable Elastic Agent testing fixture with a LocalFetcher
 // and the agent logging to the test logger.
 func NewFixtureFromLocalFIPSBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	return NewFixtureWithBinary(t, version, "elastic-agent", buildsDir(t), true, opts...)
+	return newFixtureFromLocalBuild(t, version, true, opts...)
 }
 
-// NewFixtureWithBinary returns a new Elastic Agent testing fixture with a LocalFetcher and
-// the agent logging to the test logger.
-func NewFixtureWithBinary(t *testing.T, version string, binary string, buildsDir string, fips bool, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+func newFixtureFromLocalBuild(t *testing.T, version string, fips bool, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
 	}
 
-	localFetcherOpts := []atesting.LocalFetcherOpt{atesting.WithCustomBinaryName(binary)}
+	var localFetcherOpts []atesting.LocalFetcherOpt
 	if ver.IsSnapshot() {
 		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalSnapshotOnly())
 	}
 	if fips {
 		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalFIPSOnly())
 	}
-	binFetcher := atesting.LocalFetcher(buildsDir, localFetcherOpts...)
+	binFetcher := atesting.LocalFetcher(buildsDir(t), localFetcherOpts...)
 
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
-	if binary != "elastic-agent" {
-		opts = append(opts, atesting.WithBinaryName(binary))
-	}
 	return atesting.NewFixture(t, version, opts...)
 }
 
