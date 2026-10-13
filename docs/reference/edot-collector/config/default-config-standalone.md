@@ -259,11 +259,7 @@ The following example configuration files are available for the Gateway mode:
 ::::
 :::::
 
-<<<<<<< HEAD
-Use the previous example configurations as a reference when configuring your Gateway Collector or customizing your EDOT Collector configuration.
-=======
 Use the previous example configurations as a reference when configuring or customizing {{agent}} in Gateway mode.
->>>>>>> eebdb33 (docs: Add Agent output configuration example for forwarding to a self-managed Gateway Collector (#15534))
 
 ### Data collection
 
