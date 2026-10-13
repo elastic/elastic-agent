@@ -37,6 +37,8 @@ if [[ "${ESS_PUBLISH_ENV:-false}" == "true" ]]; then
   while IFS='=' read -r name value; do
     case "${name}" in
       ELASTICSEARCH_* | KIBANA_* | FLEET_SERVER_* | INTEGRATIONS_SERVER_*)
+        # meta-data set rejects empty values, and some of these variables can be empty
+        [[ -n "${value}" ]] || continue
         buildkite-agent meta-data set --redacted-vars='' "macos-ess.${name}" "${value}"
         ;;
     esac
