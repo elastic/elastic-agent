@@ -3068,6 +3068,79 @@ func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
 	assert.Equal(t, "browser", monitors[0]["type"], "the emitted monitor must be the browser stream")
 }
 
+// TestGetReceiversConfigForComponentSyntheticsSingleReceiver checks that synthetics
+// components with single_receiver: true merge all monitors into one receiver, and
+// that the schedule-less browser auxiliary streams are still dropped before the merge.
+func TestGetReceiversConfigForComponentSyntheticsSingleReceiver(t *testing.T) {
+	newComponent := func(inputType string, streams []any) *component.Component {
+		return &component.Component{
+			ID:        "heartbeat-test-id",
+			InputType: inputType,
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "elastic-otel-collector",
+				Spec: component.InputSpec{
+					Name:           inputType,
+					SingleReceiver: true,
+					Command:        &component.CommandSpec{Args: []string{"heartbeat"}},
+				},
+			},
+			Units: []component.Unit{{
+				ID:   "heartbeat-test-id-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"type":       inputType,
+					"streams":    streams,
+				}),
+			}},
+		}
+	}
+	monitorsOf := func(t *testing.T, result map[string]any, receiverID string) []map[string]any {
+		t.Helper()
+		receiverConfig, ok := result[receiverID].(map[string]any)
+		require.True(t, ok, "receiver config should be a map")
+		heartbeatConfig, ok := receiverConfig["heartbeat"].(map[string]any)
+		require.True(t, ok, "heartbeat config should be a map")
+		monitors, ok := heartbeatConfig["monitors"].([]map[string]any)
+		require.True(t, ok, "heartbeat monitors should be a slice of maps")
+		return monitors
+	}
+	const singleReceiverID = "heartbeatreceiver/_agent-component/heartbeat-test-id/single"
+
+	t.Run("http monitors share one receiver", func(t *testing.T) {
+		comp := newComponent("synthetics/http", []any{
+			map[string]any{"id": "http-1", "schedule": "@every 5s", "urls": []any{"https://a.example.com"}},
+			map[string]any{"id": "http-2", "schedule": "@every 5s", "urls": []any{"https://b.example.com"}},
+			map[string]any{"id": "http-3", "schedule": "@every 5s", "urls": []any{"https://c.example.com"}},
+		})
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.Len(t, result, 1, "all streams must share one receiver")
+		monitors := monitorsOf(t, result, singleReceiverID)
+		require.Len(t, monitors, 3, "every stream must become a monitor of the receiver")
+		for _, m := range monitors {
+			assert.Equal(t, "http", m["type"], "monitor type must come from the input type")
+		}
+	})
+
+	t.Run("browser auxiliary streams are dropped before the merge", func(t *testing.T) {
+		comp := newComponent("synthetics/browser", []any{
+			map[string]any{"id": "browser-1", "type": "browser", "schedule": "@every 3m"},
+			map[string]any{"id": "browser-network-1", "data_stream": map[string]any{"dataset": "browser.network", "type": "synthetics"}},
+			map[string]any{"id": "browser-screenshot-1", "data_stream": map[string]any{"dataset": "browser.screenshot", "type": "synthetics"}},
+		})
+
+		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+		require.NoError(t, err)
+		require.Len(t, result, 1, "the browser component must have one receiver")
+		monitors := monitorsOf(t, result, singleReceiverID)
+		require.Len(t, monitors, 1, "only the scheduled stream must be a monitor")
+		assert.Equal(t, "@every 3m", monitors[0]["schedule"], "the monitor must carry the schedule")
+	})
+}
+
 func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
 	unit := component.Unit{
 		ID:   "heartbeat-api-test-unit",

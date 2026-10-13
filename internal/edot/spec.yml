@@ -274,6 +274,8 @@ inputs:
     description: "Synthetics Browser Monitor"
     platforms: *platforms
     outputs: *outputs
+    # Single receiver for the whole component, see synthetics/http.
+    single_receiver: true
     command: &heartbeat_command
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1
@@ -304,21 +306,31 @@ inputs:
     description: "Synthetics HTTP Monitor"
     platforms: *platforms
     outputs: *outputs
+    # Run all monitors of the component in one receiver. A receiver is a full
+    # Beat, so one receiver per monitor costs hundreds of KB each, which
+    # dominates memory with thousands of monitors.
+    single_receiver: true
     command: *heartbeat_command
   - name: synthetics/icmp
     description: "Synthetics ICMP Monitor"
     platforms: *platforms
     outputs: *outputs
+    # Single receiver for the whole component, see synthetics/http.
+    single_receiver: true
     command: *heartbeat_command
   - name: synthetics/tcp
     description: "Synthetics TCP Monitor"
     platforms: *platforms
     outputs: *outputs
+    # Single receiver for the whole component, see synthetics/http.
+    single_receiver: true
     command: *heartbeat_command
   - name: synthetics/api
     description: "Synthetics API Monitor"
     platforms: *platforms
     outputs: *outputs
+    # Single receiver for the whole component, see synthetics/http.
+    single_receiver: true
     command: *heartbeat_command
   - name: beat/metrics
     description: "Beat metrics"

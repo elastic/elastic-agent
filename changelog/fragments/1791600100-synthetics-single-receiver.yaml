@@ -1,0 +1,9 @@
+kind: enhancement
+summary: Run all monitors of a Synthetics component in one OTel receiver
+description: |
+  Heartbeat runs as an OTel receiver by default, and each monitor used to get
+  its own receiver. Every receiver is a full Beat, so memory grew by hundreds
+  of KB per monitor. All synthetics inputs now use a single receiver per
+  component. With thousands of http, tcp and icmp monitors this uses about 5x
+  less memory.
+component: elastic-agent
