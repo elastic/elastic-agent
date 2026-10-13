@@ -110,19 +110,6 @@ func WithLogOutput() FixtureOpt {
 	}
 }
 
-<<<<<<< HEAD
-=======
-// WithCmdOutput configures a writer that receives a combined copy of stdout and
-// stderr from the spawned process started by Run/RunOtelWithClient.
-// Writes from the stdout and stderr goroutines are serialized internally so the
-// supplied writer does not need to be safe for concurrent use.
-func WithCmdOutput(w io.Writer) FixtureOpt {
-	return func(f *Fixture) {
-		f.cmdOutput = w
-	}
-}
-
->>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // WithAllowErrors instructs the fixture to allow the Elastic Agent to log errors.
 // By default, the Fixture will not allow the Elastic Agent to log any errors, logging any error
 // will result on the Fixture to kill the Elastic Agent and report it as an error.
@@ -352,89 +339,6 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	return nil
 }
 
-<<<<<<< HEAD
-// RunBeat runs the given given beat
-// the beat will run until an error, or the given timeout is reached
-func (f *Fixture) RunBeat(ctx context.Context) error {
-	if f.binaryName == "elastic-agent" {
-		return errors.New("RunBeat() can't be run against elastic-agent")
-	}
-
-	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		f.t.Fatal("Context passed to Fixture.RunBeat() has no deadline set.")
-	}
-
-	var err error
-	err = f.EnsurePrepared(ctx)
-	if err != nil {
-		return fmt.Errorf("error preparing beat: %w", err)
-	}
-
-	var logProxy Logger
-	if f.logOutput {
-		logProxy = f.t
-	}
-	stdOut := newLogWatcher(logProxy)
-	stdErr := newLogWatcher(logProxy)
-	args := []string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}
-
-	args = append(args, f.additionalArgs...)
-
-	proc, err := process.Start(
-		f.binaryPath(),
-		process.WithContext(ctx),
-		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr)))
-	if err != nil {
-		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
-	}
-
-	procWaitCh := proc.Wait()
-	killProc := func() {
-		_ = proc.Kill()
-		<-procWaitCh
-	}
-
-	var doneChan <-chan time.Time
-	if f.runLength != 0 {
-		doneChan = time.After(f.runLength)
-	}
-
-	stopping := false
-	for {
-		select {
-		case <-ctx.Done():
-			killProc()
-			return ctx.Err()
-		case ps := <-procWaitCh:
-			if stopping {
-				return nil
-			}
-			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
-		case err := <-stdOut.Watch():
-			if !f.allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case err := <-stdErr.Watch():
-			if !f.allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case <-doneChan:
-			if !stopping {
-				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
-			}
-		}
-	}
-}
-
-=======
->>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // RunProcess runs the given given process
 // the process will run until an error, or the given timeout is reached
 func RunProcess(t *testing.T,

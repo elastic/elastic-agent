@@ -118,14 +118,6 @@ func newFixtureFromLocalBuild(t *testing.T, version string, fips bool, opts ...a
 	binFetcher := atesting.LocalFetcher(buildsDir(t), localFetcherOpts...)
 
 	opts = append(opts, atesting.WithFetcher(binFetcher), atesting.WithLogOutput())
-<<<<<<< HEAD
-	if binary != "elastic-agent" {
-		opts = append(opts, atesting.WithBinaryName(binary))
-=======
-	if os.Getenv("TEST_AGENT_DEVELOP") == "true" {
-		opts = append(opts, atesting.WithAppendAdditionalArgs([]string{"--develop"}))
->>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
-	}
 	return atesting.NewFixture(t, version, opts...)
 }
 
