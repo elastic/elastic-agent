@@ -65,8 +65,8 @@ import_custom_cas() {
 }
 
 import_custom_cas
+{{- end }}
 
-{{ end -}}
 if [[ "$ELASTIC_AGENT_OTEL" == "true" ]]
 then
 exec {{ .BeatName }} otel "$@"
