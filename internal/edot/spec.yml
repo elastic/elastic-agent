@@ -324,7 +324,6 @@ inputs:
     description: "Synthetics API Monitor"
     platforms: *platforms
     outputs: *outputs
-    # Single receiver for the whole component, see synthetics/http.
     single_receiver: true
     command: *heartbeat_command
   - name: beat/metrics
