@@ -910,20 +910,23 @@ func stripDefaultProcessors(defaults []map[string]any, raw any) []any {
 	return filtered
 }
 
-// EffectiveDefaultProcessors returns the default processor list for comp filtered by
-// the effective default_processors flags — global feature flags AND any per-output
-// restriction configured on comp's output unit. If comp is nil, only the global
-// flags are applied.
-func EffectiveDefaultProcessors(comp *component.Component) ([]map[string]any, error) {
-	if comp == nil {
-		flags := features.GetDefaultProcessors()
-		return filterDefaultProcessors(GetDefaultProcessors(""), flags), nil
+// EffectiveDefaultMonitoringProcessors returns the generic (beat-agnostic) default processor
+// list filtered by the effective default_processors flags — global feature flags AND
+// any per-output restriction configured on comp's output unit. If comp is nil, only
+// the global flags are applied.
+//
+// The list is deliberately independent of comp's beat: it is used for the monitoring
+// pipelines that may source data from many beats but can only have one set of global processors.
+func EffectiveDefaultMonitoringProcessors(comp *component.Component) ([]map[string]any, error) {
+	flags := features.GetDefaultProcessors()
+	if comp != nil {
+		var err error
+		flags, err = effectiveDefaultProcessorFlags(comp)
+		if err != nil {
+			return nil, err
+		}
 	}
-	flags, err := effectiveDefaultProcessorFlags(comp)
-	if err != nil {
-		return nil, err
-	}
-	return filterDefaultProcessors(GetDefaultProcessors(comp.BeatName()), flags), nil
+	return filterDefaultProcessors(GetDefaultProcessors(""), flags), nil
 }
 
 // effectiveDefaultProcessorFlags returns the DefaultProcessorFlags to use for the

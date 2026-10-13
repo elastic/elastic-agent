@@ -746,7 +746,9 @@ func injectMonitoringReceiver(
 		}
 
 		// Find the monitoring output component so per-output default_processors
-		// config is respected alongside the global flags.
+		// config is respected alongside the global flags. All monitoring components
+		// share the same output, so which one is found first does not matter; the
+		// processor list itself is always the generic, beat-agnostic one.
 		var monitoringComp *component.Component
 		for i := range components {
 			if components[i].OutputName == componentmonitoring.MonitoringOutput {
@@ -754,7 +756,7 @@ func injectMonitoringReceiver(
 				break
 			}
 		}
-		defaultProcessors, err := translate.EffectiveDefaultProcessors(monitoringComp)
+		defaultProcessors, err := translate.EffectiveDefaultMonitoringProcessors(monitoringComp)
 		if err != nil {
 			return fmt.Errorf("could not get effective default processors for monitoring: %w", err)
 		}
