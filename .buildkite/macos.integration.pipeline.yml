@@ -11,18 +11,18 @@ env:
 
 common:
   - google_oidc_plugin: &google_oidc_plugin
-      elastic/oblt-google-auth#v1.3.5:
+      elastic/oblt-google-auth#v1.3.4:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
   - google_oidc_observability_plugin: &google_oidc_observability_plugin
-      elastic/oblt-google-auth#v1.3.5:
+      elastic/oblt-google-auth#v1.3.4:
         lifetime: 10800 # seconds
   - oblt_cli_plugin: &oblt_cli_plugin
-      elastic/oblt-cli#v0.4.6:
+      elastic/oblt-cli#v0.4.5:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
-      elastic/vault-github-token#v0.2.4:
+      elastic/vault-github-token#v0.2.3:
   - shallow_checkout: &shallow_checkout |
       set -euo pipefail
       echo "~~~ Shallow checkout of $${BUILDKITE_COMMIT}"
