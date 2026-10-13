@@ -7,6 +7,7 @@ package install
 import (
 	"io"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/schollz/progressbar/v3"
@@ -24,7 +25,9 @@ func CreateAndStartNewSpinner(stream io.Writer, initialMessage string) *progress
 	)
 
 	// don't bother with the spinner refresh if we're not connected to stdout
-	if term.IsTerminal(int(os.Stdout.Fd())) {
+	// Skip auto-refresh on Windows to avoid blank lines issue on Windows Server 2022 PowerShell
+	// See: https://github.com/elastic/elastic-agent/issues/11228
+	if term.IsTerminal(int(os.Stdout.Fd())) && runtime.GOOS != "windows" {
 		// This keeps the progress spinner running while we're idling
 		// Otherwise, the spinner would freeze until it got an update
 		go func() {
