@@ -2991,30 +2991,6 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(devtools.InstallGoTestTools)
 }
 
-<<<<<<< HEAD
-// TestBeatServerless runs beats-oriented serverless tests
-func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
-
-	if cfg.IntegrationTest.AgentBuildDir == "" {
-		cfg = cfg.WithAgentBuildDir(beatBuildPath)
-	}
-
-	// a bit of bypass logic; run as serverless by default
-	if cfg.IntegrationTest.StackProvisioner == "" {
-		cfg = cfg.WithStackProvisioner("serverless")
-	} else if cfg.IntegrationTest.StackProvisioner == "stateful" {
-		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
-	}
-
-	cfg = cfg.WithTestBinaryName(beatname)
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
-}
-
-=======
->>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // TestForResourceLeaks runs the integration tests defined in testing/integration/leak
 func (i Integration) TestForResourceLeaks(ctx context.Context) error {
 	return i.testForResourceLeaks(ctx, false, "")

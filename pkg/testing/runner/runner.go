@@ -309,34 +309,6 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 	return results, nil
 }
 
-<<<<<<< HEAD
-=======
-func (r *Runner) runLocalInstances(ctx context.Context, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
-	results := make(map[string]common.OSRunnerResult)
-	for _, instance := range instances {
-		batch, ok := findBatchByID(instance.ID, r.batches)
-		if !ok {
-			return nil, fmt.Errorf("unable to find batch with ID: %s", instance.ID)
-		}
-
-		logger := &batchLogger{wrapped: r.logger, prefix: instance.ID}
-		env, err := r.stackEnv(batch, logger)
-		if err != nil {
-			return nil, err
-		}
-		env["GOTEST_FLAGS"] = r.cfg.TestFlags
-
-		result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, nil, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
-		if err != nil {
-			logger.Logf("Failed to execute tests: %s", err)
-			return nil, fmt.Errorf("failed to execute tests for batch %s: %w", batch.ID, err)
-		}
-		results[batch.ID] = result
-	}
-	return results, nil
-}
-
->>>>>>> 8fbda88 (Drop serverless Beats tests from CI (#17159))
 // runInstances runs the batch on each instance in parallel.
 func (r *Runner) runInstances(ctx context.Context, sshAuth ssh.AuthMethod, repoArchive string, instances []StateInstance) (map[string]common.OSRunnerResult, error) {
 	g, ctx := errgroup.WithContext(ctx)
