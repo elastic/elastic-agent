@@ -58,9 +58,19 @@ func (e *healthCheckEvent) Attributes() pcommon.Map        { return e.attributes
 
 // FromSerializableStatus reconstructs an AggregateStatus from serializableStatus.
 func FromSerializableStatus(ss *SerializableStatus) (*status.AggregateStatus, error) {
+	if ss == nil {
+		return nil, errors.New("cannot reconstruct AggregateStatus from nil SerializableStatus")
+	}
+	if ss.SerializableEvent == nil {
+		return nil, errors.New("serializable status must contain an event")
+	}
+
 	ev, err := FromSerializableEvent(ss.SerializableEvent)
 	if err != nil {
 		return nil, err
+	}
+	if ev == nil {
+		return nil, errors.New("serializable status must contain a valid event")
 	}
 
 	as := &status.AggregateStatus{
@@ -119,28 +129,34 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 		return false
 	}
 
-	// We do compare timestamps, because we want to emit a new status if something changed in the collector
-	// even if the same components are running, with the same status values.
-	if s1.Timestamp() != s2.Timestamp() {
+	if s1.Event == nil && s2.Event == nil {
+		// both have nil Event, skip Event comparison and check ComponentStatusMap
+	} else if s1.Event == nil || s2.Event == nil {
 		return false
-	}
-
-	if s1.Status() != s2.Status() {
-		// status doesn't match
-		return false
-	}
-
-	if (s1.Err() == nil && s2.Err() != nil) || (s1.Err() != nil && s2.Err() == nil) {
-		return false
-	}
-	if s1.Err() != nil && s2.Err() != nil {
-		if s1.Err().Error() != s2.Err().Error() {
+	} else {
+		// We do compare timestamps, because we want to emit a new status if something changed in the collector
+		// even if the same components are running, with the same status values.
+		if s1.Timestamp() != s2.Timestamp() {
 			return false
 		}
-	}
 
-	if !s1.Attributes().Equal(s2.Attributes()) {
-		return false
+		if s1.Status() != s2.Status() {
+			// status doesn't match
+			return false
+		}
+
+		if (s1.Err() == nil && s2.Err() != nil) || (s1.Err() != nil && s2.Err() == nil) {
+			return false
+		}
+		if s1.Err() != nil && s2.Err() != nil {
+			if s1.Err().Error() != s2.Err().Error() {
+				return false
+			}
+		}
+
+		if !s1.Attributes().Equal(s2.Attributes()) {
+			return false
+		}
 	}
 
 	if len(s1.ComponentStatusMap) != len(s2.ComponentStatusMap) {
