@@ -88,22 +88,28 @@ type provisioner struct {
 	client *dockerclient.Client
 }
 
+// Name returns the provisioner name.
 func (p *provisioner) Name() string {
 	return Name
 }
 
+// Type tells the test runner that this provisioner creates Kubernetes clusters.
 func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeK8SCluster
 }
 
+// Location tells the test runner that the clusters run on the local host.
 func (p *provisioner) Location() common.ProvisionerLocation {
 	return common.ProvisionerLocationLocal
 }
 
+// SetLogger sets the logger for the provisioning messages.
 func (p *provisioner) SetLogger(l common.Logger) {
 	p.logger = l
 }
 
+// Supported reports whether this provisioner can run the batch. It accepts Kubernetes batches for
+// the architecture of the host.
 func (p *provisioner) Supported(batch define.OS) bool {
 	if batch.Type != define.Kubernetes || batch.Arch != runtime.GOARCH {
 		return false
@@ -115,6 +121,8 @@ func (p *provisioner) Supported(batch define.OS) bool {
 	return true
 }
 
+// Provision creates one MicroShift cluster for each batch and loads the agent test image into it.
+// It returns one instance for each cluster with what the tests need to connect to it.
 func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches []common.OSBatch) ([]common.Instance, error) {
 	var instances []common.Instance
 	for _, batch := range batches {
@@ -157,9 +165,12 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 	return instances, nil
 }
 
+// setup gets a MicroShift cluster ready for an instance and returns the path of its kubeconfig
+// and the name of its container. It starts a new MicroShift container or reuses one that an
+// earlier run left running.
 func (p *provisioner) setup(ctx context.Context, instanceName, kubernetesVersion, repoDir string) (string, string, error) {
 	containerName := fmt.Sprintf("%s-%s", Name, instanceName)
-	microShiftImage, err := microShiftImageForKubernetesVersion(kubernetesVersion, runtime.GOARCH)
+	microShiftImage, err := microShiftImageForKubernetesVersion(kubernetesVersion)
 	if err != nil {
 		return "", "", err
 	}
@@ -230,6 +241,8 @@ func (p *provisioner) setup(ctx context.Context, instanceName, kubernetesVersion
 	return kubeConfig, containerName, nil
 }
 
+// loadImage copies an image from the Docker daemon on the host into the MicroShift container.
+// Pods can then use the image without pulling it from a registry.
 func (p *provisioner) loadImage(ctx context.Context, containerName, image string) error {
 	archive, err := p.client.ImageSave(ctx, []string{image})
 	if err != nil {
@@ -261,6 +274,7 @@ func (p *provisioner) loadImage(ctx context.Context, containerName, image string
 	return err
 }
 
+// waitForControlPlane waits until the pods for the cluster network and DNS are ready.
 func (p *provisioner) waitForControlPlane(ctx context.Context, client klient.Client) error {
 	r := client.Resources()
 	for _, sl := range []metav1.LabelSelectorRequirement{
@@ -300,6 +314,8 @@ func (p *provisioner) waitForControlPlane(ctx context.Context, client klient.Cli
 	return nil
 }
 
+// installOpenShiftCRDs adds the OpenShift monitoring and infrastructure CRDs that a full OpenShift
+// cluster has but MicroShift does not. It waits until the cluster accepts each one.
 func (p *provisioner) installOpenShiftCRDs(ctx context.Context, client klient.Client, repoDir string) error {
 	r := client.Resources()
 	if err := apiextensionsv1.AddToScheme(r.GetScheme()); err != nil {
@@ -350,6 +366,8 @@ func (p *provisioner) installOpenShiftCRDs(ctx context.Context, client klient.Cl
 	return nil
 }
 
+// createInfrastructureObject creates the cluster-wide Infrastructure object that a full OpenShift
+// cluster has.
 func (p *provisioner) createInfrastructureObject(ctx context.Context, client klient.Client, clusterName string) error {
 	r := client.Resources()
 	if err := configv1.Install(r.GetScheme()); err != nil {
@@ -377,6 +395,7 @@ func (p *provisioner) createInfrastructureObject(ctx context.Context, client kli
 	return nil
 }
 
+// Clean stops the MicroShift container of each instance. Docker removes a container when it stops.
 func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
 	var errs []error
 	for _, instance := range instances {
@@ -392,6 +411,9 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 	return errors.Join(errs...)
 }
 
+// writeKubeconfig copies the admin kubeconfig from the MicroShift container to a temporary file on
+// the host and returns the path of that file. The kubeconfig points to the API address inside the
+// container so the copy points to the port that the container publishes on the host instead.
 func (p *provisioner) writeKubeconfig(ctx context.Context, instanceName, containerName string, apiServerPort uint16) (string, error) {
 	var kubeConfigErr error
 	err := wait.For(
@@ -435,6 +457,8 @@ func (p *provisioner) writeKubeconfig(ctx context.Context, instanceName, contain
 	return file.Name(), nil
 }
 
+// containerExecOutput runs a command inside a container and returns what the command prints. If
+// stdin is set, it is sent to the command.
 func (p *provisioner) containerExecOutput(ctx context.Context, name string, stdin io.Reader, cmd ...string) (string, error) {
 	opts := dockerclient.ExecCreateOptions{
 		AttachStdout: true,
@@ -479,6 +503,8 @@ func (p *provisioner) containerExecOutput(ctx context.Context, name string, stdi
 	return stdout.String(), nil
 }
 
+// getMicroShiftAPIPort finds a running MicroShift container from an earlier run and returns the
+// host port of its Kubernetes API.
 func (p *provisioner) getMicroShiftAPIPort(ctx context.Context, containerName string) (uint16, bool, error) {
 	result, err := p.client.ContainerInspect(ctx, containerName, dockerclient.ContainerInspectOptions{})
 	if err != nil {
@@ -506,6 +532,7 @@ func (p *provisioner) getMicroShiftAPIPort(ctx context.Context, containerName st
 	return uint16(port), true, nil
 }
 
+// pullImage pulls an image to the host and waits until the pull is complete.
 func (p *provisioner) pullImage(ctx context.Context, image string) error {
 	resp, err := p.client.ImagePull(ctx, image, dockerclient.ImagePullOptions{})
 	if err != nil {
@@ -519,6 +546,8 @@ func (p *provisioner) pullImage(ctx context.Context, image string) error {
 	return nil
 }
 
+// startContainer starts a new MicroShift container that runs a whole single-node cluster. The
+// cluster API is reachable from the host on the given port.
 func (p *provisioner) startContainer(ctx context.Context, containerName, image string, apiServerPort uint16) error {
 	cfg := &container.Config{
 		Image:        image,
@@ -557,6 +586,7 @@ func (p *provisioner) startContainer(ctx context.Context, containerName, image s
 	return nil
 }
 
+// stopContainer stops a container.
 func (p *provisioner) stopContainer(ctx context.Context, containerName string) error {
 	opts := dockerclient.ContainerStopOptions{
 		Timeout: new(int(containerStopTimeout.Seconds())),
@@ -571,6 +601,7 @@ func (p *provisioner) stopContainer(ctx context.Context, containerName string) e
 	return nil
 }
 
+// getFreePort asks the system for a free TCP port on localhost.
 func getFreePort() (uint16, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {
@@ -588,7 +619,9 @@ func getFreePort() (uint16, error) {
 	return uint16(tcpAddr.Port), nil //nolint:gosec // G115 a TCP port is always within uint16 range
 }
 
-func microShiftImageForKubernetesVersion(kubernetesVersion, arch string) (string, error) {
+// microShiftImageForKubernetesVersion returns the MicroShift image that runs the minor version of
+// the given Kubernetes version.
+func microShiftImageForKubernetesVersion(kubernetesVersion string) (string, error) {
 	version, err := semver.NewVersion(kubernetesVersion)
 	if err != nil {
 		return "", fmt.Errorf("invalid Kubernetes version %q: %w", kubernetesVersion, err)
