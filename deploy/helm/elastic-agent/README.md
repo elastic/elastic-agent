@@ -210,6 +210,7 @@ The [cloud-defend](https://www.elastic.co/docs/current/integrations/cloud_defend
 ### 6.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| agent.customCAs.secretName | string | `""` | name of an existing Secret with PEM CA certificates (`*.crt` or `*.pem` keys) to trust in browser monitors. It is mounted at `/usr/local/share/ca-certificates` and imported at container start by the `complete` image variants, so use one of them. Restart the pods to apply changes. |
 | agent.fleet.enabled | bool | `false` | enable elastic-agent managed |
 | agent.fleet.url | string | `""` | Fleet server URL |
 | agent.fleet.token | string | `""` | Fleet enrollment token |

@@ -9,7 +9,8 @@ description: >
   container start. Browser monitors can then reach endpoints signed by an internal
   CA without building a custom image or ignoring TLS errors. The images ship
   certutil (nss-tools / libnss-tools) for this, and fall back to a writable HOME
-  when running as an arbitrary UID.
+  when running as an arbitrary UID. The Helm chart gains `agent.customCAs.secretName`
+  to mount a Secret with the CAs at that location.
 
 component: elastic-agent
 

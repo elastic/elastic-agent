@@ -571,6 +571,17 @@
                         }
                     }
                 },
+                "customCAs": {
+                    "type": "object",
+                    "description": "Custom certificate authorities to trust in browser monitors.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "secretName": {
+                            "type": "string",
+                            "description": "Name of an existing Secret with PEM CA certificates (*.crt or *.pem keys), mounted at /usr/local/share/ca-certificates. Requires a complete image variant."
+                        }
+                    }
+                },
                 "fleet": {
                     "type": "object",
                     "description": "Elastic-Agent managed configuration.",
