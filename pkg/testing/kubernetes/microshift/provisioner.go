@@ -66,7 +66,7 @@ var apiPort = network.MustParsePort("6443/tcp")
 var imagesByKubernetesMinor = map[string]string{
 	"1.33": "ghcr.io/microshift-io/microshift:4.20.0_g153ff0ca9_4.20.0_okd_scos.16",
 	"1.34": "ghcr.io/microshift-io/microshift:4.21.0_g29f429c21_4.21.0_okd_scos.ec.15",
-	"1.35": "ghcr.io/microshift-io/microshift:4.22.0_202610051505_gfa0f8cee8_4.22.0_okd_scos.ec.16",
+	"1.35": "ghcr.io/microshift-io/microshift:4.22.0_202610071017_g0a516b4eb_4.22.0_okd_scos.ec.16",
 }
 
 var openShiftCRDManifestPaths = []string{
@@ -218,12 +218,7 @@ func (p *provisioner) setup(ctx context.Context, instanceName, kubernetesVersion
 		}
 
 		if microShiftImage == imagesByKubernetesMinor["1.35"] {
-			// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/250 is fixed.
-			if _, err := p.containerExecOutput(ctx, containerName, nil,
-				"/bin/sh", "-c", "cp /usr/share/containers/registries.d/*.yaml /etc/containers/registries.d/"); err != nil {
-				return "", "", fmt.Errorf("copying registries.d files: %w", err)
-			}
-			// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/252 is fixed.
+			// TODO(samuelvl): Remove when https://github.com/microshift-io/microshift/issues/254 is fixed.
 			if _, err := p.containerExecOutput(ctx, containerName, nil,
 				"/bin/sh", "-c", "cat /usr/share/containers/storage.conf.d/*.conf /usr/share/containers/storage.rootful.conf.d/*.conf > /etc/containers/storage.conf && systemctl restart crio"); err != nil {
 				return "", "", fmt.Errorf("writing storage.conf: %w", err)
