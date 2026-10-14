@@ -3126,15 +3126,8 @@ func TestKeepScheduledMonitors(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
-// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
-// propagated into the generated beat receiver config.
-func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
-=======
-// TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
-// are propagated into the generated Beat receiver config.
-// Regression test: two inputs of the same type in one component may contain streams with
-// identical IDs. They must produce distinct receivers rather than collapsing into one.
+// TestGetReceiversConfigForComponentDuplicateStreamIDs verifies that streams with
+// identical IDs in separate inputs produce distinct receivers.
 func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 	newUnit := func(inputID, host string) component.Unit {
 		return component.Unit{
@@ -3167,7 +3160,7 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 		Units: []component.Unit{newUnit("pod-a", "https://10.0.0.1:9200"), newUnit("pod-b", "https://10.0.0.2:9200")},
 	}
 
-	receivers, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+	receivers, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil)
 	require.NoError(t, err)
 	require.Len(t, receivers, 2)
 	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-a-same-stream")
@@ -3185,8 +3178,9 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 	}
 }
 
-func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
->>>>>>> 5486629 (Include input ID in receiver name if present (#17148))
+// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
+// propagated into the generated beat receiver config.
+func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 	comp := &component.Component{
 		ID:        "filestream-fqdn",
 		InputType: "filestream",
