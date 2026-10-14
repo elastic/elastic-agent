@@ -17,6 +17,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,7 +49,7 @@ type Runner func(ctx context.Context, args ...string) ([]byte, error)
 // ExecRunner returns a Runner that runs the certutil binary at path.
 func ExecRunner(path string) Runner {
 	return func(ctx context.Context, args ...string) ([]byte, error) {
-		out, err := exec.CommandContext(ctx, path, args...).CombinedOutput() //nolint:gosec // path comes from exec.LookPath, args are built here
+		out, err := exec.CommandContext(ctx, path, args...).CombinedOutput()
 		if err != nil {
 			return out, fmt.Errorf("certutil %s: %w: %s", args[0], err, bytes.TrimSpace(out))
 		}
@@ -296,12 +297,18 @@ func (m *Manager) Run(ctx context.Context) {
 	}
 }
 
-func chownTree(root string, o *Owner) error {
-	return filepath.WalkDir(root, func(path string, _ os.DirEntry, err error) error {
+func chownTree(dir string, o *Owner) error {
+	// Walk through a Root so symlinks can't lead the chown outside of dir.
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	return fs.WalkDir(root.FS(), ".", func(path string, _ fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		return os.Chown(path, o.UID, o.GID)
+		return root.Lchown(path, o.UID, o.GID)
 	})
 }
 

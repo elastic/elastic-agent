@@ -110,10 +110,12 @@ func newBrowserUser(t *testing.T) (browserUser, *Owner) {
 	}
 	u, err := user.Lookup(name)
 	require.NoError(t, err, "looking up the browser user %q", name)
-	uid, _ := strconv.Atoi(u.Uid)
-	gid, _ := strconv.Atoi(u.Gid)
-	require.NoError(t, os.Chown(home, uid, gid), "giving the home to the browser user")
-	return browserUser{home: home, cred: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}}, &Owner{UID: uid, GID: gid}
+	uid, err := strconv.ParseUint(u.Uid, 10, 32)
+	require.NoError(t, err, "parsing the browser user's UID")
+	gid, err := strconv.ParseUint(u.Gid, 10, 32)
+	require.NoError(t, err, "parsing the browser user's GID")
+	require.NoError(t, os.Chown(home, int(uid), int(gid)), "giving the home to the browser user")
+	return browserUser{home: home, cred: &syscall.Credential{Uid: uint32(uid), Gid: uint32(gid)}}, &Owner{UID: int(uid), GID: int(gid)}
 }
 
 // journeyStatus runs a one-step journey that opens url in Chromium and returns its

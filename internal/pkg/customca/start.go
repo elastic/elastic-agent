@@ -43,12 +43,18 @@ func writable(dir string) bool {
 	if dir == "" {
 		return false
 	}
-	f, err := os.CreateTemp(dir, ".customca-")
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return false
+	}
+	defer root.Close()
+	probe := fmt.Sprintf(".customca-%d", os.Getpid())
+	f, err := root.OpenFile(probe, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return false
 	}
 	_ = f.Close()
-	_ = os.Remove(f.Name())
+	_ = root.Remove(probe)
 	return true
 }
 
