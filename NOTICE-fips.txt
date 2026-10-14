@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261012204939-be7044c5d7d5
+Version: v7.0.0-alpha2.0.20261013173947-05baf0d3604c
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -91317,11 +91317,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/microsoft/wmi
-Version: v0.44.0
+Version: v0.45.0
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/microsoft/wmi@v0.44.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/microsoft/wmi@v0.45.0/LICENSE:
 
     MIT License
 
