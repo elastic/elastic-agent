@@ -1076,6 +1076,23 @@ steps:
             version:
               *k8s_test_versions
 
+  - label: ":globe_with_meridians: Custom CA browser tests (complete images)"
+    key: custom-ca-browser-tests
+    if: build.pull_request.id != null
+    notify:
+      - github_commit_status:
+          context: "buildkite/elastic-agent-extended-testing - Custom CA browser tests"
+    depends_on:
+      - packaging-containers-amd64
+    command: |
+      buildkite-agent artifact download "build/distributions/*complete*-linux-amd64.docker.tar.gz" . --step 'packaging-containers-amd64'
+      .buildkite/scripts/steps/custom-ca-browser-tests.sh
+    retry:
+      automatic:
+        limit: 1
+    agents:
+      *k8s_test_agent
+
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
     if_changed:
