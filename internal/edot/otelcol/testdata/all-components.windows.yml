@@ -9,7 +9,6 @@ receivers:
       - object: Memory
         counters:
           - name: Committed Bytes
-            metric: bytes.committed
 service:
   pipelines:
     logs/windows:
