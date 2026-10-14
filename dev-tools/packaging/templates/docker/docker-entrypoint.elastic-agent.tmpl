@@ -15,27 +15,32 @@ set -eo pipefail
 {{- if contains .Variant "complete" }}
 # Chromium (browser monitors) only trusts its own NSS database, not the system
 # certificate store. Import any CA mounted into the standard location so users
-# don't need a custom image. A bad certificate only logs a warning; it must
-# not stop the agent from starting.
-import_custom_cas() {
-  local dir=/usr/local/share/ca-certificates
-  local files=() f
-  for f in "$dir"/*.crt "$dir"/*.pem; do
-    [[ -f "$f" ]] && files+=("$f")
+# don't need a custom image, and keep the database in sync while the container
+# runs. A bad certificate only logs a warning; it must not stop the agent.
+custom_ca_dir=/usr/local/share/ca-certificates
+custom_ca_reload_interval="${ELASTIC_AGENT_CUSTOM_CA_RELOAD_INTERVAL:-30}"
+[[ "$custom_ca_reload_interval" =~ ^[0-9]+$ ]] || custom_ca_reload_interval=30
+
+# Print the PEM files in the custom CA directory, one per line.
+custom_ca_files() {
+  local f
+  for f in "$custom_ca_dir"/*.crt "$custom_ca_dir"/*.pem; do
+    [[ -f "$f" ]] && echo "$f"
   done
-  (( ${#files[@]} )) || return 0
+  return 0
+}
 
-  if ! command -v certutil >/dev/null; then
-    echo "WARNING: certutil not found, skipping import of custom CAs from $dir" >&2
-    return 0
-  fi
+# Print a digest of the custom CA files' content, to detect changes.
+custom_ca_signature() {
+  local f
+  { while IFS= read -r f; do cat "$f"; done < <(custom_ca_files); } 2>/dev/null | sha256sum | cut -d' ' -f1
+}
 
-  # Chromium looks for the database under $HOME, which is "/" (read-only) when
-  # running as an arbitrary UID, e.g. on OpenShift.
-  if [[ ! -w "${HOME:-}" ]]; then
-    export HOME={{ $beatHome }}
-  fi
-
+# Make the NSS database hold exactly the certificates in the custom CA directory.
+# Certificates are named after their content so unchanged ones are never touched,
+# which keeps running browsers from seeing a gap while others are replaced.
+sync_custom_cas() {
+  # Chromium looks for the database under $HOME.
   local db="$HOME/.pki/nssdb"
   mkdir -p "$db" || true
   if [[ ! -f "$db/cert9.db" ]] && ! certutil -N -d "sql:$db" --empty-password; then
@@ -43,28 +48,65 @@ import_custom_cas() {
     return 0
   fi
 
-  local tmp n=0 pem
+  local tmp f pem name
+  local -A want=()
   tmp=$(mktemp -d)
-  for f in "${files[@]}"; do
+  while IFS= read -r f; do
     # certutil imports only the first certificate of a file, so split bundles.
     awk -v dir="$tmp" -v base="$(basename "$f")" '
       /-----BEGIN CERTIFICATE-----/ { n++; out = dir "/" base "." n ".pem" }
       out { print > out }
       /-----END CERTIFICATE-----/ { out = "" }' "$f"
-  done
+  done < <(custom_ca_files)
   for pem in "$tmp"/*.pem; do
     [[ -f "$pem" ]] || continue
-    n=$((n + 1))
-    # Drop any previous import (persisted $HOME) so re-imports don't fail.
-    certutil -D -d "sql:$db" -n "custom-ca-$(basename "$pem")" 2>/dev/null || true
-    certutil -A -d "sql:$db" -n "custom-ca-$(basename "$pem")" -t "C,," -i "$pem" ||
-      echo "WARNING: failed to import $(basename "$pem") from $dir" >&2
+    name="custom-ca-$(sha256sum "$pem" | cut -c1-16)"
+    want[$name]=$pem
   done
-  echo "Imported $n custom CA certificate(s) from $dir into the browser trust store"
+
+  local existing added=0 removed=0
+  existing=$(certutil -L -d "sql:$db" | awk '/^custom-ca-/ { print $1 }')
+  for name in "${!want[@]}"; do
+    grep -qx "$name" <<<"$existing" && continue
+    if certutil -A -d "sql:$db" -n "$name" -t "C,," -i "${want[$name]}"; then
+      added=$((added + 1))
+    else
+      echo "WARNING: failed to import $(basename "${want[$name]}") from $custom_ca_dir" >&2
+    fi
+  done
+  for name in $existing; do
+    [[ -n "${want[$name]:-}" ]] && continue
+    if certutil -D -d "sql:$db" -n "$name"; then
+      removed=$((removed + 1))
+    fi
+  done
   rm -r "$tmp"
+  echo "Custom CA certificates in the browser trust store: ${#want[@]} (added $added, removed $removed)"
 }
 
-import_custom_cas
+if ! command -v certutil >/dev/null; then
+  [[ -z "$(custom_ca_files)" ]] ||
+    echo "WARNING: certutil not found, skipping import of custom CAs from $custom_ca_dir" >&2
+else
+  custom_ca_last=$(custom_ca_signature)
+  if [[ -n "$(custom_ca_files)" ]]; then
+    # $HOME is "/" (read-only) when running as an arbitrary UID, e.g. on OpenShift.
+    # Set it before the agent starts so Chromium finds the database as well.
+    [[ -w "${HOME:-}" ]] || export HOME={{ $beatHome }}
+    sync_custom_cas
+  fi
+  if (( custom_ca_reload_interval > 0 )); then
+    (
+      while sleep "$custom_ca_reload_interval"; do
+        custom_ca_current=$(custom_ca_signature)
+        if [[ "$custom_ca_current" != "$custom_ca_last" ]]; then
+          custom_ca_last=$custom_ca_current
+          sync_custom_cas || true
+        fi
+      done
+    ) &
+  fi
+fi
 {{- end }}
 
 if [[ "$ELASTIC_AGENT_OTEL" == "true" ]]
