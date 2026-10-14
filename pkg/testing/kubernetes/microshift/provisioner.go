@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/netip"
 	"os"
@@ -395,7 +396,7 @@ func (p *provisioner) createInfrastructureObject(ctx context.Context, client kli
 	return nil
 }
 
-// Clean stops the MicroShift container of each instance. Docker removes a container when it stops.
+// Clean stops the MicroShift container of each instance and deletes its kubeconfig from the host.
 func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []common.Instance) error {
 	var errs []error
 	for _, instance := range instances {
@@ -406,6 +407,12 @@ func (p *provisioner) Clean(ctx context.Context, _ common.Config, instances []co
 
 		if err := p.stopContainer(ctx, containerName); err != nil {
 			errs = append(errs, err)
+		}
+
+		if kubeConfig, _ := instance.Internal["config"].(string); kubeConfig != "" {
+			if err := os.Remove(kubeConfig); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				errs = append(errs, fmt.Errorf("removing MicroShift kubeconfig %s: %w", kubeConfig, err))
+			}
 		}
 	}
 	return errors.Join(errs...)
