@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -564,6 +565,7 @@ func New(
 		FleetState:     fleetState,
 		FleetMessage:   fleetMessage,
 		LogLevel:       logLevel,
+		Tags:           agentInfo.GetTags(),
 		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
@@ -1303,12 +1305,14 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelRuntime  string            `yaml:"log_level"`
 					LogLevelPolicy   string            `yaml:"log_level_policy"`
 					LogLevelOverride string            `yaml:"log_level_override"`
+					Tags             []string          `yaml:"tags,omitempty"`
 					Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
 				}{
 					Headers:          c.agentInfo.Headers(),
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
 					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
 					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),
+					Tags:             c.State().Tags,
 					Metadata:         meta,
 				}
 				o, err := yaml.Marshal(output)
@@ -1842,8 +1846,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 	c.currentCfg = currentCfg
 
-	// check if log level has changed for standalone elastic-agent
-	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
+	// Standalone mode has no dedicated notification channel unlike managed mode,
+	// so the log level is read from the policy config on each reload.
 	if c.agentInfo.IsStandalone() {
 		ll := currentCfg.Settings.LoggingConfig.Level
 		if ll != c.state.LogLevel {
@@ -1853,6 +1857,13 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 			logger.SetLevel(ll)
 			c.logger.Infof("log level changed to %s", ll.String())
 		}
+	}
+
+	// Both modes read tags from the policy config so no dedicated notification channel is needed.
+	tags := info.NormalizeTags(currentCfg.Settings.Tags)
+	if !slices.Equal(tags, c.state.Tags) {
+		c.setTags(tags)
+		c.logger.Infof("tags changed to %v", tags)
 	}
 
 	return c.refreshComponentModel(ctx)
@@ -2101,6 +2112,8 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		Components: c.componentModel,
 		Signed:     signed,
 	}
+	c.state.PolicyConfiguredActionTypes = policyConfiguredActionTypes(c.componentModel)
+	c.state.PolicyApplied = true
 
 	c.logger.Info("Updating running component model")
 	if c.logger.IsDebug() {
@@ -2647,6 +2660,22 @@ func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
 		unitMap[c.ID] = c
 	}
 	return unitMap
+}
+
+// policyConfiguredActionTypes returns a map from action type to the IDs of components
+// in comps that handle it. Derived from the component spec rather than runtime state,
+// so it includes components that have not yet started.
+func policyConfiguredActionTypes(comps []component.Component) map[string][]string {
+	result := make(map[string][]string)
+	for _, comp := range comps {
+		if comp.InputSpec == nil {
+			continue
+		}
+		for _, typ := range comp.InputSpec.Spec.ProxiedActions {
+			result[typ] = append(result[typ], comp.ID)
+		}
+	}
+	return result
 }
 
 func convertComponentListToMap(compList []component.Component) map[string]component.Component {
