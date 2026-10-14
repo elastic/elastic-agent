@@ -15,8 +15,9 @@ set -eo pipefail
 {{- if contains .Variant "complete" }}
 # Chromium (browser monitors) ignores the system trust store and only reads its
 # own NSS database. Import the CAs mounted in the standard location into it and
-# keep it in sync while the container runs. Failures only warn: they must not
-# stop the agent.
+# keep it in sync while the container runs. Nothing here may stop the agent from
+# starting, so errexit is off for this block.
+set +e
 custom_ca_dir=/usr/local/share/ca-certificates
 custom_ca_reload_interval="${ELASTIC_AGENT_CUSTOM_CA_RELOAD_INTERVAL:-30}"
 [[ "$custom_ca_reload_interval" =~ ^[0-9]+$ ]] || custom_ca_reload_interval=30
@@ -33,79 +34,108 @@ custom_ca_files() {
 # Digest of the CA files' content, to detect changes.
 custom_ca_signature() {
   local f
-  { while IFS= read -r f; do cat "$f"; done < <(custom_ca_files); } 2>/dev/null | sha256sum | cut -d' ' -f1
+  while IFS= read -r f; do cat "$f"; done < <(custom_ca_files) 2>/dev/null | sha256sum | cut -d' ' -f1
 }
 
-# Make the NSS database match the CA directory. Certificates are named after
-# their content, so unchanged ones are never touched and running browsers never
-# see a gap.
+# Make the NSS database match the CA directory; fail if anything could not be done.
+# Certificates are named after their decoded content, so reformatting a PEM or
+# duplicating a CA never renames or drops it, unchanged ones are never touched and
+# running browsers never see a gap.
 sync_custom_cas() {
-  local db="$HOME/.pki/nssdb"
-  mkdir -p "$db" || true
-  if [[ ! -f "$db/cert9.db" ]] && ! certutil -N -d "sql:$db" --empty-password; then
-    echo "WARNING: could not create NSS database $db, skipping import of custom CAs" >&2
-    return 0
-  fi
-
-  local tmp f pem name
+  local db="$custom_ca_home/.pki/nssdb" tmp f pem name existing added=0 removed=0 failed=0
   local -A want=()
-  tmp=$(mktemp -d)
+  mkdir -p "$db"
+  [[ -f "$db/cert9.db" ]] || certutil -N -d "sql:$db" --empty-password
+  [[ -f "$db/cert9.db" ]] || { echo "WARNING: could not create NSS database $db, custom CAs not imported" >&2; return 1; }
+  existing=$(certutil -L -d "sql:$db") ||
+    { echo "WARNING: could not read NSS database $db (corrupt?), custom CAs not updated" >&2; return 1; }
+  existing=$(awk '/^custom-ca-/ { print $1 }' <<<"$existing")
+  tmp=$(mktemp -d) || { echo "WARNING: could not create a temporary directory, custom CAs not updated" >&2; return 1; }
+
   while IFS= read -r f; do
     # certutil imports only the first certificate of a file: split bundles.
     awk -v dir="$tmp" -v base="$(basename "$f")" '
+      { sub(/\r$/, "") }
       /-----BEGIN CERTIFICATE-----/ { n++; out = dir "/" base "." n ".pem" }
       out { print > out }
-      /-----END CERTIFICATE-----/ { out = "" }' "$f"
+      /-----END CERTIFICATE-----/ { out = "" }' "$f" || failed=1
   done < <(custom_ca_files)
   for pem in "$tmp"/*.pem; do
     [[ -f "$pem" ]] || continue
-    name="custom-ca-$(sha256sum "$pem" | cut -c1-16)"
+    name="custom-ca-$(grep -v -- '-----' "$pem" | tr -d ' \t\r\n' | sha256sum | cut -c1-16)"
     want[$name]=$pem
   done
 
-  local existing added=0 removed=0
-  existing=$(certutil -L -d "sql:$db" | awk '/^custom-ca-/ { print $1 }')
   for name in "${!want[@]}"; do
     grep -qx "$name" <<<"$existing" && continue
     if certutil -A -d "sql:$db" -n "$name" -t "C,," -i "${want[$name]}"; then
       added=$((added + 1))
     else
       echo "WARNING: failed to import $(basename "${want[$name]}") from $custom_ca_dir" >&2
+      failed=1
     fi
   done
   for name in $existing; do
     [[ -n "${want[$name]:-}" ]] && continue
     if certutil -D -d "sql:$db" -n "$name"; then
       removed=$((removed + 1))
+    else
+      failed=1
     fi
   done
   rm -r "$tmp"
+
+  # As root, the browser runs as the beat user: it must be able to read the database.
+  if [[ "$(id -u)" == 0 ]]; then
+    local uid gid
+    if uid=$(id -u "${BEAT_SETUID_AS:-}" 2>/dev/null) && gid=$(id -g "$BEAT_SETUID_AS"); then
+      chown -R "$uid:$gid" "$custom_ca_home/.pki" || failed=1
+    else
+      echo "WARNING: user '${BEAT_SETUID_AS:-}' not found, the browser may not read the custom CAs" >&2
+      failed=1
+    fi
+  fi
+
   echo "Custom CA certificates in the browser trust store: ${#want[@]} (added $added, removed $removed)"
+  return $failed
 }
 
-if ! command -v certutil >/dev/null; then
-  [[ -z "$(custom_ca_files)" ]] ||
-    echo "WARNING: certutil not found, skipping import of custom CAs from $custom_ca_dir" >&2
-else
-  custom_ca_last=$(custom_ca_signature)
-  if [[ -n "$(custom_ca_files)" ]]; then
-    # Chromium finds the database through $HOME, which is a read-only "/" for
-    # arbitrary UIDs (e.g. OpenShift). Fix it before the agent, and so Chromium, starts.
-    [[ -w "${HOME:-}" ]] || export HOME={{ $beatHome }}
-    sync_custom_cas
-  fi
-  if (( custom_ca_reload_interval > 0 )); then
-    (
-      while sleep "$custom_ca_reload_interval"; do
-        custom_ca_current=$(custom_ca_signature)
-        if [[ "$custom_ca_current" != "$custom_ca_last" ]]; then
-          custom_ca_last=$custom_ca_current
-          sync_custom_cas || true
-        fi
-      done
-    ) &
+if [[ -d "$custom_ca_dir" ]]; then
+  if ! command -v certutil >/dev/null; then
+    [[ -z "$(custom_ca_files)" ]] ||
+      echo "WARNING: certutil not found, skipping import of custom CAs from $custom_ca_dir" >&2
+  else
+    # Chromium reads the database from the browser's $HOME. Pick a writable one now,
+    # even if no CA is mounted yet, because it can't change once the agent starts.
+    if [[ "$(id -u)" == 0 ]]; then
+      # The agent drops privileges and heartbeat runs the browser as the beat user,
+      # with that user's home as HOME.
+      custom_ca_home={{ $beatHome }}
+    elif [[ -w "${HOME:-}" ]]; then
+      custom_ca_home=$HOME
+    else
+      # Arbitrary UID (e.g. OpenShift): HOME is a read-only "/".
+      custom_ca_home={{ $beatHome }}
+      export HOME=$custom_ca_home
+    fi
+
+    custom_ca_last=$(custom_ca_signature)
+    if [[ -n "$(custom_ca_files)" || -f "$custom_ca_home/.pki/nssdb/cert9.db" ]]; then
+      # On failure leave the change pending, so the loop below retries it.
+      sync_custom_cas || custom_ca_last=pending
+    fi
+    if (( custom_ca_reload_interval > 0 )); then
+      (
+        while sleep "$custom_ca_reload_interval"; do
+          custom_ca_current=$(custom_ca_signature)
+          [[ "$custom_ca_current" == "$custom_ca_last" ]] && continue
+          sync_custom_cas && custom_ca_last=$custom_ca_current
+        done
+      ) &
+    fi
   fi
 fi
+set -e
 {{- end }}
 
 if [[ "$ELASTIC_AGENT_OTEL" == "true" ]]
