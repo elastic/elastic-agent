@@ -825,24 +825,13 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool, fileDirCopy fil
 		}
 	}
 
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := install.HasAllSSDs()
-	if detectHWErr != nil {
-		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
-
 	return fileDirCopy(from, to, filecopy.Options{
 		OnSymlink: func(_ string) filecopy.SymlinkAction {
 			return filecopy.Shallow
 		},
 		Sync:         true,
 		OnError:      onErr,
-		NumOfWorkers: int64(copyConcurrency),
+		NumOfWorkers: install.CopyConcurrency,
 	})
 }
 
