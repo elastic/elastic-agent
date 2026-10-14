@@ -5,7 +5,9 @@
 // Package customca keeps the NSS database that Chromium reads in sync with the
 // CA certificates mounted in a container, so browser monitors trust them.
 //
-// Chromium ignores the system trust store and only reads $HOME/.pki/nssdb.
+// Chromium ignores the system trust store and only reads $HOME/.pki/nssdb. This
+// only applies to the Linux container images; elsewhere Start finds no CA
+// directory or certutil and does nothing.
 package customca
 
 import (
