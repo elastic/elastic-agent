@@ -40,12 +40,20 @@ docker_disable_containerd_snapshotter
 # during tests. The dnf-makecache timer periodically refreshes package
 # metadata and holds the RPM database lock while doing so, which causes
 # "Resource temporarily unavailable" errors when tests run rpm commands.
+# The timers must be disabled before their services: dnf-automatic.timer is
+# persistent, so on some images (RHEL 8) it fires at boot and dnf-automatic.service
+# can still be running when this hook does, holding the lock for several minutes.
+# Disabling the timer doesn't stop a running service, so the services are stopped explicitly.
 disable_background_package_managers() {
   if ! command -v dnf >/dev/null 2>&1; then
     return 0
   fi
   echo "Disabling background package managers to prevent RPM lock contention"
-  for unit in dnf-automatic.timer dnf-makecache.timer dnf-makecache.service packagekit.service; do
+  for unit in \
+    dnf-automatic.timer dnf-automatic-download.timer dnf-automatic-install.timer dnf-automatic-notifyonly.timer \
+    dnf-makecache.timer \
+    dnf-automatic.service dnf-automatic-download.service dnf-automatic-install.service dnf-automatic-notifyonly.service \
+    dnf-makecache.service packagekit.service; do
     sudo systemctl disable --now "$unit" 2>/dev/null || true
   done
 }

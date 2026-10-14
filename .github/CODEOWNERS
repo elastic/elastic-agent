@@ -18,6 +18,7 @@ changelog/fragments/
 /.buildkite/scripts/steps/validate-agentless-docker-image.sh @elastic/ingest-managed-jobs
 /.buildkite/scripts/steps/ecp-internal-release.sh @elastic/elastic-agent-control-plane
 /.ci @elastic/elastic-agent-control-plane @elastic/observablt-ci
+/.agents/skills/docs-authoring/SKILL.md @elastic/ski-docs
 /.ci/scripts/update-integration-testdata.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-otel.sh @elastic/elastic-agent-control-plane
 /.ci/scripts/update-beats.sh @elastic/elastic-agent-control-plane
@@ -30,6 +31,7 @@ changelog/fragments/
 /dev-tools/kubernetes @elastic/elastic-agent-control-plane
 /docs/release-notes @elastic/ski-docs
 /docs/docset.yml @elastic/ski-docs
+/docs/contributing-docs.md @elastic/ski-docs
 /.github/workflows/update-docs.yml @elastic/ski-docs @elastic/docs-engineering
 /.github/workflows/validate-docs-structure.yml @elastic/ski-docs @elastic/docs-engineering
 /docs/reference/edot-collector @elastic/ski-docs
