@@ -1092,6 +1092,9 @@ steps:
         limit: 1
     agents:
       *k8s_test_agent
+    plugins:
+      # Same as the Kubernetes tests: needed to download the image artifacts from GCS.
+      - *google_oidc_observability_plugin
 
   - group: ":kubernetes: Kubernetes (tier 2)"
     key: integration-tests-kubernetes-tier-2
