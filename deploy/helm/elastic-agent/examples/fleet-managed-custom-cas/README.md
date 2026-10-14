@@ -55,4 +55,4 @@ helm install elastic-agent ../../ \
 
 ## Note:
 
-Certificates are only read at container start. After adding, removing or rotating certificates in the Secret, restart the agent pods (for example `kubectl rollout restart daemonset/<agent-name>`).
+The agent imports the certificates when the container starts and then re-checks the directory every 30 seconds (set `ELASTIC_AGENT_CUSTOM_CA_RELOAD_INTERVAL` to another number of seconds, or `0` to turn it off). Certificates added, removed or rotated in the Secret are applied without restarting the pods, once Kubernetes has refreshed the mounted files, which can take a minute or so. Browser runs that start after the import use the new set. Changing the Secret's name changes the pod spec, so Helm rolls the pods.
