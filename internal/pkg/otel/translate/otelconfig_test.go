@@ -3057,8 +3057,8 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 			outputType:     "elasticsearch",
 			singleReceiver: false,
 			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-1",
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-2",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
 			},
 			expectedAuth: "beatsauth/_agent-component/default",
 		},
@@ -3076,8 +3076,8 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 			outputType:     "logstash",
 			singleReceiver: false,
 			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-1",
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-2",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
 			},
 		},
 		{
@@ -3085,8 +3085,8 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 			outputType:     "kafka",
 			singleReceiver: false,
 			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-1",
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-2",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
 			},
 		},
 	}
