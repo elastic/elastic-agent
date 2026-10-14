@@ -921,7 +921,7 @@ func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *con
 	assert.Equal(t, string(want), string(got))
 }
 
-func TestGetElasticsearchAuthExtensionConfig(t *testing.T) {
+func TestGetBeatsAuthExtensionConfigIncludesEndpointsAndAuthentication(t *testing.T) {
 	t.Setenv("ELASTICSEARCH_AUTH_HOST", "es.example")
 
 	source := map[string]any{
@@ -951,26 +951,8 @@ func TestGetElasticsearchAuthExtensionConfig(t *testing.T) {
 	cfg, err := config.NewConfigFrom(source)
 	require.NoError(t, err, "source output config must be valid")
 
-	got, err := getElasticsearchAuthExtensionConfig(cfg, "default")
-	require.NoError(t, err, "Heartbeat Elasticsearch auth config must translate")
-
-	assert.Equal(
-		t,
-		map[string]any{
-			"auth": map[string]any{
-				"authenticator": "beatsauth/_agent-component/default",
-			},
-			"endpoints": []string{
-				"https://es.example:9200/elastic?routing=state+loader",
-				"https://es-secondary.example:9201/elastic?routing=state+loader",
-			},
-			"headers":  map[string]string{"X-State-Loader": "true"},
-			"password": "secret",
-			"user":     "heartbeat",
-		},
-		got,
-		"elasticsearchauth config must contain only endpoint, destination-auth, header, and delegated-auth fields",
-	)
+	got, err := getBeatsAuthExtensionConfig(cfg)
+	require.NoError(t, err, "beatsauth config must translate")
 
 	assert.Equal(
 		t,
@@ -979,47 +961,25 @@ func TestGetElasticsearchAuthExtensionConfig(t *testing.T) {
 			"https://es-secondary.example:9201/elastic?routing=state+loader",
 		},
 		got["endpoints"],
-		"all endpoints must retain their own host and resolved path and query",
+		"beatsauth must contain resolved endpoints",
 	)
-
-	assert.Equal(t, "heartbeat", got["user"], "basic-auth username must be translated")
-	assert.Equal(t, "secret", got["password"], "basic-auth password must be translated")
 
 	assert.Equal(
 		t,
-		map[string]string{"X-State-Loader": "true"},
-		got["headers"],
-		"output headers must be translated",
+		map[string]any{
+			"headers": []map[string]string{{
+				"key":   "X-State-Loader",
+				"value": "true",
+			}},
+			"password": "secret",
+			"username": "heartbeat",
+		},
+		got["auth"],
+		"beatsauth must own output authentication and headers",
 	)
-
-	for _, excludedField := range []string{
-		"bulk_max_size",
-		"buffer",
-		"compression",
-		"compression_level",
-		"force_attempt_http2",
-		"idle_conn_timeout",
-		"index",
-		"keepalive",
-		"pipeline",
-		"proxy_disable",
-		"proxy_headers",
-		"proxy_url",
-		"retry",
-		"sending_queue",
-		"timeout",
-		"tls",
-	} {
-		assert.NotContains(
-			t,
-			got,
-			excludedField,
-			"elasticsearchauth config must exclude transport/exporter field %q",
-			excludedField,
-		)
-	}
 }
-func TestGetElasticsearchAuthExtensionConfigCloudID(t *testing.T) {
+
+func TestGetBeatsAuthExtensionConfigCloudID(t *testing.T) {
 	const encodedCloudID = "cloudidtest:ZXhhbXBsZS50ZXN0JGVsYXN0aWNzZWFyY2gka2liYW5h"
 	t.Setenv("ELASTICSEARCH_AUTH_CLOUD_ID", encodedCloudID)
 
@@ -1027,7 +987,7 @@ func TestGetElasticsearchAuthExtensionConfigCloudID(t *testing.T) {
 		"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
 		"cloud_auth": "cloud-user:cloud-password",
 	})
-	got, err := getElasticsearchAuthExtensionConfig(cfg, "default")
+	got, err := getBeatsAuthExtensionConfig(cfg)
 	require.NoError(t, err, "Cloud ID output config must translate")
 
 	assert.Equal(
@@ -1036,8 +996,8 @@ func TestGetElasticsearchAuthExtensionConfigCloudID(t *testing.T) {
 		got["endpoints"],
 		"Cloud ID must expand to the Elasticsearch endpoint",
 	)
-	assert.Equal(t, "cloud-user", got["user"], "Cloud auth username must be translated")
-	assert.Equal(t, "cloud-password", got["password"], "Cloud auth password must be translated")
+	assert.Equal(t, "cloud-user", got["auth"].(map[string]any)["username"], "Cloud auth username must be translated")
+	assert.Equal(t, "cloud-password", got["auth"].(map[string]any)["password"], "Cloud auth password must be translated")
 }
 
 func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
@@ -1080,19 +1040,10 @@ func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
 	)
 	require.NoError(t, err, "Heartbeat translation must accept transport and TLS settings")
 
-	elasticsearchAuthID := getElasticsearchAuthExtensionID(outputName).String()
-	elasticsearchAuth, ok := extensions[elasticsearchAuthID].(map[string]any)
-	require.True(t, ok, "Heartbeat translation must generate an output-scoped elasticsearchauth extension")
-	assert.Equal(t, map[string]any{
-		"auth": map[string]any{
-			"authenticator": getBeatsAuthExtensionID(outputName).String(),
-		},
-		"endpoints": []string{"http://localhost:9200"},
-	}, elasticsearchAuth, "elasticsearchauth must contain no transport settings")
-
 	beatsAuthID := getBeatsAuthExtensionID(outputName).String()
 	beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
-	require.True(t, ok, "Heartbeat translation must preserve the output-scoped beatsauth extension")
+	require.True(t, ok, "Heartbeat translation must generate the output-scoped beatsauth extension")
+	assert.Equal(t, []string{"http://localhost:9200"}, beatsAuth["endpoints"], "beatsauth must contain output endpoints")
 	assert.Equal(t, "15s", beatsAuth["idle_connection_timeout"], "beatsauth must retain the effective throughput-preset idle timeout")
 	assert.Equal(t, true, beatsAuth["proxy_disable"], "beatsauth must retain proxy_disable")
 	assert.Equal(t, map[string]any{"X-Proxy": "value"}, beatsAuth["proxy_headers"], "beatsauth must retain proxy_headers")

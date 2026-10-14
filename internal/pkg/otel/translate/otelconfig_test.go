@@ -404,7 +404,12 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
+			"auth": map[string]any{
+				"password": "password",
+				"username": "elastic",
+			},
 			"continue_on_error":       true,
+			"endpoints":               []string{"http://localhost:9200"},
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
 			"proxy_url":               "https://example.com",
@@ -439,17 +444,6 @@ func TestGetOtelConfig(t *testing.T) {
 			finalOutput[v.key] = v.value
 		}
 		return finalOutput
-	}
-
-	expectedElasticsearchAuthExtensionConfig := func() map[string]any {
-		return map[string]any{
-			"auth": map[string]any{
-				"authenticator": "beatsauth/_agent-component/default",
-			},
-			"endpoints": []string{"http://localhost:9200"},
-			"password":  "password",
-			"user":      "elastic",
-		}
 	}
 
 	expectedESConfig := func(outputName string) map[string]any {
@@ -599,7 +593,7 @@ func TestGetOtelConfig(t *testing.T) {
 	// expects component id
 	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
-		cfg["elasticsearch_auth"] = "elasticsearchauth/_agent-component/default"
+		cfg["elasticsearch_auth"] = "beatsauth/_agent-component/default"
 		cfg["heartbeat"] = map[string]any{
 			"monitors": []map[string]any{
 				{
@@ -2067,8 +2061,7 @@ func TestGetOtelConfig(t *testing.T) {
 					"elasticsearch/_agent-component/default": expectedESConfig("default"),
 				},
 				"extensions": map[string]any{
-					"beatsauth/_agent-component/default":         expectedExtensionConfig(),
-					"elasticsearchauth/_agent-component/default": expectedElasticsearchAuthExtensionConfig(),
+					"beatsauth/_agent-component/default": expectedExtensionConfig(),
 				},
 				"receivers": map[string]any{
 					"heartbeatreceiver/_agent-component/heartbeat-default/test-1": expectedHeartbeatReceiverConfig("heartbeat-default"),
@@ -2076,7 +2069,6 @@ func TestGetOtelConfig(t *testing.T) {
 				"service": map[string]any{
 					"extensions": []any{
 						"beatsauth/_agent-component/default",
-						"elasticsearchauth/_agent-component/default",
 					},
 					"pipelines": map[string]any{
 						"logs/_agent-component/heartbeat-default": map[string][]string{
@@ -3066,7 +3058,7 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-1",
 				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/http-2",
 			},
-			expectedAuth: "elasticsearchauth/_agent-component/default",
+			expectedAuth: "beatsauth/_agent-component/default",
 		},
 		{
 			name:           "elasticsearch single receiver",
@@ -3075,7 +3067,7 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 			expectedReceiverIDs: []string{
 				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/single",
 			},
-			expectedAuth: "elasticsearchauth/_agent-component/default",
+			expectedAuth: "beatsauth/_agent-component/default",
 		},
 		{
 			name:           "logstash",
@@ -3676,6 +3668,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -3715,6 +3708,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -3746,6 +3740,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -3781,6 +3776,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "5m",

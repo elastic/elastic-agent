@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -24,8 +25,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
-
-const elasticsearchAuthExtensionType = "elasticsearchauth"
 
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
@@ -441,50 +440,6 @@ func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string
 	return hosts, nil
 }
 
-// getElasticsearchAuthExtensionConfig translates the endpoint, destination
-// headers, and credentials used by Heartbeat's Elasticsearch state loader.
-// Transport settings are delegated to the output-scoped beatsauth extension.
-func getElasticsearchAuthExtensionConfig(output *config.C, outputName string) (map[string]any, error) {
-	resolvedOutput, err := resolveElasticsearchOutputCloudConfig(output)
-	if err != nil {
-		return nil, err
-	}
-
-	esConfig := elasticsearch.DefaultConfig()
-	if err := resolvedOutput.Unpack(&esConfig); err != nil {
-		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
-	}
-	if err := esConfig.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
-	}
-
-	endpoints, err := getURL(esConfig, resolvedOutput)
-	if err != nil {
-		return nil, fmt.Errorf("error creating elasticsearchauth endpoints: %w", err)
-	}
-
-	extensionConfig := map[string]any{
-		"endpoints": endpoints,
-		"auth": map[string]any{
-			"authenticator": getBeatsAuthExtensionID(outputName).String(),
-		},
-	}
-
-	if esConfig.Username != "" || esConfig.Password != "" {
-		if esConfig.Username == "" || esConfig.Password == "" {
-			return nil, errors.New("username and password must be configured together for the elasticsearchauth extension")
-		}
-		extensionConfig["user"] = esConfig.Username
-		extensionConfig["password"] = esConfig.Password
-	}
-	if esConfig.APIKey != "" {
-		extensionConfig["api_key"] = esConfig.APIKey
-	}
-	setIfNotNil(extensionConfig, "headers", esConfig.Headers)
-
-	return extensionConfig, nil
-}
-
 // resolveElasticsearchOutputCloudConfig returns an independently owned,
 // environment-resolved output config and applies output-scoped Cloud ID fields
 // without changing the policy-derived source map.
@@ -546,13 +501,6 @@ func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
 	return "", nil
 }
 
-// getElasticsearchAuthExtensionID returns the output-scoped ID for the
-// elasticsearchauth extension.
-func getElasticsearchAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(elasticsearchAuthExtensionType), extensionName)
-}
-
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
@@ -560,8 +508,8 @@ func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
-// getBeatsAuthExtensionConfig sets http transport settings on beatsauth
-// this is only required for elasticsearch output
+// getBeatsAuthExtensionConfig translates an Elasticsearch output into the
+// beatsauth configuration shared by the Elasticsearch exporter and Heartbeat.
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	authSettings := beatsauthextension.BeatsAuthConfig{
 		Transport: elasticsearch.ESDefaultTransportSettings(),
@@ -600,6 +548,53 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 
 	// required to make the extension not cause the collector to fail and exit on startup
 	newMap["continue_on_error"] = true
+
+	resolvedOutput, err := resolveElasticsearchOutputCloudConfig(outputCfg)
+	if err != nil {
+		return nil, err
+	}
+
+	esConfig := elasticsearch.DefaultConfig()
+	if err := resolvedOutput.Unpack(&esConfig); err != nil {
+		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
+	}
+	if err := esConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
+	}
+
+	if outputCfg.HasField("hosts") || outputCfg.HasField("cloud_id") || outputCfg.HasField("cloud.id") {
+		endpoints, err := getURL(esConfig, resolvedOutput)
+		if err != nil {
+			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)
+		}
+		newMap["endpoints"] = endpoints
+	}
+
+	auth := map[string]any{}
+	if esConfig.Username != "" || esConfig.Password != "" {
+		if esConfig.Username == "" || esConfig.Password == "" {
+			return nil, errors.New("username and password must be configured together for the beatsauth extension")
+		}
+		auth["username"] = esConfig.Username
+		auth["password"] = esConfig.Password
+	}
+	if esConfig.APIKey != "" {
+		auth["api_key"] = esConfig.APIKey
+	}
+	if len(esConfig.Headers) > 0 {
+		headerNames := slices.Sorted(maps.Keys(esConfig.Headers))
+		headers := make([]map[string]string, 0, len(headerNames))
+		for _, name := range headerNames {
+			headers = append(headers, map[string]string{
+				"key":   name,
+				"value": esConfig.Headers[name],
+			})
+		}
+		auth["headers"] = headers
+	}
+	if len(auth) > 0 {
+		newMap["auth"] = auth
+	}
 
 	return newMap, nil
 }

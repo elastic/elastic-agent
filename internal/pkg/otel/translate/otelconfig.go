@@ -442,7 +442,7 @@ func getReceiversConfigForComponent(
 		sharedConfig["include_metadata"] = true
 	}
 	if beatName == "heartbeat" && comp.OutputType == "elasticsearch" {
-		sharedConfig["elasticsearch_auth"] = getElasticsearchAuthExtensionID(comp.OutputName).String()
+		sharedConfig["elasticsearch_auth"] = getBeatsAuthExtensionID(comp.OutputName).String()
 	}
 	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
@@ -622,29 +622,6 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	)
 	if err != nil {
 		return nil, nil, nil, nil, err
-	}
-
-	if comp.BeatName() == "heartbeat" && comp.OutputType == "elasticsearch" {
-		outputConfig, err := config.NewConfigFrom(outputUnit.Config.GetSource().AsMap())
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf(
-				"error copying config for Heartbeat Elasticsearch output %s: %w",
-				comp.OutputName,
-				err,
-			)
-		}
-		elasticsearchAuthConfig, err := getElasticsearchAuthExtensionConfig(outputConfig, comp.OutputName)
-		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf(
-				"error translating elasticsearchauth config for Heartbeat output %s: %w",
-				comp.OutputName,
-				err,
-			)
-		}
-		if extensionCfg == nil {
-			extensionCfg = map[string]any{}
-		}
-		extensionCfg[getElasticsearchAuthExtensionID(comp.OutputName).String()] = elasticsearchAuthConfig
 	}
 
 	return exporterCfg, queueCfg, extensionCfg, processors, nil
