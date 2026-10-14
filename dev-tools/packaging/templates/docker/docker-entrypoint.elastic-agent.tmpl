@@ -13,15 +13,15 @@ set -eo pipefail
 #
 
 {{- if contains .Variant "complete" }}
-# Chromium (browser monitors) only trusts its own NSS database, not the system
-# certificate store. Import any CA mounted into the standard location so users
-# don't need a custom image, and keep the database in sync while the container
-# runs. A bad certificate only logs a warning; it must not stop the agent.
+# Chromium (browser monitors) ignores the system trust store and only reads its
+# own NSS database. Import the CAs mounted in the standard location into it and
+# keep it in sync while the container runs. Failures only warn: they must not
+# stop the agent.
 custom_ca_dir=/usr/local/share/ca-certificates
 custom_ca_reload_interval="${ELASTIC_AGENT_CUSTOM_CA_RELOAD_INTERVAL:-30}"
 [[ "$custom_ca_reload_interval" =~ ^[0-9]+$ ]] || custom_ca_reload_interval=30
 
-# Print the PEM files in the custom CA directory, one per line.
+# PEM files in the CA directory, one per line.
 custom_ca_files() {
   local f
   for f in "$custom_ca_dir"/*.crt "$custom_ca_dir"/*.pem; do
@@ -30,17 +30,16 @@ custom_ca_files() {
   return 0
 }
 
-# Print a digest of the custom CA files' content, to detect changes.
+# Digest of the CA files' content, to detect changes.
 custom_ca_signature() {
   local f
   { while IFS= read -r f; do cat "$f"; done < <(custom_ca_files); } 2>/dev/null | sha256sum | cut -d' ' -f1
 }
 
-# Make the NSS database hold exactly the certificates in the custom CA directory.
-# Certificates are named after their content so unchanged ones are never touched,
-# which keeps running browsers from seeing a gap while others are replaced.
+# Make the NSS database match the CA directory. Certificates are named after
+# their content, so unchanged ones are never touched and running browsers never
+# see a gap.
 sync_custom_cas() {
-  # Chromium looks for the database under $HOME.
   local db="$HOME/.pki/nssdb"
   mkdir -p "$db" || true
   if [[ ! -f "$db/cert9.db" ]] && ! certutil -N -d "sql:$db" --empty-password; then
@@ -52,7 +51,7 @@ sync_custom_cas() {
   local -A want=()
   tmp=$(mktemp -d)
   while IFS= read -r f; do
-    # certutil imports only the first certificate of a file, so split bundles.
+    # certutil imports only the first certificate of a file: split bundles.
     awk -v dir="$tmp" -v base="$(basename "$f")" '
       /-----BEGIN CERTIFICATE-----/ { n++; out = dir "/" base "." n ".pem" }
       out { print > out }
@@ -90,8 +89,8 @@ if ! command -v certutil >/dev/null; then
 else
   custom_ca_last=$(custom_ca_signature)
   if [[ -n "$(custom_ca_files)" ]]; then
-    # $HOME is "/" (read-only) when running as an arbitrary UID, e.g. on OpenShift.
-    # Set it before the agent starts so Chromium finds the database as well.
+    # Chromium finds the database through $HOME, which is a read-only "/" for
+    # arbitrary UIDs (e.g. OpenShift). Fix it before the agent, and so Chromium, starts.
     [[ -w "${HOME:-}" ]] || export HOME={{ $beatHome }}
     sync_custom_cas
   fi
