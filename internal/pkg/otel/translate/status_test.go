@@ -89,10 +89,10 @@ func TestGetAllComponentState(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-1", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -393,7 +393,7 @@ func TestGetComponentStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%stest-component/stream-1", OtelNamePrefix): {
+					fmt.Sprintf("receiver:filebeat/%stest-component/filestream-unit-stream-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
@@ -440,7 +440,7 @@ func TestGetComponentStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%stest-component/stream-1", OtelNamePrefix): {
+					fmt.Sprintf("receiver:filebeat/%stest-component/filestream-unit-stream-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
@@ -487,7 +487,7 @@ func TestGetComponentStatus(t *testing.T) {
 			status: &status.AggregateStatus{
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					fmt.Sprintf("receiver:filebeat/%stest-component/stream-1", OtelNamePrefix): {
+					fmt.Sprintf("receiver:filebeat/%stest-component/filestream-unit-stream-1", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					fmt.Sprintf("exporter:elasticsearch/%sexporter-1", OtelNamePrefix): {
@@ -1444,10 +1444,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-1", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1505,10 +1505,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-1", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1566,10 +1566,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-1", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1627,10 +1627,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-1", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {
@@ -1688,10 +1688,10 @@ func TestOutputStatus(t *testing.T) {
 					fmt.Sprintf("pipeline:logs/%sfilestream-default", OtelNamePrefix): {
 						Event: componentstatus.NewEvent(componentstatus.StatusRecoverableError),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-1", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-1", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							fmt.Sprintf("receiver:filebeat/%sfilestream-default/test-2", OtelNamePrefix): {
+							fmt.Sprintf("receiver:filebeat/%sfilestream-default/filestream-unit-test-2", OtelNamePrefix): {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							fmt.Sprintf("exporter:elasticsearch/%sfilestream-default", OtelNamePrefix): {

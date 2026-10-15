@@ -29,6 +29,7 @@ func TestSamples(t *testing.T) {
 	t.Setenv("ELASTIC_OTLP_ENDPOINT", "http://localhost:4318")
 	t.Setenv("AUTOOPS_ES_URL", "http://localhost:9200")
 	t.Setenv("AUTOOPS_TOKEN", "token")
+	t.Setenv("ELASTIC_CLOUD_CONNECTED_MODE_API_KEY", "api_key")
 	t.Setenv("AUTOOPS_OTEL_URL", "http://localhost:4318")
 
 	// Enable service.profilesSupport featuregate to test the profiling samples.

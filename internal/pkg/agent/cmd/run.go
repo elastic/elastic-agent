@@ -516,6 +516,7 @@ func runElasticAgent(
 	wg := new(sync.WaitGroup)
 	additionalGoroutinesContext, cancelAdditionalGoroutines := context.WithCancel(ctx)
 	defer cancelAdditionalGoroutines()
+
 	// Spawn the rollbacks cleanup goroutine
 	relativeHomePath, homePathErr := filepath.Rel(paths.Top(), paths.Home())
 	if homePathErr == nil {
