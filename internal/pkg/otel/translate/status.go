@@ -320,7 +320,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 				for i, stream := range u.Config.Streams {
 					src := stream.GetSource().AsMap()
 					streamID := resolveStreamID(stream.Id, src, u.ID, i)
-					receiverByInputID[streamID] = rs
+					receiverByInputID[receiverStreamSuffix(comp.ID, u.ID, streamID)] = rs
 				}
 			}
 		}
@@ -349,7 +349,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		switch unit.Type {
 		case client.UnitTypeInput:
 			if len(receiverByInputID) > 0 {
-				compState.Units[unitKey] = getComponentUnitState(nil, receiverByInputID, unit, &comp)
+				compState.Units[unitKey] = getComponentUnitState(nil, receiversForUnit(receiverByInputID, unit, &comp), unit, &comp)
 			}
 		case client.UnitTypeOutput:
 			if exporterStatus != nil {
@@ -363,6 +363,33 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		State:     compState,
 	}
 	return compStatus, nil
+}
+
+// receiversForUnit narrows a map of receiver statuses keyed by receiver stream suffix down to the
+// receivers of a single input unit, keyed by stream ID (or beat input ID for units without streams).
+func receiversForUnit(receiverBySuffix map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component) map[string]*status.AggregateStatus {
+	result := make(map[string]*status.AggregateStatus)
+	if unit.Config == nil {
+		return result
+	}
+	for i, stream := range unit.Config.Streams {
+		var streamSource map[string]any
+		if src := stream.GetSource(); src != nil {
+			streamSource = src.AsMap()
+		}
+		streamID := resolveStreamID(stream.Id, streamSource, unit.ID, i)
+		if rs, ok := receiverBySuffix[receiverStreamSuffix(comp.ID, unit.ID, streamID)]; ok {
+			result[streamID] = rs
+		}
+	}
+	if len(unit.Config.Streams) == 0 {
+		if beatInputID := comp.GetBeatInputIDForUnit(unit.ID); beatInputID != "" {
+			if rs, ok := receiverBySuffix[receiverStreamSuffix(comp.ID, unit.ID, beatInputID)]; ok {
+				result[beatInputID] = rs
+			}
+		}
+	}
+	return result
 }
 
 // getStreamStatusFromReceiver extracts a stream's status from a receiver's "inputs" attributes.

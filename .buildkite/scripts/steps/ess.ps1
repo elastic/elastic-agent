@@ -1,3 +1,8 @@
+# Default cluster.max_shards_per_node for the CI stack. Elasticsearch's default is
+# 1000 per data node, which the oblt-cli stack (3 data nodes) exhausts when many
+# integration test jobs share one stack. Keep in sync with ess_oblt-cli.sh.
+$script:EssMaxShardsPerNode = if ($Env:ESS_MAX_SHARDS_PER_NODE) { [int]$Env:ESS_MAX_SHARDS_PER_NODE } else { 2000 }
+
 function ess_up {
   param (
       [string]$StackVersion,
@@ -82,6 +87,38 @@ function ess_up {
   if ($rc -ne 0) {
       Write-Error "Error: ess_load_secrets failed (exit=$rc)"
       return $rc
+  }
+
+  ess_raise_shard_limit
+}
+
+# The oblt-cli template can't set Elasticsearch settings, so raise the shard limit
+# through the cluster settings API once the stack is up. Needs the variables set
+# by ess_load_secrets. A failure is only a warning: the stack is still usable,
+# tests just have less shard headroom.
+function ess_raise_shard_limit {
+  Write-Host "~~~ Setting cluster.max_shards_per_node to $script:EssMaxShardsPerNode"
+
+  if (-not $Env:ELASTICSEARCH_HOST -or -not $Env:ELASTICSEARCH_USERNAME -or -not $Env:ELASTICSEARCH_PASSWORD) {
+      Write-Warning "Elasticsearch credentials are not loaded, leaving cluster.max_shards_per_node at its default"
+      return
+  }
+
+  $esUrl = $Env:ELASTICSEARCH_HOST
+  if ($esUrl -notmatch '^https?://') {
+      $esUrl = "https://$esUrl"
+  }
+  $token = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("$($Env:ELASTICSEARCH_USERNAME):$($Env:ELASTICSEARCH_PASSWORD)"))
+  $body = @{ persistent = @{ "cluster.max_shards_per_node" = $script:EssMaxShardsPerNode } } | ConvertTo-Json -Compress
+
+  try {
+      Retry-Command -ScriptBlock {
+          Invoke-RestMethod -Method Put -Uri "$esUrl/_cluster/settings" `
+              -Headers @{ Authorization = "Basic $token" } `
+              -ContentType "application/json" -Body $body -TimeoutSec 30 | Out-Null
+      }
+  } catch {
+      Write-Warning "Failed to set cluster.max_shards_per_node, tests may hit the default shard limit: $($_.Exception.Message)"
   }
 }
 
