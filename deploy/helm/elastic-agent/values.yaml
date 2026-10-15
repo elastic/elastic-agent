@@ -475,6 +475,11 @@ agent:
       # -- create the SecurityContextConstraints and RoleBindings that let the agent and kube-state-metrics service accounts run on OpenShift
       # @section -- 6 - Elastic-Agent Configuration
       create: true
+  customCAs:
+    # -- name of an existing Secret with PEM CA certificates (`*.crt` or `*.pem` keys) to trust in browser monitors. It is mounted at `/usr/local/share/ca-certificates`
+    # and imported by the `complete` image variants, so use one of them. Changes to the Secret are picked up without a restart.
+    # @section -- 6 - Elastic-Agent Configuration
+    secretName: ""
   fleet:
     # -- enable elastic-agent managed
     # @section -- 6.1 - Elastic-Agent Managed Configuration

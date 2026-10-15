@@ -120,6 +120,7 @@ Validate and initialise the defined agent presets
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- include "elasticagent.preset.mutate.unprivileged" (list $ $presetVal) -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $presetVal) -}}
+{{- include "elasticagent.preset.mutate.customcas" (list $ $presetVal) -}}
 {{- $presetMode := ($presetVal).mode -}}
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- $presetInputs := dig "_inputs" (list) $presetVal -}}
@@ -211,6 +212,21 @@ Mutate an agent preset based on agent.unprivileged
 {{- $_ := set $presetSecurityContextCapabilities "add" $presetSecurityContextCapabilitiesAdd -}}
 {{- else -}}
 {{- $_ := set $presetSecurityContext "runAsUser" 0 }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Mutate an agent preset to mount the Secret in agent.customCAs, which the complete image variants import
+into the browser trust store at container start
+*/}}
+{{- define "elasticagent.preset.mutate.customcas" -}}
+{{- $ := index . 0 -}}
+{{- $preset := index . 1 -}}
+{{- with ($.Values.agent.customCAs).secretName -}}
+{{- $volume := dict "name" "custom-cas" "secret" (dict "secretName" .) -}}
+{{- $volumeMount := dict "name" "custom-cas" "mountPath" "/usr/local/share/ca-certificates" "readOnly" true -}}
+{{- include "elasticagent.preset.mutate.volumes" (list $preset (dict "extraVolumes" (list $volume))) -}}
+{{- include "elasticagent.preset.mutate.volumemounts" (list $preset (dict "extraVolumeMounts" (list $volumeMount))) -}}
 {{- end -}}
 {{- end -}}
 

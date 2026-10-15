@@ -1,0 +1,19 @@
+kind: enhancement
+
+summary: Trust custom CAs in browser monitors of the complete Docker images
+
+description: >
+  The elastic-agent-complete and elastic-agent-complete-wolfi images now import
+  the PEM certificates (.crt and .pem, including bundles) mounted in
+  /usr/local/share/ca-certificates into the NSS database that Chromium uses.
+  They do it at container start and again while the container runs when the
+  files change (every ELASTIC_AGENT_CUSTOM_CA_RELOAD_INTERVAL seconds, default
+  30). Browser monitors can then reach endpoints signed by an internal CA
+  without building a custom image or ignoring TLS errors. The images ship
+  certutil (nss-tools / libnss-tools) for this, and fall back to a writable
+  HOME when running as an arbitrary UID. The Helm chart gains
+  `agent.customCAs.secretName` to mount a Secret with the CAs at that location.
+
+component: elastic-agent
+
+issue: https://github.com/elastic/elastic-agent/issues/6633

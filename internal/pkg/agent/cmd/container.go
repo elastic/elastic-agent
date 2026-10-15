@@ -45,6 +45,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
+	"github.com/elastic/elastic-agent/internal/pkg/customca"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -185,6 +186,20 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
+// containerBeatHome is the agent user's home in the container images.
+const containerBeatHome = "/usr/share/elastic-agent"
+
+// streamsLogger writes to the container's output streams, for packages that take a logger.
+type streamsLogger struct{ streams *cli.IOStreams }
+
+func (l streamsLogger) Infof(format string, args ...any) {
+	fmt.Fprintf(l.streams.Out, format+"\n", args...)
+}
+
+func (l streamsLogger) Warnf(format string, args ...any) {
+	fmt.Fprintf(l.streams.Err, "WARNING: "+format+"\n", args...)
+}
+
 func logContainerCmd(streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
@@ -209,6 +224,12 @@ func containerCmd(streams *cli.IOStreams) error {
 	if err := setPaths("", "", "", "", true); err != nil {
 		return err
 	}
+
+	// Browser monitors (complete images) trust the CAs mounted in the container. This
+	// must run before the agent starts the browser: it may change HOME.
+	caCtx, stopCustomCAs := context.WithCancel(context.Background())
+	defer stopCustomCAs()
+	customca.Start(caCtx, customca.Options{BeatHome: containerBeatHome, Log: streamsLogger{streams}})
 
 	elasticCloud := envBool("ELASTIC_AGENT_CLOUD")
 	// if not in cloud mode, always run the agent
