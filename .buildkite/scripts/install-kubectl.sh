@@ -6,14 +6,14 @@ echo "--- Install kubectl"
 MSG="parameter missing."
 DEFAULT_HOME="/usr/local"
 K8S_VERSION=${K8S_VERSION:?$MSG}
-HOME=${HOME:?$DEFAULT_HOME}
+HOME=${HOME:-$DEFAULT_HOME}
 KUBECTL_CMD="${HOME}/bin/kubectl"
 
 if command -v kubectl
 then
     set +e
     echo "Found kubectl. Checking version.."
-    FOUND_KUBECTL_VERSION=$(kubectl version --client --short 2>&1 >/dev/null | awk '{print $3}')
+    FOUND_KUBECTL_VERSION=$(kubectl version --client 2>/dev/null | awk '/^Client Version:/ {print $3}')
     if [ "${FOUND_KUBECTL_VERSION}" == "${K8S_VERSION}" ]
     then
         echo "Versions match. No need to install kubectl. Exiting."
