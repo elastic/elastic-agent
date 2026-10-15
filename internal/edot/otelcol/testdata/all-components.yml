@@ -65,6 +65,11 @@ processors:
     rate: 1
     burst: 1
   tail_sampling:
+  adaptive_tail_sampling:
+    rules:
+      - name: default
+        sampler:
+          type: always_sample
   log_dedup:
   beat:
 
@@ -352,6 +357,7 @@ service:
         - resource_detection
         - transform
         - elasticapm
+        - adaptive_tail_sampling
       receivers:
         - nop
         - otlp
