@@ -483,11 +483,6 @@ func (m *OTelManager) buildMergedConfig(
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
-		// Components always translate to beat receivers, which read the User-Agent from this extension.
-		if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
-			return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
-		}
-
 		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
@@ -510,6 +505,10 @@ func (m *OTelManager) buildMergedConfig(
 
 	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
+	}
+
+	if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
+		return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
 	}
 
 	// if the otel log level is unset, use the most verbose level across agent and all units
@@ -560,12 +559,11 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 	}))
 }
 
-const headersSetterExtensionID = "headers_setter/" + translate.OtelNamePrefix
-
 func injectHeaderSetterExtension(config *confmap.Conf, agentInfo info.Agent) error {
+	extensionName := fmt.Sprintf("%s/%s", "headers_setter", translate.OtelNamePrefix)
 	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
 		"extensions": map[string]any{
-			headersSetterExtensionID: map[string]any{
+			extensionName: map[string]any{
 				"headers": []any{
 					map[string]any{
 						"action": "upsert",
@@ -576,7 +574,7 @@ func injectHeaderSetterExtension(config *confmap.Conf, agentInfo info.Agent) err
 			},
 		},
 		"service": map[string]any{
-			"extensions": []any{headersSetterExtensionID},
+			"extensions": []any{extensionName},
 		},
 	}))
 }
