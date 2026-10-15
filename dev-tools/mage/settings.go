@@ -1019,20 +1019,6 @@ func (s *Settings) WithTestGroups(groups string) *Settings {
 	return clone
 }
 
-// WithAgentBuildDir returns a copy of the settings with the specified agent build directory.
-func (s *Settings) WithAgentBuildDir(path string) *Settings {
-	clone := s.Clone()
-	clone.IntegrationTest.AgentBuildDir = path
-	return clone
-}
-
-// WithTestBinaryName returns a copy of the settings with the specified test binary name.
-func (s *Settings) WithTestBinaryName(name string) *Settings {
-	clone := s.Clone()
-	clone.IntegrationTest.BinaryName = name
-	return clone
-}
-
 // BuildSettings contains build-related settings.
 type BuildSettings struct {
 	// GOOS is the target operating system (from build.Default.GOOS)
@@ -1314,9 +1300,6 @@ type IntegrationTestSettings struct {
 
 	// DefineTests specifies the tests to run (from TEST_DEFINE_TESTS env var)
 	DefineTests string
-
-	// BinaryName is the binary name for testing (from TEST_BINARY_NAME env var)
-	BinaryName string
 
 	// RepoPath is the repository path for testing (from TEST_INTEG_REPO_PATH env var)
 	RepoPath string
@@ -1730,9 +1713,6 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	}
 	if v := os.Getenv("TEST_DEFINE_TESTS"); v != "" {
 		s.IntegrationTest.DefineTests = v
-	}
-	if v := os.Getenv("TEST_BINARY_NAME"); v != "" {
-		s.IntegrationTest.BinaryName = v
 	}
 	if v := os.Getenv("TEST_INTEG_REPO_PATH"); v != "" {
 		s.IntegrationTest.RepoPath = v
