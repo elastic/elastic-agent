@@ -1711,9 +1711,9 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	assert.Contains(t, list, "user_extension",
 		"user-supplied extension must be present in merged service::extensions")
 
-	assert.Contains(t, list, headersSetterExtensionID,
+	assert.Contains(t, list, "headers_setter/_agent-component/",
 		"headers_setter extension must be injected when the config has beat receivers")
-	assert.True(t, result.IsSet("extensions::"+headersSetterExtensionID),
+	assert.True(t, result.IsSet("extensions::headers_setter/_agent-component/"),
 		"headers_setter extension config must be present when the config has beat receivers")
 }
 
@@ -1767,9 +1767,9 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	assert.Contains(t, list, "user_extension",
 		"collector-config extension must be present in merged service::extensions")
 
-	assert.NotContains(t, list, headersSetterExtensionID,
+	assert.NotContains(t, list, "headers_setter/_agent-component/",
 		"headers_setter extension must not be injected without beat receivers")
-	assert.False(t, result.IsSet("extensions::"+headersSetterExtensionID),
+	assert.False(t, result.IsSet("extensions::headers_setter/_agent-component/"),
 		"headers_setter extension config must not be present without beat receivers")
 }
 
