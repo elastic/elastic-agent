@@ -38,6 +38,9 @@ jobs:
       - name: Create ephemeral GitHub token
         id: github-token
         uses: elastic/oblt-actions/github/create-token@v1
+        with:
+          # Wildcard policy bump-*.yml@* (catalog token-policy-7821ae69db47)
+          token-policy: token-policy-7821ae69db47
 
       - name: Checkout
         uses: actions/checkout@v7
