@@ -1982,3 +1982,15 @@ func TestSetClient(t *testing.T) {
 	upgrader.SetClient(&mockSender{})
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
 }
+
+func TestSetClientURISurvivesReload(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	upgrader.SetClient(&mockSender{})
+	require.NoError(t, upgrader.Reload(config.MustNewConfigFrom("")))
+	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
+}
