@@ -451,6 +451,9 @@ func getReceiversConfigForComponent(
 	if comp.OutputType == "kafka" || comp.OutputType == "logstash" {
 		sharedConfig["include_metadata"] = true
 	}
+	if beatName == "heartbeat" && comp.OutputType == "elasticsearch" {
+		sharedConfig["elasticsearch_auth"] = getBeatsAuthExtensionID(comp.OutputName).String()
+	}
 	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
 	}
@@ -620,7 +623,18 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	if !ok {
 		return nil, nil, nil, nil, nil
 	}
-	return unitToExporterConfig(outputUnit, comp.OutputName, exporterType, logger)
+
+	exporterCfg, queueCfg, extensionCfg, processors, err = unitToExporterConfig(
+		outputUnit,
+		comp.OutputName,
+		exporterType,
+		logger,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return exporterCfg, queueCfg, extensionCfg, processors, nil
 }
 
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
