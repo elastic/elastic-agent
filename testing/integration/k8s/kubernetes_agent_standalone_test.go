@@ -1258,9 +1258,7 @@ func k8sStepCreateNamespace() k8sTestStep {
 
 		t.Cleanup(func() {
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
-			if err != nil {
-				t.Logf("failed to delete namespace: %v", err)
-			}
+			assert.NoError(t, err, "failed to delete namespace")
 		})
 
 		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, k8sNamespace)
@@ -1377,9 +1375,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 			}
 
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, objects...)
-			if err != nil {
-				t.Logf("failed to delete objects: %v", err)
-			}
+			assert.NoError(t, err, "failed to delete objects")
 		})
 
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
@@ -1477,7 +1473,13 @@ func k8sStepHelmUninstall(releaseName string) k8sTestStep {
 		require.NoError(t, err, "failed to init helm action config")
 
 		uninstallAction := action.NewUninstall(actionConfig)
+<<<<<<< HEAD
 		uninstallAction.Wait = true
+=======
+		uninstallAction.WaitStrategy = helmkube.LegacyStrategy
+		uninstallAction.Timeout = 2 * time.Minute
+		uninstallAction.DeletionPropagation = "foreground"
+>>>>>>> c49b8c6 (ci(kubernetes): run Kubernetes integration tests on MicroShift (#15925))
 		_, err = uninstallAction.Run(releaseName)
 		require.NoError(t, err, "failed to uninstall helm chart")
 	}
@@ -1576,6 +1578,7 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait", "--timeout=120s")
 			_ = delCmd.Run()
 		})
+
 		// Use kubectl apply -f to apply the manifest.
 		applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", manifestPath)
 		applyOut, applyErr := applyCmd.CombinedOutput()

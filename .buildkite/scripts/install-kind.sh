@@ -6,15 +6,15 @@ echo "--- Install Kind"
 MSG="environment variable missing."
 DEFAULT_HOME="/usr/local"
 KIND_VERSION=${KIND_VERSION:?$MSG}
-HOME=${HOME:?$DEFAULT_HOME}
+HOME=${HOME:-$DEFAULT_HOME}
 KIND_CMD="${HOME}/bin/kind"
 
 if command -v kind
 then
     set +e
     echo "Found Kind. Checking version.."
-    FOUND_KIND_VERSION=$(kind --version 2>&1 >/dev/null | awk '{print $3}')
-    if [ "$FOUND_KIND_VERSION" == "$KIND_VERSION" ]
+    FOUND_KIND_VERSION=$(kind --version 2>/dev/null | awk '{print $3}')
+    if [ "$FOUND_KIND_VERSION" == "${KIND_VERSION#v}" ]
     then
         echo "Versions match. No need to install Kind. Exiting."
         exit 0
