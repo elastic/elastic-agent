@@ -99,6 +99,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [adaptivetailsamplingprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/adaptivetailsamplingprocessor/v0.161.0/processor/adaptivetailsamplingprocessor/README.md) | v0.161.0 |
 | [attributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/attributesprocessor/v0.161.0/processor/attributesprocessor/README.md) | v0.161.0 |
 | [batchprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/batchprocessor/v0.161.0/processor/batchprocessor/README.md) | v0.161.0 |
 | [cumulativetodeltaprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/cumulativetodeltaprocessor/v0.161.0/processor/cumulativetodeltaprocessor/README.md) | v0.161.0 |

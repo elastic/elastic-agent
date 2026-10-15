@@ -43,6 +43,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.161.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/logdedupprocessor v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/processor/tailsamplingprocessor v0.161.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/apachereceiver v0.161.0
@@ -142,6 +143,7 @@ require (
 	github.com/gosnmp/gosnmp v1.44.0 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
 	github.com/hashicorp/go-metrics v0.6.0 // indirect
+	github.com/honeycombio/dynsampler-go v0.6.4 // indirect
 	github.com/huandu/go-clone v1.7.3 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
 	github.com/itchyny/timefmt-go v0.1.8 // indirect

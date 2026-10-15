@@ -913,6 +913,8 @@ github.com/hetznercloud/hcloud-go/v2 v2.47.0 h1:SI7C4cvdYReb2aHUEQ8KBMOqxNnmd4hO
 github.com/hetznercloud/hcloud-go/v2 v2.47.0/go.mod h1:pdG7fFGlYsCAaJ9r0QOIF0O6wQcpbJxT2VT8aP6XlIc=
 github.com/hexops/gotextdiff v1.0.3 h1:gitA9+qJrrTCsiCl7+kh75nPqQt1cx4ZkudSTLoUqJM=
 github.com/hexops/gotextdiff v1.0.3/go.mod h1:pSWU5MAI3yDq+fZBTazCSJysOMbxWL1BSow5/V2vxeg=
+github.com/honeycombio/dynsampler-go v0.6.4 h1:EM3FXN2Lfmso41MRMmSvRynMrz+AHiRffaWHPf4ZHDs=
+github.com/honeycombio/dynsampler-go v0.6.4/go.mod h1:M5YYNOfxRrBlEWDatTlHMYo5F7GjwVnptx5z+uXIVMo=
 github.com/hpcloud/tail v1.0.0 h1:nfCOvKYfkgYP8hkirhJocXT2+zOD8yUNjXaWfTlyFKI=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/huandu/go-assert v1.1.5 h1:fjemmA7sSfYHJD7CUqs9qTwwfdNAx7/j2/ZlHXzNB3c=
@@ -1287,6 +1289,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xk8stest v0.161.0 
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xk8stest v0.161.0/go.mod h1:hDwYbgMU/xUGzDGTm2vZprOmK6LDh3y6Dw2HYsmL16Y=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xstreamencoding v0.161.0 h1:HhgPPSNMWMweV5ICSvrRgzsRQGfPa1r8tm/mFf1XXXs=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xstreamencoding v0.161.0/go.mod h1:ThlAod8EgwvCy7YisKJ9z63j1A/5fbPZN/RwiJVeOA0=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor v0.161.0 h1:EDHxCcw1TnFv3j50YbRK6qPTO4npp6xpFzG3mxnPxGs=
+github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor v0.161.0/go.mod h1:6DShv7smDgYxA6EkitvHIbnnJ8ZIIq4hrA9EM/itZ1Q=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.161.0 h1:LRvR7uhi922QBL22quliXDTNMvOvx15pAEaVbbJhDzg=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor v0.161.0/go.mod h1:Z5vTfM4nCUehjw4DDvKJlNpet5BP7R7HBrwG9OzqsFQ=
 github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor v0.161.0 h1:8e+zbTFP8GaC6D8RTNzwh7JvcahVhZGvxOnsW86AaA8=
