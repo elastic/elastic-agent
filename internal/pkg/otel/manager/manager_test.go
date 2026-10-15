@@ -1710,6 +1710,11 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	// The user-supplied extension must also be present.
 	assert.Contains(t, list, "user_extension",
 		"user-supplied extension must be present in merged service::extensions")
+
+	assert.Contains(t, list, headersSetterExtensionID,
+		"headers_setter extension must be injected when the config has beat receivers")
+	assert.True(t, result.IsSet("extensions::"+headersSetterExtensionID),
+		"headers_setter extension config must be present when the config has beat receivers")
 }
 
 // TestBuildMergedConfigCollectorOnlyExtensions verifies that when there are no
@@ -1761,6 +1766,11 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	require.NotNil(t, list)
 	assert.Contains(t, list, "user_extension",
 		"collector-config extension must be present in merged service::extensions")
+
+	assert.NotContains(t, list, headersSetterExtensionID,
+		"headers_setter extension must not be injected without beat receivers")
+	assert.False(t, result.IsSet("extensions::"+headersSetterExtensionID),
+		"headers_setter extension config must not be present without beat receivers")
 }
 
 func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
@@ -2089,7 +2099,6 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
-		assert.NoError(t, injectHeaderSetterExtension(expectedCfg, agentInfo))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))
