@@ -787,11 +787,11 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261013213844-a60ac714712a
+Version: v7.0.0-alpha2.0.20261014220942-6d2736e2a0b6
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261013213844-a60ac714712a/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/beats/v7@v7.0.0-alpha2.0.20261014220942-6d2736e2a0b6/LICENSE.txt:
 
 Source code in this repository is variously licensed under the Apache License
 Version 2.0, an Apache compatible license, or the Elastic License. Outside of
@@ -11849,11 +11849,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go@v0.123.0/LICEN
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/auth
-Version: v0.24.0
+Version: v0.24.1
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/auth@v0.24.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/auth@v0.24.1/LICENSE:
 
 
                                  Apache License
@@ -12485,11 +12485,11 @@ Contents of probable licence file $GOMODCACHE/cloud.google.com/go/bigquery@v1.85
 
 --------------------------------------------------------------------------------
 Dependency : cloud.google.com/go/compute
-Version: v1.71.0
+Version: v1.72.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute@v1.71.0/LICENSE:
+Contents of probable licence file $GOMODCACHE/cloud.google.com/go/compute@v1.72.0/LICENSE:
 
 
                                  Apache License
@@ -15195,11 +15195,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/Azure/azure-sdk-for-go/sdk/azcore
-Version: v1.23.1
+Version: v1.23.3
 Licence type (autodetected): MIT
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/!azure/azure-sdk-for-go/sdk/azcore@v1.23.1/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/!azure/azure-sdk-for-go/sdk/azcore@v1.23.3/LICENSE.txt:
 
 MIT License
 
@@ -58216,11 +58216,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/microsoft/go-mssqldb
-Version: v1.11.0
+Version: v1.11.2
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/microsoft/go-mssqldb@v1.11.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/microsoft/go-mssqldb@v1.11.2/LICENSE.txt:
 
 Copyright (c) 2012 The Go Authors. All rights reserved.
 Copyright (c) Microsoft Corporation.

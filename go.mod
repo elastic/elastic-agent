@@ -14,7 +14,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261013213844-a60ac714712a
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261014220942-6d2736e2a0b6
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.47.0
@@ -116,10 +116,10 @@ require (
 	aqwari.net/xml v0.0.0-20210331023308-d9421b293817 // indirect
 	cel.dev/expr v0.25.2 // indirect
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.24.0 // indirect
+	cloud.google.com/go/auth v0.24.1 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.3.0 // indirect
 	cloud.google.com/go/bigquery v1.85.0 // indirect
-	cloud.google.com/go/compute v1.71.0 // indirect
+	cloud.google.com/go/compute v1.72.0 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	cloud.google.com/go/iam v1.14.0 // indirect
 	cloud.google.com/go/longrunning v1.3.0 // indirect
@@ -139,7 +139,7 @@ require (
 	github.com/Azure/azure-event-hubs-go/v3 v3.6.2 // indirect
 	github.com/Azure/azure-pipeline-go v0.2.3 // indirect
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.1 // indirect
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.13.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2 v2.0.2 // indirect
@@ -483,7 +483,7 @@ require (
 	github.com/mdlayher/socket v0.6.0 // indirect
 	github.com/mdlayher/vsock v1.3.0 // indirect
 	github.com/meraki/dashboard-api-go/v3 v3.0.9 // indirect
-	github.com/microsoft/go-mssqldb v1.11.0 // indirect
+	github.com/microsoft/go-mssqldb v1.11.2 // indirect
 	github.com/microsoft/wmi v0.45.0 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
