@@ -17,6 +17,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
@@ -69,6 +70,29 @@ func forceNonRoot(detail component.PlatformDetail) component.PlatformDetail {
 	return detail
 }
 
+// IsUnprivileged reports whether the installed agent stores must be read in unprivileged mode.
+// That is the case when the current process is not root/Administrator, or when the agent was
+// installed with --unprivileged on darwin (detected through the file vault holding the agent secret),
+// as such installs use a file vault instead of the System keychain even when the process runs as root.
+func IsUnprivileged(ctx context.Context) (bool, error) {
+	isAdmin, err := utils.HasRoot()
+	if err != nil {
+		return false, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
+	}
+	if !isAdmin {
+		return true, nil
+	}
+	if runtime.GOOS != "darwin" {
+		// the vault selection only depends on the unprivileged flag on darwin
+		return false, nil
+	}
+	unprivilegedVault, err := secret.HasUnprivilegedVault(ctx)
+	if err != nil {
+		return false, fmt.Errorf("error checking for unprivileged vault: %w", err)
+	}
+	return unprivilegedVault, nil
+}
+
 func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath string, variablesWait time.Duration, platformModifiers ...component.PlatformModifier) ([]component.Component, error) {
 	// Load the requirements before trying to load the configuration. These should always load
 	// even if the configuration is wrong.
@@ -81,17 +105,17 @@ func GetComponentsFromPolicy(ctx context.Context, l *logger.Logger, cfgPath stri
 		return nil, fmt.Errorf("failed to detect inputs and outputs: %w", err)
 	}
 
-	isAdmin, err := utils.HasRoot()
-	if err != nil {
-		return nil, fmt.Errorf("error checking for root/Administrator privileges: %w", err)
-	}
-
-	m, otel, lvl, err := GetConfigWithVariables(ctx, l, cfgPath, variablesWait, !isAdmin)
+	unprivileged, err := IsUnprivileged(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	rawCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
+	m, otel, lvl, err := GetConfigWithVariables(ctx, l, cfgPath, variablesWait, unprivileged)
+	if err != nil {
+		return nil, err
+	}
+
+	rawCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
 	if err != nil {
 		return nil, err
 	}
