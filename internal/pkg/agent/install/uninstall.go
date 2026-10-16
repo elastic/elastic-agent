@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,7 +24,6 @@ import (
 	aerrors "github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vars"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/config/operations"
@@ -66,7 +64,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 	}
 
 	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
-	unprivileged, err := checkForUnprivilegedVault(ctx)
+	unprivileged, err := secret.HasUnprivilegedVault(ctx)
 	if err != nil {
 		return fmt.Errorf("error checking for unprivileged vault: %w", err)
 	}
@@ -263,27 +261,6 @@ func EnsureStoppedService(topPath string, pt ProgressDescriber) (service.Status,
 		pt.Describe("Service already stopped")
 	}
 	return status, nil
-}
-
-func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
-	// check if we have a file vault to detect if we have to use it for reading config
-	opts = append(opts, vault.WithReadonly(true))
-	vaultOpts, err := vault.ApplyOptions(opts...)
-	if err != nil {
-		return false, err
-	}
-	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
-	if fileVaultErr == nil {
-		ok, keyErr := fileVault.Exists(ctx, secret.AgentSecretKey)
-		if keyErr == nil && ok {
-			// we have a valid file vault and it contains the key, set unprivileged
-			return true, nil
-		}
-	} else if !errors.Is(fileVaultErr, fs.ErrNotExist) {
-		// we had a different error than NotExist
-		return false, fmt.Errorf("error checking for file vault existence: %w", fileVaultErr)
-	}
-	return false, nil
 }
 
 // RemovePath helps with removal of a path where there is a probability of
