@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	"github.com/elastic/elastic-agent/testing/installtest"
 
 	"github.com/otiai10/copy"
@@ -36,6 +38,7 @@ type CustomPGP struct {
 
 type UpgradeOpts struct {
 	sourceURI *string
+	BasePath  string
 
 	unprivileged     *bool
 	skipVerify       bool
@@ -77,6 +80,13 @@ func WithSourceURI(sourceURI string) UpgradeOpt {
 func WithUnprivileged(unprivileged bool) UpgradeOpt {
 	return func(opts *UpgradeOpts) {
 		opts.unprivileged = &unprivileged
+	}
+}
+
+// WithBasePath sets the custom base path for the installation checks.
+func WithBasePath(basePath string) UpgradeOpt {
+	return func(opts *UpgradeOpts) {
+		opts.BasePath = basePath
 	}
 }
 
@@ -278,6 +288,7 @@ func PerformUpgrade(
 	}
 
 	installOpts := atesting.InstallOpts{
+		BasePath:       upgradeOpts.BasePath,
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		Privileged:     !(*upgradeOpts.unprivileged),
@@ -313,7 +324,11 @@ func PerformUpgrade(
 
 		// validate installation is correct
 		if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
-			err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+			var topPath string
+			if installOpts.BasePath != "" {
+				topPath = paths.InstallPath(installOpts.BasePath)
+			}
+			err = installtest.CheckSuccess(ctx, startFixture, topPath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
 			if err != nil {
 				return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
 			}
@@ -453,7 +468,11 @@ func PerformUpgrade(
 
 	// validate again that the installation is correct, upgrade should not have changed installation validation
 	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged, TargetVersion: endVersionInfo.Binary.String(), StartVersion: startVersionInfo.Binary.String()})
+		var topPath string
+		if installOpts.BasePath != "" {
+			topPath = paths.InstallPath(installOpts.BasePath)
+		}
+		err = installtest.CheckSuccess(ctx, startFixture, topPath, &installtest.CheckOpts{Privileged: installOpts.Privileged, TargetVersion: endVersionInfo.Binary.String(), StartVersion: startVersionInfo.Binary.String()})
 		if err != nil {
 			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
 		}

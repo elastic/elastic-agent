@@ -4,11 +4,30 @@
 
 package errors
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
 
-var ErrInsufficientDiskSpace = errors.New("insufficient disk space")
+var ErrFetchUpgradeSize = errors.New("failed to fetch exact upgrade size")
 
-func IsDiskSpaceError(err error) bool {
+type DiskSpaceLowError []string
+
+func (e DiskSpaceLowError) Error() string {
+	msg := "insufficient disk space for upgrade"
+	if len(e) == 0 {
+		return msg
+	}
+	return msg + ": " + strings.Join(e, ", ")
+}
+
+func IsDiskSpaceLowError(err error) bool {
+	var diskSpaceLowErr DiskSpaceLowError
+	if errors.As(err, &diskSpaceLowErr) {
+		return true
+	}
+
+	// Errors indicating we are currently out of disk space
 	for _, osErr := range OS_DiskSpaceErrors {
 		if errors.Is(err, osErr) {
 			return true
