@@ -200,6 +200,61 @@ func TestPolicyAcked(t *testing.T) {
 	})
 }
 
+// TestClientEqual_FieldCoverage guards against the bug class fixed for
+// https://github.com/elastic/elastic-agent/issues/17015: clientEqual compared only
+// a hand-picked subset of remote.Config's fields, so a policy change to a
+// field it didn't know about (TLS/CAs) was treated as "no connectivity
+// change" and silently dropped for already-enrolled agents, even though
+// updateFleetConfig (which clientEqual gates, see validateFleetServerHosts)
+// did know how to apply it.
+//
+// This test enumerates the fields of remote.Config, httpcommon.HTTPTransportSettings,
+// and tlscommon.Config via reflection and fails if one isn't accounted for in
+// either the "covered" list (compared by clientEqual/tlsClientEqual) or the
+// "ignored" list (not read by updateFleetConfig, so a difference wouldn't
+// change what's applied to the live client). If this test fails after adding
+// a field, don't just add it to the ignored list: check whether
+// updateFleetConfig should propagate the new field, and if so, make
+// clientEqual/tlsClientEqual compare it too.
+func TestClientEqual_FieldCoverage(t *testing.T) {
+	assertFieldsAccountedFor(t, reflect.TypeOf(remote.Config{}),
+		map[string]bool{"Protocol": true, "Path": true, "Host": true, "Hosts": true, "Transport": true},
+		map[string]bool{"SpaceID": true, "Headers": true},
+	)
+
+	assertFieldsAccountedFor(t, reflect.TypeOf(httpcommon.HTTPTransportSettings{}),
+		map[string]bool{"TLS": true, "Proxy": true},
+		map[string]bool{"Auth": true, "Timeout": true, "IdleConnTimeout": true},
+	)
+
+	assertFieldsAccountedFor(t, reflect.TypeOf(tlscommon.Config{}),
+		map[string]bool{"Certificate": true, "CAs": true},
+		map[string]bool{
+			"Enabled":              true,
+			"VerificationMode":     true,
+			"Versions":             true,
+			"CipherSuites":         true,
+			"CurveTypes":           true,
+			"Renegotiation":        true,
+			"CASha256":             true,
+			"CATrustedFingerprint": true,
+			"CertificateReload":    true,
+		},
+	)
+}
+
+func assertFieldsAccountedFor(t *testing.T, typ reflect.Type, covered, ignored map[string]bool) {
+	t.Helper()
+	for i := 0; i < typ.NumField(); i++ {
+		name := typ.Field(i).Name
+		if covered[name] || ignored[name] {
+			continue
+		}
+		t.Errorf("%s.%s is neither compared by clientEqual nor explicitly listed as ignored; "+
+			"see TestClientEqual_FieldCoverage", typ.Name(), name)
+	}
+}
+
 func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T) {
 	mockProxy := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -608,6 +663,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		defer fleetNomTLSServer.Close()
 
 		trueVar := true
+		caRotationWantCAs := []string{string(fleetRootPair.Cert), string(wrongRootPair.Cert)}
 		tcs := []struct {
 			name                     string
 			originalCfg              *configuration.Configuration
@@ -638,6 +694,36 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
 						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				// Regression test for https://github.com/elastic/elastic-agent/issues/17015:
+				// a CA added to the Fleet Server host via the Fleet UI, without the
+				// Fleet Server hosts list itself changing, must still be applied to
+				// an already-enrolled agent's Fleet client.
+				name: "certificate_authorities change is applied even when Fleet hosts are unchanged",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetNomTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.host":                        fleetNomTLSServer.URL,
+					"fleet.ssl.enabled":                 true,
+					"fleet.ssl.certificate_authorities": []string{string(fleetRootPair.Cert), string(wrongRootPair.Cert)},
+				},
+				setterCalledCount: 1,
+				wantCAs:           caRotationWantCAs,
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"a CA-only policy change must update the client's trusted CAs even when Fleet hosts are unchanged")
 				},
 			},
 			{
@@ -948,7 +1034,9 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assert.Equal(t, tc.setterCalledCount, setterCalledCount,
 					"setter was not called")
 				if assert.NotNil(t, h.config.Fleet.Client.Transport.TLS, "TLS settings in fleet client config should not be null") {
-					assert.Equal(t,
+					// CA order is not meaningful: a trust pool is a set, and
+					// updateFleetConfig makes no ordering guarantee.
+					assert.ElementsMatch(t,
 						tc.wantCAs, h.config.Fleet.Client.Transport.TLS.CAs,
 						"unexpected CAs")
 					assert.Equal(t,

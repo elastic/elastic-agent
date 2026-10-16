@@ -570,6 +570,39 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 		return false
 	}
 
+	// different TLS settings (certificate/key or CAs), e.g. a Fleet Server CA rotation
+	if !tlsClientEqual(k1.Transport.TLS, k2.Transport.TLS) {
+		return false
+	}
+
+	return true
+}
+
+func tlsClientEqual(t1, t2 *tlscommon.Config) bool {
+	if t1 == nil || t2 == nil {
+		return t1 == t2
+	}
+
+	if t1.Certificate != t2.Certificate {
+		return false
+	}
+
+	if len(t1.CAs) != len(t2.CAs) {
+		return false
+	}
+
+	// Compare as a set: trust pools are unordered, and updateFleetConfig makes
+	// no ordering guarantee. Sort copies to avoid mutating the caller's slices.
+	cas1 := append([]string(nil), t1.CAs...)
+	cas2 := append([]string(nil), t2.CAs...)
+	sort.Strings(cas1)
+	sort.Strings(cas2)
+	for i, v := range cas1 {
+		if v != cas2[i] {
+			return false
+		}
+	}
+
 	return true
 }
 
