@@ -968,3 +968,117 @@ func TestAggregateStatusHelper(t *testing.T) {
 		assert.True(t, timestamp.Before(after) || timestamp.Equal(after))
 	})
 }
+
+func TestFromSerializableStatus_NilEvent(t *testing.T) {
+	t.Run("empty JSON object returns error", func(t *testing.T) {
+		var ss SerializableStatus
+		err := json.Unmarshal([]byte("{}"), &ss)
+		require.NoError(t, err)
+
+		aggStatus, err := FromSerializableStatus(&ss)
+		require.Error(t, err)
+		assert.Nil(t, aggStatus)
+		assert.Contains(t, err.Error(), "event")
+	})
+
+	t.Run("nil SerializableStatus returns error", func(t *testing.T) {
+		aggStatus, err := FromSerializableStatus(nil)
+		require.Error(t, err)
+		assert.Nil(t, aggStatus)
+		assert.Contains(t, err.Error(), "cannot reconstruct AggregateStatus from nil SerializableStatus")
+	})
+
+	t.Run("struct with nil SerializableEvent returns error", func(t *testing.T) {
+		ss := &SerializableStatus{
+			SerializableEvent: nil,
+		}
+		aggStatus, err := FromSerializableStatus(ss)
+		require.Error(t, err)
+		assert.Nil(t, aggStatus)
+		assert.Contains(t, err.Error(), "event")
+	})
+
+	t.Run("nested component with nil event returns error", func(t *testing.T) {
+		ss := &SerializableStatus{
+			SerializableEvent: &SerializableEvent{
+				Healthy:      true,
+				StatusString: "StatusOK",
+				Timestamp:    time.Now(),
+			},
+			ComponentStatuses: map[string]*SerializableStatus{
+				"comp1": {
+					SerializableEvent: nil,
+				},
+			},
+		}
+		aggStatus, err := FromSerializableStatus(ss)
+		require.Error(t, err)
+		assert.Nil(t, aggStatus)
+		assert.Contains(t, err.Error(), "comp1")
+	})
+}
+
+func TestCompareStatuses_NilEvent(t *testing.T) {
+	validStatus := AggregateStatus(componentstatus.StatusOK, nil)
+
+	t.Run("s1 has nil Event, s2 has valid Event", func(t *testing.T) {
+		s1 := &status.AggregateStatus{
+			Event:              nil,
+			ComponentStatusMap: make(map[string]*status.AggregateStatus),
+		}
+		s2 := validStatus
+
+		assert.NotPanics(t, func() {
+			equal := CompareStatuses(s1, s2)
+			assert.False(t, equal)
+		})
+	})
+
+	t.Run("s1 has valid Event, s2 has nil Event", func(t *testing.T) {
+		s1 := validStatus
+		s2 := &status.AggregateStatus{
+			Event:              nil,
+			ComponentStatusMap: make(map[string]*status.AggregateStatus),
+		}
+
+		assert.NotPanics(t, func() {
+			equal := CompareStatuses(s1, s2)
+			assert.False(t, equal)
+		})
+	})
+
+	t.Run("both s1 and s2 have nil Event with empty components", func(t *testing.T) {
+		s1 := &status.AggregateStatus{
+			Event:              nil,
+			ComponentStatusMap: make(map[string]*status.AggregateStatus),
+		}
+		s2 := &status.AggregateStatus{
+			Event:              nil,
+			ComponentStatusMap: make(map[string]*status.AggregateStatus),
+		}
+
+		assert.NotPanics(t, func() {
+			equal := CompareStatuses(s1, s2)
+			assert.True(t, equal)
+		})
+	})
+
+	t.Run("both s1 and s2 have nil Event with differing components", func(t *testing.T) {
+		s1 := &status.AggregateStatus{
+			Event: nil,
+			ComponentStatusMap: map[string]*status.AggregateStatus{
+				"comp1": validStatus,
+			},
+		}
+		s2 := &status.AggregateStatus{
+			Event:              nil,
+			ComponentStatusMap: make(map[string]*status.AggregateStatus),
+		}
+
+		assert.NotPanics(t, func() {
+			equal := CompareStatuses(s1, s2)
+			assert.False(t, equal)
+		})
+	})
+}
+
