@@ -1497,13 +1497,9 @@ func k8sStepHelmUninstall(releaseName string) k8sTestStep {
 		require.NoError(t, err, "failed to init helm action config")
 
 		uninstallAction := action.NewUninstall(actionConfig)
-<<<<<<< HEAD
 		uninstallAction.Wait = true
-=======
-		uninstallAction.WaitStrategy = helmkube.LegacyStrategy
 		uninstallAction.Timeout = 2 * time.Minute
 		uninstallAction.DeletionPropagation = "foreground"
->>>>>>> c49b8c6 (ci(kubernetes): run Kubernetes integration tests on MicroShift (#15925))
 		_, err = uninstallAction.Run(releaseName)
 		require.NoError(t, err, "failed to uninstall helm chart")
 	}
