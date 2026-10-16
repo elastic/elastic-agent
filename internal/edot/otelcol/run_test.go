@@ -48,8 +48,7 @@ func startCollector(ctx context.Context, t *testing.T, col *otelcol.Collector, e
 		if expectedErrorMessage == "" {
 			require.NoError(t, err)
 		} else {
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), expectedErrorMessage)
+			assert.ErrorContains(t, err, expectedErrorMessage)
 		}
 	}()
 	return wg

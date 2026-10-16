@@ -450,11 +450,12 @@
                 "required": ["enabled"]
             },
             "then": {
-                "required": ["autoops_token", "autoops_otel_url"],
+                "required": ["autoops_token", "autoops_otel_url", "elastic_cloud_connected_mode_api_key"],
                 "allOf": [
                     {
                         "properties": {
                             "autoops_token": { "type": "string", "minLength": 1 },
+                            "elastic_cloud_connected_mode_api_key": { "type": "string", "minLength": 1 },
                             "autoops_otel_url": { "type": "string", "minLength": 1 },
                             "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" }
                         }
@@ -545,6 +546,31 @@
                 "unprivileged": {
                     "type": "boolean",
                     "description": "Enable unprivileged mode."
+                },
+                "openshift": {
+                    "type": "object",
+                    "description": "OpenShift-specific configuration.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": ["string", "boolean"],
+                            "enum": ["auto", "true", "false", true, false],
+                            "description": "OpenShift detection mode. auto detects via API groups, true always enables, false always disables.",
+                            "default": "auto"
+                        },
+                        "securityContextConstraints": {
+                            "type": "object",
+                            "description": "SCC configuration.",
+                            "additionalProperties": false,
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Create SCC RoleBindings granting the privileged SCC to agent and kube-state-metrics service accounts.",
+                                    "default": true
+                                }
+                            }
+                        }
+                    }
                 },
                 "fleet": {
                     "type": "object",

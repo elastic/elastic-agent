@@ -254,6 +254,13 @@ inputs:
 #  # ignored by Fleet managed agents, which always use encrypted config.
 #  encrypted_config:
 #    enabled: false
+#  # attach agent tags to every event collected by beats-based inputs.
+#  include_tags_in_events:
+#    enabled: false
+
+# Agent tags are attached to every event when include_tags_in_events is enabled.
+# In managed mode, Fleet sets this list from the policy.
+#agent.tags: []
 
 # Logging
 

@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Fix EDOT collector hanging on shutdown when a component fails to start
+description: |
+  The elasticmonitoring receiver waited on a channel that was only closed by the goroutine launched in `Start` causing it to hang on shutdown when a component failed to start.
+component: elastic-agent
