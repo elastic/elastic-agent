@@ -23,8 +23,8 @@ mkdir -p build/distributions/reports/
 
 # Buildkite's "**" needs at least one directory, so the top-level binaries
 # and the reports are fetched separately.
-buildkite-agent artifact download "build/distributions/*" .
-buildkite-agent artifact download "build/distributions/reports/*.csv" .
+buildkite-agent artifact download "build/distributions/*" . || true
+buildkite-agent artifact download "build/distributions/reports/*.csv" . || true
 
 if ls build/distributions/* 1>/dev/null 2>&1; then
   chmod -R a+r build/distributions/
