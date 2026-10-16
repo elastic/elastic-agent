@@ -6,6 +6,8 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -14,6 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
@@ -25,7 +29,7 @@ func TestActionRestartHandler(t *testing.T) {
 	t.Run("wrong action type", func(t *testing.T) {
 		coord := &fakeRestartCoordinator{}
 		ss := &fakeRestartStateStore{}
-		h := NewRestart(log, coord, ss)
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
 		h.tamperProtectionFn = func() bool { return false }
 
 		err := h.Handle(t.Context(), &fleetapi.ActionSettings{}, &fakeAcker{})
@@ -46,7 +50,7 @@ func TestActionRestartHandler(t *testing.T) {
 
 		ack := &fakeAcker{}
 
-		h := NewRestart(log, coord, ss)
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
 		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
@@ -71,7 +75,7 @@ func TestActionRestartHandler(t *testing.T) {
 		ack.On("Ack", mock.Anything, action).Return(nil)
 		ack.On("Commit", mock.Anything).Return(nil)
 
-		h := NewRestart(log, coord, ss)
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
 		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
@@ -95,7 +99,7 @@ func TestActionRestartHandler(t *testing.T) {
 		ack.On("Ack", mock.Anything, action).Return(nil)
 		ack.On("Commit", mock.Anything).Return(nil)
 
-		h := NewRestart(log, coord, ss)
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
 		h.tamperProtectionFn = func() bool { return false }
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
@@ -121,7 +125,7 @@ func TestActionRestartHandler(t *testing.T) {
 		ack.On("Ack", mock.Anything, action).Return(nil)
 		ack.On("Commit", mock.Anything).Return(nil)
 
-		h := NewRestart(log, coord, ss)
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
 		h.tamperProtectionFn = func() bool { return false }
 
 		err := h.Handle(t.Context(), action, ack)
@@ -129,6 +133,154 @@ func TestActionRestartHandler(t *testing.T) {
 		ss.AssertCalled(t, "ClearPendingAckAction")
 		ack.AssertCalled(t, "Ack", mock.Anything, action)
 		require.ErrorIs(t, action.Err, restartErr)
+	})
+
+	t.Run("required signature missing is rejected and does not restart", func(t *testing.T) {
+		action := &fleetapi.ActionRestart{ActionID: "r-unsigned", ActionType: fleetapi.ActionTypeRestart}
+
+		// A signature validation key is configured but the action is not signed.
+		coord := &fakeRestartCoordinator{
+			protectionConfig: protection.Config{SignatureValidationKey: []byte("validation-key")},
+		}
+		ss := &fakeRestartStateStore{}
+		ack := &fakeAcker{}
+
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
+		h.tamperProtectionFn = func() bool { return false }
+
+		err := h.Handle(t.Context(), action, ack)
+		require.ErrorIs(t, err, protection.ErrNotSigned)
+		coord.AssertNotCalled(t, "Restart", mock.Anything, mock.Anything)
+		ss.AssertNotCalled(t, "SetPendingAckAction", mock.Anything)
+		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
+	})
+
+	t.Run("signed expired action with tampered future outer expiration is rejected", func(t *testing.T) {
+		past := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
+		future := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+
+		// The signed envelope carries an expired expiration, but the outer
+		// expiration is tampered to a future time. The handler must trust the
+		// verified signed expiration and reject the action as expired. The agents
+		// list must contain the agent ID, which is empty for &info.AgentInfo{}.
+		envelope, err := json.Marshal(map[string]any{
+			"action_id":  "r-signed-exp",
+			"type":       fleetapi.ActionTypeRestart,
+			"agents":     []string{""},
+			"data":       map[string]any{},
+			"expiration": past,
+		})
+		require.NoError(t, err)
+
+		action := &fleetapi.ActionRestart{
+			ActionID:         "r-signed-exp",
+			ActionType:       fleetapi.ActionTypeRestart,
+			ActionExpiration: future, // tampered outer value
+			Signature: &fleetapi.Signed{
+				Data:      base64.StdEncoding.EncodeToString(envelope),
+				Signature: base64.StdEncoding.EncodeToString([]byte("signature")),
+			},
+		}
+
+		coord := &fakeRestartCoordinator{}
+		ss := &fakeRestartStateStore{}
+
+		ack := &fakeAcker{}
+		ack.On("Ack", mock.Anything, action).Return(nil)
+		ack.On("Commit", mock.Anything).Return(nil)
+
+		// No validation key configured: the signed envelope is still parsed and
+		// its expiration used, but the signature bytes are not cryptographically
+		// verified (which requires a key).
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
+		h.tamperProtectionFn = func() bool { return false }
+
+		require.NoError(t, h.Handle(t.Context(), action, ack))
+		require.ErrorContains(t, action.Err, "expired at", "expired signed action should carry an error for the ack")
+		coord.AssertNotCalled(t, "Restart", mock.Anything, mock.Anything)
+		ss.AssertNotCalled(t, "SetPendingAckAction", mock.Anything)
+		ack.AssertCalled(t, "Ack", mock.Anything, action)
+	})
+
+	t.Run("key configured and valid signature is accepted and restarts", func(t *testing.T) {
+		private, validationKey, err := genKeys()
+		require.NoError(t, err)
+
+		mockAgentInfo := info.NewMockAgent(t)
+		mockAgentInfo.On("AgentID").Return("agent-id")
+
+		// The signed envelope must match the action's id/type and list the agent id.
+		envelope := []byte(`{"action_id":"r-signed","agents":["agent-id"],"type":"RESTART","data":{}}`)
+		signature, err := sign(envelope, private)
+		require.NoError(t, err)
+
+		action := &fleetapi.ActionRestart{
+			ActionID:   "r-signed",
+			ActionType: fleetapi.ActionTypeRestart,
+			Signature: &fleetapi.Signed{
+				Data:      base64.StdEncoding.EncodeToString(envelope),
+				Signature: base64.StdEncoding.EncodeToString(signature),
+			},
+		}
+
+		coord := &fakeRestartCoordinator{
+			protectionConfig: protection.Config{SignatureValidationKey: validationKey},
+		}
+		coord.On("Restart", mock.Anything, action).Return(nil)
+
+		ss := &fakeRestartStateStore{}
+		ss.On("SetPendingAckAction", action).Return()
+		ss.On("Save").Return(nil)
+
+		ack := &fakeAcker{}
+
+		h := NewRestart(log, mockAgentInfo, coord, ss)
+		h.tamperProtectionFn = func() bool { return false }
+
+		require.NoError(t, h.Handle(t.Context(), action, ack))
+		coord.AssertCalled(t, "Restart", mock.Anything, action)
+		ss.AssertCalled(t, "SetPendingAckAction", action)
+		// Must NOT ack in the handler; the ack happens after restart on startup.
+		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
+	})
+
+	t.Run("key configured and invalid signature is rejected and does not restart", func(t *testing.T) {
+		_, validationKey, err := genKeys()
+		require.NoError(t, err)
+		// Sign with a different key so the signature does not validate.
+		otherPrivate, _, err := genKeys()
+		require.NoError(t, err)
+
+		mockAgentInfo := info.NewMockAgent(t)
+		mockAgentInfo.On("AgentID").Return("agent-id")
+
+		envelope := []byte(`{"action_id":"r-bad-sig","agents":["agent-id"],"type":"RESTART","data":{}}`)
+		signature, err := sign(envelope, otherPrivate)
+		require.NoError(t, err)
+
+		action := &fleetapi.ActionRestart{
+			ActionID:   "r-bad-sig",
+			ActionType: fleetapi.ActionTypeRestart,
+			Signature: &fleetapi.Signed{
+				Data:      base64.StdEncoding.EncodeToString(envelope),
+				Signature: base64.StdEncoding.EncodeToString(signature),
+			},
+		}
+
+		coord := &fakeRestartCoordinator{
+			protectionConfig: protection.Config{SignatureValidationKey: validationKey},
+		}
+		ss := &fakeRestartStateStore{}
+		ack := &fakeAcker{}
+
+		h := NewRestart(log, mockAgentInfo, coord, ss)
+		h.tamperProtectionFn = func() bool { return false }
+
+		err = h.Handle(t.Context(), action, ack)
+		require.Error(t, err)
+		coord.AssertNotCalled(t, "Restart", mock.Anything, mock.Anything)
+		ss.AssertNotCalled(t, "SetPendingAckAction", mock.Anything)
+		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
 	})
 
 	t.Run("tamper protection proxies action to endpoint", func(t *testing.T) {
@@ -143,7 +295,7 @@ func TestActionRestartHandler(t *testing.T) {
 		ss.On("SetPendingAckAction", action).Return()
 		ss.On("Save").Return(nil)
 
-		h := NewRestart(log, coord, ss)
+		h := NewRestart(log, &info.AgentInfo{}, coord, ss)
 		h.tamperProtectionFn = func() bool { return true }
 
 		require.NoError(t, h.Handle(t.Context(), action, &fakeAcker{}))
@@ -154,6 +306,11 @@ func TestActionRestartHandler(t *testing.T) {
 
 type fakeRestartCoordinator struct {
 	mock.Mock
+	protectionConfig protection.Config
+}
+
+func (f *fakeRestartCoordinator) Protection() protection.Config {
+	return f.protectionConfig
 }
 
 func (f *fakeRestartCoordinator) State() coordinator.State {

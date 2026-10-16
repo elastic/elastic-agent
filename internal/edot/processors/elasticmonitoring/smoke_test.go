@@ -133,6 +133,59 @@ func TestSmoke_MetricNamePrefixing(t *testing.T) {
 	}
 }
 
+// TestSmoke_ReceiverDoesNotDoubleCountInputMetrics is a regression test for the
+// double-counting bug where RegistryBridge data points carrying both a "receiver"
+// attribute (processed by collectReceiverPipelineMetrics) and an "input_id"
+// attribute (processed by collectInputMetrics) appeared in both receiver events
+// and input events.
+//
+// The fixture (testdata/double-counting-metrics.json) models this pattern with:
+//   - "libbeat.output.events.acked" — receiver attribute only → receiver events only
+//   - "beat.input.log.files.open"   — receiver + input_id     → input events only
+func TestSmoke_ReceiverDoesNotDoubleCountInputMetrics(t *testing.T) {
+	raw, err := os.ReadFile("testdata/double-counting-metrics.json")
+	require.NoError(t, err)
+	var u pmetric.JSONUnmarshaler
+	md, err := u.UnmarshalMetrics(raw)
+	require.NoError(t, err)
+
+	receiverResult := collectReceiverPipelineMetrics(md)
+	inputResult := collectInputMetrics(md)
+
+	const compID = "filestream-monitoring"
+
+	// The data point with input_id must not appear in receiver pipeline events.
+	for _, dp := range receiverResult[compID] {
+		assert.NotEqual(t, "beat.input.log.files.open", dp.src.Name(),
+			"data points with input_id must be excluded from receiver pipeline metrics to prevent double-counting")
+	}
+
+	// The receiver-only data point must still appear in receiver pipeline events.
+	receiverFound := false
+	for _, dp := range receiverResult[compID] {
+		if dp.src.Name() == "libbeat.output.events.acked" {
+			receiverFound = true
+			break
+		}
+	}
+	assert.True(t, receiverFound, "data points without input_id must still appear in receiver pipeline events")
+
+	// The data point with input_id must appear in input events.
+	inputFound := false
+	for _, acc := range inputResult {
+		for _, dp := range acc.dps {
+			if dp.src.Name() == "beat.input.log.files.open" {
+				inputFound = true
+				break
+			}
+		}
+		if inputFound {
+			break
+		}
+	}
+	assert.True(t, inputFound, "data points with input_id must appear in input events")
+}
+
 // TestSmoke_ExporterEvents verifies that buildExporterMetrics maps the monitoring
 // ES exporter metrics to the configured component name and correctly surfaces
 // queue capacity and docs.processed from real exporter scopes.

@@ -33,7 +33,7 @@ import (
 // read-only disk) is resolved.
 func TestPolicyChangeNotAcknowledgedOnStateStoreFail(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,

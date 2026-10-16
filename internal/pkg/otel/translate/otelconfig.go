@@ -242,6 +242,16 @@ func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent
 	return otelcomponent.NewIDWithName(receiverType, receiverName)
 }
 
+// receiverStreamSuffix returns the receiver name segment that follows the component ID. Stream IDs are only
+// unique within an input, and different inputs of the same type share a component, so the input ID
+// (the unit ID without the component ID prefix) is included to keep receivers of different inputs distinct.
+// It is a single segment so that the stream remains the last "/"-delimited part of the receiver name.
+// Both receiver naming and status lookup must use this function to stay in sync.
+func receiverStreamSuffix(compID, unitID, streamID string) string {
+	inputID := strings.TrimPrefix(unitID, compID+"-")
+	return inputID + "-" + streamID
+}
+
 // GetExporterID returns the exporter id for the given exporter type and output name.
 func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcomponent.ID {
 	exporterName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
@@ -481,7 +491,7 @@ func getReceiversConfigForComponent(
 		if ri.streamID == "" {
 			return nil, fmt.Errorf("input missing stream ID in component %s", comp.ID)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+ri.streamID)
+		receiverID := GetReceiverID(receiverType, comp.ID+"/"+receiverStreamSuffix(comp.ID, ri.unitID, ri.streamID))
 
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared
@@ -742,6 +752,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 // name suffix. It is kept separate from the input map because not all input types
 // (e.g. metricbeat modules) carry "id" in their source config.
 type receiverInput struct {
+	unitID   string
 	streamID string
 	config   map[string]any
 }
@@ -816,7 +827,7 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 			protoStreamID = streams[i].GetId()
 		}
 		streamID := resolveStreamID(protoStreamID, input, unit.ID, i)
-		result[i] = receiverInput{streamID: streamID, config: input}
+		result[i] = receiverInput{unitID: unit.ID, streamID: streamID, config: input}
 	}
 
 	// A Synthetics browser monitor compiles into a single synthetics/browser input

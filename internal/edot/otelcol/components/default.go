@@ -54,6 +54,7 @@ import (
 	snmpreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
 	statsdreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver"
+	syslogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/syslogreceiver"
 	vcenterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/vcenterreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
@@ -71,6 +72,7 @@ import (
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor"
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
@@ -198,6 +200,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			kafkareceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			statsdreceiver.NewFactory(),
+			syslogreceiver.NewFactory(),
 			vcenterreceiver.NewFactory(),
 			zookeeperreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
@@ -238,6 +241,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			ratelimitprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
+			adaptivetailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
 			elasticmonitoringprocessor.NewFactory(),
