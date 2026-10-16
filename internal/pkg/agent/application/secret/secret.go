@@ -8,7 +8,9 @@ package secret
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"sync"
 	"time"
 
@@ -119,4 +121,29 @@ func Remove(ctx context.Context, key string, opts ...vault.OptionFunc) error {
 	defer v.Close()
 
 	return v.Remove(ctx, key)
+}
+
+// HasUnprivilegedVault reports whether a file vault containing the agent secret exists.
+// On darwin the agent secret is stored in the System keychain for privileged installs and in
+// a file vault for unprivileged installs, so this is used to detect an unprivileged install
+// regardless of the privileges of the current process. The file vault is opened read-only.
+func HasUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
+	opts = append(opts, vault.WithReadonly(true))
+	vaultOpts, err := vault.ApplyOptions(opts...)
+	if err != nil {
+		return false, err
+	}
+	fileVault, fileVaultErr := vault.NewFileVault(ctx, vaultOpts)
+	if fileVaultErr == nil {
+		defer func() { _ = fileVault.Close() }()
+		ok, keyErr := fileVault.Exists(ctx, AgentSecretKey)
+		if keyErr == nil && ok {
+			// we have a valid file vault and it contains the key
+			return true, nil
+		}
+	} else if !errors.Is(fileVaultErr, fs.ErrNotExist) {
+		// we had a different error than NotExist
+		return false, fmt.Errorf("error checking for file vault existence: %w", fileVaultErr)
+	}
+	return false, nil
 }
