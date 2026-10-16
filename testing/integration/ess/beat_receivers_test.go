@@ -837,11 +837,11 @@ agent.monitoring.enabled: false
 					t,
 					int(cproto.State_HEALTHY),
 					unit.State,
-					"expected state of unit %s to be %s, got %s",
+					"expected state of unit %s to be %s, got %d",
 					unit.UnitID,
 					cproto.State_HEALTHY.String(),
-					cproto.State(unit.State).String(),
-				) //nolint:gosec // G115 always under 32-bit
+					unit.State,
+				)
 			}
 			assert.Equal(t, 1, inputUnits, "expected exactly one input unit")
 			assert.Equal(t, 1, outputUnits, "expected exactly one output unit")
