@@ -34,6 +34,9 @@ Components marked as "Deprecated" in the table are retained in {{agent}} 9.x to 
 
 These components are included in {{agent}} version 9.5.5.
 
+:::{table}
+:filterable:
+
 | Component | GitHub Repo | Support status | Component version | Added in Elastic Agent |
 |:---|:---|:---|:---|:---|
 |***Receivers***|||||
@@ -140,7 +143,7 @@ These components are included in {{agent}} version 9.5.5.
 | [httpsprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/httpsprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.67.0 | v9.0.0 |
 | [yamlprovider](https://github.com/open-telemetry/opentelemetry-collector/tree/main/confmap/provider/yamlprovider) | [OTel Core Repo](https://github.com/open-telemetry/opentelemetry-collector) | [Core] | v1.67.0 | v9.0.0 |
 
-
+:::
 
 
 [^1]: Deprecated in 9.2.0. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
