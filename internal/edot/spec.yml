@@ -274,6 +274,7 @@ inputs:
     description: "Synthetics Browser Monitor"
     platforms: *platforms
     outputs: *outputs
+    single_receiver: true
     command: &heartbeat_command
       restart_monitoring_period: 5s
       maximum_restarts_per_period: 1
@@ -304,21 +305,25 @@ inputs:
     description: "Synthetics HTTP Monitor"
     platforms: *platforms
     outputs: *outputs
+    single_receiver: true
     command: *heartbeat_command
   - name: synthetics/icmp
     description: "Synthetics ICMP Monitor"
     platforms: *platforms
     outputs: *outputs
+    single_receiver: true
     command: *heartbeat_command
   - name: synthetics/tcp
     description: "Synthetics TCP Monitor"
     platforms: *platforms
     outputs: *outputs
+    single_receiver: true
     command: *heartbeat_command
   - name: synthetics/api
     description: "Synthetics API Monitor"
     platforms: *platforms
     outputs: *outputs
+    single_receiver: true
     command: *heartbeat_command
   - name: beat/metrics
     description: "Beat metrics"
