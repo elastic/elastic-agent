@@ -12,10 +12,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -149,6 +158,96 @@ func Test_runDispatcher(t *testing.T) {
 			dispatcher.AssertExpectations(t)
 			acker.AssertExpectations(t)
 		})
+	}
+}
+
+type fakeClientSetter struct {
+	clientCh chan client.Sender
+}
+
+func (f *fakeClientSetter) SetClient(c client.Sender) {
+	f.clientCh <- c
+}
+
+type fakeUpgradeManager struct {
+	coordinator.UpgradeManager
+	acked bool
+}
+
+func (f *fakeUpgradeManager) Ack(_ context.Context, _ acker.Acker) error {
+	f.acked = true
+	return nil
+}
+
+func (f *fakeUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
+	return nil
+}
+
+func newTestManagedConfigManager(t *testing.T, agentInfo info.Agent, ss *store.StateStore) (*managedConfigManager, *fakeClientSetter, *fakeUpgradeManager) {
+	t.Helper()
+	log, _ := loggertest.New("managed")
+
+	rollbacksSource := ttl.NewMockReadOnlySource(t)
+	rollbacksSource.EXPECT().GetAll().Return(nil, nil, nil).Maybe()
+
+	fleetClient, err := remote.NewWithConfig(log, remote.DefaultClientConfig(), nil)
+	require.NoError(t, err)
+
+	cfg := configuration.DefaultConfiguration()
+	setter := &fakeClientSetter{clientCh: make(chan client.Sender, 1)}
+	upgradeMgr := &fakeUpgradeManager{}
+	m, err := newManagedConfigManager(log, agentInfo, nil, cfg, nil, nil, 0, "", fleetClient, nil, nil, retrier.New(nil, log), ss, nil, rollbacksSource, setter)
+	require.NoError(t, err)
+	m.coord = coordinator.New(log, cfg, logger.DefaultLogLevel, agentInfo, component.RuntimeSpecs{}, nil, upgradeMgr, nil, nil, nil, nil, nil, true, nil, nil, nil)
+	return m, setter, upgradeMgr
+}
+
+func TestManagedConfigManager_Run(t *testing.T) {
+	m, _, _ := newTestManagedConfigManager(t, info.NewMockAgent(t), newTestStateStore(t))
+	m.coord = nil
+	require.ErrorContains(t, m.Run(t.Context()), "coord must be set", "Run should require a coordinator")
+
+	ss := newTestStateStore(t)
+	ss.SetAction(&fleetapi.ActionUnenroll{ActionID: "unenroll", ActionType: fleetapi.ActionTypeUnenroll})
+	m, setter, _ := newTestManagedConfigManager(t, info.NewMockAgent(t), ss)
+	require.NoError(t, m.Run(t.Context()), "Run should return without error when previously unenrolled")
+	assert.Empty(t, setter.clientCh, "Run should not set the client when previously unenrolled")
+
+	reloadErr := errors.New("reload failed")
+	agentInfo := info.NewMockAgent(t)
+	agentInfo.EXPECT().ReloadID(mock.Anything).Return(reloadErr)
+	m, setter, _ = newTestManagedConfigManager(t, agentInfo, newTestStateStore(t))
+	require.ErrorIs(t, m.Run(t.Context()), reloadErr, "Run should return the error from reloading the agent ID")
+	assert.Empty(t, setter.clientCh, "Run should not set the client when reloading the agent ID fails")
+
+	agentInfo = info.NewMockAgent(t)
+	agentInfo.EXPECT().ReloadID(mock.Anything).Return(nil)
+	agentInfo.EXPECT().AgentID().Return("agent-id")
+	m, setter, upgradeMgr := newTestManagedConfigManager(t, agentInfo, newTestStateStore(t))
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	runErr := make(chan error, 1)
+	go func() {
+		runErr <- m.Run(ctx)
+	}()
+
+	select {
+	case c := <-setter.clientCh:
+		assert.Same(t, m.client, c)
+	case <-time.After(10 * time.Second):
+		t.Fatal("SetClient was not called on the initial client setter")
+	}
+	assert.True(t, upgradeMgr.acked, "pending upgrade should be acked on startup")
+
+	cancel()
+	select {
+	case err := <-runErr:
+		if err != nil {
+			require.ErrorIs(t, err, context.Canceled)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("Run did not return after the context was cancelled")
 	}
 }
 
