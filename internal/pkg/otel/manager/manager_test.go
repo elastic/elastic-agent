@@ -1710,6 +1710,11 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	// The user-supplied extension must also be present.
 	assert.Contains(t, list, "user_extension",
 		"user-supplied extension must be present in merged service::extensions")
+
+	assert.Contains(t, list, "headers_setter/_agent-component/",
+		"headers_setter extension must be injected when the config has beat receivers")
+	assert.True(t, result.IsSet("extensions::headers_setter/_agent-component/"),
+		"headers_setter extension config must be present when the config has beat receivers")
 }
 
 // TestBuildMergedConfigCollectorOnlyExtensions verifies that when there are no
@@ -1761,6 +1766,11 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	require.NotNil(t, list)
 	assert.Contains(t, list, "user_extension",
 		"collector-config extension must be present in merged service::extensions")
+
+	assert.NotContains(t, list, "headers_setter/_agent-component/",
+		"headers_setter extension must not be injected without beat receivers")
+	assert.False(t, result.IsSet("extensions::headers_setter/_agent-component/"),
+		"headers_setter extension config must not be present without beat receivers")
 }
 
 func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
@@ -1785,10 +1795,10 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					"pipeline:logs/_agent-component/test-component": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							"receiver:filebeat/_agent-component/test-component/test-1": {
+							"receiver:filebeat/_agent-component/test-component/filestream-unit-test-1": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							"receiver:filebeat/_agent-component/test-component/test-2": {
+							"receiver:filebeat/_agent-component/test-component/filestream-unit-test-2": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							"exporter:elasticsearch/_agent-component/test-component": {
@@ -2128,7 +2138,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.True(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/filestream-unit-test-1"))
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
@@ -2144,7 +2154,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.False(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/filestream-unit-test-1"))
 	})
 
 	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
@@ -2155,10 +2165,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 				"pipeline:logs/_agent-component/test": {
 					Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					ComponentStatusMap: map[string]*status.AggregateStatus{
-						"receiver:filebeatreceiver/_agent-component/test/test-1": {
+						"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-1": {
 							Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						},
-						"receiver:filebeatreceiver/_agent-component/test/test-2": {
+						"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-2": {
 							Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						},
 						"exporter:elasticsearch/_agent-component/test": {
@@ -2395,10 +2405,10 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 			"pipeline:logs/_agent-component/test": {
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"receiver:filebeatreceiver/_agent-component/test/test-1": {
+					"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-1": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
-					"receiver:filebeatreceiver/_agent-component/test/test-2": {
+					"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-2": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					"exporter:elasticsearch/_agent-component/test": {

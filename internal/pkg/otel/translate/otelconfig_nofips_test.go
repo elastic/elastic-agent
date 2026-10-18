@@ -284,7 +284,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 			},
 		},
 		"receivers": map[string]any{
-			"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1": expectedBeatMetricConfig,
+			"metricbeatreceiver/_agent-component/beat-metrics-monitoring/beat/metrics-monitoring-test-1": expectedBeatMetricConfig,
 		},
 		"service": map[string]any{
 			"extensions": []any{"kafkapartitioner/_agent-component/default", "oauth2client/_agent-component/default"},
@@ -292,7 +292,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 				"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
 					"exporters":  {"kafka/_agent-component/default"},
 					"processors": {beatProcessorID},
-					"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/test-1"},
+					"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/beat/metrics-monitoring-test-1"},
 				},
 			},
 		},

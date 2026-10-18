@@ -46,5 +46,7 @@ jobs:
       - name: Install mage
         run: make mage
 
-      - name: mage unitTest
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+      # test:all runs the unit tests of the root module and of the
+      # internal/edot module.
+      - name: mage test:all
+        run: RACE_DETECTOR=true TEST_COVERAGE=true mage test:all
