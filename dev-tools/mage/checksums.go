@@ -40,6 +40,30 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	return GetSHA512Hash(targetPath)
 }
 
+// componentCopyOptions returns the copy options used to merge the root dir of a component into the
+// shared versioned drop path. owners tracks which component wrote each destination file during the
+// current merge: when a component overwrites a file copied from a different component (for example
+// NOTICE.txt or LICENSE.txt), a warning is logged, because only the last copy ends up in the package.
+func componentCopyOptions(component string, owners map[string]string) copy.Options {
+	return copy.Options{
+		OnSymlink: func(_ string) copy.SymlinkAction {
+			return copy.Shallow
+		},
+		Sync: true,
+		Skip: func(info os.FileInfo, _, dest string) (bool, error) {
+			// directories are merged, only files can be overwritten
+			if info.IsDir() {
+				return false, nil
+			}
+			if prev, ok := owners[dest]; ok && prev != component {
+				log.Printf("WARNING: component %s overwrites %s previously copied from component %s", component, dest, prev)
+			}
+			owners[dest] = component
+			return false, nil
+		},
+	}
+}
+
 // ChecksumsWithoutManifest is a helper function for flattenDependencies that's used when not packaging from a manifest.
 // This function will iterate over the dependencies, resolve *exactly* the package name for each dependency and platform using the passed
 // dependenciesVersion, and it will copy the extracted files contained in the rootDir of each dependency from the versionedFlatPath
@@ -48,6 +72,7 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 // ChecksumsWithoutManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
 func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
+	owners := make(map[string]string)
 
 	for _, dep := range dependencies {
 
@@ -70,17 +95,11 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 			log.Printf("--- Copying into %s: %v", versionedDropPath, srcDir)
 		}
 
-		options := copy.Options{
-			OnSymlink: func(_ string) copy.SymlinkAction {
-				return copy.Shallow
-			},
-			Sync: true,
-		}
 		if mg.Verbose() {
 			log.Printf("> prepare to copy %s into %s ", srcDir, versionedDropPath)
 		}
 
-		err := copy.Copy(srcDir, versionedDropPath, options)
+		err := copy.Copy(srcDir, versionedDropPath, componentCopyOptions(dep.BinaryName, owners))
 		if err != nil {
 			panic(fmt.Errorf("copying dependency %s files from %q to %q: %w", dep.BinaryName, srcDir, versionedDropPath, err))
 		}
@@ -113,6 +132,7 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 	if manifestResponse == nil {
 		return checksums
 	}
+	owners := make(map[string]string)
 
 	// Iterate over the external binaries that we care about for packaging agent
 	for _, spec := range dependencies {
@@ -146,19 +166,12 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 			log.Printf(">>>>>>> Calculated directory to copy: [%s]", fullPath)
 		}
 
-		// Set copy options
-		options := copy.Options{
-			OnSymlink: func(_ string) copy.SymlinkAction {
-				return copy.Shallow
-			},
-			Sync: true,
-		}
 		if mg.Verbose() {
 			log.Printf("> prepare to copy %s into %s ", fullPath, versionedDropPath)
 		}
 
 		// Do the copy
-		err = copy.Copy(fullPath, versionedDropPath, options)
+		err = copy.Copy(fullPath, versionedDropPath, componentCopyOptions(spec.BinaryName, owners))
 		if err != nil {
 			panic(err)
 		}
