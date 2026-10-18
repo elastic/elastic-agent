@@ -6,7 +6,6 @@ package mage
 
 import (
 	"bytes"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,8 +18,6 @@ import (
 
 func TestComponentCopyOptions_WarnsOnOverwrite(t *testing.T) {
 	var logs bytes.Buffer
-	log.SetOutput(&logs)
-	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	root := t.TempDir()
 	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{
@@ -40,7 +37,7 @@ func TestComponentCopyOptions_WarnsOnOverwrite(t *testing.T) {
 	dropPath := filepath.Join(root, "drop")
 	owners := make(map[string]string)
 	for _, comp := range []string{"comp-a", "comp-b"} {
-		require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, owners)))
+		require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, owners, &logs)))
 	}
 
 	warnings := warningLines(logs.String())
@@ -62,8 +59,6 @@ func TestComponentCopyOptions_WarnsOnOverwrite(t *testing.T) {
 
 func TestComponentCopyOptions_NoWarningForSameComponent(t *testing.T) {
 	var logs bytes.Buffer
-	log.SetOutput(&logs)
-	t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
 	root := t.TempDir()
 	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{"NOTICE.txt": "notice a"})
@@ -71,7 +66,7 @@ func TestComponentCopyOptions_NoWarningForSameComponent(t *testing.T) {
 	dropPath := filepath.Join(root, "drop")
 	owners := make(map[string]string)
 	for range 2 {
-		require.NoError(t, copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a", owners)))
+		require.NoError(t, copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a", owners, &logs)))
 	}
 
 	assert.Empty(t, warningLines(logs.String()))
