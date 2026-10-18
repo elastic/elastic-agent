@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/otiai10/copy"
@@ -41,9 +42,29 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 	return GetSHA512Hash(targetPath)
 }
 
+// componentMetadataFiles are files that several components ship under the same name. They are renamed to
+// <stem>.<component><ext> (e.g. NOTICE.apm-server.txt) when merged into the shared drop path, so that
+// the files of every component end up in the package instead of only the last copied one.
+var componentMetadataFiles = map[string]bool{
+	"NOTICE.txt":      true,
+	"LICENSE.txt":     true,
+	".build_hash.txt": true,
+}
+
+// componentDestination returns the path a component file is copied to in the drop path: metadata files
+// get the component name added, everything else keeps its name.
+func componentDestination(dest, component string) string {
+	dir, base := filepath.Split(dest)
+	if !componentMetadataFiles[base] {
+		return dest
+	}
+	ext := filepath.Ext(base)
+	return filepath.Join(dir, strings.TrimSuffix(base, ext)+"."+component+ext)
+}
+
 // componentCopyOptions returns the copy options used to merge the root dir of a component into the
-// shared versioned drop path. When a component overwrites a file that already exists in the drop path
-// (for example NOTICE.txt or LICENSE.txt copied from another component), a warning is written to
+// shared drop path. Metadata files are renamed per component (see componentMetadataFiles). When a
+// component overwrites any other file that already exists in the drop path, a warning is written to
 // warnOut, because only the last copy ends up in the package. The warning is not sent through the log
 // package: mage discards it unless running with -v.
 func componentCopyOptions(component string, warnOut io.Writer) copy.Options {
@@ -52,16 +73,22 @@ func componentCopyOptions(component string, warnOut io.Writer) copy.Options {
 			return copy.Shallow
 		},
 		Sync: true,
+		// Skip is called with the original destination, before RenameDestination: check the path
+		// that is actually going to be written.
 		Skip: func(info os.FileInfo, _, dest string) (bool, error) {
 			// directories are merged, only files can be overwritten
 			if info.IsDir() {
 				return false, nil
 			}
+			dest = componentDestination(dest, component)
 			// Lstat, as the destination can be a symlink copied shallowly from another component
 			if _, err := os.Lstat(dest); err == nil {
 				fmt.Fprintf(warnOut, "WARNING: component %s overwrites existing file %s\n", component, dest)
 			}
 			return false, nil
+		},
+		RenameDestination: func(_, dest string) (string, error) {
+			return componentDestination(dest, component), nil
 		},
 	}
 }
