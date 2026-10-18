@@ -35,17 +35,16 @@ func TestComponentCopyOptions_WarnsOnOverwrite(t *testing.T) {
 	})
 
 	dropPath := filepath.Join(root, "drop")
-	owners := make(map[string]string)
 	for _, comp := range []string{"comp-a", "comp-b"} {
-		require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, owners, &logs)))
+		require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, &logs)))
 	}
 
 	warnings := warningLines(logs.String())
 	assert.Len(t, warnings, 2, "expected one warning per overwritten file, got: %v", warnings)
 	assert.Contains(t, logs.String(),
-		"WARNING: component comp-b overwrites "+filepath.Join(dropPath, "NOTICE.txt")+" previously copied from component comp-a")
+		"WARNING: component comp-b overwrites existing file "+filepath.Join(dropPath, "NOTICE.txt"))
 	assert.Contains(t, logs.String(),
-		"WARNING: component comp-b overwrites "+filepath.Join(dropPath, "nested", "same", "clash.txt")+" previously copied from component comp-a")
+		"WARNING: component comp-b overwrites existing file "+filepath.Join(dropPath, "nested", "same", "clash.txt"))
 
 	// the last copied component wins, which is the behaviour the warning reports
 	content, err := os.ReadFile(filepath.Join(dropPath, "NOTICE.txt"))
@@ -57,19 +56,41 @@ func TestComponentCopyOptions_WarnsOnOverwrite(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dropPath, "shared", "only-b.yml"))
 }
 
-func TestComponentCopyOptions_NoWarningForSameComponent(t *testing.T) {
+func TestComponentCopyOptions_NoWarningWithoutOverlap(t *testing.T) {
+	var logs bytes.Buffer
+
+	root := t.TempDir()
+	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{
+		"NOTICE.comp-a.txt": "notice a",
+		"shared/only-a.yml": "a",
+	})
+	writeFiles(t, filepath.Join(root, "comp-b"), map[string]string{
+		"NOTICE.comp-b.txt": "notice b",
+		"shared/only-b.yml": "b",
+	})
+
+	dropPath := filepath.Join(root, "drop")
+	for _, comp := range []string{"comp-a", "comp-b"} {
+		require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, &logs)))
+	}
+
+	assert.Empty(t, warningLines(logs.String()))
+}
+
+func TestComponentCopyOptions_WarnsOnFileLeftInDropPath(t *testing.T) {
 	var logs bytes.Buffer
 
 	root := t.TempDir()
 	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{"NOTICE.txt": "notice a"})
-
+	// the drop path is not cleaned between builds, e.g. with KEEP_ARCHIVE
 	dropPath := filepath.Join(root, "drop")
-	owners := make(map[string]string)
-	for range 2 {
-		require.NoError(t, copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a", owners, &logs)))
-	}
+	writeFiles(t, dropPath, map[string]string{"NOTICE.txt": "left from a previous build"})
 
-	assert.Empty(t, warningLines(logs.String()))
+	require.NoError(t, copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a", &logs)))
+
+	assert.Equal(t,
+		[]string{"WARNING: component comp-a overwrites existing file " + filepath.Join(dropPath, "NOTICE.txt")},
+		warningLines(logs.String()))
 }
 
 func writeFiles(t *testing.T, dir string, files map[string]string) {

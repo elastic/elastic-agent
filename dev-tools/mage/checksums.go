@@ -42,11 +42,11 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 }
 
 // componentCopyOptions returns the copy options used to merge the root dir of a component into the
-// shared versioned drop path. owners tracks which component wrote each destination file during the
-// current merge: when a component overwrites a file copied from a different component (for example
-// NOTICE.txt or LICENSE.txt), a warning is written to warnOut, because only the last copy ends up in the
-// package. The warning is not sent through the log package: mage discards it unless running with -v.
-func componentCopyOptions(component string, owners map[string]string, warnOut io.Writer) copy.Options {
+// shared versioned drop path. When a component overwrites a file that already exists in the drop path
+// (for example NOTICE.txt or LICENSE.txt copied from another component), a warning is written to
+// warnOut, because only the last copy ends up in the package. The warning is not sent through the log
+// package: mage discards it unless running with -v.
+func componentCopyOptions(component string, warnOut io.Writer) copy.Options {
 	return copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
@@ -57,10 +57,10 @@ func componentCopyOptions(component string, owners map[string]string, warnOut io
 			if info.IsDir() {
 				return false, nil
 			}
-			if prev, ok := owners[dest]; ok && prev != component {
-				fmt.Fprintf(warnOut, "WARNING: component %s overwrites %s previously copied from component %s\n", component, dest, prev)
+			// Lstat, as the destination can be a symlink copied shallowly from another component
+			if _, err := os.Lstat(dest); err == nil {
+				fmt.Fprintf(warnOut, "WARNING: component %s overwrites existing file %s\n", component, dest)
 			}
-			owners[dest] = component
 			return false, nil
 		},
 	}
@@ -74,7 +74,6 @@ func componentCopyOptions(component string, owners map[string]string, warnOut io
 // ChecksumsWithoutManifest will accumulate the checksums of each component spec that is copied, and return it to the caller.
 func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versionedFlatPath string, versionedDropPath string, dependencies []packaging.BinarySpec) map[string]string {
 	checksums := make(map[string]string)
-	owners := make(map[string]string)
 
 	for _, dep := range dependencies {
 
@@ -101,7 +100,7 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 			log.Printf("> prepare to copy %s into %s ", srcDir, versionedDropPath)
 		}
 
-		err := copy.Copy(srcDir, versionedDropPath, componentCopyOptions(dep.BinaryName, owners, os.Stderr))
+		err := copy.Copy(srcDir, versionedDropPath, componentCopyOptions(dep.BinaryName, os.Stderr))
 		if err != nil {
 			panic(fmt.Errorf("copying dependency %s files from %q to %q: %w", dep.BinaryName, srcDir, versionedDropPath, err))
 		}
@@ -134,7 +133,6 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 	if manifestResponse == nil {
 		return checksums
 	}
-	owners := make(map[string]string)
 
 	// Iterate over the external binaries that we care about for packaging agent
 	for _, spec := range dependencies {
@@ -173,7 +171,7 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 		}
 
 		// Do the copy
-		err = copy.Copy(fullPath, versionedDropPath, componentCopyOptions(spec.BinaryName, owners, os.Stderr))
+		err = copy.Copy(fullPath, versionedDropPath, componentCopyOptions(spec.BinaryName, os.Stderr))
 		if err != nil {
 			panic(err)
 		}
