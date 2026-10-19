@@ -104,13 +104,16 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 			"name=agent-pernode-elastic-agent",
 			1, "agent"),
 
-		// 7th - verify new rotated logs are ingested with kubernetes metadata
-		k8sStepRecordLogsCheckpoint(info, checkpoint),
+		// 7th - verify new rotated logs are ingested with kubernetes metadata.
+		// No timestamp checkpoint here: the /var/log/pods/ path is disjoint from the
+		// /var/log/containers/ path used in phase 1, so there is no stale-document
+		// cross-contamination. A timestamp checkpoint would incorrectly exclude rotated
+		// files whose content predates the rotation (which is always the case).
 		k8sStepCheckLogFilesIngested(info,
-			"logs", "kubernetes.container_logs", "default", "/var/log/pods/*flog*", checkpoint,
+			"logs", "kubernetes.container_logs", "default", "/var/log/pods/*flog*", nil,
 			rotatedExpected...,
 		),
-		k8sStepCheckContainerLogsMetadata(info, "/var/log/pods/*flog*", checkpoint),
+		k8sStepCheckContainerLogsMetadata(info, "/var/log/pods/*flog*", nil),
 	}
 
 	ctx := context.Background() //nolint:forbidigo // ctx is captured by t.Cleanup in step functions; must outlive the test
