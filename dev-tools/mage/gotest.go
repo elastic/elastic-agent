@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/magefile/mage/mg"
 
@@ -69,10 +70,18 @@ func makeGoTestArgs(cfg *Settings, name string) GoTestArgs {
 	return params
 }
 
+// goUnitTestTimeout is the per-package timeout for unit tests. It is higher
+// than the "go test" default of 10m because Test.All runs the root and
+// internal/edot modules in parallel, which slows down some packages (for
+// example dev-tools/mage) on smaller Windows CI machines.
+const goUnitTestTimeout = 20 * time.Minute
+
 // DefaultGoTestUnitArgs returns a default set of arguments for running
 // all unit tests. We tag unit test files with '!integration'.
 func DefaultGoTestUnitArgs(cfg *Settings) GoTestArgs {
-	return makeGoTestArgs(cfg, "Unit")
+	args := makeGoTestArgs(cfg, "Unit")
+	args.ExtraFlags = append(args.ExtraFlags, "-timeout", goUnitTestTimeout.String())
+	return args
 }
 
 var EdotModuleDir = filepath.Join("internal", "edot")
@@ -82,6 +91,7 @@ var EdotModuleDir = filepath.Join("internal", "edot")
 func DefaultGoTestUnitEdotArgs(cfg *Settings) GoTestArgs {
 	args := makeGoTestArgs(cfg, "Unit EDOT")
 	args.WorkDir = EdotModuleDir
+	args.ExtraFlags = append(args.ExtraFlags, "-timeout", goUnitTestTimeout.String())
 	return args
 }
 
