@@ -99,24 +99,6 @@ receivers:
       s3_prefix: 'test'
     encodings:
       - extension: aws_logs_encoding/elbaccess
-<<<<<<< HEAD
-=======
-  aws_cloudwatch:
-    credentials_provider: awscredentialsprovider
-    region: us-east-1
-    logs:
-      initial_lookback: 1h
-      poll_interval: 1h
-      groups:
-        autodiscover:
-          limit: 1
-    metrics:
-      collection_interval: 5m
-      period: 5m
-      queries:
-        - namespace: AWS/Lambda
-          metric_name: Invocations
->>>>>>> 44a9334 (ci: run internal/edot unit tests (#17094))
   prometheus_remote_write:
     endpoint: 0.0.0.0:9090
   statsd:

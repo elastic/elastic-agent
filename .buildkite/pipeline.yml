@@ -303,35 +303,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - fips140=only Windows 11 arm64"
-        key: "unit-tests-win11-arm64-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        # See unit-tests-win11-arm64 for why the EDOT unit tests are skipped.
-        env:
-          FIPS: "true"
-          SKIP_EDOT_UNIT_TESTS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
->>>>>>> 44a9334 (ci: run internal/edot unit tests (#17094))
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
