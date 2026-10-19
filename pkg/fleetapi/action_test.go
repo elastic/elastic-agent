@@ -345,6 +345,39 @@ func TestActionUninstallUnmarshalJSON(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "2022-01-02T12:00:00Z", st.Format(time.RFC3339))
 	})
+
+	t.Run("UNINSTALL carries the Fleet-provided created_at", func(t *testing.T) {
+		p := []byte(`[{"id":"testid","type":"UNINSTALL","created_at":"2022-01-02T11:00:00Z","start_time":"2022-01-02T12:00:00Z"}]`)
+		a := &Actions{}
+		require.NoError(t, a.UnmarshalJSON(p))
+
+		action, ok := (*a)[0].(*ActionUninstall)
+		require.True(t, ok, "unable to cast action to ActionUninstall")
+
+		created, err := action.CreatedAt()
+		require.NoError(t, err)
+		assert.Equal(t, "2022-01-02T11:00:00Z", created.Format(time.RFC3339))
+	})
+}
+
+func TestActionUninstallCreatedAt(t *testing.T) {
+	t.Run("valid created_at parses as UTC", func(t *testing.T) {
+		a := &ActionUninstall{ActionCreatedAt: "2022-01-02T11:00:00Z"}
+		got, err := a.CreatedAt()
+		require.NoError(t, err)
+		assert.Equal(t, "2022-01-02T11:00:00Z", got.Format(time.RFC3339))
+	})
+	t.Run("absent created_at returns ErrNoCreatedAt", func(t *testing.T) {
+		a := &ActionUninstall{}
+		_, err := a.CreatedAt()
+		assert.ErrorIs(t, err, ErrNoCreatedAt)
+	})
+	t.Run("malformed created_at returns an error", func(t *testing.T) {
+		a := &ActionUninstall{ActionCreatedAt: "not-a-timestamp"}
+		_, err := a.CreatedAt()
+		require.Error(t, err)
+		assert.NotErrorIs(t, err, ErrNoCreatedAt)
+	})
 }
 
 func TestNewActionUninstall(t *testing.T) {

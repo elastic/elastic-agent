@@ -151,9 +151,10 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 	actions = ad.compactAndRemoveQueuedUpgrades(actions, &upgradeDetailsNeedUpdate)
 
 	// perform the receipt-time handling of freshly received UNINSTALL actions:
-	// drop duplicates, verify their signature, and reject any that could never run
-	// before expiring. Actions with a Fleet-provided start_time are then moved into
-	// the (cancellable, persisted) queue below by queueScheduledActions.
+	// drop duplicates, verify their signature, reject any whose start_time is
+	// outside the allowed grace-period window or that could never run before
+	// expiring. Accepted actions keep their start_time and are moved into the
+	// (cancellable, persisted) queue below by queueScheduledActions.
 	actions = ad.scheduleUninstallActions(now, actions)
 
 	// add any scheduled actions to the queue (we don't check the start time here, as we will check it later)
@@ -259,12 +260,13 @@ func detectTypes(actions []fleetapi.Action) []string {
 //     not silently drop it (terminal actions must be acked).
 const (
 	// minUninstallGracePeriod and maxUninstallGracePeriod bound the grace period
-	// an UNINSTALL action may schedule through its start_time. The agent rejects
-	// an action whose start_time is sooner than minUninstallGracePeriod from now
+	// an UNINSTALL action may schedule through its start_time, measured from the
+	// action's creation time in Fleet (created_at). The agent rejects an action
+	// whose start_time is sooner than minUninstallGracePeriod after created_at
 	// (including an immediate or absent start_time) or later than
-	// maxUninstallGracePeriod from now. This guarantees operators a predictable
-	// window to cancel an accidental uninstall and prevents one from being
-	// scheduled too soon or arbitrarily far in the future.
+	// maxUninstallGracePeriod after created_at. This guarantees operators a
+	// predictable window to cancel an accidental uninstall and prevents one from
+	// being scheduled too soon or arbitrarily far in the future.
 	minUninstallGracePeriod = time.Hour
 	maxUninstallGracePeriod = 24 * time.Hour
 )
@@ -286,14 +288,14 @@ func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []flee
 			continue
 		}
 
-		// Keep the action for further processing; queueScheduledActions moves it into
-		// the queue when it carries a future start_time, otherwise it is dispatched
-		// immediately so the handler runs (or rejects) it.
+		// Keep the action for further processing. A valid action keeps its
+		// start_time and is moved into the (cancellable, persisted) queue by
+		// queueScheduledActions; a rejected one has its start_time cleared below so
+		// it is dispatched immediately and the handler acknowledges the failure.
 		actions = append(actions, action)
 
 		// Verify the signature on receipt so a missing/invalid signature is rejected
-		// immediately and a tampered action is never scheduled. On success the verifier
-		// also replaces the action data with the signed payload. On failure clear the
+		// immediately and a tampered action is never scheduled. On failure clear the
 		// start_time so the action is not queued but dispatched immediately, where the
 		// handler rejects it (the error is not acked, so a tampered action is never
 		// acknowledged).
@@ -332,9 +334,12 @@ func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []flee
 			continue
 		}
 
-		// Also reject an action that could never run before it expires (its
-		// start_time is at or after the expiration), so the queue does not silently
-		// drop it once expired. start_time is valid here (checked above).
+		// Also reject an action that could never run before it expires — one that
+		// is already expired, or whose start_time is at or after the expiration —
+		// so the queue does not silently drop it once expired. A backdated
+		// created_at can place a valid-window start_time in the past, so the
+		// already-expired case is checked explicitly rather than inferred from the
+		// start_time.
 		exp, experr := ua.Expiration()
 		if experr != nil {
 			// No expiration (never expires) or a malformed expiration: nothing to
@@ -342,8 +347,13 @@ func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []flee
 			// dispatch.
 			continue
 		}
-		if !start.Before(exp) {
+		switch {
+		case now.After(exp):
+			ua.Err = fmt.Errorf("uninstall action already expired at %s", ua.ActionExpiration)
+		case !start.Before(exp):
 			ua.Err = fmt.Errorf("uninstall start_time %s is at or after the action expiration %s", ua.ActionStartTime, ua.ActionExpiration)
+		}
+		if ua.Err != nil {
 			ua.ActionStartTime = ""
 			ad.log.Warnf("uninstall action %s will not be scheduled: %v", ua.ID(), ua.Err)
 		}

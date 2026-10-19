@@ -1121,6 +1121,37 @@ func TestScheduleUninstallActions(t *testing.T) {
 		require.Error(t, tooSoon.Err)
 	})
 
+	t.Run("valid-window action with a past start time is kept (executes promptly)", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		// created_at is backdated so a start_time in the past still forms a valid
+		// 1h window. Such an action must be kept (queued) and run promptly, not
+		// rejected as "too soon".
+		created := now.Add(-2 * time.Hour)
+		start := rfc(created.Add(time.Hour)) // now-1h, valid window, already due
+		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionCreatedAt: rfc(created), ActionStartTime: start}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Equal(t, start, a.ActionStartTime, "a valid-window action with a past start time must still be scheduled")
+		assert.NoError(t, a.Err)
+	})
+
+	t.Run("already expired action with a valid window is rejected, not silently dropped", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		// Backdated created_at makes the 1h window valid, but the action already
+		// expired before receipt. It must be fail-acked (rejected) rather than
+		// queued and silently dropped once dequeued as expired.
+		created := now.Add(-2 * time.Hour)
+		a := &fleetapi.ActionUninstall{
+			ActionID:         "u1",
+			ActionType:       fleetapi.ActionTypeUninstall,
+			ActionCreatedAt:  rfc(created),
+			ActionStartTime:  rfc(created.Add(time.Hour)),    // now-1h, valid window
+			ActionExpiration: rfc(now.Add(-30 * time.Minute)), // already expired
+		}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Empty(t, a.ActionStartTime, "already-expired action must not be queued")
+		require.ErrorContains(t, a.Err, "expired")
+	})
+
 	t.Run("start time at or after expiration is rejected", func(t *testing.T) {
 		d := newTestDispatcher(t)
 		// Valid grace window, but the action would expire before its start time.

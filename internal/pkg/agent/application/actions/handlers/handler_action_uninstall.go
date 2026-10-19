@@ -75,9 +75,10 @@ func (h *Uninstall) Handle(ctx context.Context, a fleetapi.Action, ack acker.Ack
 		return fmt.Errorf("uninstall action %s rejected: signature verification failed: %w", action.ActionID, err)
 	}
 
-	// The dispatcher may have rejected the action on receipt (e.g. its grace
-	// period would end at or after the action expiration) by setting action.Err
-	// and dispatching it immediately without scheduling. Ack that failure now.
+	// The dispatcher may have rejected the action on receipt (e.g. its start_time
+	// is outside the allowed grace-period window, or it could never run before
+	// expiring) by setting action.Err and dispatching it immediately without
+	// scheduling. Ack that failure now.
 	if action.Err != nil {
 		h.log.Warnf("handlerUninstall: action '%s' rejected before scheduling: %v", action.ActionID, action.Err)
 		return h.ackNow(ctx, ack, action)
