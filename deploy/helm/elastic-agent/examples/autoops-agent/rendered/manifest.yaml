@@ -63,11 +63,6 @@ stringData:
             period: 24h
         output:
           otelconsumer: null
-        processors:
-        - add_fields:
-            fields:
-              token: ${env:AUTOOPS_TOKEN}
-            target: autoops_es
         telemetry_types:
         - logs
     service:
@@ -143,11 +138,6 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        - name: AUTOOPS_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: autoops-token
-              name: agent-autoops-example-autoops
         - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
           valueFrom:
             secretKeyRef:
