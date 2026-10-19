@@ -3761,7 +3761,7 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 		Units: []component.Unit{newUnit("pod-a", "https://10.0.0.1:9200"), newUnit("pod-b", "https://10.0.0.2:9200")},
 	}
 
-	receivers, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil)
+	receivers, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, receivers, 2)
 	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-a-same-stream")
