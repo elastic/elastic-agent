@@ -89,7 +89,6 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.6.0
 stringData:
-  autoops-token: "REPLACE_ME_TOKEN"
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
   otel-url: "https://otel.example.com:4318"
   es-api-key: "REPLACE_ME_API_KEY"
@@ -117,7 +116,7 @@ spec:
       labels:
         name: agent-autoops-example
       annotations:
-        checksum/config: d5c1a32862e7a7d82171912d10c3baac39407834be924866afcf55f4bc961056
+        checksum/config: c0b5a2c9ba9bb1fb13cf9ae9ab5fd4eec39219759e106fd3f937ba158d30035a
     spec:
       automountServiceAccountToken: true
       containers:
