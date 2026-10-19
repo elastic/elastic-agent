@@ -18,6 +18,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/configure"
+	libpaths "github.com/elastic/elastic-agent-libs/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -378,7 +379,7 @@ func configuredLogger(cfg *configuration.Configuration, name string) (*logger.Lo
 		return nil, err
 	}
 
-	if err := configure.LoggingWithOutputs("", libC, internal); err != nil {
+	if err := configure.LoggingWithOutputs("", libC, libpaths.New(), internal); err != nil {
 		return nil, fmt.Errorf("error initializing logging: %w", err)
 	}
 	return logp.NewLogger(""), nil

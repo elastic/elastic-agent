@@ -420,3 +420,66 @@ func TestConfigMerge(t *testing.T) {
 		})
 	}
 }
+
+// TestConfigMergeKeepsInputVariables ensures variables in inputs and outputs are left for the transpiler when
+// merging a policy, even when they reference a path that exists in the agent's own config (e.g. agent.id).
+func TestConfigMergeKeepsInputVariables(t *testing.T) {
+	policy := func() map[string]interface{} {
+		return map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"id":        "synthetics",
+					"condition": "${agent.id} == 'abc'",
+					"streams": []interface{}{
+						map[string]interface{}{"condition": "${agent.logging.level} == 'info'"},
+					},
+				},
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{"type": "elasticsearch", "api_key": "${agent.id}"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		from func(t *testing.T) interface{}
+	}{
+		{
+			name: "raw map",
+			from: func(t *testing.T) interface{} { return policy() },
+		},
+		{
+			name: "config built with NewConfigFrom",
+			from: func(t *testing.T) interface{} {
+				c, err := NewConfigFrom(policy())
+				require.NoError(t, err)
+				return c
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			base, err := NewConfigFrom(map[string]interface{}{
+				"agent": map[string]interface{}{
+					"id":      "e1eef1e7-b4d8-4d65-85be-5dc49fc5d6eb",
+					"logging": map[string]interface{}{"level": "info"},
+				},
+			})
+			require.NoError(t, err)
+			require.NoError(t, base.Merge(tc.from(t)))
+
+			m, err := base.ToMapStr()
+			require.NoError(t, err)
+
+			input := m["inputs"].([]interface{})[0].(map[string]interface{})
+			assert.Equal(t, "${agent.id} == 'abc'", input["condition"])
+			stream := input["streams"].([]interface{})[0].(map[string]interface{})
+			assert.Equal(t, "${agent.logging.level} == 'info'", stream["condition"])
+			output := m["outputs"].(map[string]interface{})["default"].(map[string]interface{})
+			assert.Equal(t, "${agent.id}", output["api_key"])
+			// the rest of the config is still resolved as usual
+			assert.Equal(t, "e1eef1e7-b4d8-4d65-85be-5dc49fc5d6eb", m["agent"].(map[string]interface{})["id"])
+		})
+	}
+}

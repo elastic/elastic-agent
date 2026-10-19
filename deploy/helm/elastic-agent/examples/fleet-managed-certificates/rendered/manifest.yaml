@@ -26,6 +26,7 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.6.0
+
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -72,6 +73,7 @@ stringData:
     PQQDAGNGADBDAiAFghoM1M53abi968RyR+DwVX3S92aiu7MogtnuKCgPLQIFRRza
     Ondv3U1X2Qwo2ZELignHs3JLWucWvCIqmbW2+B==
     -----END CERTIFICATE-----
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -227,6 +229,8 @@ rules:
   resources:
     - volumeattachments
   verbs: ["list", "watch"]
+
+
 ---
 # Source: elastic-agent/templates/agent/cluster-role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -307,6 +311,7 @@ rules:
       - get
       - list
       - watch
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -348,6 +353,7 @@ roleRef:
   kind: ClusterRole
   name: agent-perNode-example-default
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
 apiVersion: v1
@@ -376,6 +382,7 @@ spec:
   selector:    
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
+
 ---
 # Source: elastic-agent/templates/agent/k8s/daemonset.yaml
 apiVersion: apps/v1
@@ -520,6 +527,7 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-pernode-example
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
 apiVersion: apps/v1
@@ -606,3 +614,4 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+

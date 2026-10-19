@@ -49,8 +49,12 @@ type StateStore struct {
 type state struct {
 	Version          string           `json:"version"`
 	ActionSerializer actionSerializer `json:"action,omitempty"`
-	AckToken         string           `json:"ack_token,omitempty"`
-	Queue            actionQueue      `json:"action_queue,omitempty"`
+	// PendingAck holds an action that must be acknowledged after a restart.
+	// It is stored separately from ActionSerializer so it does not clobber the
+	// persisted policy-change action used to restore policy on startup.
+	PendingAck actionSerializer `json:"pending_ack,omitempty"`
+	AckToken   string           `json:"ack_token,omitempty"`
+	Queue      actionQueue      `json:"action_queue,omitempty"`
 }
 
 // actionSerializer is JSON Marshaler/Unmarshaler for fleetapi.Action.
@@ -158,20 +162,22 @@ func readState(reader io.ReadCloser) (state, error) {
 	return st, nil
 }
 
+// isNilAction reports whether a is nil, including the typed-nil case where a
+// non-nil interface holds a nil pointer. A plain `a == nil` check is not
+// sufficient because a typed nil (e.g. (*ActionPolicyChange)(nil)) stored in
+// a fleetapi.Action interface is never equal to untyped nil. See
+// https://go.dev/ref/spec#Type_switches for details.
+func isNilAction(a fleetapi.Action) bool {
+	return a == nil || reflect.ValueOf(a).IsNil()
+}
+
 // SetAction sets the current action. It accepts ActionPolicyChange or
 // ActionUnenroll. Any other type will be silently discarded.
 func (s *StateStore) SetAction(a fleetapi.Action) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	// the reflect.ValueOf(v).IsNil() is required as the type of 'v' on switch
-	// clause with multiple types will, in this case, preserve the original type.
-	// See details on https://go.dev/ref/spec#Type_switches
-	// Without using reflect accessing the concrete type stored in the interface
-	// isn't possible and as a is of type fleetapi.Action and has a concrete
-	// value, a is never nil, neither v is nil as it has the same type of a
-	// on both clauses.
-	if a == nil || reflect.ValueOf(a).IsNil() {
+	if isNilAction(a) {
 		s.log.Debugf("trying to set an nil '%T' action, ignoring the action", a)
 		return
 	}
@@ -192,6 +198,60 @@ func (s *StateStore) SetAction(a fleetapi.Action) {
 			"action.type", a.Type(),
 			"action.id", a.ID())
 	}
+}
+
+// SetPendingAckAction stores an action that must be acknowledged after a
+// restart. It accepts ActionRestart. Any other type is silently discarded.
+func (s *StateStore) SetPendingAckAction(a fleetapi.Action) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	if a == nil || reflect.ValueOf(a).IsNil() {
+		s.log.Debugf("trying to set a nil '%T' pending-ack action, ignoring the action", a)
+		return
+	}
+
+	switch v := a.(type) {
+	// If any new action type is added, don't forget to update the method's
+	// description and Save.
+	case *fleetapi.ActionRestart:
+		if s.state.PendingAck.Action != nil &&
+			s.state.PendingAck.Action.ID() == v.ID() {
+			return
+		}
+		s.dirty = true
+		s.state.PendingAck.Action = a
+	default:
+		s.log.Debugw("trying to set invalid pending-ack action type on the state store, ignoring the action",
+			"action.type", a.Type(),
+			"action.id", a.ID())
+	}
+}
+
+// PendingAckAction returns the action that must be acknowledged after a
+// restart, or nil if there is none. See SetPendingAckAction for the
+// possible action types.
+func (s *StateStore) PendingAckAction() fleetapi.Action {
+	s.mx.RLock()
+	defer s.mx.RUnlock()
+
+	if s.state.PendingAck.Action == nil {
+		return nil
+	}
+
+	return s.state.PendingAck.Action
+}
+
+// ClearPendingAckAction removes any stored pending-ack action.
+func (s *StateStore) ClearPendingAckAction() {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	if s.state.PendingAck.Action == nil {
+		return
+	}
+	s.dirty = true
+	s.state.PendingAck.Action = nil
 }
 
 // SetAckToken set ack token to the agent state
@@ -241,6 +301,15 @@ func (s *StateStore) Save() (err error) {
 			"ActionUnenroll or nil, but received %T", a)
 	}
 
+	switch a := s.state.PendingAck.Action.(type) {
+	case *fleetapi.ActionRestart,
+		nil:
+		// ok
+	default:
+		return fmt.Errorf("incompatible pending-ack type, expected "+
+			"ActionRestart or nil, but received %T", a)
+	}
+
 	reader, err = jsonToReader(&s.state)
 	if err != nil {
 		return err
@@ -260,6 +329,45 @@ func (s *StateStore) Queue() []fleetapi.ScheduledAction {
 	q := make([]fleetapi.ScheduledAction, len(s.state.Queue))
 	copy(q, s.state.Queue)
 	return q
+}
+
+// SaveAction atomically persists the action to disk and, on success, updates
+// the in-memory state. Concurrent reads always observe either the old or the
+// new action — never a partially committed state.
+// If the action is already current (same ID), the call is a no-op and returns nil.
+func (s *StateStore) SaveAction(a fleetapi.Action) error {
+	if isNilAction(a) {
+		return fmt.Errorf("cannot save nil action")
+	}
+	switch a.(type) {
+	case *fleetapi.ActionPolicyChange, *fleetapi.ActionUnenroll:
+		// ok
+	default:
+		return fmt.Errorf("incompatible action type %T, expected ActionPolicyChange or ActionUnenroll", a)
+	}
+
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	// Skip if the action is already current.
+	if current := s.state.ActionSerializer.Action; current != nil && current.ID() == a.ID() {
+		return nil
+	}
+
+	// tmp is a shallow copy; safe because the write lock is held throughout.
+	tmp := s.state
+	tmp.ActionSerializer.Action = a
+	reader, err := jsonToReader(&tmp)
+	if err != nil {
+		return fmt.Errorf("could not marshal state: %w", err)
+	}
+	if err := s.store.Save(reader); err != nil {
+		return err
+	}
+
+	s.state.ActionSerializer.Action = a
+	s.dirty = false
+	return nil
 }
 
 // Action the action to execute. See SetAction for the possible action types.

@@ -30,7 +30,7 @@ type actionCoordinator interface {
 
 type upgradeCoordinator interface {
 	actionCoordinator
-	Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt) error
+	Upgrade(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...coordinator.UpgradeOpt) error
 }
 
 type performActionFunc func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
@@ -57,6 +57,50 @@ func stopComponents(ctx context.Context, ch chan coordinator.ConfigChange, a fle
 	defer cancel()
 
 	unenrollPolicy.WaitAck(unenrollCtx)
+}
+
+// expectedComponentsForActionType returns the IDs of components that the current
+// policy configures to handle the given action type, including components that have
+// not yet emitted a runtime state update.
+func expectedComponentsForActionType(state coordinator.State, typ string) []string {
+	return state.PolicyConfiguredActionTypes[typ]
+}
+
+// allComponentsReady returns true when every component ID in expected has at least
+// one unit present in ucs. Uses component IDs rather than unit counts to avoid
+// false-positives when a single component contributes multiple units.
+func allComponentsReady(ucs []unitWithComponent, expected []string) bool {
+	ready := make(map[string]struct{}, len(ucs))
+	for _, uc := range ucs {
+		ready[uc.component.ID] = struct{}{}
+	}
+	for _, id := range expected {
+		if _, ok := ready[id]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// logUpgradeNotifyTimeout logs which components were still missing when the
+// pre-upgrade notification timed out.
+func logUpgradeNotifyTimeout(log *logp.Logger, state coordinator.State, typ string) {
+	if !state.PolicyApplied {
+		log.Warnf("handlerUpgrade: timed out waiting for policy to be applied for %v action; upgrade may fail if tamper protection is active", typ)
+		return
+	}
+	expected := expectedComponentsForActionType(state, typ)
+	ready := make(map[string]struct{})
+	for _, uc := range findMatchingUnitsByActionType(state, typ) {
+		ready[uc.component.ID] = struct{}{}
+	}
+	var missing []string
+	for _, id := range expected {
+		if _, ok := ready[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+	log.Warnf("handlerUpgrade: timed out waiting for components to be ready for %v action; missing: %v; upgrade may fail if tamper protection is active", typ, missing)
 }
 
 func findMatchingUnitsByActionType(state coordinator.State, typ string) []unitWithComponent {

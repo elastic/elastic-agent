@@ -38,8 +38,8 @@ The first stage of the process is to convert the YAML policy into an internal ab
 ### 2 Composable Providers & Variable Substitution
 After conversion of the policy into the AST the resulting AST is used to process the variables provided by the provider system inside the Elastic Agent. This substitutes any variables with values given by the providers or uses default variable values if the provider does not provide a value for the variable reference.
 ### 3 Apply Conditions
-The next stage of the policy's journey is to apply conditions. Applying conditions can result in parts of the policy being removed. This is used by many integrations to change the behavior based on variables that come from provides. (e.g. removing the winlog input on non-Windows hosts for the system integration).
-Additonal documentation for the specs files can be found in [component-specs.md](compoonent-specs.md).
+The next stage of the policy's journey is to apply conditions. Applying conditions can result in parts of the policy being removed. This is used by many integrations to change the behavior based on variables that come from providers. (e.g. removing the winlog input on non-Windows hosts for the system integration).
+Additional documentation for the specs files can be found in [component-specs.md](component-specs.md).
 ### 4 Compute Model
 The final stage of the policy’s journey is to compute the components and units model that represents the expected state of the running Elastic Agent environment. Using the input specifications that each component defines in the Elastic Agent component directory, the Elastic Agent computes a model. That model can be different based on the platform that the Elastic Agent is running on because of specification settings defined in a component’s specification.
 

@@ -32,6 +32,7 @@ stringData:
       kubernetes_leaderelection:
         enabled: false
         leader_lease: agent-ksm-sharded
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -187,6 +188,8 @@ rules:
   resources:
     - volumeattachments
   verbs: ["list", "watch"]
+
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -241,6 +244,7 @@ rules:
   - get
   - list
   - watch
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/stsdiscovery-rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -264,6 +268,7 @@ subjects:
   - kind: ServiceAccount
     name: kube-state-metrics
     namespace: default
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/service.yaml
 apiVersion: v1
@@ -293,6 +298,7 @@ spec:
   selector:    
     app.kubernetes.io/name: kube-state-metrics
     app.kubernetes.io/instance: example
+
 ---
 # Source: elastic-agent/charts/kube-state-metrics/templates/deployment.yaml
 apiVersion: apps/v1
@@ -434,3 +440,4 @@ spec:
           secret:
             defaultMode: 292
             secretName: agent-ksm
+

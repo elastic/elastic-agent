@@ -23,8 +23,10 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/useragent"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -35,10 +37,10 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -54,6 +56,10 @@ const (
 	// elasticMonitoringConnectorName is the component type name for the elastic monitoring connector.
 	// The connector receives pdata.Metrics from the receiver and converts them to Beats-format pdata.Logs.
 	elasticMonitoringConnectorName = "elasticmonitoringconnector"
+	// elasticMonitoringProcessorName is the component type name for the elastic monitoring processor.
+	// The processor aggregates and renames raw collector internal-telemetry metrics into a canonical
+	// form; both the file exporter and the connector consume its output.
+	elasticMonitoringProcessorName = "elasticmonitoringprocessor"
 )
 
 type collectorRecoveryTimer interface {
@@ -92,7 +98,6 @@ type OTelManager struct {
 
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
-	collectorCfg              *confmap.Conf
 	components                []component.Component
 
 	// The current configuration that the OTel collector is using. In the case that
@@ -318,7 +323,6 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			m.mx.Lock()
 			previousConfigHash := m.mergedCollectorCfgHash
 			configChanged, configUpdateErr := m.maybeUpdateMergedConfig(mergedCfg)
-			m.collectorCfg = cfgUpdate.collectorCfg
 			m.components = cfgUpdate.components
 			lvl, err := newLogLevelAfterConfigUpdate(cfgUpdate, mergedCfg)
 			if err != nil {
@@ -476,6 +480,10 @@ func (m *OTelManager) buildMergedConfig(
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 		}
 
+		if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
+			return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
+		}
+
 		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
@@ -546,6 +554,48 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 			"extensions": []any{"elastic_diagnostics"},
 		},
 	}))
+}
+
+func injectHeaderSetterExtension(config *confmap.Conf, agentInfo info.Agent) error {
+	extensionName := fmt.Sprintf("%s/%s", "headers_setter", translate.OtelNamePrefix)
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			extensionName: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"action": "upsert",
+						"key":    "User-Agent",
+						"value":  generateUserAgent(agentInfo),
+					},
+				},
+			},
+		},
+		"service": map[string]any{
+			"extensions": []any{extensionName},
+		},
+	}))
+}
+
+// generateUserAgent builds the User-Agent the same way libbeat's Beat.GenerateUserAgent does.
+func generateUserAgent(agentInfo info.Agent) string {
+	// A standalone Elastic Agent maps to "Unmanaged": in libbeat's terms, "Standalone"
+	// means a Beat that is not running under Elastic Agent at all.
+	mode := useragent.AgentManagementModeManaged
+	if agentInfo.IsStandalone() {
+		mode = useragent.AgentManagementModeUnmanaged
+	}
+
+	unprivileged := useragent.AgentUnprivilegedModePrivileged
+	if agentInfo.Unprivileged() {
+		unprivileged = useragent.AgentUnprivilegedModeUnprivileged
+	}
+
+	var uaOpts []string
+	if fbfeatures.IsElasticsearchStateStoreEnabled() {
+		uaOpts = append(uaOpts, "agentless")
+	}
+
+	return useragent.UserAgentWithBeatTelemetry("Agent", agentInfo.Version(), mode, unprivileged, release.FIPSDistribution(), uaOpts...)
 }
 
 func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
@@ -679,6 +729,8 @@ func injectMonitoringReceiver(
 
 	diagName := translate.OtelNamePrefix + receiverName
 	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
+	monitoringProcessorType := otelcomponent.MustNewType(elasticMonitoringProcessorName)
+	monitoringProcessorID := otelcomponent.NewIDWithName(monitoringProcessorType, diagName).String()
 	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + receiverName
 	logsPipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 
@@ -698,14 +750,20 @@ func injectMonitoringReceiver(
 		metricsPipelineExporters = append(metricsPipelineExporters, connectorID)
 	}
 	metricsPipelineCfg := map[string]any{
-		"receivers": []string{receiverID},
-		"exporters": metricsPipelineExporters,
+		"receivers":  []string{receiverID},
+		"processors": []string{monitoringProcessorID},
+		"exporters":  metricsPipelineExporters,
 	}
 
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{
 			receiverID: map[string]any{
 				"interval": monitoring.MetricsPeriod,
+			},
+		},
+		"processors": map[string]any{
+			monitoringProcessorID: map[string]any{
+				"exporter_names": outputNameLookup,
 			},
 		},
 		"exporters": map[string]any{
@@ -733,14 +791,25 @@ func injectMonitoringReceiver(
 			"receivers": []string{connectorID},
 			"exporters": []string{exporterID},
 		}
-		if features.DefaultProcessors() {
-			// This pipeline forwards Agent's own internal telemetry in beats format,
-			// not a specific beat's data, so it always gets the standard default
-			// processors.
-			collectorCfg["processors"] = map[string]any{
-				processorID: map[string]any{
-					"processors": translate.GetDefaultProcessors(""),
-				},
+
+		// Find the monitoring output component so per-output default_processors
+		// config is respected alongside the global flags. All monitoring components
+		// share the same output, so which one is found first does not matter; the
+		// processor list itself is always the generic, beat-agnostic one.
+		var monitoringComp *component.Component
+		for i := range components {
+			if components[i].OutputName == componentmonitoring.MonitoringOutput {
+				monitoringComp = &components[i]
+				break
+			}
+		}
+		defaultProcessors, err := translate.EffectiveDefaultMonitoringProcessors(monitoringComp)
+		if err != nil {
+			return fmt.Errorf("could not get effective default processors for monitoring: %w", err)
+		}
+		if len(defaultProcessors) > 0 {
+			collectorCfg["processors"].(map[string]any)[processorID] = map[string]any{
+				"processors": defaultProcessors,
 			}
 			logsPipelineCfg["processors"] = []string{processorID}
 		}
@@ -748,7 +817,6 @@ func injectMonitoringReceiver(
 			connectorID: map[string]any{
 				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
 				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
-				"exporter_names":       outputNameLookup,
 			},
 		}
 		collectorCfg["service"].(map[string]any)["pipelines"].(map[string]any)[logsPipelineID] = logsPipelineCfg
@@ -860,6 +928,8 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
+					delete(extensionsMap.ComponentStatusMap, extensionKey)
+				case strings.HasPrefix(extensionKey, "extension:oauth2client"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}

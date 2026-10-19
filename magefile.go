@@ -12,6 +12,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -60,6 +62,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -85,14 +88,15 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/yaml.v3"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/downloader"
-	"helm.sh/helm/v3/pkg/getter"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/action"
+	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/downloader"
+	"helm.sh/helm/v4/pkg/getter"
+	"helm.sh/helm/v4/pkg/registry"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
 )
 
 const (
@@ -149,9 +153,6 @@ type Check mg.Namespace
 
 // Prepare tasks related to bootstrap the environment or get information about the environment.
 type Prepare mg.Namespace
-
-// Format automatically format the code.
-type Format mg.Namespace
 
 // Demo runs agent out of container.
 type Demo mg.Namespace
@@ -230,7 +231,7 @@ func (Dev) RegenerateMocks() error {
 		return fmt.Errorf("generating mocks: %w", err)
 	}
 
-	mg.SerialDeps(Format.License, devtools.Format)
+	mg.SerialDeps(devtools.Format)
 	return nil
 }
 
@@ -582,12 +583,16 @@ func (Check) Changes() error {
 	return nil
 }
 
-// All runs all the tests.
-func (Test) All() {
-	mg.SerialDeps(Test.Unit)
+// All runs all the unit tests of the root module (Test.Unit)
+// and internal/edot (Test.UnitEdot). The two run in
+// parallel and write to separate build/TEST-go-unit.* and
+// build/TEST-go-unit_edot.* files.
+func (Test) All(ctx context.Context) {
+	mg.CtxDeps(ctx, Test.Unit, Test.UnitEdot)
 }
 
-// Unit runs all the unit tests.
+// Unit runs all the unit tests of the root Go module. It does not reach
+// internal/edot, which is a separate module; see Test.UnitEdot and Test.All.
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
@@ -606,21 +611,21 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	return devtools.GoTest(ctx, params)
 }
 
+// UnitEdot runs all the unit tests of the internal/edot module (the EDOT Collector).
+// internal/edot is a separate Go module, so Test.Unit does not reach its tests;
+// Test.All runs both. Honours the same env vars as Test.Unit (RACE_DETECTOR,
+// TEST_COVERAGE, FIPS); results are written to build/TEST-go-unit_edot.*.
+func (Test) UnitEdot(ctx context.Context) error {
+	mg.Deps(Prepare.Env)
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitEdotArgs(cfg)
+	return devtools.GoTest(ctx, params)
+}
+
 // Coverage takes the coverages report from running all the tests and display the results in the browser.
 func (Test) Coverage() error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	return RunGo("tool", "cover", "-html="+filepath.Join(buildDir, "coverage.out"))
-}
-
-// All format automatically all the codes.
-func (Format) All() {
-	mg.SerialDeps(Format.License)
-}
-
-// License applies the right license header.
-func (Format) License() error {
-	mg.Deps(Prepare.InstallGoLicenser)
-	return sh.RunV("go-licenser", "-license", licenses.Elasticv2LicenseName, "-exclude", "beats")
 }
 
 // Package packages the Elastic Agent for distribution.
@@ -674,6 +679,12 @@ func Package(ctx context.Context) error {
 	pkgSpec, err := devtools.LoadElasticAgentPackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return fmt.Errorf("error loading agent package spec: %w", err)
+	}
+
+	// Add tinit and jq, as declared in the hardening manifest, to the build
+	// context of the ironbank Docker variant.
+	if err := addIronbankResources(pkgSpec); err != nil {
+		return fmt.Errorf("adding ironbank resources: %w", err)
 	}
 
 	// Pass the resolved settings to dependency targets. Without this,
@@ -938,8 +949,11 @@ func PackageAgentCore(ctx context.Context) error {
 
 	cfg := devtools.SettingsFromContext(ctx)
 
-	// If Docker is selected but TarGz isn't, add TarGz since it's required for docker images
-	if cfg.IsPackageTypeSelected(devtools.Docker) && !cfg.IsPackageTypeSelected(devtools.TarGz) {
+	// The elastic-agent-core spec only defines tgz/zip types. When only deb/rpm (or
+	// docker) is selected the core build would produce nothing, causing
+	// extractAgentCoreForPackage to fail. Add TarGz so the core archive is always
+	// built regardless of which final package types were requested.
+	if !cfg.IsPackageTypeSelected(devtools.TarGz) {
 		cfg = cfg.WithAddedPackageType(devtools.TarGz)
 		ctx = devtools.ContextWithSettings(ctx, cfg)
 	}
@@ -963,7 +977,7 @@ func Config(ctx context.Context) error {
 }
 
 // ControlProto generates pkg/agent/control/proto module.
-func ControlProto() error {
+func ControlProto(ctx context.Context) error {
 	if err := sh.RunV(
 		"protoc",
 		"--go_out=pkg/control/v2/cproto", "--go_opt=paths=source_relative",
@@ -980,8 +994,10 @@ func ControlProto() error {
 		return err
 	}
 
-	mg.Deps(devtools.AddLicenseHeaders, devtools.GoImports)
-	return nil
+	if err := devtools.AddLicenseHeaders(devtools.SettingsFromContext(ctx)); err != nil {
+		return err
+	}
+	return devtools.GoImports()
 }
 
 func BuildPGP() error {
@@ -2100,6 +2116,140 @@ func getIronbankContextName(cfg *devtools.Settings) string {
 	return outputDir
 }
 
+// ironbankResource holds the download URL and sha256 hash for a binary
+// resource listed in hardening_manifest.yaml.tmpl.
+type ironbankResource struct {
+	URL    string
+	SHA256 string
+}
+
+// ironbankResourcesFromManifest parses hardening_manifest.yaml.tmpl and
+// returns the resource info keyed by filename. Template expressions ({{ … }})
+// are stripped before parsing so the YAML is well-formed.
+func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankResource, error) {
+	raw, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Strip Go template expressions so the file parses as plain YAML.
+	stripped := regexp.MustCompile(`\{\{[^}]*\}\}`).ReplaceAll(raw, []byte("tmpl"))
+
+	var manifest struct {
+		Resources []struct {
+			Filename   string `yaml:"filename"`
+			URL        string `yaml:"url"`
+			Validation struct {
+				Type  string `yaml:"type"`
+				Value string `yaml:"value"`
+			} `yaml:"validation"`
+		} `yaml:"resources"`
+	}
+	if err := yaml.Unmarshal(stripped, &manifest); err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", manifestPath, err)
+	}
+
+	resources := make(map[string]ironbankResource, len(manifest.Resources))
+	for _, r := range manifest.Resources {
+		if r.Validation.Type == "sha256" {
+			resources[r.Filename] = ironbankResource{URL: r.URL, SHA256: r.Validation.Value}
+		}
+	}
+	return resources, nil
+}
+
+// addIronbankResources adds tinit and jq to the build context of every ironbank
+// Docker variant spec. Ironbank supplies these through the hardening manifest;
+// the public CI build has no such step, so they are downloaded and verified here
+// from the same manifest, which stays their only definition. The download runs
+// when the spec is evaluated, so only builds that include the variant fetch them.
+func addIronbankResources(specs []devtools.OSPackageArgs) error {
+	manifestPath := filepath.Join("dev-tools", "packaging", "templates", "ironbank", "hardening_manifest.yaml.tmpl")
+	resources, err := ironbankResourcesFromManifest(manifestPath)
+	if err != nil {
+		return err
+	}
+	for _, name := range []string{"tinit", "jq"} {
+		if resources[name].URL == "" || len(resources[name].SHA256) < 12 {
+			return fmt.Errorf("%s: no sha256-validated %q resource found", manifestPath, name)
+		}
+	}
+	for i := range specs {
+		if specs[i].Spec.DockerVariant != devtools.Ironbank {
+			continue
+		}
+		if specs[i].Spec.Files == nil {
+			specs[i].Spec.Files = map[string]devtools.PackageFile{}
+		}
+		for _, name := range []string{"tinit", "jq"} {
+			resource := resources[name]
+			dir := filepath.Join("build", "ironbank-resources", resource.SHA256[:12])
+			// The target is relative to the "beat" directory of the docker build
+			// context; "../" places the file at the context root, where the
+			// Ironbank Dockerfile expects it, instead of inside the agent payload.
+			specs[i].Spec.Files["../"+name] = devtools.PackageFile{
+				Source: filepath.Join(dir, name),
+				Dep: func(devtools.PackageSpec) error {
+					return fetchIronbankResource(dir, name, resource)
+				},
+			}
+		}
+	}
+	return nil
+}
+
+// fetchIronbankResource downloads r into dir/name and verifies its sha256. It
+// does nothing if a verified copy is already there.
+func fetchIronbankResource(dir, name string, r ironbankResource) error {
+	dst := filepath.Join(dir, name)
+	if existing, err := os.ReadFile(dst); err == nil {
+		if sum := sha256.Sum256(existing); hex.EncodeToString(sum[:]) == r.SHA256 {
+			return nil
+		}
+	}
+
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	fmt.Printf(">> downloading %s from %s\n", name, r.URL)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.URL, nil)
+	if err != nil {
+		return fmt.Errorf("downloading %s: %w", r.URL, err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("downloading %s: %w", r.URL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("downloading %s: unexpected status %s", r.URL, resp.Status)
+	}
+
+	tmp, err := os.CreateTemp(dir, name+".*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	hash := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(tmp, hash), resp.Body); err != nil {
+		tmp.Close()
+		return fmt.Errorf("downloading %s: %w", r.URL, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if got := hex.EncodeToString(hash.Sum(nil)); got != r.SHA256 {
+		return fmt.Errorf("%s: sha256 mismatch: got %s, want %s (from hardening_manifest.yaml.tmpl)", r.URL, got, r.SHA256)
+	}
+	// Executable, and preserved when copied into the docker build context.
+	if err := os.Chmod(tmp.Name(), 0o755); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), dst)
+}
+
 func prepareIronbankBuild(cfg *devtools.Settings) error {
 	fmt.Println(">> prepareIronbankBuild: prepare the IronBank container context.")
 	buildDir := filepath.Join("build", getIronbankContextName(cfg))
@@ -2107,6 +2257,9 @@ func prepareIronbankBuild(cfg *devtools.Settings) error {
 
 	data := map[string]interface{}{
 		"MajorMinor": majorMinor(cfg),
+		// Dockerfile.tmpl is shared with the public CI variant; the template
+		// engine rejects missing keys, so this must be defined here.
+		"public_build": false,
 	}
 
 	err := filepath.WalkDir(templatesDir, func(path string, d fs.DirEntry, _ error) error {
@@ -2175,7 +2328,7 @@ func (Integration) Clean(ctx context.Context) error {
 		}
 	}
 
-	r, err := createTestRunner(cfg, false, "", "")
+	r, err := createTestRunner(ctx, cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -2196,7 +2349,6 @@ func (Integration) Check() error {
 	return errors.Join(
 		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
-		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -2292,7 +2444,7 @@ func (i Integration) testServerless(ctx context.Context, matrix bool, testName s
 	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs the integration tests defined in testing/integration/k8s
+// TestKubernetes runs the integration tests defined in testing/integration/k8s.
 func (i Integration) TestKubernetes(ctx context.Context) error {
 	return i.testKubernetes(ctx, false, "")
 }
@@ -2338,12 +2490,26 @@ func (Integration) BuildKubernetesTestData(ctx context.Context) error {
 	}
 
 	// render elastic-agent-standalone kustomize
-	kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join("deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"))
-	if err != nil {
-		return fmt.Errorf("failed to render kustomize: %w", err)
-	}
-	if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", k8s.AgentKustomizePath), kustomizeYaml, 0o644); err != nil {
-		return fmt.Errorf("failed to write kustomize.yaml: %w", err)
+	for _, kustomize := range []struct {
+		overlay []string
+		target  string
+	}{
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizePath,
+		},
+		{
+			overlay: []string{"deploy", "kubernetes", "elastic-agent-kustomize", "openshift", "default", "elastic-agent-standalone"},
+			target:  k8s.AgentKustomizeOpenShiftPath,
+		},
+	} {
+		kustomizeYaml, err := kubernetes.RenderKustomize(ctx, filepath.Join(kustomize.overlay...))
+		if err != nil {
+			return fmt.Errorf("failed to render kustomize %q: %w", filepath.Join(kustomize.overlay...), err)
+		}
+		if err := os.WriteFile(filepath.Join("testing", "integration", "k8s", kustomize.target), kustomizeYaml, 0o644); err != nil {
+			return fmt.Errorf("failed to write %q: %w", kustomize.target, err)
+		}
 	}
 
 	return nil
@@ -2887,28 +3053,6 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(devtools.InstallGoTestTools)
 }
 
-// TestBeatServerless runs beats-oriented serverless tests
-func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
-
-	if cfg.IntegrationTest.AgentBuildDir == "" {
-		cfg = cfg.WithAgentBuildDir(beatBuildPath)
-	}
-
-	// a bit of bypass logic; run as serverless by default
-	switch cfg.IntegrationTest.StackProvisioner {
-	case "":
-		cfg = cfg.WithStackProvisioner("serverless")
-	case "stateful":
-		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
-	}
-
-	cfg = cfg.WithTestBinaryName(beatname)
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
-}
-
 // TestForResourceLeaks runs the integration tests defined in testing/integration/leak
 func (i Integration) TestForResourceLeaks(ctx context.Context) error {
 	return i.testForResourceLeaks(ctx, false, "")
@@ -3101,7 +3245,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(cfg, matrix, singleTest, goTestFlags, batches...)
+	r, err := createTestRunner(ctx, cfg, matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -3159,7 +3303,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	return agentVersion, agentStackVersion, nil
 }
 
-func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(ctx context.Context, cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion := cfg.GoVersion()
 
 	agentVersion, agentStackVersion, err := getTestRunnerVersions(cfg)
@@ -3206,22 +3350,47 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = multipass.NewProvisioner()
 		identifier = localIdentifier()
 	case kind.Name:
-		instanceProvisioner = kind.NewProvisioner()
+		var err error
+		instanceProvisioner, err = kind.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
+		identifier = localIdentifier()
+	case microshift.Name:
+		var err error
+		instanceProvisioner, err = microshift.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case dockerprov.Name:
-		instanceProvisioner = dockerprov.NewProvisioner()
+		instanceProvisioner, err = dockerprov.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
 		identifier = localIdentifier()
 	case local.Name:
 		instanceProvisioner = local.NewProvisioner()
 		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf(
+			"INSTANCE_PROVISIONER environment variable must be one of %q, %q, %q, %q, %q, or %q, not %s",
+			gcloud.Name,
+			multipass.Name,
+			kind.Name,
+			microshift.Name,
+			dockerprov.Name,
+			local.Name,
+			instanceProvisionerMode,
+		)
 	}
 
-	// The local stack provisioner runs elastic-package locally and needs no ESS
+	// The local stack provisioner runs elastic-package locally and the external one
+	// reads an already running stack from the environment, so neither needs ESS
 	// credentials; only the cloud (stateful/serverless) provisioners require an API key.
 	var provisionCfg ess.ProvisionerConfig
-	if cfg.IntegrationTest.StackProvisioner != ess.ProvisionerLocal {
+	stackProvisionerMode := cfg.IntegrationTest.StackProvisioner
+	if stackProvisionerMode != ess.ProvisionerLocal && stackProvisionerMode != ess.ProvisionerExternal {
 		provisionCfg, err = essProvisionerConfig(cfg, identifier)
 		if err != nil {
 			return nil, err
@@ -3260,13 +3429,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
 	}
 
-	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
-	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
-	binaryName := cfg.IntegrationTest.BinaryName
-	if binaryName == "" {
-		binaryName = "elastic-agent"
-	}
-
 	repoDir := cfg.IntegrationTest.RepoPath
 	if repoDir == "" {
 		repoDir = "."
@@ -3292,7 +3454,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		Timestamp:      timestamp,
 		TestFlags:      goTestFlags,
 		ExtraEnv:       extraEnv,
-		BinaryName:     binaryName,
 	}
 
 	r, err := runner.NewRunner(runnerCfg, instanceProvisioner, stackProvisioner, batches...)
@@ -3341,13 +3502,17 @@ func newStackProvisioner(cfg *devtools.Settings, provisionCfg ess.ProvisionerCon
 		defer cancel()
 		sp, err := ess.NewServerlessProvisioner(ctx, provisionCfg)
 		return sp, mode, err
+	case ess.ProvisionerExternal:
+		sp, err := ess.NewExternalProvisioner()
+		return sp, mode, err
 	case ess.ProvisionerLocal:
 		sp, err := ess.NewLocalProvisioner()
 		return sp, mode, err
 	default:
-		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q or %q, not %s",
+		return nil, "", fmt.Errorf("STACK_PROVISIONER environment variable must be one of %q, %q, %q or %q, not %s",
 			ess.ProvisionerStateful,
 			ess.ProvisionerServerless,
+			ess.ProvisionerExternal,
 			ess.ProvisionerLocal,
 			mode)
 	}
@@ -4063,8 +4228,7 @@ func (h Helm) RenderExamples() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4110,16 +4274,17 @@ func (h Helm) RenderExamples() error {
 		installAction := action.NewInstall(actionConfig)
 		installAction.Namespace = "default"
 		installAction.ReleaseName = "example"
-		installAction.CreateNamespace = true
 		installAction.UseReleaseName = true
-		installAction.CreateNamespace = false
-		installAction.DryRun = true
+		installAction.DryRunStrategy = action.DryRunClient
 		installAction.Replace = true
-		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
-		installAction.ClientOnly = true
-		release, err := installAction.Run(helmChart, helmValues)
+		installAction.KubeVersion = &helmchartcommon.KubeVersion{Version: "1.27.0"}
+		relResult, err := installAction.Run(helmChart, helmValues)
 		if err != nil {
 			return fmt.Errorf("failed to install helm chart: %w", err)
+		}
+		rel, ok := relResult.(*releasev1.Release)
+		if !ok {
+			return fmt.Errorf("unexpected release type: %T", relResult)
 		}
 
 		renderedFolder := filepath.Join(exampleFullPath, "rendered")
@@ -4129,7 +4294,7 @@ func (h Helm) RenderExamples() error {
 		}
 
 		renderedManifestPath := filepath.Join(renderedFolder, "manifest.yaml")
-		err = os.WriteFile(renderedManifestPath, []byte(release.Manifest), 0o644)
+		err = os.WriteFile(renderedManifestPath, []byte(rel.Manifest), 0o644)
 		if err != nil {
 			return fmt.Errorf("failed to write rendered manifest %q: %w", renderedManifestPath, err)
 		}
@@ -4204,8 +4369,7 @@ func (h Helm) Lint() error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err := actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err := actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4348,8 +4512,7 @@ func (h Helm) handleDependencies(update bool) error {
 		}
 	}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-		func(format string, v ...interface{}) {})
+	err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}
@@ -4377,6 +4540,7 @@ func (h Helm) handleDependencies(update bool) error {
 		RegistryClient:   registryClient,
 		RepositoryConfig: settings.RepositoryConfig,
 		RepositoryCache:  settings.RepositoryCache,
+		ContentCache:     settings.ContentCache,
 		Debug:            settings.Debug,
 	}
 	if client.Verify {
@@ -4492,8 +4656,7 @@ func (h Helm) Package(ctx context.Context) error {
 	settings := cli.New() // Helm CLI settings
 	actionConfig := &action.Configuration{}
 
-	err = actionConfig.Init(settings.RESTClientGetter(), "default", "",
-		func(format string, v ...interface{}) {})
+	err = actionConfig.Init(settings.RESTClientGetter(), "default", "")
 	if err != nil {
 		return fmt.Errorf("failed to init helm action config: %w", err)
 	}

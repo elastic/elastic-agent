@@ -130,7 +130,7 @@ type MockRuntimeManager_PerformAction_Call struct {
 //   - unit component.Unit
 //   - name string
 //   - params map[string]interface{}
-func (_e *MockRuntimeManager_Expecter) PerformAction(ctx interface{}, comp interface{}, unit interface{}, name interface{}, params interface{}) *MockRuntimeManager_PerformAction_Call {
+func (_e *MockRuntimeManager_Expecter) PerformAction(ctx any, comp any, unit any, name any, params any) *MockRuntimeManager_PerformAction_Call {
 	return &MockRuntimeManager_PerformAction_Call{Call: _e.mock.On("PerformAction", ctx, comp, unit, name, params)}
 }
 
@@ -180,11 +180,11 @@ func (_c *MockRuntimeManager_PerformAction_Call) RunAndReturn(run func(ctx conte
 // PerformComponentDiagnostics provides a mock function for the type MockRuntimeManager
 func (_mock *MockRuntimeManager) PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error) {
 	// component.Component
-	_va := make([]interface{}, len(req))
+	_va := make([]any, len(req))
 	for _i := range req {
 		_va[_i] = req[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, ctx, additionalMetrics)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -222,9 +222,9 @@ type MockRuntimeManager_PerformComponentDiagnostics_Call struct {
 //   - ctx context.Context
 //   - additionalMetrics []cproto.AdditionalDiagnosticRequest
 //   - req ...component.Component
-func (_e *MockRuntimeManager_Expecter) PerformComponentDiagnostics(ctx interface{}, additionalMetrics interface{}, req ...interface{}) *MockRuntimeManager_PerformComponentDiagnostics_Call {
+func (_e *MockRuntimeManager_Expecter) PerformComponentDiagnostics(ctx any, additionalMetrics any, req ...any) *MockRuntimeManager_PerformComponentDiagnostics_Call {
 	return &MockRuntimeManager_PerformComponentDiagnostics_Call{Call: _e.mock.On("PerformComponentDiagnostics",
-		append([]interface{}{ctx, additionalMetrics}, req...)...)}
+		append([]any{ctx, additionalMetrics}, req...)...)}
 }
 
 func (_c *MockRuntimeManager_PerformComponentDiagnostics_Call) Run(run func(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component)) *MockRuntimeManager_PerformComponentDiagnostics_Call {
@@ -267,11 +267,11 @@ func (_c *MockRuntimeManager_PerformComponentDiagnostics_Call) RunAndReturn(run 
 // PerformDiagnostics provides a mock function for the type MockRuntimeManager
 func (_mock *MockRuntimeManager) PerformDiagnostics(context1 context.Context, componentUnitDiagnosticRequests ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic {
 	// runtime.ComponentUnitDiagnosticRequest
-	_va := make([]interface{}, len(componentUnitDiagnosticRequests))
+	_va := make([]any, len(componentUnitDiagnosticRequests))
 	for _i := range componentUnitDiagnosticRequests {
 		_va[_i] = componentUnitDiagnosticRequests[_i]
 	}
-	var _ca []interface{}
+	var _ca []any
 	_ca = append(_ca, context1)
 	_ca = append(_ca, _va...)
 	ret := _mock.Called(_ca...)
@@ -299,9 +299,9 @@ type MockRuntimeManager_PerformDiagnostics_Call struct {
 // PerformDiagnostics is a helper method to define mock.On call
 //   - context1 context.Context
 //   - componentUnitDiagnosticRequests ...runtime.ComponentUnitDiagnosticRequest
-func (_e *MockRuntimeManager_Expecter) PerformDiagnostics(context1 interface{}, componentUnitDiagnosticRequests ...interface{}) *MockRuntimeManager_PerformDiagnostics_Call {
+func (_e *MockRuntimeManager_Expecter) PerformDiagnostics(context1 any, componentUnitDiagnosticRequests ...any) *MockRuntimeManager_PerformDiagnostics_Call {
 	return &MockRuntimeManager_PerformDiagnostics_Call{Call: _e.mock.On("PerformDiagnostics",
-		append([]interface{}{context1}, componentUnitDiagnosticRequests...)...)}
+		append([]any{context1}, componentUnitDiagnosticRequests...)...)}
 }
 
 func (_c *MockRuntimeManager_PerformDiagnostics_Call) Run(run func(context1 context.Context, componentUnitDiagnosticRequests ...runtime.ComponentUnitDiagnosticRequest)) *MockRuntimeManager_PerformDiagnostics_Call {
@@ -360,7 +360,7 @@ type MockRuntimeManager_Run_Call struct {
 
 // Run is a helper method to define mock.On call
 //   - context1 context.Context
-func (_e *MockRuntimeManager_Expecter) Run(context1 interface{}) *MockRuntimeManager_Run_Call {
+func (_e *MockRuntimeManager_Expecter) Run(context1 any) *MockRuntimeManager_Run_Call {
 	return &MockRuntimeManager_Run_Call{Call: _e.mock.On("Run", context1)}
 }
 
@@ -413,7 +413,7 @@ type MockRuntimeManager_SubscribeAll_Call struct {
 
 // SubscribeAll is a helper method to define mock.On call
 //   - context1 context.Context
-func (_e *MockRuntimeManager_Expecter) SubscribeAll(context1 interface{}) *MockRuntimeManager_SubscribeAll_Call {
+func (_e *MockRuntimeManager_Expecter) SubscribeAll(context1 any) *MockRuntimeManager_SubscribeAll_Call {
 	return &MockRuntimeManager_SubscribeAll_Call{Call: _e.mock.On("SubscribeAll", context1)}
 }
 
@@ -453,7 +453,7 @@ type MockRuntimeManager_Update_Call struct {
 
 // Update is a helper method to define mock.On call
 //   - model component.Model
-func (_e *MockRuntimeManager_Expecter) Update(model interface{}) *MockRuntimeManager_Update_Call {
+func (_e *MockRuntimeManager_Expecter) Update(model any) *MockRuntimeManager_Update_Call {
 	return &MockRuntimeManager_Update_Call{Call: _e.mock.On("Update", model)}
 }
 

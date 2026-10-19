@@ -363,6 +363,49 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsAgentTags(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+	})
+
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent)
+	require.NoError(t, err)
+
+	err = f.Run(ctx, integrationtest.State{
+		Configure:  simpleConfigWithTags,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: componentSetup,
+		After: func(ctx context.Context) error {
+			diagZip, err := f.ExecDiagnostics(ctx, "diagnostics", "collect")
+			require.NoError(t, err)
+
+			extractionDir := t.TempDir()
+			extractZipArchive(t, diagZip, extractionDir)
+
+			agentInfoPath := filepath.Join(extractionDir, "agent-info.yaml")
+			agentInfoFile, err := os.Open(agentInfoPath)
+			require.NoErrorf(t, err, "open file %q failed", agentInfoPath)
+			defer agentInfoFile.Close()
+
+			var agentInfo map[string]any
+			err = yaml.NewDecoder(agentInfoFile).Decode(&agentInfo)
+			require.NoErrorf(t, err, "decode file %q failed", agentInfoPath)
+
+			assert.Equal(t, []any{"tag1", "tag2"}, agentInfo["tags"],
+				"agent-info.yaml should report the tags set with agent.tags")
+
+			return nil
+		},
+	})
+	assert.NoError(t, err)
+}
+
 func TestBeatDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -492,16 +535,15 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
-			// Beat receivers register diagnostic hooks per input stream via the OTel receiver
-			// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
-			// at the component level and land under the component directory, same as for process-runtime beats.
+			// Beat receivers register diagnostic hooks per input stream via the OTel
+			// receiver instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>").
 			name:              "filebeat receiver",
 			runtime:           "otel",
 			monitoringEnabled: true,
 			expectedCompDiagnosticsFiles: []string{
-				"registry.tar.gz",
-				"beat_metrics.json",
-				"input_metrics.json",
+				"*/registry.tar.gz",
+				"*/beat_metrics.json",
+				"*/input_metrics.json",
 			},
 			agentCompState: fileStreamAgentCompState,
 			diagCompSetup: map[string]integrationtest.ComponentState{
@@ -605,6 +647,15 @@ inputs:
     prospector.scanner.fingerprint.enabled: false
     file_identity.native: ~
     use_output: default
+  - id: system-metrics
+    type: system/metrics
+    use_output: default
+    streams:
+      - id: system/metrics-system.cpu
+        metricsets:
+          - cpu
+        period: 1s
+        data_stream.dataset: system.cpu
 agent.grpc:
     port: 6790
 outputs:
@@ -614,6 +665,7 @@ outputs:
     api_key: placeholder
 agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.metricbeat.system/metrics: otel
 `
 
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(10*time.Minute))
@@ -666,6 +718,8 @@ agent.internal.runtime.filebeat.filestream: otel
 	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
 	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
 	// at the component level and land under the component directory, same as for process-runtime beats.
+	// The system/metrics component and stream IDs contain "/", exercising association using the
+	// complete component ID before the archive path is normalized to "system-metrics-default".
 	expectedFiles := []string{
 		"edot/otel-merged-actual.yaml",
 		"edot/environment.yaml",
@@ -675,9 +729,11 @@ agent.internal.runtime.filebeat.filestream: otel
 		"edot/heap.profile.gz",
 		"edot/mutex.profile.gz",
 		"edot/threadcreate.profile.gz",
-		"components/filestream-default/registry.tar.gz",
-		"components/filestream-default/beat_metrics.json",
-		"components/filestream-default/input_metrics.json",
+		"components/filestream-default/*/registry.tar.gz",
+		"components/filestream-default/*/beat_metrics.json",
+		"components/filestream-default/*/input_metrics.json",
+		"components/system-metrics-default/*/beat_metrics.json",
+		"components/system-metrics-default/*/input_metrics.json",
 		"logs/elastic-agent-*/elastic-agent-*.ndjson",
 		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
@@ -690,7 +746,10 @@ agent.internal.runtime.filebeat.filestream: otel
 		require.NoErrorf(t, err, "stat file %q failed", matches[0])
 		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
 	}
-	verifyFilebeatRegistry(t, filepath.Join(extractionDir, "components/filestream-default/registry.tar.gz"))
+	registryMatches, err := filepath.Glob(filepath.Join(extractionDir, "components/filestream-default/*/registry.tar.gz"))
+	require.NoError(t, err)
+	require.NotEmpty(t, registryMatches)
+	verifyFilebeatRegistry(t, registryMatches[0])
 }
 
 // TestContainerDiagnostics verifies that `elastic-agent diagnostics` collects

@@ -3,7 +3,7 @@ notify:
       channels:
         - "#ingest-notifications"
       message: "<!subteam^S030QSX59PH|agent-control-plane-team> Version bump to ${NEW_VERSION} — ${BUILDKITE_BUILD_URL}"
-    if: (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+\$/) && (build.state == 'passed' || build.state == 'failed')
+    if: (build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+$/) && (build.state == 'passed' || build.state == 'failed')
   - slack:
       channels:
         - "#ingest-notifications"
@@ -22,6 +22,15 @@ env:
   IMAGE_BEATS_WITH_HOOKS_LATEST: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:latest"
 
 steps:
+  - label: ":slack: Notify team version bump started"
+    if: build.branch == 'main' || build.branch =~ /^[0-9]+\.[0-9x]+$/
+    command: echo "Version bump started"
+    notify:
+      - slack:
+          channels:
+            - "#ingest-notifications"
+          message: "<!subteam^S030QSX59PH|agent-control-plane-team> Version bump to ${NEW_VERSION} started — ${BUILDKITE_BUILD_URL}"
+
   # BRANCH is major.minor (e.g. 9.5 for a 9.5.0 minor release, 9.4 for a 9.4.3 patch).
   - label: "Bump version minor"
     key: bump-version-minor

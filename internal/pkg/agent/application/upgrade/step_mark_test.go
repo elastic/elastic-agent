@@ -48,8 +48,8 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 			ActionID:   "action-123",
 			ActionType: "UPGRADE",
 			Data: fleetapi.ActionUpgradeData{
-				Version:   "8.5.0",
-				SourceURI: "https://example.com/upgrade",
+				Version: "8.5.0",
+				Sources: []string{"https://example.com/upgrade"},
 			},
 		},
 		Details: details.NewDetails(
@@ -86,6 +86,73 @@ func TestSaveAndLoadMarker_NoLoss(t *testing.T) {
 	// Clean up the temporary file
 	err = os.Remove(markerFile)
 	require.NoError(t, err, "Failed to clean up marker file")
+}
+
+func TestMarker_LegacySourceURI(t *testing.T) {
+	t.Run("load with only source_uri", func(t *testing.T) {
+		dataDir := t.TempDir()
+		markerFile := markerFilePath(dataDir)
+		const sourceURI = "https://example.com/upgrade"
+		const markerYAML = `action:
+  id: action-123
+  type: UPGRADE
+  version: 8.5.0
+  source_uri: https://example.com/upgrade
+`
+		require.NoError(t, os.WriteFile(markerFile, []byte(markerYAML), 0o600))
+
+		marker, err := LoadMarker(dataDir)
+		require.NoError(t, err)
+		require.NotNil(t, marker.Action)
+		require.Equal(t, []string{sourceURI}, marker.Action.Data.Sources)
+	})
+
+	t.Run("load with both source_uri and sources", func(t *testing.T) {
+		dataDir := t.TempDir()
+		markerFile := markerFilePath(dataDir)
+		sources := []string{"https://primary.example.com/upgrade", "https://fallback.example.com/upgrade"}
+		const markerYAML = `action:
+  id: action-123
+  type: UPGRADE
+  version: 8.5.0
+  source_uri: https://legacy.example.com/upgrade
+  sources:
+    - https://primary.example.com/upgrade
+    - https://fallback.example.com/upgrade
+`
+		require.NoError(t, os.WriteFile(markerFile, []byte(markerYAML), 0o600))
+
+		marker, err := LoadMarker(dataDir)
+		require.NoError(t, err)
+		require.NotNil(t, marker.Action)
+		require.Equal(t, sources, marker.Action.Data.Sources)
+	})
+
+	t.Run("save writes both fields", func(t *testing.T) {
+		dataDir := t.TempDir()
+		markerFile := markerFilePath(dataDir)
+		sources := []string{"https://primary.example.com/upgrade", "https://fallback.example.com/upgrade"}
+		marker := &UpdateMarker{
+			Action: &fleetapi.ActionUpgrade{
+				ActionID:   "action-123",
+				ActionType: "UPGRADE",
+				Data: fleetapi.ActionUpgradeData{
+					Version: "8.5.0",
+					Sources: sources,
+				},
+			},
+		}
+
+		require.NoError(t, SaveMarker(dataDir, marker, true))
+
+		markerBytes, err := os.ReadFile(markerFile)
+		require.NoError(t, err)
+		require.Contains(t, string(markerBytes), "source_uri: "+sources[0])
+		require.Contains(t, string(markerBytes), "sources:")
+		for _, source := range sources {
+			require.Contains(t, string(markerBytes), "- "+source)
+		}
+	})
 }
 
 func TestTryLoadMarker_CorruptMarker(t *testing.T) {

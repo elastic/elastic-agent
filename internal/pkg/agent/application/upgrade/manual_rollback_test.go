@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -1047,12 +1048,38 @@ func TestPerformScheduledCleanup(t *testing.T) {
 			},
 		},
 		{
-			name: "Degraded cleanup (no symlink): retry at minInterval regardless of unexpired TTL",
+			name: "No symlink, no marker: schedule at TTL expiry (fresh volume, not degraded)",
 			setup: func(t *testing.T, log *logger.Logger, topDir string, source *ttl.MockSource) {
-				// Create a fake install without a symlink so liveVersionedHome() fails,
-				// causing cleanupAgentDirectories to return errCleanupDegraded.
-				// A degraded run retries at minInterval so the broken symlink is
-				// rechecked promptly rather than waiting until TTL expiry.
+				// No symlink, no upgrade marker — models a fresh volume. The absent
+				// symlink is not a degraded state when there is no marker, so the
+				// next run is scheduled at the TTL expiry time rather than minInterval.
+				createFakeAgentInstall(t, topDir, v456Valid.version, v456Valid.hash, true)
+				source.EXPECT().GetAll().Return(
+					map[string]ttl.TTLMarker{
+						filepath.Join("data", "elastic-agent-4.5.6-valid1"): {
+							Version:    "4.5.6",
+							Hash:       "valid1",
+							ValidUntil: now.Add(1 * time.Hour),
+						},
+					},
+					nil, nil)
+			},
+			args: args{
+				currentVersionedHome: filepath.Join("data", "elastic-agent-4.5.6-valid1"),
+				minInterval:          cleanupInterval,
+			},
+			want: now.Add(1 * time.Hour),
+		},
+		{
+			name: "Degraded cleanup (symlink path occupied by dir): retry at minInterval",
+			setup: func(t *testing.T, log *logger.Logger, topDir string, source *ttl.MockSource) {
+				if runtime.GOOS == "windows" {
+					t.Skip("directory-at-symlink-path to force EINVAL is not portable on Windows")
+				}
+				// Place a directory where the symlink should be — os.Readlink returns
+				// EINVAL (not ErrNotExist). This is a genuine degraded state and must
+				// cause a minInterval retry so the broken state is rechecked promptly.
+				require.NoError(t, os.MkdirAll(filepath.Join(topDir, AgentName), 0o750))
 				createFakeAgentInstall(t, topDir, v456Valid.version, v456Valid.hash, true)
 				source.EXPECT().GetAll().Return(
 					map[string]ttl.TTLMarker{

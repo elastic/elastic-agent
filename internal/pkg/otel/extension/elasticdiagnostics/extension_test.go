@@ -19,8 +19,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/extension"
+	"go.opentelemetry.io/collector/extension/extensioncapabilities"
 	"go.uber.org/zap"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics/internal/metadata"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -123,6 +126,56 @@ func TestExtension(t *testing.T) {
 		}
 		require.NoError(collect, resp.Body.Close())
 	}, 10*time.Second, 1*time.Millisecond, "extension did not start in time")
+}
+
+func TestExtension_NotifyConfigSnapshot(t *testing.T) {
+	ext, err := NewFactory().Create(context.Background(), extension.Settings{
+		TelemetrySettings: component.TelemetrySettings{
+			Logger: zap.NewNop(),
+		},
+		ID: component.NewID(metadata.Type),
+	}, createDefaultConfig())
+	require.NoError(t, err)
+	diagExt := ext.(*diagnosticsExtension)
+	// Register the built-in hooks without starting the HTTP server.
+	diagExt.registerGlobalDiagnostics()
+
+	configHook, ok := diagExt.globalHooks["collector_config"]
+	require.True(t, ok, "collector_config diagnostic hook not registered")
+	require.Equal(t, "edot/otel-merged-actual.yaml", configHook.filename)
+
+	// Before the collector notifies the extension there is no config to report.
+	assert.Equal(t, "no active OTel Configuration", string(configHook.hook()))
+
+	effective := confmap.NewFromStringMap(map[string]any{
+		"receivers": map[string]any{"nop": map[string]any{}},
+		"exporters": map[string]any{"nop": map[string]any{"api_key": "secret"}},
+	})
+	unexpanded := confmap.NewFromStringMap(map[string]any{
+		"receivers": map[string]any{"nop": map[string]any{}},
+		"exporters": map[string]any{"nop": map[string]any{"api_key": "${env:API_KEY}"}},
+	})
+	require.NoError(t, diagExt.NotifyConfigSnapshot(context.Background(),
+		extensioncapabilities.NewConfigSnapshot(effective, unexpanded)))
+
+	// The diagnostic reports the effective (expanded) configuration.
+	var got map[string]any
+	require.NoError(t, yaml.Unmarshal(configHook.hook(), &got))
+	assert.Equal(t, effective.ToStringMap(), got)
+
+	// A subsequent notification replaces the stored configuration.
+	updated := confmap.NewFromStringMap(map[string]any{
+		"receivers": map[string]any{"otlp": map[string]any{}},
+	})
+	require.NoError(t, diagExt.NotifyConfigSnapshot(context.Background(),
+		extensioncapabilities.NewConfigSnapshot(updated, updated)))
+	got = nil
+	require.NoError(t, yaml.Unmarshal(configHook.hook(), &got))
+	assert.Equal(t, updated.ToStringMap(), got)
+
+	// A nil snapshot clears the stored configuration instead of panicking.
+	require.NoError(t, diagExt.NotifyConfigSnapshot(context.Background(), nil))
+	assert.Equal(t, "no active OTel Configuration", string(configHook.hook()))
 }
 
 func verifyPprof(t *testing.T, content []byte) {

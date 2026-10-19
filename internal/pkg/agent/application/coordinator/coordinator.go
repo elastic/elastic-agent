@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
-	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,6 +29,7 @@ import (
 
 	"go.elastic.co/apm/v2"
 	"go.opentelemetry.io/collector/confmap"
+	gproto "google.golang.org/protobuf/proto"
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -79,6 +80,13 @@ var ErrNotUpgradable = errors.New(
 	"cannot be upgraded; must be installed with install sub-command and " +
 		"running under control of the systems supervisor")
 
+// ErrNotRestartable error is returned when a restart cannot be performed
+// because the agent is not running in an environment where a re-execution
+// would be recovered.
+var ErrNotRestartable = errors.New(
+	"cannot be restarted; must be installed with install sub-command and " +
+		"running under control of the systems supervisor")
+
 // ErrUpgradeInProgress error is returned if two or more upgrades are
 // attempted at the same time.
 var ErrUpgradeInProgress = errors.New("upgrade already in progress")
@@ -98,7 +106,7 @@ type UpgradeManager interface {
 	Reload(rawConfig *config.Config) error
 
 	// Upgrade upgrades running agent.
-	Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
+	Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error)
 
 	// Ack is used on startup to check if the agent has upgraded and needs to send an ack for the action
 	Ack(ctx context.Context, acker acker.Acker) error
@@ -337,6 +345,12 @@ type Coordinator struct {
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
+	// canReExec reports whether a re-execution of the process will be recovered
+	// (installed and running under a system supervisor). It is a field so tests
+	// can override it; it defaults to reexec.CanReExec. Both the upgrade path
+	// (via UpgradeManager.Upgradeable) and the restart path rely on this check.
+	canReExec func() bool
+
 	monitoringServerReloader configReloader
 
 	runtimeMgr RuntimeManager
@@ -427,6 +441,13 @@ type Coordinator struct {
 
 	// The policy after spec and variable substitution
 	derivedConfig map[string]interface{}
+
+	// renderCache reuses the rendered inputs of the previous refresh for the (input, vars)
+	// pairs that did not change. It is reset whenever ast changes.
+	renderCache *transpiler.RenderCache
+	// expectedConfigCache reuses the unit configurations of the previous refresh for the
+	// units whose configuration did not change.
+	expectedConfigCache *component.ExpectedConfigCache
 
 	// The final component model generated from ast and vars (this is the same
 	// value that is sent to the runtime manager).
@@ -544,6 +565,7 @@ func New(
 		FleetState:     fleetState,
 		FleetMessage:   fleetMessage,
 		LogLevel:       logLevel,
+		Tags:           agentInfo.GetTags(),
 		UpgradeDetails: initialUpgradeDetails,
 	}
 	c := &Coordinator{
@@ -589,6 +611,10 @@ func New(
 
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
+		canReExec:        reexec.CanReExec,
+
+		renderCache:         transpiler.NewRenderCache(),
+		expectedConfigCache: component.NewExpectedConfigCache(),
 	}
 	// Setup communication channels for any non-nil components. This pattern
 	// lets us transparently accept nil managers / simulated events during
@@ -699,6 +725,23 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 	c.reexecMgr.ReExec(callback, argOverrides...)
 }
 
+// Restart re-executes the agent to fulfil a RESTART action. It reuses the same
+// re-exec machinery as an upgrade, but performs no upgrade steps (no download,
+// marker, or version change). Unlike an upgrade it does not consider the
+// release-level upgrade flag; it only requires that a re-execution will be
+// recovered (canReExec). The action is not acknowledged here; it is
+// acknowledged on the next startup by the managed config manager.
+// Called from external goroutines.
+func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) error {
+	if !c.canReExec() {
+		return ErrNotRestartable
+	}
+
+	// ReExec sets the override state to Stopping and performs the re-execution.
+	c.ReExec(nil)
+	return nil
+}
+
 // Migrate migrates agent to a new cluster and ACKs success to the old one.
 // In case of failure no ack is performed and error is returned.
 func (c *Coordinator) Migrate(
@@ -749,7 +792,7 @@ func (c *Coordinator) Migrate(
 	}
 
 	// Target is checked prior to enroll
-	if err := fleetapiClient.CheckRemote(ctx, newFleetClient); err != nil {
+	if err := fleetapiClient.CheckRemote(ctx, c.logger, newFleetClient); err != nil {
 		return err
 	}
 
@@ -879,7 +922,7 @@ func WithRollback(rollback bool) UpgradeOpt {
 
 // Upgrade runs the upgrade process.
 // Called from external goroutines.
-func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
+func (c *Coordinator) Upgrade(ctx context.Context, version string, sources []string, action *fleetapi.ActionUpgrade, opts ...UpgradeOpt) error {
 	var uOpts upgradeOpts
 	for _, opt := range opts {
 		opt(&uOpts)
@@ -944,14 +987,15 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sourceURI str
 
 	// early check capabilities to ensure this upgrade actions is allowed
 	if c.caps != nil {
-		if !c.caps.AllowUpgrade(version, sourceURI) {
+		if !c.caps.AllowUpgrade(version, sources) {
 			c.ClearOverrideState()
 			det.Fail(ErrNotUpgradable)
 			return ErrNotUpgradable
 		}
+		sources = c.caps.FilterUpgradeSources(version, sources)
 	}
 
-	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sourceURI, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
+	cb, err := c.upgradeMgr.Upgrade(ctx, version, uOpts.rollback, sources, action, det, uOpts.skipVerifyOverride, uOpts.skipDefaultPgp, uOpts.pgpBytes, uOpts.upgradeOpts...)
 	if err != nil {
 		c.ClearOverrideState()
 		if errors.Is(err, upgrade.ErrUpgradeSameVersion) {
@@ -1261,12 +1305,14 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 					LogLevelRuntime  string            `yaml:"log_level"`
 					LogLevelPolicy   string            `yaml:"log_level_policy"`
 					LogLevelOverride string            `yaml:"log_level_override"`
+					Tags             []string          `yaml:"tags,omitempty"`
 					Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
 				}{
 					Headers:          c.agentInfo.Headers(),
 					LogLevelRuntime:  c.agentInfo.GetLogLevelRuntime(),
 					LogLevelPolicy:   c.agentInfo.GetLogLevelPolicy(),
 					LogLevelOverride: c.agentInfo.GetLogLevelOverride(),
+					Tags:             c.State().Tags,
 					Metadata:         meta,
 				}
 				o, err := yaml.Marshal(output)
@@ -1733,8 +1779,6 @@ func (c *Coordinator) processConfigChange(ctx context.Context, change ConfigChan
 	}
 
 	if err := change.Ack(); err != nil {
-		// This currently only happens if we fail to save the action to the state store.
-		// Not a transient failure, so return error instead of just logging.
 		return fmt.Errorf("failed to ack new policy change: %w", err)
 	}
 
@@ -1802,8 +1846,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 	c.currentCfg = currentCfg
 
-	// check if log level has changed for standalone elastic-agent
-	// we'd have to update both the periodic and once config watchers and refactor initialization in application.go to do otherwise.
+	// Standalone mode has no dedicated notification channel unlike managed mode,
+	// so the log level is read from the policy config on each reload.
 	if c.agentInfo.IsStandalone() {
 		ll := currentCfg.Settings.LoggingConfig.Level
 		if ll != c.state.LogLevel {
@@ -1813,6 +1857,13 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 			logger.SetLevel(ll)
 			c.logger.Infof("log level changed to %s", ll.String())
 		}
+	}
+
+	// Both modes read tags from the policy config so no dedicated notification channel is needed.
+	tags := info.NormalizeTags(currentCfg.Settings.Tags)
+	if !slices.Equal(tags, c.state.Tags) {
+		c.setTags(tags)
+		c.logger.Infof("tags changed to %v", tags)
 	}
 
 	return c.refreshComponentModel(ctx)
@@ -1865,6 +1916,7 @@ func (c *Coordinator) generateAST(cfg *config.Config, m map[string]interface{}) 
 	}
 
 	c.ast = rawAst
+	c.renderCache.Reset()
 	return nil
 }
 
@@ -2060,9 +2112,14 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		Components: c.componentModel,
 		Signed:     signed,
 	}
+	c.state.PolicyConfiguredActionTypes = policyConfiguredActionTypes(c.componentModel)
+	c.state.PolicyApplied = true
 
 	c.logger.Info("Updating running component model")
-	c.logger.With("components", model.Components).Debug("Updating running component model")
+	if c.logger.IsDebug() {
+		// With encodes the components eagerly, so only pay for it when it can be logged
+		c.logger.With("components", model.Components).Debug("Updating running component model")
+	}
 	c.updateManagersWithConfig(model)
 	return nil
 }
@@ -2348,13 +2405,16 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	// perform variable substitution for inputs
 	inputs, ok := transpiler.Lookup(ast, "inputs")
 	var renderedInputInfo map[string]transpiler.RenderedInputInfo
+	var renderedInputs *transpiler.RenderedInputs
 	if ok {
-		var renderedInputs transpiler.Node
-		renderedInputs, renderedInputInfo, err = transpiler.RenderInputs(inputs, c.vars)
+		renderedInputs, err = transpiler.RenderInputsCached(inputs, c.vars, c.renderCache)
 		if err != nil {
 			return fmt.Errorf("rendering inputs failed: %w", err)
 		}
-		err = transpiler.Insert(ast, renderedInputs, "inputs")
+		renderedInputInfo = renderedInputs.Info
+		// the rendered inputs are added to the map form of the policy below, straight from
+		// the render cache, instead of being converted from the tree on every refresh
+		err = transpiler.Insert(ast, transpiler.NewList(nil), "inputs")
 		if err != nil {
 			return fmt.Errorf("inserting rendered inputs failed: %w", err)
 		}
@@ -2377,6 +2437,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	cfg, err := ast.Map()
 	if err != nil {
 		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	if renderedInputs != nil {
+		cfg["inputs"] = renderedInputs.Maps()
 	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
@@ -2412,6 +2475,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		c.agentInfo,
 		existingCompState,
 		dynamicInputs,
+		component.WithExpectedConfigCache(c.expectedConfigCache),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
@@ -2598,6 +2662,22 @@ func convertUnitListToMap(unitList []component.Unit) map[string]component.Unit {
 	return unitMap
 }
 
+// policyConfiguredActionTypes returns a map from action type to the IDs of components
+// in comps that handle it. Derived from the component spec rather than runtime state,
+// so it includes components that have not yet started.
+func policyConfiguredActionTypes(comps []component.Component) map[string][]string {
+	result := make(map[string][]string)
+	for _, comp := range comps {
+		if comp.InputSpec == nil {
+			continue
+		}
+		for _, typ := range comp.InputSpec.Spec.ProxiedActions {
+			result[typ] = append(result[typ], comp.ID)
+		}
+	}
+	return result
+}
+
 func convertComponentListToMap(compList []component.Component) map[string]component.Component {
 	compMap := map[string]component.Component{}
 	for _, c := range compList {
@@ -2617,7 +2697,7 @@ func diffUnitList(old, new []component.Unit) map[string]diffCheck {
 		if oldUnit, ok := oldMap[id]; ok {
 			diff.inLast = true
 			if newUnits.Config != nil && oldUnit.Config != nil && newUnits.Config.GetSource() != nil && oldUnit.Config.GetSource() != nil {
-				diff.updated = !reflect.DeepEqual(newUnits.Config.GetSource().AsMap(), oldUnit.Config.GetSource().AsMap())
+				diff.updated = !gproto.Equal(newUnits.Config.GetSource(), oldUnit.Config.GetSource())
 			}
 			delete(oldMap, id)
 		}
