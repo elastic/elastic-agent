@@ -10,12 +10,16 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"helm.sh/helm/v4/pkg/cli/values"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 )
@@ -189,10 +193,19 @@ func TestKubernetesAgentHelmSingleContainerLogsInput(t *testing.T) {
 	// checkIngested verifies that logs produced after the previous deployment
 	// step are ingested; documents from earlier steps are ignored so a mode
 	// switch that stops the ingestion can't pass on stale documents.
+	//
+	// A unique log marker is written after the agent is running and must appear
+	// in Elasticsearch before the timestamp checkpoint is set. This guarantees
+	// the agent is actively indexing at the moment the checkpoint is recorded,
+	// so the subsequent flog checks cannot pass on a stale pre-upgrade document
+	// that was produced by the old agent but indexed only after the upgrade.
 	checkpoint := &logsCheckpoint{}
+	marker := &logMarker{}
 	checkIngested := func() []k8sTestStep {
 		return []k8sTestStep{
 			k8sStepCheckRunningPods("name=agent-pernode-elastic-agent", 1, "agent"),
+			k8sStepDeployLogMarker(marker),
+			k8sStepWaitForLogMarker(info, marker),
 			k8sStepRecordLogsCheckpoint(info, checkpoint),
 			k8sStepCheckLogFilesIngested(info,
 				"logs", "kubernetes.container_logs", "default", "/var/log/containers/*flog*.log", checkpoint,
@@ -246,6 +259,88 @@ func (c *logsCheckpoint) filter() []any {
 			"gt":     c.epochMillis,
 			"format": "epoch_millis",
 		}}},
+	}
+}
+
+// logMarker is a unique string written to a short-lived pod's stdout after
+// each helm deployment step. k8sStepWaitForLogMarker blocks until the marker
+// appears in Elasticsearch, proving the running agent is actively indexing
+// container logs from the test namespace before the timestamp checkpoint is set.
+type logMarker struct {
+	id string
+}
+
+// k8sStepDeployLogMarker creates a one-shot pod that writes a unique marker
+// string to stdout and waits for the pod to succeed.
+func k8sStepDeployLogMarker(marker *logMarker) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		uid, err := uuid.NewV4()
+		require.NoError(t, err, "failed to generate log marker UUID")
+		// Strip dashes so the marker is a single word, directly findable with match_phrase.
+		marker.id = "elasticagentmarker" + strings.ReplaceAll(uid.String(), "-", "")
+
+		podName := "log-marker-" + uid.String()[:8]
+		pod := &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: namespace,
+			},
+			Spec: corev1.PodSpec{
+				RestartPolicy: corev1.RestartPolicyNever,
+				Containers: []corev1.Container{
+					{
+						Name:    "marker",
+						Image:   "busybox",
+						Command: []string{"sh", "-c", "echo " + marker.id},
+					},
+				},
+			},
+		}
+
+		_, err = kCtx.clientSet.CoreV1().Pods(namespace).Create(ctx, pod, metav1.CreateOptions{})
+		require.NoError(t, err, "failed to create log marker pod")
+
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			p, err := kCtx.clientSet.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+			require.NoError(ct, err)
+			assert.Equal(ct, corev1.PodSucceeded, p.Status.Phase,
+				"marker pod %s phase: %s", podName, p.Status.Phase)
+		}, 2*time.Minute, 5*time.Second, "log marker pod did not succeed")
+
+		t.Logf("log marker deployed: %s", marker.id)
+	}
+}
+
+// k8sStepWaitForLogMarker blocks until the marker string written by
+// k8sStepDeployLogMarker appears in Elasticsearch with the expected
+// kubernetes.namespace, proving the agent is forwarding logs from the namespace.
+func k8sStepWaitForLogMarker(info *define.Info, marker *logMarker) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			query := map[string]any{
+				"size": 0,
+				"query": map[string]any{
+					"bool": map[string]any{
+						"filter": []any{
+							map[string]any{"term": map[string]any{
+								"data_stream.dataset": "kubernetes.container_logs",
+							}},
+							map[string]any{"term": map[string]any{
+								"kubernetes.namespace": namespace,
+							}},
+							map[string]any{"match_phrase": map[string]any{
+								"message": marker.id,
+							}},
+						},
+					},
+				},
+			}
+			resp, err := PerformQuery(ctx, query, ".ds-logs*", info.ESClient)
+			require.NoError(ct, err, "failed to query for log marker")
+			assert.Positive(ct, resp.Hits.Total.Value,
+				"marker %s not yet in Elasticsearch", marker.id)
+		}, 3*time.Minute, 10*time.Second, "log marker never appeared in Elasticsearch")
+		t.Logf("log marker confirmed in Elasticsearch: %s", marker.id)
 	}
 }
 
