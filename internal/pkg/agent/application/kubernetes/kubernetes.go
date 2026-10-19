@@ -76,6 +76,16 @@ var k8sVarPattern = regexp.MustCompile(`\$\{kubernetes\.[^}]*\}`)
 // dedotted) annotation key as it appears on the pod.
 var k8sAnnotationVarPattern = regexp.MustCompile(`\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|[^}]*)?\}`)
 
+// k8sExactAnnotationVarPattern matches a value that is nothing but a single
+// annotation reference, optionally with an empty-string fallback. Group 1 is the
+// raw annotation key.
+var k8sExactAnnotationVarPattern = regexp.MustCompile(`^\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|\s*(?:""|\'\'))?\}$`)
+
+// k8sExactVarPattern matches a value that is nothing but a single
+// ${kubernetes.*} reference with no fallback. Group 1 is the event field the
+// reference resolves from once add_kubernetes_metadata has run.
+var k8sExactVarPattern = regexp.MustCompile(`^\$\{(kubernetes\.[^}|\s]+)\}$`)
+
 // k8sStarAdjacentVarPattern is like starAdjacentVarPattern but only matches
 // ${kubernetes.*} references. Used in path translation so that context-provider
 // references (${env.*}, ${host.*}, …) are preserved and resolved by the AST.
@@ -616,57 +626,121 @@ func processorHasNonAnnotationKubernetesVarRef(processor interface{}) bool {
 }
 
 // processorHasUntransformableKubernetesVarRef reports whether the processor
-// has a non-annotation ${kubernetes.*} reference in a location we cannot
-// transform. For add_fields processors the fields map is excluded since those
-// field values are handled by transformAddFieldsToFieldCopies; everything else
-// (the outer processor map, e.g. when:, and any non-fields config inside
-// add_fields) must not reference kubernetes variables. For all other processor
-// types the entire processor is checked.
+// has a ${kubernetes.*} reference the rewrite cannot reproduce on a static
+// input. For add_fields processors the fields values are classified by
+// classifyAddFieldsValue; everything else (the outer processor map, when:, and
+// any non-fields config inside add_fields) must not reference kubernetes
+// variables. For all other processor types the entire processor is checked.
 func processorHasUntransformableKubernetesVarRef(processor interface{}) bool {
 	processorMap, ok := processor.(map[string]interface{})
 	if !ok {
 		return false
 	}
-	if addFieldsCfg, ok := processorMap["add_fields"].(map[string]interface{}); ok {
-		for k, v := range processorMap {
-			if k == "add_fields" {
-				continue
-			}
-			if processorHasNonAnnotationKubernetesVarRef(v) {
-				return true
-			}
-		}
-		for k, v := range addFieldsCfg {
-			if k == "fields" {
-				continue
-			}
-			if processorHasNonAnnotationKubernetesVarRef(v) {
-				return true
-			}
-		}
-		return false
+	addFieldsCfg, ok := processorMap["add_fields"].(map[string]interface{})
+	if !ok {
+		return processorHasNonAnnotationKubernetesVarRef(processor)
 	}
-	return processorHasNonAnnotationKubernetesVarRef(processor)
+	for k, v := range processorMap {
+		if k != "add_fields" && walkHasKubernetesVarRef(v) {
+			return true
+		}
+	}
+	for k, v := range addFieldsCfg {
+		if k != "fields" && walkHasKubernetesVarRef(v) {
+			return true
+		}
+	}
+	fields, _ := addFieldsCfg["fields"].(map[string]interface{})
+	target, hasTarget := addFieldsCfg["target"].(string)
+	for key, val := range fields {
+		if kind, _ := classifyAddFieldsValue(target, hasTarget, key, val); kind == addFieldsUnsupported {
+			return true
+		}
+	}
+	return false
 }
 
-// isExactNonAnnotationKubernetesVarRef reports whether s is entirely a single
-// ${kubernetes.*} variable reference that is NOT an annotation reference.
-// Mixed or templated strings (surrounding text, multiple refs) return false.
-func isExactNonAnnotationKubernetesVarRef(s string) bool {
-	return k8sVarPattern.FindString(s) == s && !k8sAnnotationVarPattern.MatchString(s)
+// walkHasKubernetesVarRef reports whether any string in the value tree contains
+// a ${kubernetes.*} reference, annotation references included.
+func walkHasKubernetesVarRef(value interface{}) bool {
+	found := false
+	walkStrings(value, func(s string) {
+		if k8sVarPattern.MatchString(s) {
+			found = true
+		}
+	})
+	return found
 }
 
-// transformAddFieldsToFieldCopies converts an add_fields processor whose field
-// values are exact non-annotation ${kubernetes.*} variable references into
-// copy_fields processors that copy from the event fields added by
-// add_kubernetes_metadata. Fields with annotation or mixed variable references
-// are omitted (the annotation-extraction pass in filterVarProcessors already
-// handles annotation refs via include_annotations). Static fields are preserved
-// in a residual add_fields.
+type addFieldsValueKind int
+
+const (
+	// addFieldsStatic is a value with no kubernetes reference.
+	addFieldsStatic addFieldsValueKind = iota
+	// addFieldsCopy is exactly one ${kubernetes.*} reference, reproducible with
+	// copy_fields from the fields add_kubernetes_metadata sets.
+	addFieldsCopy
+	// addFieldsAnnotation is the annotation mapping that include_annotations
+	// publishes on its own, so the original field can be dropped.
+	addFieldsAnnotation
+	// addFieldsUnsupported references kubernetes in a form the rewrite cannot
+	// reproduce: mixed with other text, with a fallback, or mapped somewhere
+	// other than where include_annotations puts it.
+	addFieldsUnsupported
+)
+
+// addFieldsDestination returns the event field an add_fields entry writes.
+// A missing target defaults to "fields"; an empty target is the event root.
+func addFieldsDestination(target string, hasTarget bool, key string) string {
+	switch {
+	case !hasTarget:
+		return "fields." + key
+	case target == "":
+		return key
+	default:
+		return target + "." + key
+	}
+}
+
+// classifyAddFieldsValue decides how the rewrite treats a single add_fields
+// entry. For addFieldsCopy it also returns the source event field.
+func classifyAddFieldsValue(target string, hasTarget bool, key string, val interface{}) (addFieldsValueKind, string) {
+	str, isString := val.(string)
+	if !isString {
+		if walkHasKubernetesVarRef(val) {
+			return addFieldsUnsupported, ""
+		}
+		return addFieldsStatic, ""
+	}
+	if !k8sVarPattern.MatchString(str) {
+		return addFieldsStatic, ""
+	}
+	if m := k8sExactAnnotationVarPattern.FindStringSubmatch(str); m != nil {
+		// include_annotations publishes annotation "a.b/c" as
+		// kubernetes.annotations.a_b/c.
+		published := "kubernetes.annotations." + strings.ReplaceAll(m[1], ".", "_")
+		if addFieldsDestination(target, hasTarget, key) == published {
+			return addFieldsAnnotation, ""
+		}
+		return addFieldsUnsupported, ""
+	}
+	if m := k8sExactVarPattern.FindStringSubmatch(str); m != nil {
+		return addFieldsCopy, m[1]
+	}
+	return addFieldsUnsupported, ""
+}
+
+// transformAddFieldsToFieldCopies converts an add_fields processor that
+// references ${kubernetes.*} into processors that work on a static input:
+// exact references become copy_fields from the fields add_kubernetes_metadata
+// sets, annotation mappings are dropped (include_annotations publishes them),
+// and static fields stay in a residual add_fields. A when: condition, which
+// lives inside the processor configuration, is carried onto each generated
+// processor.
 //
-// Returns the replacement processors and true when at least one field was
-// transformed. Returns nil, false for any other processor type or when no field
-// could be transformed.
+// Returns false for any other processor type, or an add_fields without fields.
+// Callers must already have rejected unsupported values through
+// processorHasUntransformableKubernetesVarRef.
 func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool) {
 	processorMap, ok := processor.(map[string]interface{})
 	if !ok {
@@ -680,9 +754,9 @@ func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool
 	if !ok || len(fields) == 0 {
 		return nil, false
 	}
-	target, _ := addFieldsCfg["target"].(string)
-	_, hasTarget := addFieldsCfg["target"]
-	when := processorMap["when"]
+	rawTarget, hasTarget := addFieldsCfg["target"]
+	target, _ := rawTarget.(string)
+	when := addFieldsCfg["when"]
 
 	// Iterate in sorted key order for a stable config hash.
 	keys := make([]string, 0, len(fields))
@@ -693,58 +767,41 @@ func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool
 
 	var copySpecs []interface{}
 	staticFields := make(map[string]interface{})
-
 	for _, key := range keys {
-		val := fields[key]
-		strVal, isStr := val.(string)
-		if !isStr || !isExactNonAnnotationKubernetesVarRef(strVal) {
-			if isStr && k8sVarPattern.MatchString(strVal) {
-				// Annotation ref or complex template — drop; annotation key was
-				// already extracted by filterVarProcessors above.
-				continue
-			}
-			staticFields[key] = val
-			continue
+		kind, from := classifyAddFieldsValue(target, hasTarget, key, fields[key])
+		switch kind {
+		case addFieldsStatic:
+			staticFields[key] = fields[key]
+		case addFieldsCopy:
+			copySpecs = append(copySpecs, map[string]interface{}{
+				"from": from,
+				"to":   addFieldsDestination(target, hasTarget, key),
+			})
 		}
-		// Strip ${ and } to get the event-field path, e.g. "kubernetes.pod.name".
-		kubernetesField := strVal[2 : len(strVal)-1]
-		destField := key
-		if target != "" {
-			destField = target + "." + key
-		}
-		copySpecs = append(copySpecs, map[string]interface{}{
-			"from": kubernetesField,
-			"to":   destField,
-		})
-	}
-
-	if len(copySpecs) == 0 {
-		return nil, false
 	}
 
 	var result []interface{}
 	if len(staticFields) > 0 {
-		addFieldsBody := map[string]interface{}{"fields": staticFields}
+		body := map[string]interface{}{"fields": staticFields}
 		if hasTarget {
-			addFieldsBody["target"] = target
+			body["target"] = rawTarget
 		}
-		p := map[string]interface{}{"add_fields": addFieldsBody}
 		if when != nil {
-			p["when"] = when
+			body["when"] = when
 		}
-		result = append(result, p)
+		result = append(result, map[string]interface{}{"add_fields": body})
 	}
-	p := map[string]interface{}{
-		"copy_fields": map[string]interface{}{
+	if len(copySpecs) > 0 {
+		body := map[string]interface{}{
 			"fields":         copySpecs,
 			"fail_on_error":  false,
 			"ignore_missing": true,
-		},
+		}
+		if when != nil {
+			body["when"] = when
+		}
+		result = append(result, map[string]interface{}{"copy_fields": body})
 	}
-	if when != nil {
-		p["when"] = when
-	}
-	result = append(result, p)
 	return result, true
 }
 

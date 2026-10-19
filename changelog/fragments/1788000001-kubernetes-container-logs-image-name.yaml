@@ -1,0 +1,22 @@
+kind: breaking-change
+
+summary: Kubernetes container logs report the fully qualified image in container.image.name
+
+description: >
+  Kubernetes container logs are now enriched with add_kubernetes_metadata instead
+  of per-container inputs, so the `container.image.name` field contains the fully
+  qualified image reference reported by the Kubernetes API, including registry and
+  tag (for example `docker.io/mingrammer/flog:latest`), instead of the short name
+  reported previously (for example `mingrammer/flog`).
+
+impact: >
+  Dashboards, alerts, and queries that match on `container.image.name` using the
+  short image name no longer match newly collected logs.
+
+action: >
+  Update queries that depend on `container.image.name` to match the fully
+  qualified image reference. To keep the previous per-container inputs, set
+  `agent.internal.kubernetes.container_logs_glob_input: false` in the policy or
+  `ELASTIC_AGENT_KUBERNETES_CONTAINER_LOGS_GLOB=false` in the agent environment.
+
+component: elastic-agent

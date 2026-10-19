@@ -274,9 +274,9 @@ inputs:
               target: labels
               fields:
                 app: '${kubernetes.labels.app}'
-            when:
-              equals:
-                host.name: '${kubernetes.pod.name}'
+              when:
+                equals:
+                  host.name: '${kubernetes.pod.name}'
 `
 	before := mustConfig(t, cfg)
 	after := mustConfig(t, cfg)
@@ -305,9 +305,9 @@ inputs:
               fields:
                 app: '${kubernetes.labels.app}'
                 env: production
-            when:
-              equals:
-                host.os.type: linux
+              when:
+                equals:
+                  host.os.type: linux
 `)
 	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
 
@@ -319,14 +319,16 @@ inputs:
 
 	wantWhen := map[string]interface{}{"equals": map[string]interface{}{"host.os.type": "linux"}}
 
-	t.Run("residual add_fields carries when", func(t *testing.T) {
+	t.Run("residual add_fields carries when inside its config", func(t *testing.T) {
 		pm := processors[1].(map[string]interface{})
-		assert.Equal(t, wantWhen, pm["when"])
+		assert.NotContains(t, pm, "when", "when is not a sibling of the processor name")
+		assert.Equal(t, wantWhen, pm["add_fields"].(map[string]interface{})["when"])
 	})
 
-	t.Run("copy_fields carries when", func(t *testing.T) {
+	t.Run("copy_fields carries when inside its config", func(t *testing.T) {
 		pm := processors[2].(map[string]interface{})
-		assert.Equal(t, wantWhen, pm["when"])
+		assert.NotContains(t, pm, "when", "when is not a sibling of the processor name")
+		assert.Equal(t, wantWhen, pm["copy_fields"].(map[string]interface{})["when"])
 	})
 }
 
@@ -827,12 +829,12 @@ func TestIncludedAnnotations_NonList(t *testing.T) {
 
 // TestTransformAddFieldsToFieldCopies_NoTargetOmittedFromResidual verifies that
 // when an add_fields processor has no target key, the residual add_fields also
-// has no target key (not "target: """). Beats treats a missing target as root
-// placement and "target: """ as a "fields" subkey.
+// has no target key (not "target: """). A missing target defaults to "fields",
+// while "target: """ means the root of the event.
 func TestTransformAddFieldsToFieldCopies_NoTargetOmittedFromResidual(t *testing.T) {
 	processor := map[string]interface{}{
 		"add_fields": map[string]interface{}{
-			// no "target" key — fields go to event root
+			// no "target" key — fields go under "fields"
 			"fields": map[string]interface{}{
 				"pod": "${kubernetes.pod.name}",
 				"env": "production",
@@ -848,11 +850,11 @@ func TestTransformAddFieldsToFieldCopies_NoTargetOmittedFromResidual(t *testing.
 	assert.NotContains(t, residual, "target", "target must be absent, not empty string")
 	assert.Equal(t, map[string]interface{}{"env": "production"}, residual["fields"])
 
-	// copy_fields destination must be bare key (no "." prefix)
+	// copy_fields must write where the original add_fields would have: fields.<key>
 	copyFields := result[1].(map[string]interface{})["copy_fields"].(map[string]interface{})
 	specs := copyFields["fields"].([]interface{})
 	require.Len(t, specs, 1)
-	assert.Equal(t, "pod", specs[0].(map[string]interface{})["to"])
+	assert.Equal(t, "fields.pod", specs[0].(map[string]interface{})["to"])
 }
 
 // TestTransformAddFieldsToFieldCopies_NotAMap covers the branch where the
@@ -1255,4 +1257,94 @@ func TestRewriteContainerLogInputs_StopsObservingKubernetesProvider(t *testing.T
 		assert.True(t, observedProviders(t, m)["kubernetes"],
 			"hints inputs stay per-container, so the provider must keep running for them")
 	})
+}
+
+func mustYAML(t testing.TB, value any) string {
+	t.Helper()
+	data, err := yaml.Marshal(value)
+	require.NoError(t, err, "marshal test value as YAML")
+	return string(data)
+}
+
+func assertConfigUnchanged(t testing.TB, before, after map[string]any, message string) {
+	t.Helper()
+	if mustYAML(t, before) != mustYAML(t, after) {
+		t.Errorf("%s\n\nbefore:\n%s\n\nafter:\n%s", message, mustYAML(t, before), mustYAML(t, after))
+	}
+}
+
+const addFieldsStreamTemplate = `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+        processors:
+%s
+`
+
+// TestRewriteContainerLogInputs_UnreproducibleAddFieldsDisqualifiesInput covers
+// add_fields values that copy_fields cannot reproduce. Rewriting those inputs
+// would silently drop or relocate the field, so they must be left alone.
+func TestRewriteContainerLogInputs_UnreproducibleAddFieldsDisqualifiesInput(t *testing.T) {
+	cases := map[string]string{
+		"mixed text and variable": `          - add_fields:
+              target: foo
+              fields:
+                pod: 'pod-${kubernetes.pod.name}'`,
+		"custom annotation mapping": `          - add_fields:
+              target: custom
+              fields:
+                team: '${kubernetes.annotations.example.com/team|""}'`,
+		"annotation mapped to the wrong field": `          - add_fields:
+              target: kubernetes
+              fields:
+                annotations.team: '${kubernetes.annotations.example.com/team|""}'`,
+		"fallback expression": `          - add_fields:
+              target: custom
+              fields:
+                pod: '${kubernetes.pod.name|""}'`,
+		"variable in a nested value": `          - add_fields:
+              target: custom
+              fields:
+                nested:
+                  pod: '${kubernetes.pod.name}'`,
+	}
+	for name, processors := range cases {
+		t.Run(name, func(t *testing.T) {
+			cfg := fmt.Sprintf(addFieldsStreamTemplate, processors)
+			before := mustConfig(t, cfg)
+			after := mustConfig(t, cfg)
+			RewriteContainerLogInputs(after, true, logp.NewNopLogger())
+			assertConfigUnchanged(t, before, after, "input must not be rewritten and silently lose the field")
+		})
+	}
+}
+
+// TestRewriteContainerLogInputs_AnnotationMappingKeepsStaticFields verifies the
+// annotation mapping include_annotations reproduces is dropped without taking
+// the static fields of the same add_fields along with it.
+func TestRewriteContainerLogInputs_AnnotationMappingKeepsStaticFields(t *testing.T) {
+	m := mustConfig(t, fmt.Sprintf(addFieldsStreamTemplate, `          - add_fields:
+              target: kubernetes
+              fields:
+                annotations.elastic_co/dataset: '${kubernetes.annotations.elastic.co/dataset|""}'
+                owner: platform`))
+	RewriteContainerLogInputs(m, true, logp.NewNopLogger())
+
+	stream := m["inputs"].([]interface{})[0].(map[string]interface{})["streams"].([]interface{})[0].(map[string]interface{})
+	processors := stream["processors"].([]interface{})
+	require.Len(t, processors, 2, "add_kubernetes_metadata and the residual add_fields")
+
+	metadata := processors[0].(map[string]interface{})["add_kubernetes_metadata"].(map[string]interface{})
+	assert.Equal(t, []interface{}{"elastic.co/dataset"}, metadata["include_annotations"])
+
+	residual := processors[1].(map[string]interface{})["add_fields"].(map[string]interface{})
+	assert.Equal(t, map[string]interface{}{"owner": "platform"}, residual["fields"])
+	assert.Equal(t, "kubernetes", residual["target"])
 }
