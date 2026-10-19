@@ -3103,6 +3103,81 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		}
 	})
 
+	t.Run("duplicate action while in-flight does not spawn a second uninstaller", func(t *testing.T) {
+		top := paths.Top()
+		tmpTop := t.TempDir()
+		paths.SetTop(tmpTop)
+		t.Cleanup(func() { paths.SetTop(top) })
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		var mu sync.Mutex
+		spawns := 0
+		var cmds []*exec.Cmd
+		restore := overrideUninstallCmd(func(_ string, _ ...string) *exec.Cmd {
+			// A long-blocking stand-in so the in-flight marker is not cleared by
+			// the reaping goroutine while the assertions run.
+			c := blockingUninstallCmd()
+			mu.Lock()
+			spawns++
+			cmds = append(cmds, c)
+			mu.Unlock()
+			return c
+		})
+		defer restore()
+		t.Cleanup(func() {
+			mu.Lock()
+			defer mu.Unlock()
+			for _, c := range cmds {
+				if c.Process != nil {
+					_ = c.Process.Kill()
+				}
+			}
+		})
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 4),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		// First delivery spawns the detached uninstaller.
+		require.NoError(t, coord.Uninstall(ctx, action))
+		// A Fleet redelivery of the same action while the first uninstaller is
+		// still in flight must be a no-op: it returns nil (so the handler does not
+		// fail-ack) and does not spawn a second, concurrent uninstaller.
+		require.NoError(t, coord.Uninstall(ctx, action))
+
+		mu.Lock()
+		got := spawns
+		mu.Unlock()
+		assert.Equal(t, 1, got, "a duplicate in-flight uninstall action must not spawn a second uninstaller")
+	})
+
+}
+
+// blockingUninstallCmd returns a command that re-invokes the test binary and
+// blocks, standing in for a detached uninstaller that is still running. This
+// keeps the Coordinator's in-flight marker set (the reaping goroutine only
+// clears it once the process exits) so the duplicate-dispatch guard can be
+// tested deterministically. Callers must kill the returned process.
+func blockingUninstallCmd() *exec.Cmd {
+	// #nosec G204 -- test-only; references the test binary with constant args.
+	cmd := exec.Command(os.Args[0], "-test.run", "^TestCoordinatorUninstallBlockingHelper$")
+	cmd.Env = append(os.Environ(), "GO_UNINSTALL_BLOCK=1")
+	return cmd
+}
+
+// TestCoordinatorUninstallBlockingHelper is not a real test: it is the process
+// spawned by blockingUninstallCmd. It blocks until the parent test kills it, with
+// a safety cap so a leaked process does not linger.
+func TestCoordinatorUninstallBlockingHelper(t *testing.T) {
+	if os.Getenv("GO_UNINSTALL_BLOCK") != "1" {
+		return
+	}
+	time.Sleep(60 * time.Second)
 }
 
 // overrideUninstallCmd swaps the package-level uninstallCmd for tests and returns

@@ -415,6 +415,16 @@ type Coordinator struct {
 	// SetOverrideState helper to the Coordinator goroutine.
 	overrideStateChan chan *coordinatorOverrideState
 
+	// uninstallingMu guards uninstalling, which tracks the Fleet UNINSTALL action
+	// IDs for which a detached uninstaller has been spawned but has not finished.
+	// The uninstaller delays its Fleet ack until the point of no return, so Fleet
+	// may redeliver the action before the ack is observed; this set lets Uninstall
+	// drop such a redelivery instead of spawning a second, concurrent uninstaller.
+	// An entry is cleared only if the uninstaller exits while the agent is still
+	// installed (a pre-point-of-no-return failure), so a later retry can proceed.
+	uninstallingMu sync.Mutex
+	uninstalling   map[string]struct{}
+
 	// upgradeDetailsChan forwards upgrade details from the publicly accessible
 	// SetUpgradeDetails helper to the Coordinator goroutine.
 	upgradeDetailsChan chan *details.Details
@@ -805,8 +815,48 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 		return ErrUninstallRequiresRoot
 	}
 
+	// Guard against spawning more than one detached uninstaller for the same
+	// Fleet action. The detached process delays its success ack until the point
+	// of no return, so Fleet can redeliver the action (which is no longer in the
+	// scheduled-action queue once dequeued) before the ack is observed. Without
+	// this guard, that redelivery would start a second, concurrent uninstaller
+	// that could race the first and clobber its ack. A duplicate is dropped by
+	// returning nil (not an error) so the handler does not fail-ack it; the
+	// in-flight uninstaller owns the acknowledgement.
+	actionID := ""
+	if action != nil {
+		actionID = action.ActionID
+	}
+	if actionID != "" {
+		c.uninstallingMu.Lock()
+		if c.uninstalling == nil {
+			c.uninstalling = make(map[string]struct{})
+		}
+		if _, inFlight := c.uninstalling[actionID]; inFlight {
+			c.uninstallingMu.Unlock()
+			c.logger.Infow("Uninstall already in progress for this action, ignoring duplicate",
+				"action.id", actionID)
+			return nil
+		}
+		c.uninstalling[actionID] = struct{}{}
+		c.uninstallingMu.Unlock()
+	}
+	// clearInFlight removes the in-flight marker so a later redelivery can retry.
+	// It is called on every failure path before the point of no return; on the
+	// success path the agent's service is removed and this process terminates, so
+	// the marker simply disappears with it.
+	clearInFlight := func() {
+		if actionID == "" {
+			return
+		}
+		c.uninstallingMu.Lock()
+		delete(c.uninstalling, actionID)
+		c.uninstallingMu.Unlock()
+	}
+
 	executable, err := os.Executable()
 	if err != nil {
+		clearInFlight()
 		return fmt.Errorf("failed to resolve agent executable for uninstall: %w", err)
 	}
 
@@ -834,6 +884,7 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 
 	if err := cmd.Start(); err != nil {
 		c.ClearOverrideState()
+		clearInFlight()
 		return fmt.Errorf("failed to start uninstall process: %w", err)
 	}
 
@@ -852,6 +903,10 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 			c.logger.Warnw("Uninstall process exited but the agent is still installed; clearing Stopping state",
 				"uninstall.process.pid", cmd.Process.Pid)
 			c.ClearOverrideState()
+			// The uninstall failed before the point of no return and the agent
+			// remains installed; clear the in-flight marker so a redelivery of the
+			// same action can spawn a new uninstaller.
+			clearInFlight()
 		}
 	}()
 

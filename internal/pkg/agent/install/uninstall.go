@@ -175,6 +175,25 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		pt.Describe("Successfully uninstalled service")
 	}
 
+	// Point of no return: the service and components have been removed, so the
+	// agent is effectively uninstalled and can no longer run to retry.
+	// Acknowledge the Fleet UNINSTALL action (if any) now, before the best-effort
+	// cleanup below (post-uninstall tasks, shell-wrapper removal, install-directory
+	// removal). That cleanup can still return an error, but it must not turn an
+	// already-effective uninstall into a reported failure: acking here (and
+	// setting ackSuccessSent) prevents the deferred failure-ack from firing if a
+	// later best-effort step fails. It is also sent before the audit/unenroll
+	// notification below (which can invalidate the API key) and before the install
+	// directory (holding the credentials) is removed. The uninstall proceeds
+	// regardless of the ack outcome; a failed ack here is best-effort and
+	// complemented by the audit/unenroll notification.
+	if fleetAckActionID != "" && notifyFleet && cfg != nil {
+		if ackErr := ackFleetUninstallAction(ctx, log, pt, cfg, &agentID, fleetAckActionID, nil); ackErr != nil {
+			pt.Describe(fmt.Sprintf("failed to ack uninstall action to Fleet: %v", ackErr))
+		}
+		ackSuccessSent = true
+	}
+
 	// platform-specific post-uninstall tasks
 	err = postUninstall()
 	if err != nil {
@@ -192,20 +211,6 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 				fmt.Sprintf("failed to remove shell wrapper (%s)", paths.ShellWrapperPath()),
 				aerrors.M("destination", paths.ShellWrapperPath()))
 		}
-	}
-
-	// Point of no return: the service and components have been removed, so the
-	// agent is effectively uninstalled. Acknowledge the Fleet UNINSTALL action
-	// (if any) now, before the audit/unenroll notification below (which can
-	// invalidate the API key) and before the install directory (holding the
-	// credentials) is removed. The uninstall proceeds regardless of the ack
-	// outcome; a failed ack here is best-effort and complemented by the
-	// audit/unenroll notification.
-	if fleetAckActionID != "" && notifyFleet && cfg != nil {
-		if ackErr := ackFleetUninstallAction(ctx, log, pt, cfg, &agentID, fleetAckActionID, nil); ackErr != nil {
-			pt.Describe(fmt.Sprintf("failed to ack uninstall action to Fleet: %v", ackErr))
-		}
-		ackSuccessSent = true
 	}
 
 	// Notify Fleet of the uninstall before removing the top path, at this point the service is stopped and won't run anymore.
