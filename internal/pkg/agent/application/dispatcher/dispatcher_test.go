@@ -1144,7 +1144,7 @@ func TestScheduleUninstallActions(t *testing.T) {
 			ActionID:         "u1",
 			ActionType:       fleetapi.ActionTypeUninstall,
 			ActionCreatedAt:  rfc(created),
-			ActionStartTime:  rfc(created.Add(time.Hour)),    // now-1h, valid window
+			ActionStartTime:  rfc(created.Add(time.Hour)),     // now-1h, valid window
 			ActionExpiration: rfc(now.Add(-30 * time.Minute)), // already expired
 		}
 		d.scheduleUninstallActions(now, []fleetapi.Action{a})
