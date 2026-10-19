@@ -450,11 +450,12 @@
                 "required": ["enabled"]
             },
             "then": {
-                "required": ["autoops_token", "autoops_otel_url"],
+                "required": ["autoops_token", "autoops_otel_url", "elastic_cloud_connected_mode_api_key"],
                 "allOf": [
                     {
                         "properties": {
                             "autoops_token": { "type": "string", "minLength": 1 },
+                            "elastic_cloud_connected_mode_api_key": { "type": "string", "minLength": 1 },
                             "autoops_otel_url": { "type": "string", "minLength": 1 },
                             "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" }
                         }
