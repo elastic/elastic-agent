@@ -61,6 +61,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -578,12 +579,16 @@ func (Check) Changes() error {
 	return nil
 }
 
-// All runs all the tests.
-func (Test) All() {
-	mg.SerialDeps(Test.Unit)
+// All runs all the unit tests of the root module (Test.Unit)
+// and internal/edot (Test.UnitEdot). The two run in
+// parallel and write to separate build/TEST-go-unit.* and
+// build/TEST-go-unit_edot.* files.
+func (Test) All(ctx context.Context) {
+	mg.CtxDeps(ctx, Test.Unit, Test.UnitEdot)
 }
 
-// Unit runs all the unit tests.
+// Unit runs all the unit tests of the root Go module. It does not reach
+// internal/edot, which is a separate module; see Test.UnitEdot and Test.All.
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
@@ -599,6 +604,17 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
 	params.Tags = append(params.Tags, "requirefips")
+	return devtools.GoTest(ctx, params)
+}
+
+// UnitEdot runs all the unit tests of the internal/edot module (the EDOT Collector).
+// internal/edot is a separate Go module, so Test.Unit does not reach its tests;
+// Test.All runs both. Honours the same env vars as Test.Unit (RACE_DETECTOR,
+// TEST_COVERAGE, FIPS); results are written to build/TEST-go-unit_edot.*.
+func (Test) UnitEdot(ctx context.Context) error {
+	mg.Deps(Prepare.Env)
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitEdotArgs(cfg)
 	return devtools.GoTest(ctx, params)
 }
 
@@ -2308,7 +2324,7 @@ func (Integration) Clean(ctx context.Context) error {
 		}
 	}
 
-	r, err := createTestRunner(cfg, false, "", "")
+	r, err := createTestRunner(ctx, cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -2329,7 +2345,6 @@ func (Integration) Check() error {
 	return errors.Join(
 		define.ValidateDir("testing/integration/ess"),
 		define.ValidateDir("testing/integration/serverless"),
-		define.ValidateDir("testing/integration/beats/serverless"),
 		define.ValidateDir("testing/integration/leak"),
 		define.ValidateDir("testing/integration/k8s"),
 	)
@@ -2425,7 +2440,7 @@ func (i Integration) testServerless(ctx context.Context, matrix bool, testName s
 	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs the integration tests defined in testing/integration/k8s
+// TestKubernetes runs the integration tests defined in testing/integration/k8s.
 func (i Integration) TestKubernetes(ctx context.Context) error {
 	return i.testKubernetes(ctx, false, "")
 }
@@ -3034,28 +3049,6 @@ func (Integration) PrepareOnRemote() {
 	mg.Deps(devtools.InstallGoTestTools)
 }
 
-// TestBeatServerless runs beats-oriented serverless tests
-func (Integration) TestBeatServerless(ctx context.Context, beatname string) error {
-	cfg := devtools.SettingsFromContext(ctx)
-	beatBuildPath := filepath.Join("..", "beats", "x-pack", beatname, "build", "distributions")
-
-	if cfg.IntegrationTest.AgentBuildDir == "" {
-		cfg = cfg.WithAgentBuildDir(beatBuildPath)
-	}
-
-	// a bit of bypass logic; run as serverless by default
-	switch cfg.IntegrationTest.StackProvisioner {
-	case "":
-		cfg = cfg.WithStackProvisioner("serverless")
-	case "stateful":
-		fmt.Printf(">>> Warning: running TestBeatServerless as stateful\n")
-	}
-
-	cfg = cfg.WithTestBinaryName(beatname)
-	ctx = devtools.ContextWithSettings(ctx, cfg)
-	return integRunner(ctx, "testing/integration/beats/serverless", false, "TestBeatsServerless")
-}
-
 // TestForResourceLeaks runs the integration tests defined in testing/integration/leak
 func (i Integration) TestForResourceLeaks(ctx context.Context) error {
 	return i.testForResourceLeaks(ctx, false, "")
@@ -3248,7 +3241,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(cfg, matrix, singleTest, goTestFlags, batches...)
+	r, err := createTestRunner(ctx, cfg, matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -3306,7 +3299,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	return agentVersion, agentStackVersion, nil
 }
 
-func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(ctx context.Context, cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion := cfg.GoVersion()
 
 	agentVersion, agentStackVersion, err := getTestRunnerVersions(cfg)
@@ -3359,6 +3352,13 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 			return nil, err
 		}
 		identifier = localIdentifier()
+	case microshift.Name:
+		var err error
+		instanceProvisioner, err = microshift.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
+		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner, err = dockerprov.NewProvisioner()
 		if err != nil {
@@ -3369,7 +3369,16 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = local.NewProvisioner()
 		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf(
+			"INSTANCE_PROVISIONER environment variable must be one of %q, %q, %q, %q, %q, or %q, not %s",
+			gcloud.Name,
+			multipass.Name,
+			kind.Name,
+			microshift.Name,
+			dockerprov.Name,
+			local.Name,
+			instanceProvisionerMode,
+		)
 	}
 
 	// The local stack provisioner runs elastic-package locally and the external one
@@ -3416,13 +3425,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		extraEnv["GOTESTSUM_FORMAT"] = "standard-verbose"
 	}
 
-	// these following two env vars are currently not used by anything, but can be used in the future to test beats or
-	// other binaries, see https://github.com/elastic/elastic-agent/pull/3258
-	binaryName := cfg.IntegrationTest.BinaryName
-	if binaryName == "" {
-		binaryName = "elastic-agent"
-	}
-
 	repoDir := cfg.IntegrationTest.RepoPath
 	if repoDir == "" {
 		repoDir = "."
@@ -3448,7 +3450,6 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		Timestamp:      timestamp,
 		TestFlags:      goTestFlags,
 		ExtraEnv:       extraEnv,
-		BinaryName:     binaryName,
 	}
 
 	r, err := runner.NewRunner(runnerCfg, instanceProvisioner, stackProvisioner, batches...)

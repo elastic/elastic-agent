@@ -30,7 +30,16 @@ stringData:
       otlphttp:
         endpoint: ${env:AUTOOPS_OTEL_URL}
         headers:
-          Authorization: AutoOpsToken ${env:AUTOOPS_TOKEN}
+          Authorization: ApiKey ${env:ELASTIC_CLOUD_CONNECTED_MODE_API_KEY}
+        sending_queue:
+          batch:
+            flush_timeout: 11s
+            max_size: 4194304
+            min_size: 1048576
+            sizer: bytes
+          block_on_overflow: true
+          enabled: true
+          queue_size: 52428800
     receivers:
       metricbeatreceiver:
         metricbeat:
@@ -113,7 +122,7 @@ spec:
       labels:
         name: agent-autoops-example
       annotations:
-        checksum/config: eab1751e24658605a55df70c811493c831b731d734718ee636226c675d578639
+        checksum/config: d5c1a32862e7a7d82171912d10c3baac39407834be924866afcf55f4bc961056
     spec:
       automountServiceAccountToken: true
       containers:
@@ -139,6 +148,11 @@ spec:
             secretKeyRef:
               key: autoops-token
               name: agent-autoops-example-autoops
+        - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              key: cloud-connected-mode-api-key
+              name: agent-autoops-example-autoops
         - name: AUTOOPS_OTEL_URL
           valueFrom:
             secretKeyRef:
@@ -153,11 +167,6 @@ spec:
           valueFrom:
             secretKeyRef:
               key: es-api-key
-              name: agent-autoops-example-autoops
-        - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              key: cloud-connected-mode-api-key
               name: agent-autoops-example-autoops
         - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL
           valueFrom:
