@@ -19,12 +19,23 @@ $env:TEST_COVERAGE = $true
 if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64" -and $env:DISABLE_RACE_DETECTOR -ne "true") {
   $env:RACE_DETECTOR = $true
 }
-mage unitTest
-# Copy coverage file to build directory so it can be downloaded as an artifact
+if ($env:SKIP_EDOT_UNIT_TESTS -eq "true") {
+  mage test:unit
+} else {
+  # test:all runs the unit tests of the root module (build/TEST-go-unit.*) and of
+  # the internal/edot module (build/TEST-go-unit_edot.*).
+  mage test:all
+}
+# Copy coverage files to build directory so they can be downloaded as artifacts.
+# Each module's results get a unique name so they do not collide across jobs.
 Write-Host "--- Prepare artifacts"
 $buildkiteJobId = $env:BUILDKITE_JOB_ID
 Move-Item -Path "build/TEST-go-unit.cov" -Destination "coverage-$buildkiteJobId.out"
 Move-Item -Path "build/TEST-go-unit.xml" -Destination "build/TEST-$buildkiteJobId.xml"
+if ($env:SKIP_EDOT_UNIT_TESTS -ne "true") {
+  Move-Item -Path "build/TEST-go-unit_edot.cov" -Destination "coverage-$buildkiteJobId-edot.out"
+  Move-Item -Path "build/TEST-go-unit_edot.xml" -Destination "build/TEST-$buildkiteJobId-edot.xml"
+}
 if ($LASTEXITCODE -ne 0) {
   exit 1
 }

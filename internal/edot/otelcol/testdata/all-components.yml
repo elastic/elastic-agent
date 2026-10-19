@@ -130,7 +130,7 @@ receivers:
     region: us-east-1
     logs:
       initial_lookback: 1h
-      poll_interval: 1m
+      poll_interval: 1h
       groups:
         autodiscover:
           limit: 1

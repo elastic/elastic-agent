@@ -579,12 +579,16 @@ func (Check) Changes() error {
 	return nil
 }
 
-// All runs all the tests.
-func (Test) All() {
-	mg.SerialDeps(Test.Unit)
+// All runs all the unit tests of the root module (Test.Unit)
+// and internal/edot (Test.UnitEdot). The two run in
+// parallel and write to separate build/TEST-go-unit.* and
+// build/TEST-go-unit_edot.* files.
+func (Test) All(ctx context.Context) {
+	mg.CtxDeps(ctx, Test.Unit, Test.UnitEdot)
 }
 
-// Unit runs all the unit tests.
+// Unit runs all the unit tests of the root Go module. It does not reach
+// internal/edot, which is a separate module; see Test.UnitEdot and Test.All.
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
@@ -600,6 +604,17 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
 	params.Tags = append(params.Tags, "requirefips")
+	return devtools.GoTest(ctx, params)
+}
+
+// UnitEdot runs all the unit tests of the internal/edot module (the EDOT Collector).
+// internal/edot is a separate Go module, so Test.Unit does not reach its tests;
+// Test.All runs both. Honours the same env vars as Test.Unit (RACE_DETECTOR,
+// TEST_COVERAGE, FIPS); results are written to build/TEST-go-unit_edot.*.
+func (Test) UnitEdot(ctx context.Context) error {
+	mg.Deps(Prepare.Env)
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitEdotArgs(cfg)
 	return devtools.GoTest(ctx, params)
 }
 
