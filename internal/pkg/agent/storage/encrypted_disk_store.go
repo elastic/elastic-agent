@@ -57,7 +57,12 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...Encrypted
 	} else if runtime.GOOS == darwin {
 		// an agent installed with --unprivileged keeps its secret in the file vault instead of the
 		// System keychain, so it must be read from there even when running as root (e.g. sudo inspect)
-		unprivileged, err = secret.HasUnprivilegedVault(ctx)
+		// honour a custom vault path passed through the options
+		probe := &EncryptedDiskStore{vaultPath: paths.AgentVaultPath()}
+		for _, opt := range opts {
+			opt(probe)
+		}
+		unprivileged, err = secret.HasUnprivilegedVault(ctx, vault.WithVaultPath(probe.vaultPath))
 		if err != nil {
 			return nil, fmt.Errorf("error checking for unprivileged vault: %w", err)
 		}
