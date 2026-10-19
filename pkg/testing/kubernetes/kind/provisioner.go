@@ -120,10 +120,11 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			return nil, fmt.Errorf("failed to check if cluster exists: %w", err)
 		}
 		if !exists {
-			p.logger.Logf("Provisioning kind cluster %s", instanceName)
+			p.logger.Logf("kind: provisioning cluster %s", instanceName)
 			nodeImage := fmt.Sprintf("kindest/node:%s", k8sVersion)
 			clusterConfig := strings.NewReader(clusterCfg)
 
+			clusterCreationStart := time.Now()
 			createCtx, createCancel := context.WithTimeout(ctx, createClusterTimeout)
 			ret, err := p.kindCmd(createCtx, clusterConfig, "create", "cluster", "--name", instanceName, "--image", nodeImage, "--config", "-")
 			createCancel()
@@ -139,10 +140,12 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 			if !exists {
 				return nil, fmt.Errorf("kind: failed to find cluster %s after successful creation", instanceName)
 			}
+			p.logger.Logf("kind: cluster created in %s", time.Since(clusterCreationStart).Round(time.Millisecond))
 		} else {
-			p.logger.Logf("Kind cluster %s already exists", instanceName)
+			p.logger.Logf("kind: cluster %s already exists", instanceName)
 		}
 
+		controlPlaneStart := time.Now()
 		kConfigPath, err := p.writeKubeconfig(ctx, instanceName)
 		if err != nil {
 			return nil, err
@@ -156,10 +159,13 @@ func (p *provisioner) Provision(ctx context.Context, cfg common.Config, batches 
 		if err := p.waitForControlPlane(ctx, c); err != nil {
 			return nil, err
 		}
+		p.logger.Logf("kind: control plane ready in %s", time.Since(controlPlaneStart).Round(time.Millisecond))
 
+		loadImageStart := time.Now()
 		if err := p.loadImage(ctx, instanceName, testsImage); err != nil {
 			return nil, err
 		}
+		p.logger.Logf("kind: agent image loaded in %s", time.Since(loadImageStart).Round(time.Millisecond))
 
 		instances = append(instances, common.Instance{
 			ID:          batch.ID,
@@ -240,17 +246,17 @@ func (p *provisioner) Clean(ctx context.Context, cfg common.Config, instances []
 		// kind will not return an error if we try to delete a nonexistent cluster
 		exists, err := p.clusterExists(ctx, instance.Name)
 		if err != nil {
-			p.logger.Logf("Failed to check if cluster exists: %s", err)
+			p.logger.Logf("kind: failed to check if cluster exists: %s", err)
 			continue
 		}
 		if !exists {
-			p.logger.Logf("Tried to delete instance, but it was not found: %s", instance.Name)
+			p.logger.Logf("kind: tried to delete instance, but it was not found: %s", instance.Name)
 			continue
 		}
 		err = p.deleteCluster(ctx, instance.Name)
 		if err != nil {
 			// prevent a failure from stopping the other instances and clean
-			p.logger.Logf("Delete instance %s failed: %s", instance.Name, err)
+			p.logger.Logf("kind: delete instance %s failed: %s", instance.Name, err)
 		}
 	}
 
