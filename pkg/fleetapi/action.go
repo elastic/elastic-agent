@@ -45,6 +45,7 @@ const (
 var (
 	ErrNoStartTime  = fmt.Errorf("action has no start time")
 	ErrNoExpiration = fmt.Errorf("action has no expiration")
+	ErrNoCreatedAt  = fmt.Errorf("action has no creation time")
 )
 
 // Action base interface for all the implemented action from the fleet API.
@@ -538,6 +539,7 @@ func (a *ActionRestart) MarshalMap() (map[string]interface{}, error) {
 type ActionUninstall struct {
 	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`
 	ActionType       string `json:"type" yaml:"type" mapstructure:"type"`
+	ActionCreatedAt  string `json:"created_at,omitempty" yaml:"created_at,omitempty" mapstructure:"-"`
 	ActionStartTime  string `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
 	ActionExpiration string `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
 	// Signature is the action signature (JSON key "signed"). It is exposed via the
@@ -571,6 +573,21 @@ func (a *ActionUninstall) Type() string {
 // ID returns the ID of the Action.
 func (a *ActionUninstall) ID() string {
 	return a.ActionID
+}
+
+// CreatedAt returns the action creation time (set by Fleet) as a UTC time.Time,
+// or ErrNoCreatedAt if it is not set. It is used to anchor the uninstall
+// grace-period window to when the action was created rather than when the agent
+// received it, so delivery latency does not affect the window validation.
+func (a *ActionUninstall) CreatedAt() (time.Time, error) {
+	if a.ActionCreatedAt == "" {
+		return time.Time{}, ErrNoCreatedAt
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionCreatedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
 }
 
 // StartTime returns the start_time as a UTC time.Time or ErrNoStartTime if there is no start time.

@@ -23,9 +23,11 @@ description: >
   action's signature is verified on receipt when tamper protection is enabled;
   an action with a missing or invalid signature is rejected immediately and never
   scheduled. To guard against accidental (especially bulk) uninstalls, the action
-  can carry a grace period expressed with the standard action start_time: when it
-  is set in the future the uninstall is scheduled and can be cancelled with a
-  Fleet CANCEL action before it runs. While it waits, the agent reports an
+  carries a grace period expressed with the standard action start_time, and the
+  agent rejects the action unless its start_time is between 1 and 24 hours after
+  the action was created (created_at). Within that window the uninstall is
+  scheduled and can be cancelled with a Fleet CANCEL action before it runs. While
+  it waits, the agent reports an
   "Uninstall pending" state. The pending uninstall is held in the persisted
   action queue, so the grace period survives agent restarts. When the start_time
   is reached the agent spawns a detached process that uninstalls it (the uninstall

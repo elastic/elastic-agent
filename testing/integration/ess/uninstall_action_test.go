@@ -46,13 +46,17 @@ func TestFleetUninstallAction(t *testing.T) {
 
 	// Deliver an UNINSTALL action on the next checkin. Stamp a short start_time so
 	// the test exercises the scheduling path without a long wait: the agent holds
-	// the action in its queue until the start_time, then uninstalls.
+	// the action in its queue until the start_time, then uninstalls. The agent
+	// enforces a grace-period window of [created_at+1h, created_at+24h], so
+	// created_at is backdated 1h to keep the short start_time inside the window.
+	base := time.Now()
 	uninstallActionID := "uninstall-action-id"
 	uninstallAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
 		AgentID:   policy.AgentID,
 		ActionID:  uninstallActionID,
 		Type:      fleetapi.ActionTypeUninstall,
-		StartTime: time.Now().Add(5 * time.Second).UTC().Format(time.RFC3339),
+		CreatedAt: base.Add(-1 * time.Hour).UTC().Format(time.RFC3339),
+		StartTime: base.Add(5 * time.Second).UTC().Format(time.RFC3339),
 		Data:      `{}`,
 	})
 	require.NoError(t, err, "failed to create uninstall action")
@@ -95,13 +99,17 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 	fixture, checkinWithAcker, policy := setupUninstallFleetServer(t, ctx)
 
 	// Deliver an UNINSTALL action with a start_time far enough out that, without a
-	// cancel, the agent would uninstall within this test's window.
+	// cancel, the agent would uninstall within this test's window. created_at is
+	// backdated 1h so the short start_time stays inside the agent's
+	// [created_at+1h, created_at+24h] grace-period window.
+	base := time.Now()
 	uninstallActionID := "uninstall-action-id"
 	uninstallAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
 		AgentID:   policy.AgentID,
 		ActionID:  uninstallActionID,
 		Type:      fleetapi.ActionTypeUninstall,
-		StartTime: time.Now().Add(1 * time.Minute).UTC().Format(time.RFC3339),
+		CreatedAt: base.Add(-1 * time.Hour).UTC().Format(time.RFC3339),
+		StartTime: base.Add(1 * time.Minute).UTC().Format(time.RFC3339),
 		Data:      `{}`,
 	})
 	require.NoError(t, err, "failed to create uninstall action")

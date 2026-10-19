@@ -257,6 +257,18 @@ func detectTypes(actions []fleetapi.Action) []string {
 //     immediately and a tampered action is never scheduled;
 //   - rejects an action that could never run before it expires so the queue does
 //     not silently drop it (terminal actions must be acked).
+const (
+	// minUninstallGracePeriod and maxUninstallGracePeriod bound the grace period
+	// an UNINSTALL action may schedule through its start_time. The agent rejects
+	// an action whose start_time is sooner than minUninstallGracePeriod from now
+	// (including an immediate or absent start_time) or later than
+	// maxUninstallGracePeriod from now. This guarantees operators a predictable
+	// window to cancel an accidental uninstall and prevents one from being
+	// scheduled too soon or arbitrarily far in the future.
+	minUninstallGracePeriod = time.Hour
+	maxUninstallGracePeriod = 24 * time.Hour
+)
+
 func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []fleetapi.Action) []fleetapi.Action {
 	actions := make([]fleetapi.Action, 0, len(input))
 	for _, action := range input {
@@ -293,12 +305,36 @@ func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []flee
 			}
 		}
 
-		// Reject an action that can never run before it expires so the queue does not
-		// silently drop it: one that is already expired, or whose start_time is at or
-		// after its expiration. Clear the start_time and record the failure so it is
-		// dispatched immediately and the handler acknowledges it, rather than being
-		// queued and dropped once expired.
-		// (RFC: "expired when received, or unschedulable before expiration: immediate failure ack, no scheduling".)
+		// Enforce the grace-period window on receipt: the uninstall start_time must
+		// be between minUninstallGracePeriod and maxUninstallGracePeriod after the
+		// action was created in Fleet. Anchoring on the creation time (not the
+		// agent's receipt time) keeps the window independent of delivery latency,
+		// so an action is not wrongly rejected because it was delivered late. An
+		// action with no/invalid start_time, or one whose window is too short or
+		// too long, is rejected: clear the start_time and record the error so it is
+		// dispatched immediately and the handler acknowledges the failure.
+		anchor := now
+		if created, cerr := ua.CreatedAt(); cerr == nil {
+			anchor = created
+		}
+		start, serr := ua.StartTime()
+		switch {
+		case serr != nil:
+			ua.Err = fmt.Errorf("uninstall action rejected: a start_time between %s and %s after the action creation time is required, but it is missing or invalid", minUninstallGracePeriod, maxUninstallGracePeriod)
+		case start.Before(anchor.Add(minUninstallGracePeriod)):
+			ua.Err = fmt.Errorf("uninstall start_time %s is too soon: it must be at least %s after the action creation time %s", ua.ActionStartTime, minUninstallGracePeriod, anchor.Format(time.RFC3339))
+		case start.After(anchor.Add(maxUninstallGracePeriod)):
+			ua.Err = fmt.Errorf("uninstall start_time %s is too far out: it must be at most %s after the action creation time %s", ua.ActionStartTime, maxUninstallGracePeriod, anchor.Format(time.RFC3339))
+		}
+		if ua.Err != nil {
+			ua.ActionStartTime = ""
+			ad.log.Warnf("uninstall action %s rejected: %v", ua.ID(), ua.Err)
+			continue
+		}
+
+		// Also reject an action that could never run before it expires (its
+		// start_time is at or after the expiration), so the queue does not silently
+		// drop it once expired. start_time is valid here (checked above).
 		exp, experr := ua.Expiration()
 		if experr != nil {
 			// No expiration (never expires) or a malformed expiration: nothing to
@@ -306,17 +342,11 @@ func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []flee
 			// dispatch.
 			continue
 		}
-		start, serr := ua.StartTime()
-		switch {
-		case serr == nil && !start.Before(exp):
-			ua.Err = fmt.Errorf("uninstall start time %s is at or after the action expiration %s", ua.ActionStartTime, ua.ActionExpiration)
-		case now.After(exp):
-			ua.Err = fmt.Errorf("uninstall action expired at %s", exp.Format(time.RFC3339))
-		default:
-			continue
+		if !start.Before(exp) {
+			ua.Err = fmt.Errorf("uninstall start_time %s is at or after the action expiration %s", ua.ActionStartTime, ua.ActionExpiration)
+			ua.ActionStartTime = ""
+			ad.log.Warnf("uninstall action %s will not be scheduled: %v", ua.ID(), ua.Err)
 		}
-		ua.ActionStartTime = ""
-		ad.log.Warnf("uninstall action %s will not be scheduled: %v", ua.ID(), ua.Err)
 	}
 	return actions
 }
