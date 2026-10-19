@@ -1,0 +1,9 @@
+kind: bug-fix
+
+summary: Fix Elasticsearch output parameters sending all data to the first host when running beats as OTel receivers
+
+description: |
+  When an Elasticsearch output with several hosts set `parameters`, every exporter endpoint was replaced with the
+  first host, so all data was sent to that host and the others were never used.
+
+component: elastic-agent

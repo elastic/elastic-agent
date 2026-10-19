@@ -53,15 +53,21 @@ agent:
     rollback:
       window: 10m
 `
+
+// fastWatcherCfgWithShortRollbackWindow expires the rollback after the grace period has ended, so that it is
+// removed by the periodic cleanup in the running agent and not by the watcher at the end of the grace period.
+// The grace period is counted from the upgrade marker and must leave enough time for the test to observe the
+// upgrade watcher: on slow Windows VMs it takes the agent 20+ seconds to restart after the upgrade, and
+// PerformUpgrade only starts looking for the UPG_WATCHING state after that.
 const fastWatcherCfgWithShortRollbackWindow = `
 agent:
   logging.level: debug
   upgrade:
     watcher:
-      grace_period: 30s
+      grace_period: 2m
       error_check.interval: 5s
     rollback:
-      window: 1m
+      window: 3m
       cleanup_interval: 10s
 `
 
@@ -200,7 +206,7 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -283,7 +289,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 // rolled back to the previous version and that Fleet reports the correct informations
 func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		Stack: &define.Stack{},
@@ -337,7 +343,7 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 // See https://github.com/elastic/elastic-agent/issues/12910
 func TestFleetManagedUpgradeRollback(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Local: false,
 		Sudo:  true,
 		Stack: &define.Stack{},
@@ -474,7 +480,7 @@ type rollbackTriggerFunc func(ctx context.Context, t *testing.T, client client.C
 // of Agent, a manual rollback is triggered. It checks that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeManualRollback(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -645,7 +651,7 @@ func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesti
 
 func TestCleanupRollbacks(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -683,7 +689,7 @@ func TestCleanupRollbacks(t *testing.T) {
 				require.EventuallyWithT(t, func(collect *assert.CollectT) {
 					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
 					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
-				}, 1*time.Minute, 10*time.Second)
+				}, 2*time.Minute, 10*time.Second)
 			},
 		},
 		{

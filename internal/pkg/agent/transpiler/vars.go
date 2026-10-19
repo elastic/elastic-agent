@@ -15,7 +15,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/core/composable"
 )
 
-const varsSeparator = "."
+const (
+	varsSeparator = "."
+	// varsPrefix is the start of a variable reference; a string without it can never contain a variable.
+	varsPrefix = "${"
+)
 
 var varsRegex = regexp.MustCompile(`\$\$?{([\p{L}\d\s\\\-_|.'":\/]*)}`)
 
@@ -34,6 +38,8 @@ type Vars struct {
 	// observer, when set, is called with the name of every variable that is successfully
 	// resolved from this vars set. See WithVarObserver.
 	observer func(name string)
+	// cacheKey identifies the content of this vars set across renders, see SetCacheKey.
+	cacheKey string
 }
 
 // NewVars returns a new instance of vars.
@@ -111,6 +117,32 @@ func (v *Vars) WithVarObserver(observer func(name string)) *Vars {
 	return &observed
 }
 
+// SetCacheKey sets the key that identifies the content of this vars set across renders.
+//
+// Two vars sets with the same non-empty key must resolve every variable to the same value (fetch
+// context providers excluded, as their values are resolved at lookup time). RenderCache uses the
+// key to reuse the result of rendering an input against a previous vars set with the same key.
+// The empty key disables caching for this vars set.
+func (v *Vars) SetCacheKey(key string) {
+	v.cacheKey = key
+}
+
+// CacheKey returns the key set with SetCacheKey.
+func (v *Vars) CacheKey() string {
+	return v.cacheKey
+}
+
+// referencesFetchProvider returns true when any of the given provider names is a fetch context
+// provider of this vars set.
+func (v *Vars) referencesFetchProvider(providers map[string]struct{}) bool {
+	for name := range v.fetchContextProviders {
+		if _, ok := providers[name]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 // observe reports a successfully resolved variable to the observer, if one is set.
 func (v *Vars) observe(name string) {
 	if v.observer != nil {
@@ -178,17 +210,22 @@ func (v *Vars) lookupNode(name string) (Node, bool) {
 
 func replaceVars(value string, replacer func(variable string) (Node, Processors, bool), reqMatch bool, defaultProvider string) (Node, error) {
 	var processors Processors
-	matchIdxs := varsRegex.FindAllSubmatchIndex([]byte(value), -1)
+	if !strings.Contains(value, varsPrefix) {
+		// fast path: nothing to replace (the vast majority of config strings)
+		return NewStrVal(value), nil
+	}
+	matchIdxs := varsRegex.FindAllStringSubmatchIndex(value, -1)
 	if !validBrackets(value, matchIdxs) {
 		return nil, fmt.Errorf("starting ${ is missing ending }")
 	}
-	result := ""
+	var result strings.Builder
 	lastIndex := 0
 	for _, r := range matchIdxs {
 		for i := 0; i < len(r); i += 4 {
 			if value[r[i]+1] == '$' {
 				// match on an escaped var, append the raw string with the '$' prefix removed
-				result += value[lastIndex:r[0]] + value[r[i]+1:r[i+1]]
+				result.WriteString(value[lastIndex:r[0]])
+				result.WriteString(value[r[i]+1 : r[i+1]])
 				lastIndex = r[1]
 				continue
 			}
@@ -201,7 +238,8 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 			for _, val := range vars {
 				switch val.(type) {
 				case *constString:
-					result += value[lastIndex:r[0]] + val.Value()
+					result.WriteString(value[lastIndex:r[0]])
+					result.WriteString(val.Value())
 					set = true
 				case *varString:
 					node, nodeProcessors, ok := replacer(val.Value())
@@ -215,7 +253,8 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 							// is not inside of a string
 							return attachProcessors(node, processors), nil
 						}
-						result += value[lastIndex:r[0]] + node.String()
+						result.WriteString(value[lastIndex:r[0]])
+						result.WriteString(node.String())
 						set = true
 					}
 				}
@@ -229,7 +268,8 @@ func replaceVars(value string, replacer func(variable string) (Node, Processors,
 			lastIndex = r[1]
 		}
 	}
-	return NewStrValWithProcessors(result+value[lastIndex:], processors), nil
+	result.WriteString(value[lastIndex:])
+	return NewStrValWithProcessors(result.String(), processors), nil
 }
 
 func toRepresentation(vars []varI) string {

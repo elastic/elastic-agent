@@ -142,8 +142,12 @@ func (c *Config) Unpack(cfg *c.C) error {
 	// the default so a misconfigured policy can't cause that.
 	if tmp.RetrySleepInitDuration <= 0 {
 		def := DefaultConfig().RetrySleepInitDuration
-		logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
-			tmp.RetrySleepInitDuration, def)
+		// Only warn when the field was explicitly set to a bad value. When it is
+		// absent the zero value is the default, which is not a user misconfiguration.
+		if cfg.HasField("retry_sleep_init_duration") {
+			logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
+				tmp.RetrySleepInitDuration, def)
+		}
 		tmp.RetrySleepInitDuration = def
 	}
 

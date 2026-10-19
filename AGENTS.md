@@ -31,7 +31,9 @@ A **Makefile** still exists and CI runs targets such as `make check-ci` and `mak
 mage build:binary   # Main agent binary
 mage build:all      # All binaries for current platform
 mage dev:build      # DEV build (debug symbols)
-mage test:unit      # All unit tests
+mage test:all       # All unit tests: root module + internal/edot, in parallel (what CI runs)
+mage test:unit      # Unit tests of the root module only
+mage test:unitEdot  # Unit tests of the internal/edot module only (separate Go module, not covered by test:unit)
 mage fmt            # Format .go and .py files
 mage check:all      # License headers, integration-test define checks, docs file validation
 mage check:lint     # golangci-lint on changed files (see make lint)
@@ -92,12 +94,14 @@ Produced artifacts will be placed in the `build` directory.
 ## Testing
 
 ```bash
-mage test:unit        # All unit tests (typical pre-PR gate)
+mage test:all         # All unit tests of all Go modules (root + internal/edot), in parallel; this is what CI runs
+mage test:unit        # Unit tests of the root module only (typical pre-PR gate)
+mage test:unitEdot    # Unit tests of the internal/edot module only (EDOT Collector)
 mage test:coverage    # Unit tests with coverage report
 go test -run TestName ./path/to/pkg -v   # Single test / package
 ```
 
-Treat **`mage test:unit` passing** as the minimum bar before considering a change complete. If you add or change integration/E2E behavior, run the relevant mage integration targets and consult the testing docs.
+Treat **`mage test:unit` passing** as the minimum bar before considering a change complete. `internal/edot` is a separate Go module, so `mage test:unit` does not reach its tests; run **`mage test:unitEdot`** as well when touching `internal/edot/`, or **`mage test:all`** to run both (CI runs `test:all`). If you add or change integration/E2E behavior, run the relevant mage integration targets and consult the testing docs.
 
 Testing artifacts, including outputs and results will be placed in the `build/` directory.
 
@@ -125,9 +129,8 @@ The repo contains **multiple Go modules**; use **`mage tidy`** to keep `go.mod` 
 ### Lint Commands
 
 ```bash
-mage fmt             # formats source code (.go and .py) and adds license headers.
-mage format:all      # format automatically all the codes.
-mage format:license  # applies the right license header.
+mage fmt               # formats source code (.go and .py) and adds license headers.
+mage addLicenseHeaders # adds license headers without formatting imports.
 ```
 
 ### Rules enforced by tooling
@@ -148,6 +151,10 @@ CI and local checks enforce the following (details in [.golangci.yml](./.golangc
 - **Docs structure:** **`mage check:all`** includes validation that files expected by docs generation exist (`Check.DocsFiles` in magefile).
 - **Go toolchain:** Version pinned in [.go-version](./.go-version).
 - **FIPS:** The codebase supports FIPS-oriented builds and tests (for example **`mage test:fIPSOnlyUnit`**, `requirefips` build tag). Crypto-related changes should remain compatible with FIPS expectations where applicable.
+
+## Documentation
+
+For changes that affect published documentation or documentation generation, use the `docs-authoring` skill (`.agents/skills/docs-authoring/SKILL.md`).
 
 ## Contribution hygiene
 
@@ -176,6 +183,7 @@ Unless instructed otherwise, always add the `backport-active-all` label to the p
 ## Further documentation
 
 - [README.md](./README.md) — setup, packaging, dependency hygiene
+- [docs/contributing-docs.md](./docs/contributing-docs.md) — where the published docs live and how generated sections are updated
 - [docs/architecture.md](./docs/architecture.md) — architecture overview
 - [docs/component-specs.md](./docs/component-specs.md) — component spec format
 - [docs/test-framework-dev-guide.md](./docs/test-framework-dev-guide.md) — integration tests

@@ -53,6 +53,7 @@ stringData:
       kubernetes_leaderelection:
         enabled: false
         leader_lease: example-nginx
+
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -113,3 +114,4 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-nginx-example
+
