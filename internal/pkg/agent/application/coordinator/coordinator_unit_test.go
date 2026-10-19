@@ -3226,7 +3226,7 @@ func TestCoordinator_Uninstall(t *testing.T) {
 // tested deterministically. Callers must kill the returned process.
 func blockingUninstallCmd() *exec.Cmd {
 	// #nosec G204 G702 -- test-only; references the test binary with constant args.
-	cmd := exec.Command(os.Args[0], "-test.run", "^TestCoordinatorUninstallBlockingHelper$")
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run", "^TestCoordinatorUninstallBlockingHelper$")
 	cmd.Env = append(os.Environ(), "GO_UNINSTALL_BLOCK=1")
 	return cmd
 }
