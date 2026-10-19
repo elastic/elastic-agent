@@ -127,6 +127,8 @@ func Remove(ctx context.Context, key string, opts ...vault.OptionFunc) error {
 // On darwin the agent secret is stored in the System keychain for privileged installs and in
 // a file vault for unprivileged installs, so this is used to detect an unprivileged install
 // regardless of the privileges of the current process. The file vault is opened read-only.
+// A vault that cannot be queried for the key is reported as not present, matching the previous
+// uninstall behavior; only unexpected errors opening the vault are returned.
 func HasUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (bool, error) {
 	opts = append(opts, vault.WithReadonly(true))
 	vaultOpts, err := vault.ApplyOptions(opts...)
