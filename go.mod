@@ -6,6 +6,7 @@ replace github.com/elastic/beats/v7 => ./beats
 
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/Microsoft/go-winio v0.6.3
 	github.com/antlr4-go/antlr/v4 v4.13.1
 	github.com/blakesmith/ar v0.0.0-20190502131153-809d4375e1fb
@@ -16,7 +17,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261008204943-7eff44ff320c
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261016070059-4b88e6062e6b
 	github.com/elastic/cloud-on-k8s/v3 v3.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.47.0
@@ -46,8 +47,8 @@ require (
 	github.com/moby/moby/client v0.6.2
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.163.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.161.0
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.161.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.163.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.163.0
 	github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
@@ -124,7 +125,6 @@ require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/MakeNowJust/heredoc v1.0.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Masterminds/squirrel v1.5.4 // indirect
 	github.com/ProtonMail/go-crypto v1.4.1 // indirect
