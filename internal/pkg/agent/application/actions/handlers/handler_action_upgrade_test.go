@@ -426,26 +426,16 @@ func TestEndpointPreUpgradeCallback(t *testing.T) {
 
 			upgradeCalledChan := make(chan struct{})
 			if tc.shouldProxyToEndpoint {
-<<<<<<< HEAD
+				// Tamper protection on → Upgrade receives rollback opt + pre-upgrade callback opt.
 				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt"), mock.AnythingOfType("coordinator.UpgradeOpt")).
 					RunAndReturn(func(ctx context.Context, s string, s2 string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
-=======
-				// Tamper protection on → Upgrade receives rollback opt + pre-upgrade callback opt.
-				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.Sources, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt"), mock.AnythingOfType("coordinator.UpgradeOpt")).
-					RunAndReturn(func(ctx context.Context, v string, s []string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
->>>>>>> 5ea37bf (fix(upgrade): defer Endpoint notification to pre-upgrade callback and wait for policy (#16921))
 						upgradeCalledChan <- struct{}{}
 						return tc.coordUpgradeErr
 					})
 			} else {
-<<<<<<< HEAD
+				// Tamper protection off → Upgrade receives rollback opt only.
 				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.SourceURI, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt")).
 					RunAndReturn(func(ctx context.Context, s string, s2 string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
-=======
-				// Tamper protection off → Upgrade receives rollback opt only.
-				mockCoordinator.EXPECT().Upgrade(mock.Anything, tc.upgradeAction.Data.Version, tc.upgradeAction.Data.Sources, mock.Anything, mock.AnythingOfType("coordinator.UpgradeOpt")).
-					RunAndReturn(func(ctx context.Context, v string, s []string, actionUpgrade *fleetapi.ActionUpgrade, opt ...coordinator.UpgradeOpt) error {
->>>>>>> 5ea37bf (fix(upgrade): defer Endpoint notification to pre-upgrade callback and wait for policy (#16921))
 						upgradeCalledChan <- struct{}{}
 						return tc.coordUpgradeErr
 					})
