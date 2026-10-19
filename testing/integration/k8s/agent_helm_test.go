@@ -79,7 +79,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 			1, "agent"),
 
 		// 4th - verify new logs are ingested from `/var/log/containers/` with kubernetes metadata
-		k8sStepRecordLogsCheckpoint(info, checkpoint),
+		k8sStepRecordLogsCheckpoint(checkpoint),
 		k8sStepCheckLogFilesIngested(info,
 			"logs", "kubernetes.container_logs", "default", "/var/log/containers/*flog*.log", checkpoint,
 			expectedLogFile{regex: containerRegex,
@@ -101,7 +101,7 @@ func TestKubernetesAgentHelmRotatedLogs(t *testing.T) {
 			1, "agent"),
 
 		// 7th - verify new rotated logs are ingested with kubernetes metadata
-		k8sStepRecordLogsCheckpoint(info, checkpoint),
+		k8sStepRecordLogsCheckpoint(checkpoint),
 		k8sStepCheckLogFilesIngested(info,
 			"logs", "kubernetes.container_logs", "default", "/var/log/pods/*flog*", checkpoint,
 			rotatedExpected...,
@@ -193,7 +193,7 @@ func TestKubernetesAgentHelmSingleContainerLogsInput(t *testing.T) {
 	checkIngested := func() []k8sTestStep {
 		return []k8sTestStep{
 			k8sStepCheckRunningPods("name=agent-pernode-elastic-agent", 1, "agent"),
-			k8sStepRecordLogsCheckpoint(info, checkpoint),
+			k8sStepRecordLogsCheckpoint(checkpoint),
 			k8sStepCheckLogFilesIngested(info,
 				"logs", "kubernetes.container_logs", "default", "/var/log/containers/*flog*.log", checkpoint,
 				containerFile),
@@ -228,9 +228,10 @@ func TestKubernetesAgentHelmSingleContainerLogsInput(t *testing.T) {
 	}
 }
 
-// logsCheckpoint is the @timestamp (epoch millis) of the latest flog log
-// document in Elasticsearch at the time it was recorded. Checks using it only
-// consider documents newer than that.
+// logsCheckpoint is the wall-clock time (epoch millis) at which it was
+// recorded. Checks using it only consider documents with @timestamp strictly
+// greater than the checkpoint, which excludes any log line produced before the
+// checkpoint regardless of when Elasticsearch indexes it.
 type logsCheckpoint struct {
 	epochMillis int64
 }
@@ -249,32 +250,15 @@ func (c *logsCheckpoint) filter() []any {
 	}
 }
 
-// k8sStepRecordLogsCheckpoint records in checkpoint the @timestamp of the
-// latest flog container log document. Run it once the agent under test is
-// running, so that documents sent by a previous agent are older than the
-// checkpoint. The checkpoint comes from Elasticsearch so it doesn't depend on
-// the clock of the test runner.
-func k8sStepRecordLogsCheckpoint(info *define.Info, checkpoint *logsCheckpoint) k8sTestStep {
-	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		query := map[string]any{
-			"size": 0,
-			"query": map[string]any{
-				"bool": map[string]any{
-					"filter": []any{
-						map[string]any{"term": map[string]any{"data_stream.dataset": "kubernetes.container_logs"}},
-						map[string]any{"term": map[string]any{"data_stream.type": "logs"}},
-						map[string]any{"wildcard": map[string]any{"log.file.path": map[string]any{"value": "*flog*"}}},
-					},
-				},
-			},
-			"aggs": map[string]any{
-				"max_timestamp": map[string]any{"max": map[string]any{"field": "@timestamp"}},
-			},
-		}
-
-		resp, err := PerformQuery(ctx, query, ".ds-logs*", info.ESClient)
-		require.NoError(t, err, "failed to query the latest container log timestamp")
-		checkpoint.epochMillis = int64(resp.Aggregations.MaxTimestamp.Value)
+// k8sStepRecordLogsCheckpoint records the current wall-clock time as the
+// checkpoint. Subsequent checks only consider log documents with @timestamp
+// strictly greater than this value. Because flog generates timestamps in real
+// time, any log line produced before this moment has @timestamp ≤ checkpoint
+// and is filtered out — including lines that were produced just before the
+// upgrade but had not yet been indexed when the checkpoint was set.
+func k8sStepRecordLogsCheckpoint(checkpoint *logsCheckpoint) k8sTestStep {
+	return func(t *testing.T, _ context.Context, _ k8sContext, _ string) {
+		checkpoint.epochMillis = time.Now().UnixMilli()
 		t.Logf("container logs checkpoint: %d", checkpoint.epochMillis)
 	}
 }

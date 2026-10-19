@@ -23,7 +23,7 @@ renames the outer input id. The stream id of the single input would then be dupl
       "kubernetes.namespace" (toString .Values.kubernetes.namespace)
       "kubernetes.onboardingID" (toString (default "" .Values.kubernetes.onboardingID)) -}}
 {{- range $name, $value := $userValues -}}
-{{- if regexMatch "\\$\\{\\s*(kubernetes|docker)\\." $value -}}
+{{- if regexMatch "\\$\\{[^}]*(kubernetes|docker)\\." $value -}}
 {{- fail (printf "%s references a dynamic provider variable (${kubernetes.*} or ${docker.*}), which is not supported with kubernetes.containers.logs.single_input=true. Set kubernetes.containers.logs.single_input=false to use one input per container." $name) -}}
 {{- end -}}
 {{- end -}}
