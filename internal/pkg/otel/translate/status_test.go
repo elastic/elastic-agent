@@ -520,10 +520,10 @@ func TestGetComponentStatus(t *testing.T) {
 	}
 }
 
-// TestGetComponentStatusNoEnabledStreams verifies that a component whose input unit has no
+// TestGetComponentStatusNoEnabledStreams verifies that a component whose input units have no
 // enabled streams (see getReceiversConfigForComponent's no-op receiver fallback) gets both a
-// component-level diagnostic message and a real per-unit status, rather than the input unit
-// being silently absent from State.Units.
+// component-level diagnostic message and a real status on every input unit, rather than
+// units being silently absent from State.Units or stuck in Starting.
 func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
 	comp := component.Component{
 		ID:         "linux-metrics-default",
@@ -539,14 +539,22 @@ func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
 		},
 		Units: []component.Unit{
 			{
-				// Follows the real Fleet "<comp.ID>-<inputID>" unit ID convention so
-				// GetBeatInputIDForUnit resolves "linux-metrics-unit" below.
 				ID:   "linux-metrics-default-linux-metrics-unit",
 				Type: client.UnitTypeInput,
 				Config: component.MustExpectedConfig(map[string]any{
 					"id":      "linux/metrics-linux-metrics-default",
 					"type":    "linux/metrics",
 					"streams": []any{}, // all streams disabled
+				}),
+			},
+			{
+				// A second integration using the same input type lands in the same component.
+				ID:   "linux-metrics-default-other-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":      "linux/metrics-other",
+					"type":    "linux/metrics",
+					"streams": []any{},
 				}),
 			},
 			{
@@ -560,10 +568,7 @@ func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
 		},
 	}
 
-	// Use the real production code path to derive the receiver key, rather than
-	// hand-computing the expected ID, so this test actually exercises the wiring
-	// between getReceiversConfigForComponent's chosen receiver name and
-	// getComponentState's receiverByInputID matching.
+	// Derive the receiver key from the config translation so the test covers it end to end.
 	receiversConfig, err := getReceiversConfigForComponent(&comp, &info.AgentInfo{}, nil)
 	require.NoError(t, err)
 	require.Len(t, receiversConfig, 1, "expected exactly one fallback receiver")
@@ -587,12 +592,15 @@ func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
 	result, err := getComponentState(otelStatus, comp)
 	require.NoError(t, err)
 	assert.Equal(t, client.UnitStateHealthy, result.State.State)
-	assert.Equal(t, "Healthy: component has no enabled streams, no data will be collected", result.State.Message)
+	assert.Equal(t, noEnabledStreamsMessage, result.State.Message)
 
-	unitKey := runtime.ComponentUnitKey{UnitID: comp.Units[0].ID, UnitType: client.UnitTypeInput}
-	unitState, found := result.State.Units[unitKey]
-	require.True(t, found, "input unit must have a status entry, not be silently absent")
-	assert.Equal(t, client.UnitStateHealthy, unitState.State)
+	for _, unit := range comp.Units[:2] {
+		unitKey := runtime.ComponentUnitKey{UnitID: unit.ID, UnitType: client.UnitTypeInput}
+		unitState, found := result.State.Units[unitKey]
+		require.True(t, found, "input unit %s must have a status entry, not be silently absent", unit.ID)
+		assert.Equal(t, client.UnitStateHealthy, unitState.State)
+		assert.Equal(t, noEnabledStreamsMessage, unitState.Message)
+	}
 }
 
 // TestUpdateStatusPartialReloadReceiverRemoved covers the workaround for the upstream

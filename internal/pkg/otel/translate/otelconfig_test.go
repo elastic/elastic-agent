@@ -3678,10 +3678,7 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 // TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
 // enabled streams (either no input units, or input units with nil config) falls back to
 // a no-op receiver instead of an error, so the pipeline stays valid and the component
-// remains OTel-managed and healthy. The receiver is named per-component (and per-input-unit,
-// when the unit ID follows the "<comp.ID>-<inputID>" convention) rather than sharing a
-// single ID across every such component, so getComponentState can still resolve a status
-// for the affected input unit (see TestGetComponentStatus's "no enabled streams" case).
+// remains OTel-managed and healthy. The receiver is named after the component.
 func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 	testAgentInfo := &info.AgentInfo{}
 	nopType := otelcomponent.MustNewType(NoEnabledStreamsReceiverType)
@@ -3732,8 +3729,6 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 				},
 				Units: []component.Unit{
 					{
-						// Follows the real Fleet "<comp.ID>-<inputID>" unit ID convention so
-						// GetBeatInputIDForUnit resolves "input-unit" below.
 						ID:     "nil-config-test-id-input-unit",
 						Type:   client.UnitTypeInput,
 						Config: nil,
@@ -3747,7 +3742,7 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 					},
 				},
 			},
-			expectedReceiverID: GetReceiverID(nopType, "nil-config-test-id/input-unit"),
+			expectedReceiverID: GetReceiverID(nopType, "nil-config-test-id"),
 		},
 	}
 
@@ -4152,9 +4147,8 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
 		{
-			// A unit with nil Config contributes no inputs. The component still falls back
-			// to the shared no-op receiver and remains supported (see
-			// TestGetReceiversConfigForComponentNoEnabledStreams).
+			// A unit with nil Config contributes no inputs. The component falls back to
+			// the no-op receiver and remains supported.
 			name: "input unit with nil config is supported",
 			component: &component.Component{
 				ID:         "nil-config-comp",
@@ -4187,11 +4181,8 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			// Fleet produces streams: [] when input.enabled=true but all streams are disabled.
-			// This state can exist in ECE clusters upgraded from pre-8.15 Fleet (before the
-			// alignInputsAndStreams guard was added) and is never retroactively corrected.
-			// The component falls back to the shared no-op receiver and remains supported
-			// (see TestGetReceiversConfigForComponentNoEnabledStreams).
+			// Fleet can compile streams: [] when the input is enabled but all its streams
+			// are disabled. The component falls back to the no-op receiver and remains supported.
 			name: "all streams disabled produces no inputs - supported via no-op receiver",
 			component: &component.Component{
 				ID:         "linux-metrics-default",
@@ -4208,8 +4199,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				},
 				Units: []component.Unit{
 					{
-						// Empty streams list: Fleet compiled streams: [] because all streams
-						// had enabled: false but input.enabled was still true.
+						// Empty streams list: all streams are disabled.
 						ID:   "linux-metrics-unit",
 						Type: client.UnitTypeInput,
 						Config: component.MustExpectedConfig(map[string]any{
