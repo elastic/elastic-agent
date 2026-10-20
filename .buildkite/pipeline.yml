@@ -355,7 +355,8 @@ steps:
       # Remove `skip` once https://github.com/elastic/elastic-agent/issues/17227 is resolved.
       - label: "EDOT unit tests - Windows 11 arm64"
         key: "edot-unit-tests-win11-arm64"
-        skip: "EDOT unit tests don't compile on Windows arm64, see https://github.com/elastic/elastic-agent/issues/17227"
+        # Buildkite limits the skip reason to 70 characters.
+        skip: "Doesn't compile, see github.com/elastic/elastic-agent/issues/17227"
         command: .buildkite/scripts/steps/unit-tests.ps1
         env:
           GO_MODULE_DIR: "internal/edot"
