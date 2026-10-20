@@ -1121,6 +1121,21 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "with API key",
+			outputCfg: map[string]any{
+				"api_key": "id:key",
+			},
+			expected: map[string]any{
+				"auth": map[string]any{
+					"api_key": "aWQ6a2V5",
+				},
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"timeout":                 "1m30s",
+			},
+		},
+		{
 			name: "with ssl enabled",
 			outputCfg: map[string]any{
 				"ssl.enabled": true,

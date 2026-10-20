@@ -595,7 +595,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		auth["password"] = esConfig.Password
 	}
 	if esConfig.APIKey != "" {
-		auth["api_key"] = esConfig.APIKey
+		auth["api_key"] = base64.StdEncoding.EncodeToString([]byte(esConfig.APIKey))
 	}
 	if len(esConfig.Headers) > 0 {
 		headerNames := slices.Sorted(maps.Keys(esConfig.Headers))
