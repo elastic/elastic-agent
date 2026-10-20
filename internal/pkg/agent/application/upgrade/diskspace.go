@@ -12,6 +12,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"net/http"
 	"os"
@@ -28,9 +29,9 @@ import (
 )
 
 const (
-	ChecksumSize     = uint64(1024)             // 1KB
-	ExtraInstallSize = uint64(50 * 1024 * 1024) // 50MB
-	MarkerSize       = uint64(1024 * 1024)      // 1MB
+	ChecksumSize     = uint64(1024)            // 1KB
+	ExtraInstallSize = uint64(5 * 1024 * 1024) // 5MB
+	MarkerSize       = uint64(1024 * 1024)     // 1MB
 
 	reservationFillByte  = 0xFF
 	reservationFillChunk = 1024 * 1024
@@ -81,7 +82,7 @@ type readRangeFunc func(uri string, offset, length int64) ([]byte, error)
 // ReserveDiskSpace reserves upgrade space at the download archive path and install directory.
 // Pre-existing reservation files are resized to the required size.
 func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (bool, error) {
-	installSize := min(decompressedSize+ExtraInstallSize, math.MaxInt64)
+	installSize := min(decompressedSize+ExtraInstallSize+getRunSize(), math.MaxInt64)
 	artifactsSize := min(archiveSize+ChecksumSize, math.MaxInt64)
 
 	installPath := getInstallReservation()
@@ -137,6 +138,23 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 	}
 
 	return false, goerrors.Join(errs...)
+}
+
+func getRunSize() uint64 {
+	var size uint64
+	_ = filepath.WalkDir(paths.Run(), func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fs.SkipDir
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+		if info, err := d.Info(); err == nil {
+			size += uint64(info.Size()) //nolint:gosec // G115: os.FileInfo.Size is expected to be non-negative
+		}
+		return nil
+	})
+	return size
 }
 
 func reserveDiskSpace(path string, size int64) error {
