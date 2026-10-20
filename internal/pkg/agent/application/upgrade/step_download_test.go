@@ -892,7 +892,7 @@ func TestDownloadArtifact(t *testing.T) {
 			settings := &artifact.Config{
 				TargetDirectory:        paths.Downloads(),
 				RetrySleepInitDuration: time.Millisecond,
-				ReserveDiskSpace:       true,
+				ReserveDiskSpace:       artifact.ReserveDiskSpaceConfig{Enabled: true},
 				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 					Timeout: time.Second,
 				},

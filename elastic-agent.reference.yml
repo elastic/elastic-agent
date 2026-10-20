@@ -141,7 +141,8 @@ inputs:
 #   retry_sleep_init_duration: 30s
 #   # if reserve_diskspace is enabled, upgrade will check for available diskspace and attempt to
 #   # reserve the required amount upfront, failing the upgrade if there is insufficient diskspace.
-#   reserve_diskspace: false
+#   reserve_diskspace:
+#     enabled: false
 
 # agent.upgrade
 #   # rollback settings

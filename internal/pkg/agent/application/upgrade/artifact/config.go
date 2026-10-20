@@ -46,7 +46,12 @@ type configWithoutHTTPTransportSettings struct {
 	// This key is, for some reason, problematic
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 
-	ReserveDiskSpace bool `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+	ReserveDiskSpace ReserveDiskSpaceConfig `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+}
+
+// ReserveDiskSpaceConfig controls the upgrade disk space reservation.
+type ReserveDiskSpaceConfig struct {
+	Enabled bool `yaml:"enabled" config:"enabled"`
 }
 
 // Config is a configuration used for verifier and downloader
@@ -72,7 +77,7 @@ type Config struct {
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 
-	ReserveDiskSpace bool `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+	ReserveDiskSpace ReserveDiskSpaceConfig `yaml:"reserve_diskspace" config:"reserve_diskspace"`
 
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
@@ -93,7 +98,7 @@ func DefaultConfig() *Config {
 		TargetDirectory:        paths.Downloads(),
 		InstallPath:            paths.Install(),
 		RetrySleepInitDuration: 30 * time.Second,
-		ReserveDiskSpace:       false,
+		ReserveDiskSpace:       ReserveDiskSpaceConfig{Enabled: false},
 		HTTPTransportSettings:  transport,
 	}
 }
