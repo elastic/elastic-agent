@@ -704,41 +704,37 @@ func TestDownloadArtifact(t *testing.T) {
 		{
 			name: "multiple remote sourceURIs stops when totalTimeout is exceeded before per-source retries complete",
 			run: func(t *testing.T, fx *fixture) {
-				// totalTimeout sits between one and two requestDelays so the
-				// first source completes but the second is interrupted mid-download.
-				const requestDelay = 120 * time.Millisecond
-				fx.settings.Timeout = 150 * time.Millisecond
-				fx.downloader.totalTimeout = 180 * time.Millisecond
+				fx.settings.Timeout = 10 * time.Second
+				fx.downloader.totalTimeout = 500 * time.Millisecond
 				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
+				testLogger, logs := loggertest.New(t.Name())
+				fx.downloader.log = testLogger
 
-				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
-				firstRequests := map[string]int{}
-				secondRequests := map[string]int{}
-
-				makeServer := func(counts map[string]int) *httptest.Server {
-					return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						select {
-						case <-time.After(requestDelay):
-							counts[r.URL.Path]++
-							w.WriteHeader(http.StatusInternalServerError)
-						case <-r.Context().Done():
-						}
-					}))
-				}
-				firstServer := makeServer(firstRequests)
+				firstServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
 				t.Cleanup(firstServer.Close)
-				secondServer := makeServer(secondRequests)
+
+				secondServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					<-r.Context().Done()
+				}))
 				t.Cleanup(secondServer.Close)
 
 				upgradeDetails, _, _, _ := mockUpgradeDetails(fx.target.Version)
 
+				start := time.Now()
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
 					[]string{firstServer.URL, secondServer.URL}, upgradeDetails, false, true, pgpSource)
-				require.Error(t, err)
-				require.Positive(t, firstRequests[remotePath])
-				require.Zero(t, secondRequests[remotePath])
+				require.Less(t, time.Since(start), fx.settings.Timeout)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				firstAttempts := logs.FilterMessageSnippet("could not fetch artifact from " + firstServer.URL).All()
+				require.Len(t, firstAttempts, 1)
+				require.Contains(t, firstAttempts[0].Message, "unsuccessful status code: 500")
+				secondAttempts := logs.FilterMessageSnippet("could not fetch artifact from " + secondServer.URL).All()
+				require.Len(t, secondAttempts, 1)
+				require.Contains(t, secondAttempts[0].Message, context.DeadlineExceeded.Error())
 				require.NoFileExists(t, artifactPath)
 			},
 		},
