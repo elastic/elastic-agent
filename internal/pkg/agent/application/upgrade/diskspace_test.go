@@ -287,6 +287,23 @@ func TestReserveDiskSpace(t *testing.T) {
 		require.EqualValues(t, payloadSize+ExtraInstallSize, installInfo.Size())
 	})
 
+	t.Run("cleans up reservations", func(t *testing.T) {
+		archive, payloadSize := makeGzipArtifact(t, "some artifact content")
+		archiveDir := t.TempDir()
+
+		hasSpace, err := ReserveDiskSpace(archiveDir, uint64(len(archive)), payloadSize)
+		require.NoError(t, err)
+		require.True(t, hasSpace)
+		require.FileExists(t, getArchiveReservation(archiveDir))
+		require.FileExists(t, getInstallReservation())
+
+		require.NoError(t, CleanupDiskSpaceReservations(archiveDir))
+		require.NoFileExists(t, getArchiveReservation(archiveDir))
+		require.NoFileExists(t, getInstallReservation())
+
+		require.NoError(t, CleanupDiskSpaceReservations(archiveDir))
+	})
+
 	t.Run("reports insufficient disk space", func(t *testing.T) {
 		// mock file has 4096 entries of ~4 GiB (~16 TiB of payload content)
 		archive := makeHugeZipArtifact(4096)

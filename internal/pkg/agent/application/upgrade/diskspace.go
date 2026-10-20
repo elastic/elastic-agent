@@ -205,6 +205,16 @@ func fillReservation(file *os.File, size int64) error {
 	return file.Sync()
 }
 
+func CleanupDiskSpaceReservations(archiveDir string) error {
+	var errs []error
+	for _, path := range []string{getInstallReservation(), getArchiveReservation(archiveDir)} {
+		if err := os.Remove(path); err != nil && !goerrors.Is(err, os.ErrNotExist) {
+			errs = append(errs, fmt.Errorf("could not remove upgrade reservation file %s: %w", path, err))
+		}
+	}
+	return goerrors.Join(errs...)
+}
+
 func shrinkDiskSpaceReservation(path string, delta int64) error {
 	info, err := os.Stat(path)
 	if goerrors.Is(err, os.ErrNotExist) {
