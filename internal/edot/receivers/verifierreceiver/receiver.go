@@ -320,7 +320,7 @@ func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 		}
 	}
 
-	// Send logs to the consumer
+	// Send logs to the consumer.
 	logCount := scopeLogs.LogRecords().Len()
 	if logCount > 0 {
 		if err := r.consumer.ConsumeLogs(ctx, logs); err != nil {
