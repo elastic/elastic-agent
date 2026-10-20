@@ -139,8 +139,8 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	}
 
 	a.log.Infow("Getting upgrade artifact", "filename", fileName, "version", target.Version, "drop_path", settings.DropPath, "target_path", targetPath, "install_path", settings.InstallPath)
-	if !settings.ReserveDiskSpace {
-		a.log.Warn("Upgrade disk space reservation is disabled by agent.download.reserve_diskspace")
+	if !settings.ReserveDiskSpace.Enabled {
+		a.log.Warn("Upgrade disk space reservation is disabled by agent.download.reserve_diskspace.enabled")
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, a.totalTimeout)
@@ -193,7 +193,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				continue
 			}
 
-			if settings.ReserveDiskSpace {
+			if settings.ReserveDiskSpace.Enabled {
 				archiveSize, decompressedSize, err := a.getUpgradeSize(ctx, &settings, sourceURI)
 				if err != nil {
 					if download.IsLocal(sourceURI) || downloaderrors.IsPermanentHTTPError(err) {

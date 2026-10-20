@@ -335,7 +335,8 @@ agent.download:
   install_path: "/sonic_screwdriver"
   drop_path: "/gallifrey"
   retry_sleep_init_duration: 10s
-  reserve_diskspace: true
+  reserve_diskspace:
+    enabled: true
   timeout: 30s
   proxy_url: "http://trenzalore:1234"
   proxy_headers:
@@ -433,7 +434,7 @@ agent.download:
 		InstallPath:            "/sonic_screwdriver",
 		DropPath:               "/gallifrey",
 		RetrySleepInitDuration: 10 * time.Second,
-		ReserveDiskSpace:       true,
+		ReserveDiskSpace:       artifact.ReserveDiskSpaceConfig{Enabled: true},
 
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			TLS: &tlscommon.Config{
