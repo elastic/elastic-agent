@@ -29,16 +29,8 @@ const (
 	ActionTypeDiagnostics          = string(api.REQUESTDIAGNOSTICS)
 	ActionTypeMigrate              = string(api.MIGRATE)
 	ActionTypePrivilegeLevelChange = string(api.PRIVILEGELEVELCHANGE)
-	// ActionTypeRestart is defined locally because the Fleet Server API spec
-	// does not yet expose a RESTART action type. Switch to string(api.RESTART)
-	// once it is added upstream.
-	// TODO: Replace with the real reference once Fleet supports the action.
-	ActionTypeRestart = "RESTART"
-	// ActionTypeUninstall is defined locally because the Fleet Server API spec
-	// does not yet expose an UNINSTALL action type. Switch to
-	// string(api.UNINSTALL) once it is added upstream.
-	// TODO: Replace with the real reference once Fleet supports the action.
-	ActionTypeUninstall = "UNINSTALL"
+	ActionTypeRestart              = string(api.RESTART)
+	ActionTypeUninstall            = string(api.UNINSTALL)
 )
 
 // Error values that the Action interface can return
