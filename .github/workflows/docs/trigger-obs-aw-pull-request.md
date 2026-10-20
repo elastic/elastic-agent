@@ -38,4 +38,3 @@ The reusable workflow is maintained outside this repository; its internal PR pro
 ## Sources
 
 - Workflow: [`trigger-obs-aw-pull-request.yml`](../trigger-obs-aw-pull-request.yml)
-- Reusable workflow: [`obs-aw-event-pull-request.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-pull-request.yml)

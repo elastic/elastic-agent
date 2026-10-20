@@ -38,4 +38,3 @@ The reusable workflow implementation is in `elastic/docs-actions` and is not che
 ## Sources
 
 - Workflow: [`docs-build.yml`](../docs-build.yml)
-- Reusable workflow: [`elastic/docs-actions/.github/workflows/docs-build.yml`](https://github.com/elastic/docs-actions/blob/v1/.github/workflows/docs-build.yml)

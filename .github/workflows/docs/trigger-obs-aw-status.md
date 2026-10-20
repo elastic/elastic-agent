@@ -38,4 +38,3 @@ The `elastic/oblt-aw` status-handler implementation is external and not checked 
 ## Sources
 
 - Workflow: [`trigger-obs-aw-status.yml`](../trigger-obs-aw-status.yml)
-- Reusable workflow: [`obs-aw-event-status.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-status.yml)

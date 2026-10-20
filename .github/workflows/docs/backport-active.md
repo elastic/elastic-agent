@@ -22,7 +22,7 @@ It listens to `pull_request_target` events `closed` and `labeled` on the `main` 
 
 | Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `backport` | The merged-PR and label condition is true | None | Runs `elastic/oblt-actions/github/backport-active@v1`. |
+| `backport` | The merged-PR and label condition is true | None | Runs the configured backport action. |
 
 ## Inputs, outputs, and access
 

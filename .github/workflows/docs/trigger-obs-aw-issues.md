@@ -38,4 +38,3 @@ The external reusable workflow implementation is not part of this repository; it
 ## Sources
 
 - Workflow: [`trigger-obs-aw-issues.yml`](../trigger-obs-aw-issues.yml)
-- Reusable workflow: [`obs-aw-event-issues.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-issues.yml)

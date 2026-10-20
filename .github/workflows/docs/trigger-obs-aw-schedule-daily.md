@@ -38,4 +38,3 @@ The shared `obs-aw-event-schedule.yml` implementation is not in this repository.
 ## Sources
 
 - Workflow: [`trigger-obs-aw-schedule-daily.yml`](../trigger-obs-aw-schedule-daily.yml)
-- Reusable workflow: [`obs-aw-event-schedule.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-schedule.yml)

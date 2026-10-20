@@ -12,7 +12,7 @@ Runs the external catalog validator for pull requests that change `catalog-info.
 
 ## Purpose
 
-The workflow delegates validation of the catalog file—which declares the Elastic Agent component and Buildkite resources—to `elastic/oblt-actions/elastic/validate-catalog@v1`.
+The workflow delegates validation of the catalog file—which declares the Elastic Agent component and Buildkite resources—to a shared catalog-validation action.
 
 ## When it runs
 

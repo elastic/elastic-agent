@@ -38,4 +38,3 @@ The external implementation is not checked in here. The caller enables Vale for 
 ## Sources
 
 - Workflow: [`docs-deploy.yml`](../docs-deploy.yml)
-- Reusable workflow: [`elastic/docs-actions/.github/workflows/docs-deploy.yml`](https://github.com/elastic/docs-actions/blob/v1/.github/workflows/docs-deploy.yml)

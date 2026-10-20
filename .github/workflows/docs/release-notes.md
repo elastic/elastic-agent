@@ -34,9 +34,8 @@ It runs only through `workflow_dispatch`. Both `bc_commit_sha` and `version` are
 
 ## Operational notes
 
-The reusable workflow is referenced at `@main`; its implementation is not checked into this repository and may change independently of this caller.
+The reusable workflow implementation is not checked into this repository and may change independently of this caller.
 
 ## Sources
 
 - Workflow: [`release-notes.yml`](../release-notes.yml)
-- Reusable workflow: [`generate-release-notes.yml`](https://github.com/elastic/elastic-agent-changelog-tool/blob/main/.github/workflows/generate-release-notes.yml)

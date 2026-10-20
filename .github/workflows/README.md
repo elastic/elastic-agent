@@ -71,4 +71,4 @@ This index covers all 49 checked-in `.github/workflows/*.yml` definitions. Each 
 
 ## Source access gaps
 
-Several callers use reusable workflows or actions maintained outside this repository, including `elastic/ai-github-actions`, `elastic/oblt-aw`, `elastic/oblt-actions`, `elastic/docs-actions`, and `elastic/elastic-agent-changelog-tool`. Their implementations are not checked in here; the per-workflow pages document only the local trigger, permissions, inputs, and configuration available in this checkout. No repository-local composite actions were found under `.github/actions/`, and none of the 49 checked-in workflow files defines a `workflow_call` reusable workflow.
+Some callers use reusable workflows or actions maintained outside this repository. Their implementations are not checked in here; the per-workflow pages document only the local trigger, permissions, inputs, and configuration available in this checkout. No repository-local composite actions were found under `.github/actions/`, and none of the 49 checked-in workflow files defines a `workflow_call` reusable workflow.

@@ -12,7 +12,7 @@ Delegates pre-commit checks to the shared Elastic pre-commit action on pull requ
 
 ## Purpose
 
-The workflow calls `elastic/oblt-actions/pre-commit@v1`; its detailed check set is maintained by that external action.
+The workflow calls a shared Elastic pre-commit action; its detailed check set is maintained outside this repository.
 
 ## When it runs
 

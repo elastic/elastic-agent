@@ -34,7 +34,7 @@ The job skips PRs labeled `skip-changelog` or `backport`, and heads under `mergi
 
 ## Operational notes
 
-The changelog tool is installed from `github.com/elastic/elastic-agent-changelog-tool@latest`; its implementation is external to this repository.
+The changelog tool is installed by the workflow; its implementation is external to this repository.
 
 ## Sources
 

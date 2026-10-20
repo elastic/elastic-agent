@@ -38,4 +38,3 @@ The job comments that its permissions are the union of all jobs in the shared sc
 ## Sources
 
 - Workflow: [`trigger-obs-aw-schedule-frequent.yml`](../trigger-obs-aw-schedule-frequent.yml)
-- Reusable workflow: [`obs-aw-event-schedule.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-schedule.yml)

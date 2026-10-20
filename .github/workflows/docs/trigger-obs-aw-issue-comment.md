@@ -38,4 +38,3 @@ The `elastic/oblt-aw` implementation is outside this checkout; no further event 
 ## Sources
 
 - Workflow: [`trigger-obs-aw-issue-comment.yml`](../trigger-obs-aw-issue-comment.yml)
-- Reusable workflow: [`obs-aw-event-issue-comment.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-issue-comment.yml)

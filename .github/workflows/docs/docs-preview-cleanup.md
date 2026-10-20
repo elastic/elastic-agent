@@ -38,4 +38,3 @@ The shared workflow implementation is not present in this repository, so the pre
 ## Sources
 
 - Workflow: [`docs-preview-cleanup.yml`](../docs-preview-cleanup.yml)
-- Reusable workflow: [`elastic/docs-actions/.github/workflows/docs-preview-cleanup.yml`](https://github.com/elastic/docs-actions/blob/v1/.github/workflows/docs-preview-cleanup.yml)
