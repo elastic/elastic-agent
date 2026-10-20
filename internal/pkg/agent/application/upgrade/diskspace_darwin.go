@@ -12,11 +12,6 @@ import (
 	"syscall"
 )
 
-const (
-	FallbackArchiveSize = uint64(400 * 1024 * 1024)
-	FallbackPayloadSize = uint64(1280 * 1024 * 1024)
-)
-
 func disableCompression(*os.File) {}
 
 func getVolumeNameAt(dir string) (string, error) {

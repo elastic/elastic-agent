@@ -239,8 +239,7 @@ func getUpgradeSize(ctx context.Context, config *artifact.Config, uri string) (u
 }
 
 func GetLocalUpgradeSize(uri string) (uint64, uint64, error) {
-	decompressedSize := FallbackPayloadSize
-	archiveSize := FallbackArchiveSize
+	var archiveSize, decompressedSize uint64
 
 	path := strings.TrimPrefix(uri, "file://")
 	if info, err := os.Stat(path); err == nil {
@@ -284,8 +283,7 @@ func GetLocalUpgradeSize(uri string) (uint64, uint64, error) {
 }
 
 func GetRemoteUpgradeSize(ctx context.Context, config *artifact.Config, uri string) (uint64, uint64, error) {
-	decompressedSize := FallbackPayloadSize
-	archiveSize := FallbackArchiveSize
+	var archiveSize, decompressedSize uint64
 
 	var getPayloadSize func(uri string, archiveSize uint64, readRange readRangeFunc) (uint64, error)
 	if strings.HasSuffix(uri, ".tar.gz") {

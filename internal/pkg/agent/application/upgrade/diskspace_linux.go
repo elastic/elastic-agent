@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	FallbackArchiveSize = uint64(600 * 1024 * 1024)
-	FallbackPayloadSize = uint64(2 * 1024 * 1024 * 1024)
-
 	fsNoCompFl = 0x00000400
 	fsNoCowFl  = 0x00800000
 )

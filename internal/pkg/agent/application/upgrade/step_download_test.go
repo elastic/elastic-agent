@@ -402,11 +402,48 @@ func TestDownloadArtifact(t *testing.T) {
 			},
 		},
 		{
-			name: "remote sourceURI proceeds when disk space reservation uses a fallback estimate",
+			name: "remote sourceURI retries when fetching upgrade size fails",
+			run: func(t *testing.T, fx *fixture) {
+				getUpgradeSizeCount := 0
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+					getUpgradeSizeCount++
+					if getUpgradeSizeCount == 1 {
+						return 0, 0, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, goerrors.New("transient failure"))
+					}
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+				}
+				var reservedArchiveSize uint64
+				fx.downloader.reserveDiskSpace = func(_ string, archiveSize, _ uint64) (bool, error) {
+					reservedArchiveSize = archiveSize
+					return true, nil
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 2, getUpgradeSizeCount)
+				require.Equal(t, uint64(len(archiveContent)), reservedArchiveSize)
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI is tried when fetching drop path upgrade size fails",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
-				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
-					return FallbackArchiveSize, FallbackPayloadSize, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
+				localURI := "file://" + filepath.ToSlash(filepath.Join(fx.settings.DropPath, fx.target.FileName()))
+				getUpgradeSizeCounts := make(map[string]int)
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, uri string) (uint64, uint64, error) {
+					getUpgradeSizeCounts[uri]++
+					if uri == localURI {
+						return 0, 0, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
+					}
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
 				}
 				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
 					return true, nil
@@ -420,42 +457,8 @@ func TestDownloadArtifact(t *testing.T) {
 				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, true, true, pgpSource)
 				require.NoError(t, err)
-				require.Equal(t, 1, requestCounts[remotePath])
-				require.FileExists(t, artifactPath)
-			},
-		},
-		{
-			name: "remote sourceURI is tried when drop path reservation uses an insufficient fallback estimate",
-			run: func(t *testing.T, fx *fixture) {
-				fx.settings.DropPath = t.TempDir()
-				localURI := "file://" + filepath.ToSlash(filepath.Join(fx.settings.DropPath, fx.target.FileName()))
-				diskSpaceReserveCounts := make(map[string]int)
-				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, uri string) (uint64, uint64, error) {
-					diskSpaceReserveCounts[uri]++
-					if uri == localURI {
-						return FallbackArchiveSize, FallbackPayloadSize, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
-					}
-					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
-				}
-				fx.downloader.reserveDiskSpace = func(archiveDir string, archiveSize, _ uint64) (bool, error) {
-					if archiveSize == FallbackArchiveSize {
-						return false, downloaderrors.DiskSpaceLowError{
-							fmt.Sprintf("need 700.0 MB at %s", archiveDir),
-						}
-					}
-					return true, nil
-				}
-
-				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
-				serverURL, requestCounts := newFileServer(t, map[string][]byte{
-					remotePath: archiveContent,
-				})
-
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
-					fx.upgradeDetails, true, true, pgpSource)
-				require.NoError(t, err)
-				require.Equal(t, 1, diskSpaceReserveCounts[localURI])
-				require.Equal(t, 1, diskSpaceReserveCounts[serverURL+remotePath])
+				require.Equal(t, 1, getUpgradeSizeCounts[localURI])
+				require.Equal(t, 1, getUpgradeSizeCounts[serverURL+remotePath])
 				require.Equal(t, 1, requestCounts[remotePath])
 				require.FileExists(t, artifactPath)
 			},
@@ -896,6 +899,9 @@ func TestDownloadArtifact(t *testing.T) {
 			}
 			testLogger, _ := loggertest.New(t.Name())
 			downloader := newArtifactDownloader(settings, testLogger)
+			downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+				return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+			}
 			downloader.getPGPSources = func(_ *logger.Logger, _ string, _ *agtversion.ParsedSemVer, pgpSources []string) []string {
 				return pgpSources
 			}
