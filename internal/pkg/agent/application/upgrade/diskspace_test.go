@@ -53,7 +53,7 @@ func makeZipArtifact(t *testing.T, files map[string]string) ([]byte, uint64) {
 	return buf.Bytes(), payload
 }
 
-func makeHugeZipArtifact(entries int) []byte {
+func makeHugeZipArtifact(entries uint16) []byte {
 	// mock zip central directory plus EOCD with fake entries
 	entry := make([]byte, 46)
 	entry[0], entry[1], entry[2], entry[3] = 'P', 'K', 0x01, 0x02
@@ -70,8 +70,10 @@ func makeHugeZipArtifact(entries int) []byte {
 	for range entries {
 		cdSize += 46
 	}
-	binary.LittleEndian.PutUint32(eocd[12:16], cdSize) // central directory size
-	binary.LittleEndian.PutUint32(eocd[16:20], 0)      // central directory offset
+	binary.LittleEndian.PutUint16(eocd[8:10], entries)  // entries on this disk
+	binary.LittleEndian.PutUint16(eocd[10:12], entries) // total entries
+	binary.LittleEndian.PutUint32(eocd[12:16], cdSize)  // central directory size
+	binary.LittleEndian.PutUint32(eocd[16:20], 0)       // central directory offset
 	buf.Write(eocd)
 
 	return buf.Bytes()
@@ -305,8 +307,8 @@ func TestReserveDiskSpace(t *testing.T) {
 	})
 
 	t.Run("reports insufficient disk space", func(t *testing.T) {
-		// mock file has 4096 entries of ~4 GiB (~16 TiB of payload content)
-		archive := makeHugeZipArtifact(4096)
+		// mock file has 2048 entries of ~4 GiB (~8 TiB of payload content)
+		archive := makeHugeZipArtifact(2048)
 		target := filepath.Join(t.TempDir(), "elastic-agent.zip")
 		require.NoError(t, os.WriteFile(target, archive, 0o644))
 		archiveDir := t.TempDir()

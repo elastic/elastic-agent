@@ -5,6 +5,8 @@
 package upgrade
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/binary"
 	goerrors "errors"
@@ -32,6 +34,11 @@ const (
 
 	reservationFillByte  = 0xFF
 	reservationFillChunk = 1024 * 1024
+
+	// Number of bytes read from end of zip for the central directory.
+	// Larger central directories will fail to parse. Agent archives are
+	// currently ~30KiB at this time.
+	zipTailSize = int64(128 * 1024)
 )
 
 func getArchiveReservation(archiveDir string) string {
@@ -393,40 +400,25 @@ func getGzipPayloadSize(uri string, archiveSize uint64, readRange readRangeFunc)
 }
 
 func getZipPayloadSize(uri string, archiveSize uint64, readRange readRangeFunc) (uint64, error) {
-	// zip EOCD is in the last 22 bytes. Elastic artifacts have no archive
-	// comments, so read zip EOCD from the last 22 bytes.
 	if archiveSize < 22 {
-		return 0, fmt.Errorf("could not fetch zip EOCD: resource is only %d bytes", archiveSize)
+		return 0, fmt.Errorf("could not read zip central directory: resource is only %d bytes", archiveSize)
 	}
-	if archiveSize-22 > uint64(math.MaxInt64) {
-		return 0, fmt.Errorf("could not fetch zip EOCD: archive size %d overflows int64 offset", archiveSize)
+	if archiveSize > uint64(math.MaxInt64) {
+		return 0, fmt.Errorf("could not read zip central directory: archive size %d overflows int64 offset", archiveSize)
 	}
-	eocd, err := readRange(uri, int64(archiveSize-22), 22)
+	tailSize := min(int64(archiveSize), zipTailSize)
+	tail, err := readRange(uri, int64(archiveSize)-tailSize, tailSize)
 	if err != nil {
-		return 0, fmt.Errorf("could not fetch zip EOCD: %w", err)
+		return 0, fmt.Errorf("could not read zip central directory: %w", err)
 	}
-	if eocd[0] != 'P' || eocd[1] != 'K' || eocd[2] != 0x05 || eocd[3] != 0x06 {
-		return 0, fmt.Errorf("could not fetch zip EOCD: missing or invalid")
-	}
-
-	cdSize := binary.LittleEndian.Uint32(eocd[12:16])
-	cdOffset := binary.LittleEndian.Uint32(eocd[16:20])
-
-	cdData, err := readRange(uri, int64(cdOffset), int64(cdSize))
+	zr, err := zip.NewReader(bytes.NewReader(tail), tailSize)
 	if err != nil {
-		return 0, fmt.Errorf("could not fetch zip central directory: %w", err)
+		return 0, fmt.Errorf("could not read zip central directory from the last %d bytes: %w", tailSize, err)
 	}
 
 	var total uint64
-	for pos := 0; pos+46 <= len(cdData); {
-		if cdData[pos] != 'P' || cdData[pos+1] != 'K' || cdData[pos+2] != 0x01 || cdData[pos+3] != 0x02 {
-			break
-		}
-		total += uint64(binary.LittleEndian.Uint32(cdData[pos+24 : pos+28]))
-		pos += 46 +
-			int(binary.LittleEndian.Uint16(cdData[pos+28:pos+30])) + // file name length
-			int(binary.LittleEndian.Uint16(cdData[pos+30:pos+32])) + // extra field length
-			int(binary.LittleEndian.Uint16(cdData[pos+32:pos+34])) // comment length
+	for _, f := range zr.File {
+		total += f.UncompressedSize64
 	}
 	return total, nil
 }
