@@ -44,19 +44,24 @@ func TestFleetUninstallAction(t *testing.T) {
 
 	fixture, checkinWithAcker, policy := setupUninstallFleetServer(t, ctx)
 
-	// Deliver an UNINSTALL action on the next checkin. Stamp a short start_time so
-	// the test exercises the scheduling path without a long wait: the agent holds
-	// the action in its queue until the start_time, then uninstalls. The agent
-	// enforces a grace-period window of [created_at+1h, created_at+24h], so
-	// created_at is backdated 1h to keep the short start_time inside the window.
+	// Deliver an UNINSTALL action on the next checkin. The agent enforces a
+	// grace-period window of [created_at+1h, created_at+24h] on the start_time.
+	// The fleet gateway only triggers a dispatch when a checkin returns at least
+	// one action; a scheduled action with a *future* start_time would otherwise
+	// sit in the queue until the periodic (multi-minute) flush, racing this
+	// test's timeout. So we stamp a start_time that is already in the past while
+	// still inside the valid window (created_at backdated 2h, start_time 30m
+	// ago): the action is due the moment it is received and is dequeued and
+	// dispatched in the same cycle, exercising the full queue -> dispatch ->
+	// detached uninstaller -> point-of-no-return ack flow without a long wait.
 	base := time.Now()
 	uninstallActionID := "uninstall-action-id"
 	uninstallAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
 		AgentID:   policy.AgentID,
 		ActionID:  uninstallActionID,
 		Type:      fleetapi.ActionTypeUninstall,
-		CreatedAt: base.Add(-1 * time.Hour).UTC().Format(time.RFC3339),
-		StartTime: base.Add(5 * time.Second).UTC().Format(time.RFC3339),
+		CreatedAt: base.Add(-2 * time.Hour).UTC().Format(time.RFC3339),
+		StartTime: base.Add(-30 * time.Minute).UTC().Format(time.RFC3339),
 		Data:      `{}`,
 	})
 	require.NoError(t, err, "failed to create uninstall action")
@@ -98,10 +103,18 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 
 	fixture, checkinWithAcker, policy := setupUninstallFleetServer(t, ctx)
 
-	// Deliver an UNINSTALL action with a start_time far enough out that, without a
-	// cancel, the agent would uninstall within this test's window. created_at is
-	// backdated 1h so the short start_time stays inside the agent's
-	// [created_at+1h, created_at+24h] grace-period window.
+	// Deliver an UNINSTALL action with a *future* start_time so it is held in the
+	// scheduled-action queue, giving the cancel below a window to remove it before
+	// it executes. created_at is backdated 1h so the start_time stays inside the
+	// agent's [created_at+1h, created_at+24h] grace-period window.
+	//
+	// Unlike TestFleetUninstallAction (which needs an already-due start_time so the
+	// action is dispatched on the delivering checkin), a future start_time is
+	// correct here: the fleet gateway only triggers a dispatch when a checkin
+	// returns at least one action, and the CANCEL action delivered below is
+	// exactly such a trigger — its arrival re-runs the dispatcher, which removes
+	// the still-queued uninstall from the queue. So the cancel never depends on
+	// the periodic queue flush.
 	base := time.Now()
 	uninstallActionID := "uninstall-action-id"
 	uninstallAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
