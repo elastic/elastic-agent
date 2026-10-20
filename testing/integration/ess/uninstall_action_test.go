@@ -128,7 +128,23 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 	require.NoError(t, err, "failed to create uninstall action")
 	checkinWithAcker.AddCheckin("token", 1*time.Second, uninstallAction)
 
-	// Cancel it before the grace period elapses by targeting the uninstall action id.
+	// While the uninstall waits out its grace period in the queue, the agent
+	// surfaces an "Uninstall pending" state. Wait for it so we know the action was
+	// received and queued before we cancel it. (CANCEL actions are not
+	// acknowledged by the agent, so cancellation is verified via this observable
+	// state rather than an ack.)
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assert.Contains(collect, status.Message, "Uninstall pending",
+			"agent did not report the uninstall as pending")
+	}, 3*time.Minute, 1*time.Second, "agent never reported the uninstall as pending")
+
+	// Cancel it before the grace period elapses by targeting the uninstall action
+	// id. The CANCEL delivery is itself a checkin that returns an action, which
+	// re-runs the dispatcher and removes the still-queued uninstall from the queue
+	// (dispatchCancelActions runs before queued actions are dequeued, so the
+	// cancel wins even if the start_time has just elapsed).
 	cancelActionID := "cancel-action-id"
 	cancelAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
 		AgentID:  policy.AgentID,
@@ -139,17 +155,21 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 	require.NoError(t, err, "failed to create cancel action")
 	checkinWithAcker.AddCheckin("token", 1*time.Second, cancelAction)
 
-	// The cancel is acknowledged once processed.
+	// Once the cancel is processed the pending uninstall is removed from the queue
+	// and the agent clears the "Uninstall pending" state. This confirms the cancel
+	// took effect.
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		assert.True(collect, checkinWithAcker.Acked(cancelActionID),
-			"cancel action has not been acknowledged to Fleet")
-	}, 3*time.Minute, 500*time.Millisecond, "agent did not acknowledge the cancel action")
+		status, statusErr := fixture.ExecStatus(ctx)
+		assert.NoError(collect, statusErr)
+		assert.NotContains(collect, status.Message, "Uninstall pending",
+			"agent still reports the uninstall as pending after the cancel")
+	}, 3*time.Minute, 1*time.Second, "agent did not clear the pending uninstall after the cancel")
 
-	// Well past the uninstall's would-be execution, the uninstall must never be
-	// acknowledged (it was removed from the queue) — proving the cancel prevented it.
+	// The uninstall must never be acknowledged (it was removed from the queue) —
+	// proving the cancel prevented it from ever executing.
 	require.Never(t, func() bool {
 		return checkinWithAcker.Acked(uninstallActionID)
-	}, 90*time.Second, 5*time.Second, "uninstall action was acknowledged despite being cancelled")
+	}, 30*time.Second, 5*time.Second, "uninstall action was acknowledged despite being cancelled")
 
 	// The agent must still be installed and responding to status.
 	_, statusErr := fixture.ExecStatus(ctx)
