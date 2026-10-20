@@ -320,13 +320,14 @@ func (r *verifierReceiver) verifyPermissions(ctx context.Context) error {
 		}
 	}
 
-	// Send logs to the consumer
-	if scopeLogs.LogRecords().Len() > 0 {
+	// Send logs to the consumer.
+	logCount := scopeLogs.LogRecords().Len()
+	if logCount > 0 {
 		if err := r.consumer.ConsumeLogs(ctx, logs); err != nil {
 			return fmt.Errorf("failed to consume logs: %w", err)
 		}
 		r.logger.Info("Permission verification logs emitted",
-			zap.Int("log_count", scopeLogs.LogRecords().Len()),
+			zap.Int("log_count", logCount),
 		)
 	}
 
