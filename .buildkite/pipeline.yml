@@ -691,7 +691,9 @@ steps:
   # NOTE: Tests the unified-release staging packaging workflow against the latest
   # staging manifest, to catch regressions before they reach the release pipeline.
   # See https://buildkite.com/elastic/unified-release-staging
+  # Temporarily skipping until new artifacts available in staging. See https://github.com/elastic/elastic-agent/pull/17099#issuecomment-6213275037
   - label: "Trigger Elastic Agent Package (unified-release staging)"
+    skip: true
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh
