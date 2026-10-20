@@ -27,7 +27,7 @@ outputs:
     # @default -- `""`
     # @key -- outputs.{name}.password
     password: "changeme"
-    # -- the API key use to authenticate with the output [required for type `ESPlainAuthAPI`]
+    # -- the API key used to authenticate with the output [required for type `ESPlainAuthAPI`]
     # @section -- 1.1 - Output Object
     # @key -- outputs.{name}.api_key
     api_key: ""
@@ -125,7 +125,7 @@ kubernetes:
         requests:
           cpu: 100m
           memory: 400Mi
-    # -- host of the kube-state-metrics service. This used only when `kube-state-metrics.enabled` is set to `false`.
+    # -- host of the kube-state-metrics service. This is used only when `kube-state-metrics.enabled` is set to `false`.
     # @section -- 2 - Kubernetes integration
     host: "kube-state-metrics:8080"
     # -- state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note
