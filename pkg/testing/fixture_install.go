@@ -364,6 +364,11 @@ func (f *Fixture) installNoPkgManager(ctx context.Context, installOpts *InstallO
 		f.setClient(nil)
 		if err != nil &&
 			(errors.Is(err, ErrNotInstalled) ||
+				// The uninstall binary is gone (e.g. the agent already uninstalled
+				// itself via a Fleet UNINSTALL action). fs.ErrNotExist covers both
+				// Linux (ENOENT, "no such file or directory") and Windows
+				// (ERROR_PATH_NOT_FOUND, "The system cannot find the path specified").
+				errors.Is(err, fs.ErrNotExist) ||
 				strings.Contains(
 					err.Error(),
 					"elastic-agent: no such file or directory")) {
