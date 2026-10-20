@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var ErrFetchUpgradeSize = errors.New("failed to fetch exact upgrade size")
+var ErrFetchUpgradeSize = errors.New("failed to fetch upgrade size")
 
 type DiskSpaceLowError []string
 

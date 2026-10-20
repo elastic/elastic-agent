@@ -159,7 +159,6 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	attempt := 0
 	skip := make([]bool, len(sources))
 	errs := make([]error, len(sources))
-	var lastArchiveSize, lastDecompressedSize uint64
 
 	fetchSources := func() error {
 		for i, src := range sources {
@@ -195,30 +194,24 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 			}
 
 			if settings.ReserveDiskSpace {
-				archiveSize, decompressedSize, sizeErr := a.getUpgradeSize(ctx, &settings, sourceURI)
-				if sizeErr == nil {
-					lastArchiveSize, lastDecompressedSize = archiveSize, decompressedSize
-				} else if lastArchiveSize != 0 {
-					archiveSize, decompressedSize = lastArchiveSize, lastDecompressedSize
-					sizeErr = fmt.Errorf("using previous size: %w", sizeErr)
+				archiveSize, decompressedSize, err := a.getUpgradeSize(ctx, &settings, sourceURI)
+				if err != nil {
+					if download.IsLocal(sourceURI) || downloaderrors.IsPermanentHTTPError(err) {
+						skip[i] = true
+					}
+					e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
+					a.log.Debugf("%v", e)
+					errs[i] = e
+					continue
 				}
 
 				hasDiskSpace, err := a.reserveDiskSpace(settings.TargetDirectory, archiveSize, decompressedSize)
-				err = goerrors.Join(err, sizeErr)
 				if err != nil {
-					// failed size can still succeed with estimate or previous size so don't fail immediately
 					e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
 					a.log.Debugf("%v", e)
 					errs[i] = e
 				}
 				if !hasDiskSpace {
-					if goerrors.Is(err, downloaderrors.ErrFetchUpgradeSize) {
-						// Checking exact required upgrade size failed and an estimated
-						// required size was used. We might have enough diskspace for
-						// the actual upgrade artifact, so check other sources.
-						skip[i] = true
-						continue
-					}
 					return backoff.Permanent(err)
 				}
 			}

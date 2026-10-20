@@ -177,8 +177,8 @@ func TestGetUpgradeSize(t *testing.T) {
 
 		archiveSize, payloadSize, err := GetLocalUpgradeSize(uri)
 		require.Error(t, err)
-		require.Equal(t, FallbackArchiveSize, archiveSize)
-		require.Equal(t, FallbackPayloadSize, payloadSize)
+		require.Zero(t, archiveSize)
+		require.Zero(t, payloadSize)
 	})
 
 	t.Run("http tar.gz", func(t *testing.T) {
