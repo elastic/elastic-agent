@@ -437,6 +437,13 @@ func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string
 		if err != nil {
 			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
 		}
+		hostURL, err := url.Parse(esURL)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse generated Elasticsearch URL: %w", err)
+		}
+		if hostURL.User != nil {
+			return nil, errors.New("credentials in Elasticsearch host URLs are unsupported; configure username and password separately")
+		}
 		if !slices.Contains(hosts, esURL) {
 			hosts = append(hosts, esURL)
 		}

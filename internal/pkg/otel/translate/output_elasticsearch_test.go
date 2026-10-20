@@ -819,6 +819,21 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 	}
 }
 
+func TestESToOTelConfigRejectsHostURLCredentials(t *testing.T) {
+	cfg := config.MustNewConfigFrom(map[string]any{
+		"hosts": []any{"https://user:secret@es.example:9200"},
+	})
+
+	_, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+	require.ErrorContains(
+		t,
+		err,
+		"credentials in Elasticsearch host URLs are unsupported; configure username and password separately",
+		"URL-embedded credentials must be rejected during translation",
+	)
+	assert.NotContains(t, err.Error(), "secret", "translation error must not expose the URL password")
+}
+
 func TestCalcNamedPresetSizing(t *testing.T) {
 	cases := []struct {
 		name          string
