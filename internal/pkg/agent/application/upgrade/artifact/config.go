@@ -98,7 +98,7 @@ func DefaultConfig() *Config {
 		TargetDirectory:        paths.Downloads(),
 		InstallPath:            paths.Install(),
 		RetrySleepInitDuration: 30 * time.Second,
-		ReserveDiskSpace:       ReserveDiskSpaceConfig{Enabled: false},
+		ReserveDiskSpace:       ReserveDiskSpaceConfig{Enabled: true},
 		HTTPTransportSettings:  transport,
 	}
 }
