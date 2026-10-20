@@ -183,35 +183,8 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - fips140=only Windows 2022"
-        key: "unit-tests-win2022-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
   # Skipping due to Orka provider slowness
   # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
->>>>>>> 8b1ea4c (skipping MacOS 13 unit test step due to Orka slowness (#17316))
   - group: "macOS tests"
     skip: true
     key: "macos-unit-tests"
