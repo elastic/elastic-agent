@@ -979,25 +979,59 @@ func TestGetBeatsAuthExtensionConfigIncludesEndpointsAndAuthentication(t *testin
 	)
 }
 
-func TestGetBeatsAuthExtensionConfigCloudID(t *testing.T) {
+func TestESToOTelConfigCloudID(t *testing.T) {
+	// Decoded Base64: example.test$elasticsearch$kibana
 	const encodedCloudID = "cloudidtest:ZXhhbXBsZS50ZXN0JGVsYXN0aWNzZWFyY2gka2liYW5h"
 	t.Setenv("ELASTICSEARCH_AUTH_CLOUD_ID", encodedCloudID)
 
-	cfg := config.MustNewConfigFrom(map[string]any{
-		"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
-		"cloud_auth": "cloud-user:cloud-password",
-	})
-	got, err := getBeatsAuthExtensionConfig(cfg)
-	require.NoError(t, err, "Cloud ID output config must translate")
+	tests := []struct {
+		name   string
+		output map[string]any
+	}{
+		{
+			name: "Cloud ID only",
+			output: map[string]any{
+				"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
+				"cloud_auth": "cloud-user:cloud-password",
+			},
+		},
+		{
+			name: "Cloud ID overrides hosts and credentials",
+			output: map[string]any{
+				"hosts":      []any{"https://other.example:9200"},
+				"username":   "other-user",
+				"password":   "other-password",
+				"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
+				"cloud_auth": "cloud-user:cloud-password",
+			},
+		},
+	}
 
-	assert.Equal(
-		t,
-		[]string{"https://elasticsearch.example.test:443"},
-		got["endpoints"],
-		"Cloud ID must expand to the Elasticsearch endpoint",
-	)
-	assert.Equal(t, "cloud-user", got["auth"].(map[string]any)["username"], "Cloud auth username must be translated")
-	assert.Equal(t, "cloud-password", got["auth"].(map[string]any)["password"], "Cloud auth password must be translated")
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			exporter, _, extensions, err := ESToOTelConfig(
+				config.MustNewConfigFrom(test.output),
+				"default",
+				logp.NewNopLogger(),
+			)
+			require.NoError(t, err, "Cloud ID output config must translate")
+
+			expectedEndpoints := []string{"https://elasticsearch.example.test:443"}
+			assert.Equal(t, expectedEndpoints, exporter["endpoints"], "exporter must use the Cloud ID endpoint")
+			assert.Equal(t, "cloud-user", exporter["user"], "exporter must use the Cloud auth username")
+			assert.Equal(t, "cloud-password", exporter["password"], "exporter must use the Cloud auth password")
+
+			beatsAuthID := getBeatsAuthExtensionID("default").String()
+			beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
+			require.True(t, ok, "translation must generate the output-scoped beatsauth extension")
+			assert.Equal(t, expectedEndpoints, beatsAuth["endpoints"], "beatsauth must use the same Cloud ID endpoint as the exporter")
+
+			auth, ok := beatsAuth["auth"].(map[string]any)
+			require.True(t, ok, "beatsauth authentication config must be a map")
+			assert.Equal(t, "cloud-user", auth["username"], "beatsauth must use the Cloud auth username")
+			assert.Equal(t, "cloud-password", auth["password"], "beatsauth must use the Cloud auth password")
+		})
+	}
 }
 
 func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {

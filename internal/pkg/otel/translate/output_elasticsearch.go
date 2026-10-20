@@ -139,6 +139,14 @@ var defaultOptions = esToOTelOptions{
 func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
 	escfg := defaultOptions
 
+	// Cloud resolution returns a copy, but effective queue settings must be
+	// written back for unitToExporterConfig.
+	originalOutput := output
+	output, err = resolveElasticsearchOutputCloudConfig(output)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// check for unsupported config
 	err = checkUnsupportedConfig(output)
 	if err != nil {
@@ -212,6 +220,19 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		queueSize = getQueueSize(logger, output)
 		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
 			logger.Infof("queue.mem.events (%d) is below the suggested minimum for %d connection(s); consider setting queue.mem.events: %d", queueSize, maxConns, suggested)
+		}
+	}
+
+	// unitToExporterConfig promotes the effective output queue into the receiver
+	// configuration after translation. Preserve that write-back while keeping
+	// Cloud ID resolution isolated from the policy-derived output config.
+	if output.HasField("queue") {
+		queueConfig, err := output.Child("queue", -1)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed reading effective output queue config: %w", err)
+		}
+		if err := originalOutput.SetChild("queue", -1, queueConfig); err != nil {
+			return nil, nil, nil, fmt.Errorf("failed updating effective output queue config: %w", err)
 		}
 	}
 
@@ -549,13 +570,8 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	// required to make the extension not cause the collector to fail and exit on startup
 	newMap["continue_on_error"] = true
 
-	resolvedOutput, err := resolveElasticsearchOutputCloudConfig(outputCfg)
-	if err != nil {
-		return nil, err
-	}
-
 	esConfig := elasticsearch.DefaultConfig()
-	if err := resolvedOutput.Unpack(&esConfig); err != nil {
+	if err := outputCfg.Unpack(&esConfig); err != nil {
 		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
 	}
 	if err := esConfig.Validate(); err != nil {
@@ -563,7 +579,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	}
 
 	if outputCfg.HasField("hosts") || outputCfg.HasField("cloud_id") || outputCfg.HasField("cloud.id") {
-		endpoints, err := getURL(esConfig, resolvedOutput)
+		endpoints, err := getURL(esConfig, outputCfg)
 		if err != nil {
 			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)
 		}
