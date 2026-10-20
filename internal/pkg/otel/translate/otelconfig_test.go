@@ -597,7 +597,9 @@ func TestGetOtelConfig(t *testing.T) {
 	// expects component id
 	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
-		cfg["elasticsearch_auth"] = "beatsauth/_agent-component/default"
+		cfg["monitor_state"] = map[string]any{
+			"elasticsearch": "beatsauth/_agent-component/default",
+		}
 		cfg["heartbeat"] = map[string]any{
 			"monitors": []map[string]any{
 				{
@@ -3718,10 +3720,12 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 				receiverConfig, ok := rawConfig.(map[string]any)
 				require.True(t, ok, "receiver %q config must be a map", receiverID)
 				if tt.expectedAuth == "" {
-					assert.NotContains(t, receiverConfig, "elasticsearch_auth", "receiver %q must omit Elasticsearch auth for %s output", receiverID, tt.outputType)
+					assert.NotContains(t, receiverConfig, "monitor_state", "receiver %q must omit monitor state for %s output", receiverID, tt.outputType)
 					continue
 				}
-				assert.Equal(t, tt.expectedAuth, receiverConfig["elasticsearch_auth"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
+				monitorState, ok := receiverConfig["monitor_state"].(map[string]any)
+				require.True(t, ok, "receiver %q monitor state config must be a map", receiverID)
+				assert.Equal(t, tt.expectedAuth, monitorState["elasticsearch"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
 			}
 		})
 	}

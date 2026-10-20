@@ -464,7 +464,9 @@ func getReceiversConfigForComponent(
 		sharedConfig["include_metadata"] = true
 	}
 	if beatName == "heartbeat" && comp.OutputType == "elasticsearch" {
-		sharedConfig["elasticsearch_auth"] = getBeatsAuthExtensionID(comp.OutputName).String()
+		sharedConfig["monitor_state"] = map[string]any{
+			"elasticsearch": getBeatsAuthExtensionID(comp.OutputName).String(),
+		}
 	}
 	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
