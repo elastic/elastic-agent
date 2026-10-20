@@ -1,55 +1,40 @@
-# Issue Triage
+# Triage new issues
 
-This GitHub Actions workflow coordinates **Issue Triage** from the checked-in definition.
+Invokes the shared issue-triage workflow when an issue is opened.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-issue-triage.yml`](../trigger-issue-triage.yml) |
-| Trigger | issues: types: opened |
+| Source | [`trigger-issue-triage.yml`](../trigger-issue-triage.yml) |
+| Trigger | Issue opened |
 
 ## Purpose
 
-The workflow is named **Issue Triage** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The caller delegates new-issue triage to `gh-aw-issue-triage.lock.yml` in `elastic/ai-github-actions`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `issues: types: opened`
+It listens to `issues:opened`, with no additional job condition or branch filter.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | Always when triggered | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-issue-triage.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Every issue-opened event | None | Calls the external triage workflow and installs the listed system libraries and Mage prerequisites. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: read, copilot-requests: write, discussions: write, issues: write,   pull-requests: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: read`, `copilot-requests: write`, `discussions: write`, `issues: write`, `pull-requests: write`. |
+| Outputs | Triage results are produced by the external workflow; failure-as-issue reporting is disabled. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The reusable workflow implementation is not checked in here.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-issue-triage.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-issue-triage.yml`](../trigger-issue-triage.yml)
+- Workflow: [`trigger-issue-triage.yml`](../trigger-issue-triage.yml)

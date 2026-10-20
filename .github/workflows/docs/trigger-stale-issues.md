@@ -1,57 +1,40 @@
-# Stale Issues Investigator
+# Investigate stale issues
 
-This GitHub Actions workflow coordinates **Stale Issues Investigator** from the checked-in definition.
+Runs the shared stale-issue investigator on a schedule or manual dispatch.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-stale-issues.yml`](../trigger-stale-issues.yml) |
-| Trigger | schedule; workflow_dispatch |
+| Source | [`trigger-stale-issues.yml`](../trigger-stale-issues.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **Stale Issues Investigator** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The caller delegates issue investigation to `gh-aw-stale-issues-investigator.lock.yml` in `elastic/ai-github-actions`.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `schedule`
-- `workflow_dispatch`
+Runs on a schedule or when manually dispatched, with no branch or path filters.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | Always when triggered | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-stale-issues-investigator.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Every matching event | None | Calls the external investigator with failure-as-issue reporting disabled and the listed setup commands. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read, copilot-requests: write, issues: write, pull-requests: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: read`, `copilot-requests: write`, `issues: write`, `pull-requests: read`. |
+| Outputs | Investigation behavior is owned by the external workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The reusable workflow implementation and its staleness criteria are not available in this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-stale-issues-investigator.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-stale-issues.yml`](../trigger-stale-issues.yml)
+- Workflow: [`trigger-stale-issues.yml`](../trigger-stale-issues.yml)

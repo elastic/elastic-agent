@@ -1,60 +1,41 @@
-# catalog-info
+# Validate catalog metadata
 
-This GitHub Actions workflow coordinates **catalog-info** from the checked-in definition.
+Runs the external catalog validator for pull requests that change `catalog-info.yaml` on `main`.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/catalog-info.yml`](../catalog-info.yml) |
-| Trigger | pull_request: branches: main; pull_request: paths: catalog-info.yaml |
+| Source | [`catalog-info.yml`](../catalog-info.yml) |
+| Trigger | Pull request to `main` changing `catalog-info.yaml` |
 
 ## Purpose
 
-The workflow is named **catalog-info** and is configured to run the declared jobs: `validate`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow delegates validation of the catalog file—which declares the Elastic Agent component and Buildkite resources—to `elastic/oblt-actions/elastic/validate-catalog@v1`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: branches: main`
-- `pull_request: paths: catalog-info.yaml`
+It runs for pull requests targeting `main` when the changed paths include `catalog-info.yaml`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `validate` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `validate`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-|  | Inputs: `submodules` |  |
-| step-2 | elastic/oblt-actions/elastic/validate-catalog@v1 | Always when job runs |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `validate` | Matching pull request | None | Checks out the repository and runs the external catalog validation action. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Workflow and job grant `contents: read`; the job also grants `packages: read`. |
+| Outputs | Validation result is reported by the external action. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The action implementation is outside this repository, so its validation rules are not described here.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/elastic/validate-catalog@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/catalog-info.yml`](../catalog-info.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
+- Workflow: [`catalog-info.yml`](../catalog-info.yml)
+- Catalog metadata: [`catalog-info.yaml`](../../../catalog-info.yaml)

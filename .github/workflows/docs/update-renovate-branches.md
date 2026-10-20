@@ -1,68 +1,43 @@
-# update-renovate-branches
+# Update Renovate base branches
 
-This GitHub Actions workflow coordinates **update-renovate-branches** from the checked-in definition.
+Refreshes Renovate's branch targets from the active release-branch list and opens a pull request with the updated configuration.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/update-renovate-branches.yml`](../update-renovate-branches.yml) |
-| Trigger | workflow_dispatch; schedule |
+| Source | [`update-renovate-branches.yml`](../update-renovate-branches.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **update-renovate-branches** and is configured to run the declared jobs: `update`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The inline script sets `baseBranchPatterns` from the active-branches action and rewrites the major-update rule so major updates are allowed on `main` and the latest branch of the previous major.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `schedule`
+Runs on a schedule or when manually dispatched, with no branch/path filters.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `update` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `update`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/elastic/active-branches@v1 | Always when job runs |
-|  | Inputs: `filter-branches` |  |
-| step-2 | actions/checkout@v7 | Always when job runs |
-| Update baseBranches in renovate.json | `branches=$(printf '%s' "$MATRIX" \| jq -c '[.include[].branch]')` | Always when job runs |
-| step-4 | peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 | Always when job runs |
-|  | Inputs: `token, commit-message, title, body, branch, base, delete-branch, labels` |  |
-| step-5 | elastic/oblt-actions/slack/send@v1 | ${{ failure() }} |
-|  | Inputs: `bot-token, channel-id, message` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `update` | Every matching event | None | Gets filtered active branches, updates `renovate.json`, opens a PR against `main`, and posts to Slack on failure. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | Workflow variables: JOB_URL |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Branch matrix from the external active-branches action. |
+| Permissions | Workflow grants `contents: read`; job grants `contents: write` and `pull-requests: write`. |
+| Outputs | PR branch is `update-renovate-branches`, with automation labels. |
+| Secrets | `GITHUB_TOKEN` for PR creation; `SLACK_BOT_TOKEN` for failure notification. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The current Renovate rules are in [`renovate.json`](../../../renovate.json). The update job uses inline shell rather than a local helper script.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/elastic/active-branches@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/update-renovate-branches.yml`](../update-renovate-branches.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1` (implementation not checked in this repository).
+- Workflow: [`update-renovate-branches.yml`](../update-renovate-branches.yml)
+- Renovate configuration: [`renovate.json`](../../../renovate.json)

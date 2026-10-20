@@ -1,93 +1,44 @@
-# update-agent-versions
+# Update agent test versions
 
-This GitHub Actions workflow coordinates **update-agent-versions** from the checked-in definition.
+Updates package-version metadata on each active branch and opens a pull request when the generated version files change.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/bump-agent-versions.yml`](../bump-agent-versions.yml) |
-| Trigger | workflow_dispatch; schedule |
+| Source | [`bump-agent-versions.yml`](../bump-agent-versions.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **update-agent-versions** and is configured to run the declared jobs: `filter`, `update_versions`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow refreshes the version data used by upgrade integration tests. The local helper calls Mage targets to generate the package version and requirements, then creates a branch and PR only when the tracked version files changed.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `schedule`
+Runs on a schedule or when manually dispatched. Its filter job emits the active-branch matrix consumed by the update job.
 
 ## Execution flow
 
-```mermaid
-flowchart TD
-  filter --> update_versions
-```
-
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `filter` | Always when triggered | None declared | ubuntu-slim |
-| `update_versions` | Always when triggered | `[filter]` | ubuntu-latest |
-
-### Steps
-
-#### `filter`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/elastic/active-branches@v1 | Always when job runs |
-|  | Inputs: `filter-branches` |  |
-#### `update_versions`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| Create ephemeral GitHub token | elastic/oblt-actions/github/create-token@v1 | Always when job runs |
-|  | Inputs: `token-policy` |  |
-| Checkout | actions/checkout@v7 | Always when job runs |
-|  | Inputs: `submodules, ref, token, fetch-depth` |  |
-| Set up Go | actions/setup-go@v7 | Always when job runs |
-|  | Inputs: `go-version-file` |  |
-| Set git config | `git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"` | Always when job runs |
-| Install mage | magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db | Always when job runs |
-|  | Inputs: `version, install-only` |  |
-| Update versions | `./.github/workflows/bump-agent-versions.sh` | Always when job runs |
-| step-7 | slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d | ${{ failure()  }} |
-|  | Inputs: `method, token, payload` |  |
-| step-8 | slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d | ${{ startsWith(steps.update.outputs.pr, 'https') }} |
-|  | Inputs: `method, token, payload` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `filter` | Every workflow run | None | Uses the external active-branches action to produce a filtered matrix. |
+| `update_versions` | For each matrix branch | `filter` | Checks out the branch, installs Go and Mage, and runs the local update helper. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | Job outputs: `filter`: matrix |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Active branches from the matrix. |
+| Permissions | Update job has `contents: write`, `id-token: write`, and `pull-requests: write`. |
+| Outputs | The helper writes the created PR URL to step output `pr`; Slack notifications are sent on failure and when a PR URL is produced. |
+| Secrets | `SLACK_BOT_TOKEN`; the ephemeral token is minted through the external token action under the configured token policy. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
-
-Referenced local sources:
-
-- [`.github/workflows/bump-agent-versions.sh`](../../../.github/workflows/bump-agent-versions.sh)
+The helper is [`.github/workflows/bump-agent-versions.sh`](../../../.github/workflows/bump-agent-versions.sh). It skips when neither version file changes and avoids creating another PR when an open `update-versions` PR already targets the branch.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/elastic/active-branches@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/github/create-token@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/bump-agent-versions.yml`](../bump-agent-versions.yml)
-- Referenced local file: [`.github/workflows/bump-agent-versions.sh`](../../../.github/workflows/bump-agent-versions.sh)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `actions/setup-go@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db` (implementation not checked in this repository).
-- External action or reusable workflow: `slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d` (implementation not checked in this repository).
+- Workflow: [`bump-agent-versions.yml`](../bump-agent-versions.yml)
+- Helper: [`bump-agent-versions.sh`](../../../.github/workflows/bump-agent-versions.sh)

@@ -1,55 +1,41 @@
-# Observability Agentic Workflow — Issue Comment
+# Route issue comments to Observability Agentic Workflow
 
-This GitHub Actions workflow coordinates **Observability Agentic Workflow — Issue Comment** from the checked-in definition.
+Delegates every created issue-comment event to the shared Observability Agentic Workflow event handler.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-obs-aw-issue-comment.yml`](../trigger-obs-aw-issue-comment.yml) |
-| Trigger | issue_comment: types: created |
+| Source | [`trigger-obs-aw-issue-comment.yml`](../trigger-obs-aw-issue-comment.yml) |
+| Trigger | Issue comment created |
 
 ## Purpose
 
-The workflow is named **Observability Agentic Workflow — Issue Comment** and is configured to run the declared jobs: `run-obs-aw-issue-comment`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The repository workflow is a thin caller for `obs-aw-event-issue-comment.yml` in `elastic/oblt-aw`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `issue_comment: types: created`
+It listens to `issue_comment:created`; the caller defines no additional job condition or branch filter.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run-obs-aw-issue-comment` | Always when triggered | None declared | elastic/oblt-aw/.github/workflows/obs-aw-event-issue-comment.yml@v0 |
-
-### Steps
-
-#### `run-obs-aw-issue-comment`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run-obs-aw-issue-comment` | Every issue-comment event | None | Calls the external reusable workflow. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Caller grants `contents: read`; job grants `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `id-token: write`, `issues: write`, and `pull-requests: write`. |
+| Outputs | Event handling is owned by the external workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The `elastic/oblt-aw` implementation is outside this checkout; no further event behavior is asserted.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-aw/.github/workflows/obs-aw-event-issue-comment.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-obs-aw-issue-comment.yml`](../trigger-obs-aw-issue-comment.yml)
+- Workflow: [`trigger-obs-aw-issue-comment.yml`](../trigger-obs-aw-issue-comment.yml)
+- Reusable workflow: [`obs-aw-event-issue-comment.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-issue-comment.yml)

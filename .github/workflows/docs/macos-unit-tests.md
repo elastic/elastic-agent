@@ -1,65 +1,41 @@
-# macos-unit-tests
+# Run macOS unit tests
 
-This GitHub Actions workflow coordinates **macos-unit-tests** from the checked-in definition.
+Runs the root and EDOT unit-test Mage targets on the macOS runner for pull requests, supported branch pushes, and manual dispatches.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/macos-unit-tests.yml`](../macos-unit-tests.yml) |
-| Trigger | workflow_dispatch; pull_request; push: branches: main, 8.19, 9.* |
+| Source | [`macos-unit-tests.yml`](../macos-unit-tests.yml) |
+| Trigger | Pull request, push to selected branches, or manual dispatch |
 
 ## Purpose
 
-The workflow is named **macos-unit-tests** and is configured to run the declared jobs: `unit-tests`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+This workflow runs both unit-test targets on macOS with race detection and coverage enabled.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `pull_request`
-- `push: branches: main, 8.19, 9.*`
+It runs for any pull request, a push to `main`, `8.19`, or `9.*`, or `workflow_dispatch`. A concurrency group is keyed by workflow and ref; in-progress runs are canceled for refs other than `main`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `unit-tests` | Always when triggered | None declared | ${{ matrix.os }} |
-
-### Steps
-
-#### `unit-tests`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-|  | Inputs: `submodules, fetch-depth` |  |
-| step-2 | actions/setup-go@v7 | Always when job runs |
-|  | Inputs: `go-version-file` |  |
-| Install make | `brew install make` | Always when job runs |
-| Install mage | `make mage` | Always when job runs |
-| mage ${{ matrix.mage_target }} | `RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}` | Always when job runs |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `unit-tests` | Every matching event | None | Runs on `xcode-27` with a matrix of `test:unit` and `test:unitEdot`; checks out submodules and full Git history, installs make/Mage, then runs the selected target. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Mage target from the matrix. |
+| Permissions | `contents: read`. |
+| Outputs | Test and coverage results; no artifact upload is declared. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The checkout comment identifies full Git history as necessary for `TestGetReleaseBranches`.
 
 ## Sources
 
-- Workflow: [`.github/workflows/macos-unit-tests.yml`](../macos-unit-tests.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `actions/setup-go@v7` (implementation not checked in this repository).
+- Workflow: [`macos-unit-tests.yml`](../macos-unit-tests.yml)

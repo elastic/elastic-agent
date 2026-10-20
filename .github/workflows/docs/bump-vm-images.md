@@ -1,78 +1,45 @@
-# bump-vm-images
+# Bump VM image versions
 
-This GitHub Actions workflow coordinates **bump-vm-images** from the checked-in definition.
+Checks active release branches for a newer CI VM image version and opens pull requests with the Buildkite image references updated.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/bump-vm-images.yml`](../bump-vm-images.yml) |
-| Trigger | workflow_dispatch; schedule |
+| Source | [`bump-vm-images.yml`](../bump-vm-images.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **bump-vm-images** and is configured to run the declared jobs: `filter`, `bump`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow applies an Updatecli policy to update image versions in checked-in Buildkite pipeline YAML files.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `schedule`
+Runs on a schedule or when manually dispatched. An external active-branches action provides a filtered branch matrix; the update job runs once for each branch with `fail-fast: false`.
 
 ## Execution flow
 
-```mermaid
-flowchart TD
-  filter --> bump
-```
-
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `filter` | Always when triggered | None declared | ubuntu-slim |
-| `bump` | Always when triggered | `[filter]` | ubuntu-latest |
-
-### Steps
-
-#### `filter`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/elastic/active-branches@v1 | Always when job runs |
-|  | Inputs: `filter-branches` |  |
-#### `bump`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-|  | Inputs: `ref` |  |
-| step-2 | elastic/oblt-actions/updatecli/run@v1 | Always when job runs |
-|  | Inputs: `command, version-file` |  |
-| step-3 | elastic/oblt-actions/slack/send@v1 | ${{ failure()  }} |
-|  | Inputs: `bot-token, channel-id, message` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `filter` | Every run | None | Generates active branch matrix. |
+| `bump` | For each matrix branch | `filter` | Checks out the target branch, applies the VM image policy, and sends a Slack alert on failure. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | Workflow variables: JOB_URL |
-| Outputs | Job outputs: `filter`: matrix |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Matrix branch passed as `BRANCH_NAME`. |
+| Permissions | Update job grants `contents: write` and `pull-requests: write`. |
+| Outputs | The Updatecli policy may open a PR for the branch. |
+| Secrets | `GITHUB_TOKEN` for Updatecli; `SLACK_BOT_TOKEN` for failure notification. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The policy [`updatecli-bump-vm-images.yml`](../../../.ci/updatecli/updatecli-bump-vm-images.yml) reads the latest image date and updates GCP/AWS and Azure image strings in `.buildkite/*.yml`.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/elastic/active-branches@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/updatecli/run@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/bump-vm-images.yml`](../bump-vm-images.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
+- Workflow: [`bump-vm-images.yml`](../bump-vm-images.yml)
+- Updatecli policy: [`updatecli-bump-vm-images.yml`](../../../.ci/updatecli/updatecli-bump-vm-images.yml)
+- SCM values: [`scm.yml`](../../../.ci/updatecli/values.d/scm.yml)

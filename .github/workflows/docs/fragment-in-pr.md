@@ -1,67 +1,42 @@
-# fragment-in-pr
+# Validate changelog fragments in pull requests
 
-This GitHub Actions workflow coordinates **fragment-in-pr** from the checked-in definition.
+Checks eligible pull requests for a changelog fragment and validates its syntax with the changelog tool.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/fragment-in-pr.yml`](../fragment-in-pr.yml) |
-| Trigger | pull_request: types: labeled, unlabeled, opened, reopened, synchronize |
+| Source | [`fragment-in-pr.yml`](../fragment-in-pr.yml) |
+| Trigger | Pull request opened, reopened, synchronized, labeled, or unlabeled |
 
 ## Purpose
 
-The workflow is named **fragment-in-pr** and is configured to run the declared jobs: `fragments`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow uses the Elastic Agent changelog tool to check that a PR has a fragment and that fragments build for the current agent version.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: types: labeled, unlabeled, opened, reopened, synchronize`
+The job skips PRs labeled `skip-changelog` or `backport`, and heads under `mergify/merge-queue/`. Other pull request events in the trigger list run the job.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `fragments` | !contains(github.event.pull_request.labels.*.name, 'skip-changelog') && !contains(github.event.pull_request.labels.*.name, 'backport') && !startsWith(github.head_ref, 'mergify/merge-queue/') | None declared | ubuntu-latest |
-
-### Steps
-
-#### `fragments`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-|  | Inputs: `submodules` |  |
-| step-2 | actions/setup-go@v7 | Always when job runs |
-|  | Inputs: `go-version-file` |  |
-| check pr-has-fragment | `GOBIN=$PWD/bin go install github.com/elastic/elastic-agent-changelog-tool@latest` | Always when job runs |
-| get elasti-agent version | `gv=$(awk '$0 ~ /[0-9]+\.[0-9]+\.[0-9]+/ {print $4}' version/version.go)` | Always when job runs |
-| check fragment-syntax | `./bin/elastic-agent-changelog-tool build --version ${{steps.agent-version.outputs.agent-version}} --owner elastic --repo elastic-agent` | Always when job runs |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `fragments` | PR passes the label and head-ref conditions | None | Checks out submodules, installs the latest changelog tool, checks for a fragment, extracts the version, and validates fragment syntax. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Pull request repository name and number; agent version is read from `version/version.go`. |
+| Permissions | `contents: read`. |
+| Outputs | The job reports the PR fragment checks; no artifacts are declared. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
-
-Referenced source gaps:
-
-- `./bin/elastic-agent-changelog-tool` is referenced by the workflow but is not present in this checkout.
+The changelog tool is installed from `github.com/elastic/elastic-agent-changelog-tool@latest`; its implementation is external to this repository.
 
 ## Sources
 
-- Workflow: [`.github/workflows/fragment-in-pr.yml`](../fragment-in-pr.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `actions/setup-go@v7` (implementation not checked in this repository).
+- Workflow: [`fragment-in-pr.yml`](../fragment-in-pr.yml)
+- Version source: [`version/version.go`](../../../version/version.go)

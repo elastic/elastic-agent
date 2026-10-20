@@ -1,64 +1,43 @@
-# bump-edot-images
+# Bump EDOT SDK images
 
-This GitHub Actions workflow coordinates **bump-edot-images** from the checked-in definition.
+Checks for newer EDOT SDK image releases and opens a dependency pull request when configured image references change.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/bump-edot-images.yml`](../bump-edot-images.yml) |
-| Trigger | workflow_dispatch; schedule |
+| Source | [`bump-edot-images.yml`](../bump-edot-images.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **bump-edot-images** and is configured to run the declared jobs: `bump`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow runs the repository's Updatecli policy for the .NET, Java, Node.js, Python, and Go instrumentation images used by the EDOT Kubernetes Helm chart values.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `schedule`
+Runs on a schedule or when manually dispatched. There are no branch or path filters in the workflow definition.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `bump` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `bump`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-| step-2 | elastic/oblt-actions/updatecli/run@v1 | Always when job runs |
-|  | Inputs: `command, version-file` |  |
-| step-3 | elastic/oblt-actions/slack/send@v1 | ${{ failure()  }} |
-|  | Inputs: `bot-token, channel-id, message` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `bump` | Every run | None | Checks out the repository and applies the EDOT image Updatecli policy; sends a Slack notification on failure. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | Workflow variables: JOB_URL |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Job grants `contents: write` and `pull-requests: write`. |
+| Outputs | Updatecli may open a dependency PR; the policy defines its labels and title. |
+| Secrets | `GITHUB_TOKEN` for Updatecli and `SLACK_BOT_TOKEN` for failure notification. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The policy [`updatecli-bump-edot.yml`](../../../.ci/updatecli/updatecli-bump-edot.yml) reads upstream releases and updates both EDOT Helm values files. It is invoked with [`values.d/scm.yml`](../../../.ci/updatecli/values.d/scm.yml); submodules are not checked out.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/updatecli/run@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/bump-edot-images.yml`](../bump-edot-images.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
+- Workflow: [`bump-edot-images.yml`](../bump-edot-images.yml)
+- Updatecli policy: [`updatecli-bump-edot.yml`](../../../.ci/updatecli/updatecli-bump-edot.yml)
+- SCM values: [`scm.yml`](../../../.ci/updatecli/values.d/scm.yml)

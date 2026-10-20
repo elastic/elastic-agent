@@ -1,64 +1,43 @@
-# bump-golang
+# Bump Go version
 
-This GitHub Actions workflow coordinates **bump-golang** from the checked-in definition.
+Checks for a newer Go release and opens a dependency pull request updating the repository's Go version declarations.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/bump-golang.yml`](../bump-golang.yml) |
-| Trigger | workflow_dispatch; schedule |
+| Source | [`bump-golang.yml`](../bump-golang.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **bump-golang** and is configured to run the declared jobs: `bump`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow applies the Updatecli Go policy, which selects the latest matching `golang-crossbuild` release and updates Go version files.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `schedule`
+Runs on a schedule or when manually dispatched, with no branch/path filter. The schedule is configured in the workflow source.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `bump` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `bump`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-| step-2 | elastic/oblt-actions/updatecli/run@v1 | Always when job runs |
-|  | Inputs: `command, version-file` |  |
-| step-3 | elastic/oblt-actions/slack/send@v1 | ${{ failure()  }} |
-|  | Inputs: `bot-token, channel-id, message` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `bump` | Every run | None | Checks out the repository and runs the Go Updatecli policy; posts to Slack if the job fails. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | Workflow variables: JOB_URL |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Job grants `contents: write` and `pull-requests: write`. |
+| Outputs | Updatecli may open a dependency PR with labels from the policy. |
+| Secrets | `GITHUB_TOKEN` for Updatecli and `SLACK_BOT_TOKEN` for failure notification. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The policy [`updatecli-bump-golang.yml`](../../../.ci/updatecli/updatecli-bump-golang.yml) updates `.go-version`, the root and nested Go module versions, and `version/docs/version.asciidoc`. The workflow does not check out submodules.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/updatecli/run@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/bump-golang.yml`](../bump-golang.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
+- Workflow: [`bump-golang.yml`](../bump-golang.yml)
+- Updatecli policy: [`updatecli-bump-golang.yml`](../../../.ci/updatecli/updatecli-bump-golang.yml)
+- SCM values: [`scm.yml`](../../../.ci/updatecli/values.d/scm.yml)

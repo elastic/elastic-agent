@@ -1,55 +1,40 @@
-# Mention in Issue
+# Run AI assistance from an issue comment
 
-This GitHub Actions workflow coordinates **Mention in Issue** from the checked-in definition.
+Invokes the shared issue-comment assistant for eligible comments on non-pull-request issues.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-mention-in-issue.yml`](../trigger-mention-in-issue.yml) |
-| Trigger | issue_comment: types: created |
+| Source | [`trigger-mention-in-issue.yml`](../trigger-mention-in-issue.yml) |
+| Trigger | Issue comment created |
 
 ## Purpose
 
-The workflow is named **Mention in Issue** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow routes explicit `/ai` commands or `@claude` mentions on issues to `gh-aw-mention-in-issue.lock.yml`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `issue_comment: types: created`
+It listens to `issue_comment:created`; the job requires the issue not to be a pull request and the comment body to start with `/ai` or contain `@claude`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | github.event.issue.pull_request == null && (startsWith(github.event.comment.body, '/ai') \|\| contains(github.event.comment.body, '@claude')) | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-issue.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Comment matches the issue-only condition | None | Calls the external mention workflow with setup commands and an instruction to label any created PR `ai`. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: write, copilot-requests: write, discussions: write, issues: write,   pull-requests: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `issues: write`, `pull-requests: write`. |
+| Outputs | The external workflow may respond to the comment or create repository changes. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The assistant implementation is external. The caller's setup commands install required system libraries and Mage.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-issue.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-mention-in-issue.yml`](../trigger-mention-in-issue.yml)
+- Workflow: [`trigger-mention-in-issue.yml`](../trigger-mention-in-issue.yml)

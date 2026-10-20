@@ -1,57 +1,41 @@
-# Observability Agentic Workflow — Schedule (frequent)
+# Run the frequent Observability Agentic Workflow schedule
 
-This GitHub Actions workflow coordinates **Observability Agentic Workflow — Schedule (frequent)** from the checked-in definition.
+Calls the shared scheduled Observability Agentic Workflow using the `frequent` schedule profile.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-obs-aw-schedule-frequent.yml`](../trigger-obs-aw-schedule-frequent.yml) |
-| Trigger | schedule; workflow_dispatch |
+| Source | [`trigger-obs-aw-schedule-frequent.yml`](../trigger-obs-aw-schedule-frequent.yml) |
+| Trigger | Schedule or manual dispatch |
 
 ## Purpose
 
-The workflow is named **Observability Agentic Workflow — Schedule (frequent)** and is configured to run the declared jobs: `run-obs-aw-schedule-frequent`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow routes the frequent schedule profile to the shared schedule handler. Its comment describes this as the high-cadence lane, separate from the daily profile.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `schedule`
-- `workflow_dispatch`
+Runs on a schedule or when manually dispatched. The source marks this caller as the frequent cadence; the cron expression is intentionally omitted.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run-obs-aw-schedule-frequent` | Always when triggered | None declared | elastic/oblt-aw/.github/workflows/obs-aw-event-schedule.yml@v0 |
-
-### Steps
-
-#### `run-obs-aw-schedule-frequent`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run-obs-aw-schedule-frequent` | Every matching event | None | Calls the external schedule workflow with `schedule-profile: frequent`. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Caller grants `contents: read`; job grants `actions: read`, `contents: write`, `copilot-requests: write`, `id-token: write`, `issues: write`, and `pull-requests: write`. |
+| Outputs | Scheduled task routing is handled externally. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The job comments that its permissions are the union of all jobs in the shared schedule workflow, including routes skipped by profile conditions. The reusable workflow is not checked in here.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-aw/.github/workflows/obs-aw-event-schedule.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-obs-aw-schedule-frequent.yml`](../trigger-obs-aw-schedule-frequent.yml)
+- Workflow: [`trigger-obs-aw-schedule-frequent.yml`](../trigger-obs-aw-schedule-frequent.yml)
+- Reusable workflow: [`obs-aw-event-schedule.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-schedule.yml)

@@ -1,56 +1,41 @@
-# Observability Agentic Workflow — Issues
+# Route issue events to Observability Agentic Workflow
 
-This GitHub Actions workflow coordinates **Observability Agentic Workflow — Issues** from the checked-in definition.
+Delegates selected issue events and manual dispatches to the shared Observability Agentic Workflow.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-obs-aw-issues.yml`](../trigger-obs-aw-issues.yml) |
-| Trigger | issues: types: opened, labeled, edited; workflow_dispatch |
+| Source | [`trigger-obs-aw-issues.yml`](../trigger-obs-aw-issues.yml) |
+| Trigger | Issue opened, labeled, or edited; manual dispatch |
 
 ## Purpose
 
-The workflow is named **Observability Agentic Workflow — Issues** and is configured to run the declared jobs: `run-obs-aw-issues`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow calls `obs-aw-event-issues.yml` in `elastic/oblt-aw` as the repository's issue-event handler.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `issues: types: opened, labeled, edited`
-- `workflow_dispatch`
+It listens to issue `opened`, `labeled`, and `edited` activity types, and supports `workflow_dispatch`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run-obs-aw-issues` | Always when triggered | None declared | elastic/oblt-aw/.github/workflows/obs-aw-event-issues.yml@v0 |
-
-### Steps
-
-#### `run-obs-aw-issues`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run-obs-aw-issues` | Every matching event | None | Calls the external reusable workflow. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Caller grants `contents: read`; job grants `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `id-token: write`, `issues: write`, and `pull-requests: write`. |
+| Outputs | Event handling is owned by the external workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The external reusable workflow implementation is not part of this repository; its issue routing logic could not be inspected locally.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-aw/.github/workflows/obs-aw-event-issues.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-obs-aw-issues.yml`](../trigger-obs-aw-issues.yml)
+- Workflow: [`trigger-obs-aw-issues.yml`](../trigger-obs-aw-issues.yml)
+- Reusable workflow: [`obs-aw-event-issues.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-issues.yml)

@@ -1,55 +1,41 @@
-# Observability Agentic Workflow — Pull Request
+# Route pull requests to Observability Agentic Workflow
 
-This GitHub Actions workflow coordinates **Observability Agentic Workflow — Pull Request** from the checked-in definition.
+Delegates selected pull-request events to the shared Observability Agentic Workflow.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-obs-aw-pull-request.yml`](../trigger-obs-aw-pull-request.yml) |
-| Trigger | pull_request: types: opened, synchronize, reopened, labeled |
+| Source | [`trigger-obs-aw-pull-request.yml`](../trigger-obs-aw-pull-request.yml) |
+| Trigger | Pull request opened, synchronized, reopened, or labeled |
 
 ## Purpose
 
-The workflow is named **Observability Agentic Workflow — Pull Request** and is configured to run the declared jobs: `run-obs-aw-pull-request`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow calls `obs-aw-event-pull-request.yml` in `elastic/oblt-aw` as the repository's PR-event handler.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: types: opened, synchronize, reopened, labeled`
+It listens for `pull_request` events of type `opened`, `synchronize`, `reopened`, and `labeled`; no branch/path filter is declared.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run-obs-aw-pull-request` | Always when triggered | None declared | elastic/oblt-aw/.github/workflows/obs-aw-event-pull-request.yml@v0 |
-
-### Steps
-
-#### `run-obs-aw-pull-request`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run-obs-aw-pull-request` | Every matching event | None | Calls the external reusable workflow. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Caller grants `contents: read`; job grants `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `id-token: write`, `issues: write`, and `pull-requests: write`. |
+| Outputs | Event handling is owned by the external workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The reusable workflow is maintained outside this repository; its internal PR processing cannot be verified from this checkout.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-aw/.github/workflows/obs-aw-event-pull-request.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-obs-aw-pull-request.yml`](../trigger-obs-aw-pull-request.yml)
+- Workflow: [`trigger-obs-aw-pull-request.yml`](../trigger-obs-aw-pull-request.yml)
+- Reusable workflow: [`obs-aw-event-pull-request.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-pull-request.yml)

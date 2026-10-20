@@ -1,59 +1,42 @@
 # Add issue to Platform Ingest project
 
-This GitHub Actions workflow coordinates **Add issue to Platform Ingest project** from the checked-in definition.
+Adds issues labeled for Elastic Agent teams to the Platform Ingest GitHub project and sets their area.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/add-issues-to-ingest-board.yml`](../add-issues-to-ingest-board.yml) |
-| Trigger | issues: types: labeled |
+| Source | [`add-issues-to-ingest-board.yml`](../add-issues-to-ingest-board.yml) |
+| Trigger | Issues labeled |
 
 ## Purpose
 
-The workflow is named **Add issue to Platform Ingest project** and is configured to run the declared jobs: `add_to_ingest_project`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow routes issues labeled `Team:Elastic-Agent-Data-Plane`, `Team:Elastic-Agent-Control-Plane`, or `Team:Elastic-Agent` into the configured Platform Ingest project and assigns the Elastic Agent area.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `issues: types: labeled`
+It starts for an `issues:labeled` event. Both GraphQL steps run only when the new label matches one of the three team labels above.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `add_to_ingest_project` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `add_to_ingest_project`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | octokit/graphql-action@v2.x | github.event.label.name == env.DATA_PLANE_LABEL \|\| github.event.label.name == env.CONTROL_PLANE_LABEL \|\| github.event.label.name == env.ELASTIC_AGENT_LABEL |
-|  | Inputs: `query, project_id, content_id` |  |
-| step-2 | octokit/graphql-action@v2.x | github.event.label.name == env.DATA_PLANE_LABEL \|\| github.event.label.name == env.CONTROL_PLANE_LABEL \|\| github.event.label.name == env.ELASTIC_AGENT_LABEL |
-|  | Inputs: `query, item_id, project_id, area_field_id, area_id` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `add_to_project` | Matching team label | None | Adds the issue to the project and returns its item ID. |
+| `set_elastic_agent_area` | Matching team label | `add_to_project` | Sets the project's area field to the Elastic Agent option. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | Workflow variables: INGEST_PROJECT_ID, DATA_PLANE_LABEL, CONTROL_PLANE_LABEL, ELASTIC_AGENT_LABEL, AREA_FIELD_ID, ELASTIC_AGENT_OPTION_ID |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: none}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Issue node ID and the event's label; project and field IDs are configured in the workflow. |
+| Permissions | Workflow-level `contents: none`; the GraphQL token is supplied by `PROJECT_ASSIGNER_TOKEN`. |
+| Outputs | The first mutation's project item ID feeds the second mutation. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+Both mutations use `octokit/graphql-action`. Their GraphQL operation details are inline; no local action implementation is referenced.
 
 ## Sources
 
-- Workflow: [`.github/workflows/add-issues-to-ingest-board.yml`](../add-issues-to-ingest-board.yml)
-- External action or reusable workflow: `octokit/graphql-action@v2.x` (implementation not checked in this repository).
+- Workflow: [`add-issues-to-ingest-board.yml`](../add-issues-to-ingest-board.yml)

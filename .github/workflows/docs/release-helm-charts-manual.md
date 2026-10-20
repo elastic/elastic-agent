@@ -1,68 +1,43 @@
-# release-helm-charts-manual
+# Manually release Helm charts
 
-This GitHub Actions workflow coordinates **release-helm-charts-manual** from the checked-in definition.
+Dispatches the `elastic-agent-helm-charts` Buildkite pipeline with operator-supplied branch, commit, and repository environment.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/release-helm-charts-manual.yml`](../release-helm-charts-manual.yml) |
-| Trigger | workflow_dispatch: inputs: branch: description: Branch the commit belongs to; workflow_dispatch: inputs: branch: required: True; workflow_dispatch: inputs: branch: type: string; workflow_dispatch: inputs: commit: description: Commit to be released; workflow_dispatch: inputs: commit: required: True; workflow_dispatch: inputs: commit: type: string; workflow_dispatch: inputs: repo-env: required: True; workflow_dispatch: inputs: repo-env: type: choice; workflow_dispatch: inputs: repo-env: options: dev, prod |
+| Source | [`release-helm-charts-manual.yml`](../release-helm-charts-manual.yml) |
+| Trigger | Manual dispatch |
 
 ## Purpose
 
-The workflow is named **release-helm-charts-manual** and is configured to run the declared jobs: `trigger-release`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+This is the manual release path for the Helm chart pipeline, with explicit inputs for the source branch, commit, and `dev` or `prod` repository environment.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `workflow_dispatch: inputs: branch: description: Branch the commit belongs to`
-- `workflow_dispatch: inputs: branch: required: True`
-- `workflow_dispatch: inputs: branch: type: string`
-- `workflow_dispatch: inputs: commit: description: Commit to be released`
-- `workflow_dispatch: inputs: commit: required: True`
-- `workflow_dispatch: inputs: commit: type: string`
-- `workflow_dispatch: inputs: repo-env: required: True`
-- `workflow_dispatch: inputs: repo-env: type: choice`
-- `workflow_dispatch: inputs: repo-env: options: dev, prod`
+It runs only by `workflow_dispatch`. All three inputs (`branch`, `commit`, `repo-env`) are required; `repo-env` is a choice between `dev` and `prod`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `trigger-release` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `trigger-release`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/buildkite/run@v1 | Always when job runs |
-|  | Inputs: `branch, commit, pipeline, token, wait-for, env-vars` |  |
-| step-2 | elastic/oblt-actions/slack/send@v1 | ${{ failure()  }} |
-|  | Inputs: `bot-token, channel-id, message` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `trigger-release` | Every manual dispatch | None | Runs the Buildkite pipeline and waits for completion; sends a Slack alert if the job fails. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | `workflow_dispatch` input names: branch, commit, repo-env |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | `trigger-release`: helmcharts |
+| Inputs | `branch`, `commit`, and `repo-env`. |
+| Permissions | `contents: read`; job uses the `helmcharts` environment. |
+| Outputs | Buildkite run result; `SNAPSHOT` is true for `dev`, and `HELM_REPO_ENV` is the selected value. |
+| Secrets | `BUILDKITE_TOKEN` and, on failure, `SLACK_BOT_TOKEN`. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The Buildkite action targets the `elastic-agent-helm-charts` pipeline and sets `USE_PACKAGE_VERSION=false`. Its implementation is external.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/buildkite/run@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/release-helm-charts-manual.yml`](../release-helm-charts-manual.yml)
+- Workflow: [`release-helm-charts-manual.yml`](../release-helm-charts-manual.yml)
+- Checked-in pipeline definition: [`pipeline.elastic-agent-helm-charts.yml`](../../../.buildkite/pipeline.elastic-agent-helm-charts.yml)

@@ -1,73 +1,42 @@
-# Validate docs generation structure
+# Validate documentation-generation structure
 
-This GitHub Actions workflow coordinates **Validate docs generation structure** from the checked-in definition.
+Checks that required local source files for generated EDOT documentation are present when relevant files change in a pull request.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/validate-docs-structure.yml`](../validate-docs-structure.yml) |
-| Trigger | pull_request: paths: internal/edot/**, docs/scripts/update-docs/**, .github/workflows/validate-docs-structure.yml |
+| Source | [`validate-docs-structure.yml`](../validate-docs-structure.yml) |
+| Trigger | Pull request changing EDOT or documentation-generator paths |
 
 ## Purpose
 
-The workflow is named **Validate docs generation structure** and is configured to run the declared jobs: `validate-structure`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow runs the `mage check:docsFiles` target to ensure the documentation generator's required source files exist.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: paths: internal/edot/**, docs/scripts/update-docs/**, .github/workflows/validate-docs-structure.yml`
+It runs for pull requests changing `internal/edot/**`, `docs/scripts/update-docs/**`, or the workflow file itself.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `validate-structure` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `validate-structure`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | actions/checkout@v7 | Always when job runs |
-|  | Inputs: `submodules` |  |
-| Set up Go | actions/setup-go@v7 | Always when job runs |
-|  | Inputs: `go-version-file` |  |
-| Install mage | magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db | Always when job runs |
-|  | Inputs: `install-only` |  |
-| Validate expected files for docs generation | `mage check:docsFiles` | Always when job runs |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `validate-structure` | Matching pull request | None | Checks out submodules, installs Go from `go.mod`, installs Mage, and runs `mage check:docsFiles`. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: read`. |
+| Outputs | Check result; no artifact is declared. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
-
-Referenced local sources:
-
-- [`.github/workflows/validate-docs-structure.yml`](../../../.github/workflows/validate-docs-structure.yml)
-
-Referenced local sources:
-
-- [`docs/scripts/update-docs`](../../../docs/scripts/update-docs)
+The Mage target checks `go.mod`, `internal/edot/components.yml`, and `internal/edot/samples/linux/gateway.yml`. The checker is implemented in `magefile.go`.
 
 ## Sources
 
-- Workflow: [`.github/workflows/validate-docs-structure.yml`](../validate-docs-structure.yml)
-- Referenced local file: [`.github/workflows/validate-docs-structure.yml`](../../../.github/workflows/validate-docs-structure.yml)
-- External action or reusable workflow: `actions/checkout@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `actions/setup-go@v7` (implementation not checked in this repository).
-- External action or reusable workflow: `magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db` (implementation not checked in this repository).
+- Workflow: [`validate-docs-structure.yml`](../validate-docs-structure.yml)
+- Source checker: [`magefile.go`](../../../magefile.go)
+- Generator: [`update-components-docs.py`](../../../docs/scripts/update-docs/update-components-docs.py)

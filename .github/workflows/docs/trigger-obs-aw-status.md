@@ -1,55 +1,41 @@
-# Observability Agentic Workflow — Status
+# Route Buildkite failures to Observability Agentic Workflow
 
-This GitHub Actions workflow coordinates **Observability Agentic Workflow — Status** from the checked-in definition.
+Delegates failed Buildkite status events to the shared Observability Agentic Workflow status handler.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-obs-aw-status.yml`](../trigger-obs-aw-status.yml) |
-| Trigger | status |
+| Source | [`trigger-obs-aw-status.yml`](../trigger-obs-aw-status.yml) |
+| Trigger | GitHub status event |
 
 ## Purpose
 
-The workflow is named **Observability Agentic Workflow — Status** and is configured to run the declared jobs: `run-obs-aw-status`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow routes only failing status contexts containing `buildkite` to the external status handler and passes the Buildkite log API token under the expected secret name.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `status`
+It listens to `status` events. The job requires `github.event.state == 'failure'` and a context containing `buildkite`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run-obs-aw-status` | github.event.state == 'failure' && contains(github.event.context, 'buildkite') | None declared | elastic/oblt-aw/.github/workflows/obs-aw-event-status.yml@v0 |
-
-### Steps
-
-#### `run-obs-aw-status`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run-obs-aw-status` | Status is a Buildkite failure | None | Calls the external status workflow and maps `BUILDKITE_LOGS_API_TOKEN` to `BUILDKITE_API_TOKEN`. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | Caller grants `contents: read`; job grants `actions: read`, `contents: read`, `copilot-requests: write`, `id-token: write`, `issues: write`, and `pull-requests: write`. |
+| Secrets | `BUILDKITE_LOGS_API_TOKEN` is passed as `BUILDKITE_API_TOKEN`. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The `elastic/oblt-aw` status-handler implementation is external and not checked into this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-aw/.github/workflows/obs-aw-event-status.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-obs-aw-status.yml`](../trigger-obs-aw-status.yml)
+- Workflow: [`trigger-obs-aw-status.yml`](../trigger-obs-aw-status.yml)
+- Reusable workflow: [`obs-aw-event-status.yml`](https://github.com/elastic/oblt-aw/blob/v0/.github/workflows/obs-aw-event-status.yml)

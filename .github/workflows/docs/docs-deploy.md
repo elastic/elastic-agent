@@ -1,61 +1,41 @@
-# docs-deploy
+# Deploy documentation
 
-This GitHub Actions workflow coordinates **docs-deploy** from the checked-in definition.
+Starts the shared documentation deployment workflow after a `docs-build` workflow completes.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/docs-deploy.yml`](../docs-deploy.yml) |
-| Trigger | workflow_run: workflows: docs-build; workflow_run: types: completed |
+| Source | [`docs-deploy.yml`](../docs-deploy.yml) |
+| Trigger | Completion of the `docs-build` workflow |
 
 ## Purpose
 
-The workflow is named **docs-deploy** and is configured to run the declared jobs: `deploy`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow delegates deployment to `elastic/docs-actions` and passes the same Vale configuration used by the repository's docs-build workflow.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `workflow_run: workflows: docs-build`
-- `workflow_run: types: completed`
+It listens for `workflow_run` completion events from the workflow named `docs-build`. The checked-in definition does not declare a branch or conclusion condition.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `deploy` | Always when triggered | None declared | elastic/docs-actions/.github/workflows/docs-deploy.yml@v1 |
-
-### Steps
-
-#### `deploy`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `deploy` | `docs-build` completes | The named workflow run | Calls the external reusable docs deployment workflow. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: read, deployments: write, id-token: write, pull-requests: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: read`, `deployments: write`, `id-token: write`, `pull-requests: write`, and `actions: read`. |
+| Outputs | Deployment behavior and artifacts are managed by the external reusable workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
-
-Referenced local sources:
-
-- [`.github/workflows/docs-deploy.yml`](../../../.github/workflows/docs-deploy.yml)
+The external implementation is not checked in here. The caller enables Vale for `docs/release-notes/**` and `docs/reference/**`.
 
 ## Sources
-- External action or reusable workflow: `elastic/docs-actions/.github/workflows/docs-deploy.yml@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/docs-deploy.yml`](../docs-deploy.yml)
-- Referenced local file: [`.github/workflows/docs-deploy.yml`](../../../.github/workflows/docs-deploy.yml)
+- Workflow: [`docs-deploy.yml`](../docs-deploy.yml)
+- Reusable workflow: [`elastic/docs-actions/.github/workflows/docs-deploy.yml`](https://github.com/elastic/docs-actions/blob/v1/.github/workflows/docs-deploy.yml)

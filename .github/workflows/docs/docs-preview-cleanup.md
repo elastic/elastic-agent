@@ -1,60 +1,41 @@
-# docs-preview-cleanup
+# Clean up documentation previews
 
-This GitHub Actions workflow coordinates **docs-preview-cleanup** from the checked-in definition.
+Delegates preview deployment cleanup to the shared docs workflow when a pull request closes.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/docs-preview-cleanup.yml`](../docs-preview-cleanup.yml) |
-| Trigger | pull_request_target: types: closed |
+| Source | [`docs-preview-cleanup.yml`](../docs-preview-cleanup.yml) |
+| Trigger | Pull request closed |
 
 ## Purpose
 
-The workflow is named **docs-preview-cleanup** and is configured to run the declared jobs: `cleanup`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow calls the reusable cleanup workflow in `elastic/docs-actions`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request_target: types: closed`
+It listens to `pull_request_target` with the `closed` activity type. No branch filter is declared.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `cleanup` | Always when triggered | None declared | elastic/docs-actions/.github/workflows/docs-preview-cleanup.yml@v1 |
-
-### Steps
-
-#### `cleanup`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `cleanup` | Matching closed PR event | None | Invokes the external docs preview cleanup workflow. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: none, deployments: write, id-token: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: none`, `deployments: write`, and `id-token: write`. |
+| Outputs | Cleanup is performed by the external reusable workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
-
-Referenced local sources:
-
-- [`.github/workflows/docs-preview-cleanup.yml`](../../../.github/workflows/docs-preview-cleanup.yml)
+The shared workflow implementation is not present in this repository, so the preview naming and deletion behavior cannot be verified locally.
 
 ## Sources
-- External action or reusable workflow: `elastic/docs-actions/.github/workflows/docs-preview-cleanup.yml@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/docs-preview-cleanup.yml`](../docs-preview-cleanup.yml)
-- Referenced local file: [`.github/workflows/docs-preview-cleanup.yml`](../../../.github/workflows/docs-preview-cleanup.yml)
+- Workflow: [`docs-preview-cleanup.yml`](../docs-preview-cleanup.yml)
+- Reusable workflow: [`elastic/docs-actions/.github/workflows/docs-preview-cleanup.yml`](https://github.com/elastic/docs-actions/blob/v1/.github/workflows/docs-preview-cleanup.yml)

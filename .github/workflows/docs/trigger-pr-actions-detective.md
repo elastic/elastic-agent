@@ -1,56 +1,40 @@
-# PR Actions Detective
+# Investigate failed pull-request workflows
 
-This GitHub Actions workflow coordinates **PR Actions Detective** from the checked-in definition.
+Invokes the shared PR-actions detective when a selected workflow fails for a run associated with a pull request.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-pr-actions-detective.yml`](../trigger-pr-actions-detective.yml) |
-| Trigger | workflow_run: workflows: pre-commit, golangci-lint, Validate docs generation structure, docs-build, fragment-in-pr; workflow_run: types: completed |
+| Source | [`trigger-pr-actions-detective.yml`](../trigger-pr-actions-detective.yml) |
+| Trigger | Completion of selected workflows |
 
 ## Purpose
 
-The workflow is named **PR Actions Detective** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The caller delegates workflow-failure investigation to `gh-aw-pr-actions-detective.lock.yml` in `elastic/ai-github-actions`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `workflow_run: workflows: pre-commit, golangci-lint, Validate docs generation structure, docs-build, fragment-in-pr`
-- `workflow_run: types: completed`
+It listens for completed runs of `pre-commit`, `golangci-lint`, `Validate docs generation structure`, `docs-build`, or `fragment-in-pr`. The job runs only for a failed run with at least one associated pull request.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | github.event.workflow_run.conclusion == 'failure' && toJSON(github.event.workflow_run.pull_requests) != '[]' | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-pr-actions-detective.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Matching workflow failed and has PR association | Completed workflow run | Calls the external detective with setup commands and failure-as-issue reporting disabled. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: read, copilot-requests: write, issues: write, pull-requests: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: read`, `copilot-requests: write`, `issues: write`, `pull-requests: write`. |
+| Outputs | Investigation behavior is external; no local artifact is declared. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The caller's reusable workflow implementation and investigation prompt are not available in this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-pr-actions-detective.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-pr-actions-detective.yml`](../trigger-pr-actions-detective.yml)
+- Workflow: [`trigger-pr-actions-detective.yml`](../trigger-pr-actions-detective.yml)

@@ -1,62 +1,41 @@
-# docs-build
+# Build documentation
 
-This GitHub Actions workflow coordinates **docs-build** from the checked-in definition.
+Delegates documentation checks and builds to the shared Elastic docs workflow for pull requests, `main` pushes, and merge groups.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/docs-build.yml`](../docs-build.yml) |
-| Trigger | pull_request: types: opened, synchronize, reopened; push: branches: main; merge_group |
+| Source | [`docs-build.yml`](../docs-build.yml) |
+| Trigger | Pull request, push to `main`, or merge group |
 
 ## Purpose
 
-The workflow is named **docs-build** and is configured to run the declared jobs: `build`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The repository workflow calls the reusable `elastic/docs-actions` build workflow and enables Vale linting for release notes and reference documentation.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: types: opened, synchronize, reopened`
-- `push: branches: main`
-- `merge_group`
+It runs for pull request `opened`, `synchronize`, and `reopened` events; pushes to `main`; and `merge_group` events. No path filter is declared.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `build` | Always when triggered | None declared | elastic/docs-actions/.github/workflows/docs-build.yml@v1 |
-
-### Steps
-
-#### `build`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `build` | Every matching event | None | Calls the external reusable docs build workflow with Vale enabled for `docs/release-notes/**` and `docs/reference/**`. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read, pull-requests: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: read`, `pull-requests: read`. |
+| Outputs | Build and lint results are produced by the external reusable workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
-
-Referenced local sources:
-
-- [`.github/workflows/docs-build.yml`](../../../.github/workflows/docs-build.yml)
+The reusable workflow implementation is in `elastic/docs-actions` and is not checked into this repository; its internal build steps are not covered here.
 
 ## Sources
-- External action or reusable workflow: `elastic/docs-actions/.github/workflows/docs-build.yml@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/docs-build.yml`](../docs-build.yml)
-- Referenced local file: [`.github/workflows/docs-build.yml`](../../../.github/workflows/docs-build.yml)
+- Workflow: [`docs-build.yml`](../docs-build.yml)
+- Reusable workflow: [`elastic/docs-actions/.github/workflows/docs-build.yml`](https://github.com/elastic/docs-actions/blob/v1/.github/workflows/docs-build.yml)

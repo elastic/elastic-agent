@@ -1,57 +1,40 @@
-# mergify backport labels copier
+# Copy labels to Mergify backports
 
-This GitHub Actions workflow coordinates **mergify backport labels copier** from the checked-in definition.
+Copies eligible labels from a pull request to an automatically created Mergify backport pull request.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/mergify-labels-copier.yml`](../mergify-labels-copier.yml) |
-| Trigger | pull_request: types: opened |
+| Source | [`mergify-labels-copier.yml`](../mergify-labels-copier.yml) |
+| Trigger | Pull request opened |
 
 ## Purpose
 
-The workflow is named **mergify backport labels copier** and is configured to run the declared jobs: `mergify-backport-labels-copier`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow delegates label copying to `elastic/oblt-actions` for pull requests whose head branch uses the `mergify/bp/` prefix.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: types: opened`
+It listens to `pull_request:opened`; the job condition restricts execution to `mergify/bp/` head branches.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `mergify-backport-labels-copier` | startsWith(github.head_ref, 'mergify/bp/') | None declared | ubuntu-latest |
-
-### Steps
-
-#### `mergify-backport-labels-copier`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/mergify/labels-copier@v1 | Always when job runs |
-|  | Inputs: `excluded-labels-regex` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `mergify-backport-labels-copier` | Head branch starts with `mergify/bp/` | None | Runs the external labels-copier action and excludes labels matching the configured backport pattern. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: read`; job-level `pull-requests: write` and `repository-projects: read`. |
+| Outputs | Label changes are performed by the external action. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The action implementation is external and is not checked into this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/mergify/labels-copier@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/mergify-labels-copier.yml`](../mergify-labels-copier.yml)
+- Workflow: [`mergify-labels-copier.yml`](../mergify-labels-copier.yml)

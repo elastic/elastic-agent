@@ -1,68 +1,44 @@
-# release-helm-charts
+# Release Helm charts
 
-This GitHub Actions workflow coordinates **release-helm-charts** from the checked-in definition.
+Triggers the Helm chart Buildkite pipeline for published releases and supports a development snapshot run through manual dispatch.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/release-helm-charts.yml`](../release-helm-charts.yml) |
-| Trigger | workflow_dispatch; release: types: published |
+| Source | [`release-helm-charts.yml`](../release-helm-charts.yml) |
+| Trigger | Manual dispatch or published release |
 
 ## Purpose
 
-The workflow is named **release-helm-charts** and is configured to run the declared jobs: `trigger-release`, `trigger-workflow`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow delegates Helm chart creation/publication to the `elastic-agent-helm-charts` Buildkite pipeline.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `workflow_dispatch`
-- `release: types: published`
+It listens for `workflow_dispatch` and published releases. The production job runs only for the published-release event and skips refs beginning with `8.16` or `8.17`. The manual-dispatch job runs when the event action is not `published`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `trigger-release` | ${{ github.event.action == 'published' && !startsWith(github.ref_name, '8.16') && !startsWith(github.ref_name, '8.17') }} | None declared | ubuntu-latest |
-| `trigger-workflow` | github.event.action != 'published' | None declared | ubuntu-latest |
-
-### Steps
-
-#### `trigger-release`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/buildkite/run@v1 | Always when job runs |
-|  | Inputs: `branch, pipeline, token, wait-for, env-vars` |  |
-| step-2 | elastic/oblt-actions/slack/send@v1 | ${{ failure()  }} |
-|  | Inputs: `bot-token, channel-id, message` |  |
-#### `trigger-workflow`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/buildkite/run@v1 | Always when job runs |
-|  | Inputs: `branch, pipeline, token, wait-for, env-vars` |  |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `trigger-release` | Published release outside the excluded prefixes | None | Runs and waits for Buildkite using production settings; posts to Slack on failure. |
+| `trigger-workflow` | Non-published dispatch event | None | Runs and waits for Buildkite using development snapshot settings. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Inputs | Release ref is passed as the Buildkite branch. |
+| Permissions | `contents: read`. |
+| Outputs | Buildkite run result; production uses `SNAPSHOT=false` and `HELM_REPO_ENV=prod`, while manual runs use `SNAPSHOT=true` and `HELM_REPO_ENV=dev`. Both set `USE_PACKAGE_VERSION=false`. |
+| Secrets | `BUILDKITE_TOKEN`; the production job also references `SLACK_BOT_TOKEN` on failure. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The Buildkite action is external; the checked-in pipeline is linked below.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/buildkite/run@v1` (implementation not checked in this repository).
-- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/release-helm-charts.yml`](../release-helm-charts.yml)
+- Workflow: [`release-helm-charts.yml`](../release-helm-charts.yml)
+- Checked-in pipeline definition: [`pipeline.elastic-agent-helm-charts.yml`](../../../.buildkite/pipeline.elastic-agent-helm-charts.yml)

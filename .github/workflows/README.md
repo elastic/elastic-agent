@@ -1,57 +1,74 @@
 # GitHub Actions workflows
 
-This directory contains 49 checked-in GitHub Actions workflow definitions. Each workflow has a source-backed documentation page below. Exact schedule expressions remain in the workflow files so the pages do not become stale.
+This index covers all 49 checked-in `.github/workflows/*.yml` definitions. Each page documents the checked-in caller configuration and links to local dependencies where relevant.
 
-- [`Add issue to Platform Ingest project`](docs/add-issues-to-ingest-board.md) — [`add-issues-to-ingest-board.yml`](add-issues-to-ingest-board.yml)
-- [`Backport to active branches`](docs/backport-active.md) — [`backport-active.yml`](backport-active.yml)
-- [`update-agent-versions`](docs/bump-agent-versions.md) — [`bump-agent-versions.yml`](bump-agent-versions.yml)
-- [`update-beats`](docs/bump-beats-version.md) — [`bump-beats-version.yml`](bump-beats-version.yml)
-- [`bump-edot-images`](docs/bump-edot-images.md) — [`bump-edot-images.yml`](bump-edot-images.yml)
-- [`bump-golang`](docs/bump-golang.md) — [`bump-golang.yml`](bump-golang.yml)
-- [`bump-kube-stack-version`](docs/bump-kube-stack-version.md) — [`bump-kube-stack-version.yml`](bump-kube-stack-version.yml)
-- [`bump-otel-version`](docs/bump-otel-version.md) — [`bump-otel-version.yml`](bump-otel-version.yml)
-- [`bump-vm-images`](docs/bump-vm-images.md) — [`bump-vm-images.yml`](bump-vm-images.yml)
-- [`catalog-info`](docs/catalog-info.md) — [`catalog-info.yml`](catalog-info.yml)
-- [`docs-build`](docs/docs-build.md) — [`docs-build.yml`](docs-build.yml)
-- [`docs-deploy`](docs/docs-deploy.md) — [`docs-deploy.yml`](docs-deploy.yml)
-- [`docs-preview-cleanup`](docs/docs-preview-cleanup.md) — [`docs-preview-cleanup.yml`](docs-preview-cleanup.yml)
-- [`fragment-in-pr`](docs/fragment-in-pr.md) — [`fragment-in-pr.yml`](fragment-in-pr.yml)
-- [`golangci-lint`](docs/golangci-lint.md) — [`golangci-lint.yml`](golangci-lint.yml)
-- [`macos-unit-tests`](docs/macos-unit-tests.md) — [`macos-unit-tests.yml`](macos-unit-tests.yml)
-- [`mergify backport labels copier`](docs/mergify-labels-copier.md) — [`mergify-labels-copier.yml`](mergify-labels-copier.yml)
-- [`post-dependency-update`](docs/post-dependency-update.md) — [`post-dependency-update.yml`](post-dependency-update.yml)
-- [`pre-commit`](docs/pre-commit.md) — [`pre-commit.yml`](pre-commit.yml)
-- [`release-helm-charts-manual`](docs/release-helm-charts-manual.md) — [`release-helm-charts-manual.yml`](release-helm-charts-manual.yml)
-- [`release-helm-charts`](docs/release-helm-charts.md) — [`release-helm-charts.yml`](release-helm-charts.yml)
-- [`Generate release notes`](docs/release-notes.md) — [`release-notes.yml`](release-notes.yml)
-- [`Buildkite Test Flaky`](docs/report-buildkite-flaky-tests.md) — [`report-buildkite-flaky-tests.yml`](report-buildkite-flaky-tests.yml)
-- [`serverless-project`](docs/serverless-project.md) — [`serverless-project.yml`](serverless-project.yml)
-- [`Sweeper: Coordinator and Health Status Accuracy`](docs/sweep-coordinator-status-accuracy.md) — [`sweep-coordinator-status-accuracy.yml`](sweep-coordinator-status-accuracy.yml)
-- [`Sweeper: Fleet Enrollment and Communication Resilience`](docs/sweep-fleet-enrollment-resilience.md) — [`sweep-fleet-enrollment-resilience.yml`](sweep-fleet-enrollment-resilience.yml)
-- [`Sweeper: OTel Collector and Beats Receiver Integration`](docs/sweep-otel-collector-integration.md) — [`sweep-otel-collector-integration.yml`](sweep-otel-collector-integration.yml)
-- [`Sweeper: Upgrade and Rollback Lifecycle`](docs/sweep-upgrade-lifecycle.md) — [`sweep-upgrade-lifecycle.yml`](sweep-upgrade-lifecycle.yml)
-- [`Breaking Change Detect`](docs/trigger-breaking-change-detect.md) — [`trigger-breaking-change-detect.yml`](trigger-breaking-change-detect.yml)
-- [`Docs New Contributor Review`](docs/trigger-docs-new-contributor-review.md) — [`trigger-docs-new-contributor-review.yml`](trigger-docs-new-contributor-review.yml)
-- [`Docs Patrol`](docs/trigger-docs-patrol.md) — [`trigger-docs-patrol.yml`](trigger-docs-patrol.yml)
-- [`Duplicate Issue Detector`](docs/trigger-duplicate-issue-detector.md) — [`trigger-duplicate-issue-detector.yml`](trigger-duplicate-issue-detector.yml)
-- [`Issue Triage`](docs/trigger-issue-triage.md) — [`trigger-issue-triage.yml`](trigger-issue-triage.yml)
-- [`Mention in Issue`](docs/trigger-mention-in-issue.md) — [`trigger-mention-in-issue.yml`](trigger-mention-in-issue.yml)
-- [`Mention in PR`](docs/trigger-mention-in-pr.md) — [`trigger-mention-in-pr.yml`](trigger-mention-in-pr.yml)
-- [`Observability Agentic Workflow — Issue Comment`](docs/trigger-obs-aw-issue-comment.md) — [`trigger-obs-aw-issue-comment.yml`](trigger-obs-aw-issue-comment.yml)
-- [`Observability Agentic Workflow — Issues`](docs/trigger-obs-aw-issues.md) — [`trigger-obs-aw-issues.yml`](trigger-obs-aw-issues.yml)
-- [`Observability Agentic Workflow — Pull Request`](docs/trigger-obs-aw-pull-request.md) — [`trigger-obs-aw-pull-request.yml`](trigger-obs-aw-pull-request.yml)
-- [`Observability Agentic Workflow — Schedule (daily)`](docs/trigger-obs-aw-schedule-daily.md) — [`trigger-obs-aw-schedule-daily.yml`](trigger-obs-aw-schedule-daily.yml)
-- [`Observability Agentic Workflow — Schedule (frequent)`](docs/trigger-obs-aw-schedule-frequent.md) — [`trigger-obs-aw-schedule-frequent.yml`](trigger-obs-aw-schedule-frequent.yml)
-- [`Observability Agentic Workflow — Status`](docs/trigger-obs-aw-status.md) — [`trigger-obs-aw-status.yml`](trigger-obs-aw-status.yml)
-- [`PR Actions Detective`](docs/trigger-pr-actions-detective.md) — [`trigger-pr-actions-detective.yml`](trigger-pr-actions-detective.yml)
-- [`PR Review`](docs/trigger-pr-review.md) — [`trigger-pr-review.yml`](trigger-pr-review.yml)
-- [`Stale Issues Investigator`](docs/trigger-stale-issues.md) — [`trigger-stale-issues.yml`](trigger-stale-issues.yml)
-- [`Text Auditor`](docs/trigger-text-auditor.md) — [`trigger-text-auditor.yml`](trigger-text-auditor.yml)
-- [`Update documentation`](docs/update-docs.md) — [`update-docs.yml`](update-docs.yml)
-- [`update-renovate-branches`](docs/update-renovate-branches.md) — [`update-renovate-branches.yml`](update-renovate-branches.yml)
-- [`updatecli-compose`](docs/updatecli-compose.md) — [`updatecli-compose.yml`](updatecli-compose.yml)
-- [`Validate docs generation structure`](docs/validate-docs-structure.md) — [`validate-docs-structure.yml`](validate-docs-structure.yml)
+## CI and documentation validation
 
-## Source limitations
+- [Catalog metadata validation](docs/catalog-info.md)
+- [Documentation build](docs/docs-build.md)
+- [Documentation deployment](docs/docs-deploy.md)
+- [Documentation preview cleanup](docs/docs-preview-cleanup.md)
+- [Changelog fragment checks](docs/fragment-in-pr.md)
+- [golangci-lint](docs/golangci-lint.md)
+- [macOS unit tests](docs/macos-unit-tests.md)
+- [Pre-commit checks](docs/pre-commit.md)
+- [Documentation-generation structure validation](docs/validate-docs-structure.md)
 
-Documentation is based on the checked-in workflow files and local files available in this checkout. Implementations of external actions and reusable workflows are not copied into this repository; pages identify those references as source-access gaps where relevant.
+## Dependency automation
+
+- [Agent test-version updates](docs/bump-agent-versions.md)
+- [Beats version updates](docs/bump-beats-version.md)
+- [EDOT SDK image updates](docs/bump-edot-images.md)
+- [Go version updates](docs/bump-golang.md)
+- [Kube Stack chart updates](docs/bump-kube-stack-version.md)
+- [OpenTelemetry dependency updates](docs/bump-otel-version.md)
+- [VM image updates](docs/bump-vm-images.md)
+- [Dependency-update follow-on changes](docs/post-dependency-update.md)
+- [Renovate branch updates](docs/update-renovate-branches.md)
+- [Composed Updatecli policies](docs/updatecli-compose.md)
+
+## Release and publication
+
+- [Manual Helm chart release](docs/release-helm-charts-manual.md)
+- [Helm chart release](docs/release-helm-charts.md)
+- [Release-note generation](docs/release-notes.md)
+- [Generated documentation updates](docs/update-docs.md)
+
+## Repository and infrastructure maintenance
+
+- [Add labeled issues to the Platform Ingest project](docs/add-issues-to-ingest-board.md)
+- [Backport to active branches](docs/backport-active.md)
+- [Copy labels to Mergify backports](docs/mergify-labels-copier.md)
+- [Buildkite flaky-test reporting](docs/report-buildkite-flaky-tests.md)
+- [Serverless integration-test project](docs/serverless-project.md)
+
+## Agentic audits and issue/PR assistance
+
+- [Coordinator status-accuracy sweep](docs/sweep-coordinator-status-accuracy.md)
+- [Fleet enrollment resilience sweep](docs/sweep-fleet-enrollment-resilience.md)
+- [OTel Collector integration sweep](docs/sweep-otel-collector-integration.md)
+- [Upgrade and rollback lifecycle sweep](docs/sweep-upgrade-lifecycle.md)
+- [Breaking-change detection](docs/trigger-breaking-change-detect.md)
+- [New-contributor documentation review](docs/trigger-docs-new-contributor-review.md)
+- [Documentation patrol](docs/trigger-docs-patrol.md)
+- [Duplicate issue detection](docs/trigger-duplicate-issue-detector.md)
+- [Issue triage](docs/trigger-issue-triage.md)
+- [AI assistance from issue comments](docs/trigger-mention-in-issue.md)
+- [AI assistance from pull-request comments](docs/trigger-mention-in-pr.md)
+- [PR workflow-failure investigation](docs/trigger-pr-actions-detective.md)
+- [Automated PR review](docs/trigger-pr-review.md)
+- [Stale-issue investigation](docs/trigger-stale-issues.md)
+- [Text audit](docs/trigger-text-auditor.md)
+
+## Observability Agentic Workflow event routing
+
+- [Issue-comment events](docs/trigger-obs-aw-issue-comment.md)
+- [Issue events](docs/trigger-obs-aw-issues.md)
+- [Pull-request events](docs/trigger-obs-aw-pull-request.md)
+- [Daily schedule profile](docs/trigger-obs-aw-schedule-daily.md)
+- [Frequent schedule profile](docs/trigger-obs-aw-schedule-frequent.md)
+- [Buildkite failure status events](docs/trigger-obs-aw-status.md)
+
+## Source access gaps
+
+Several callers use reusable workflows or actions maintained outside this repository, including `elastic/ai-github-actions`, `elastic/oblt-aw`, `elastic/oblt-actions`, `elastic/docs-actions`, and `elastic/elastic-agent-changelog-tool`. Their implementations are not checked in here; the per-workflow pages document only the local trigger, permissions, inputs, and configuration available in this checkout. No repository-local composite actions were found under `.github/actions/`, and none of the 49 checked-in workflow files defines a `workflow_call` reusable workflow.

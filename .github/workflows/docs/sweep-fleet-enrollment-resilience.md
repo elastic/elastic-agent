@@ -1,57 +1,40 @@
-# Sweeper: Fleet Enrollment and Communication Resilience
+# Sweep Fleet enrollment resilience
 
-This GitHub Actions workflow coordinates **Sweeper: Fleet Enrollment and Communication Resilience** from the checked-in definition.
+Runs a scheduled code-quality audit focused on Fleet enrollment, check-in, re-enrollment, and liveness resilience.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/sweep-fleet-enrollment-resilience.yml`](../sweep-fleet-enrollment-resilience.yml) |
-| Trigger | schedule; workflow_dispatch |
+| Source | [`sweep-fleet-enrollment-resilience.yml`](../sweep-fleet-enrollment-resilience.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **Sweeper: Fleet Enrollment and Communication Resilience** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The inline audit instructions direct the shared workflow to investigate enrollment state, Fleet communication/backoff, and liveness behavior, and to report only confirmed scenarios possible in normal agent operation.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `schedule`
-- `workflow_dispatch`
+Runs on a schedule or when manually dispatched. No branch/path filter is declared.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | Always when triggered | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Every matching event | None | Calls the external code-quality audit workflow with a high severity threshold, repository setup commands, and Fleet resilience instructions. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: read, copilot-requests: write, issues: write, pull-requests: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: read`, `copilot-requests: write`, `issues: write`, `pull-requests: read`. |
+| Outputs | The external workflow is instructed to file one issue for confirmed findings; `report-failure-as-issue` is false. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The external reusable workflow is not present locally. The source includes setup commands to install required system libraries and build Mage.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-code-quality-audit.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/sweep-fleet-enrollment-resilience.yml`](../sweep-fleet-enrollment-resilience.yml)
+- Workflow: [`sweep-fleet-enrollment-resilience.yml`](../sweep-fleet-enrollment-resilience.yml)

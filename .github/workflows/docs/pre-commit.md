@@ -1,57 +1,40 @@
-# pre-commit
+# Run pre-commit checks
 
-This GitHub Actions workflow coordinates **pre-commit** from the checked-in definition.
+Delegates pre-commit checks to the shared Elastic pre-commit action on pull requests and selected branch pushes.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/pre-commit.yml`](../pre-commit.yml) |
-| Trigger | pull_request; push: branches: main, 8.*, 9.* |
+| Source | [`pre-commit.yml`](../pre-commit.yml) |
+| Trigger | Pull request or push to `main`, `8.*`, or `9.*` |
 
 ## Purpose
 
-The workflow is named **pre-commit** and is configured to run the declared jobs: `pre-commit`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow calls `elastic/oblt-actions/pre-commit@v1`; its detailed check set is maintained by that external action.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request`
-- `push: branches: main, 8.*, 9.*`
+It runs for pull requests and pushes to `main`, `8.*`, and `9.*`. No path filter is declared.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `pre-commit` | Always when triggered | None declared | ubuntu-latest |
-
-### Steps
-
-#### `pre-commit`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-| step-1 | elastic/oblt-actions/pre-commit@v1 | Always when job runs |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `pre-commit` | Every matching event | None | Runs the shared pre-commit action on `ubuntu-latest`. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{contents: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `contents: read`. |
+| Outputs | Check results are reported by the external action. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The action implementation and its exact hook list are not available in this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/oblt-actions/pre-commit@v1` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/pre-commit.yml`](../pre-commit.yml)
+- Workflow: [`pre-commit.yml`](../pre-commit.yml)

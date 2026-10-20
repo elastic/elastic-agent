@@ -1,57 +1,40 @@
-# Docs New Contributor Review
+# Review documentation for new contributors
 
-This GitHub Actions workflow coordinates **Docs New Contributor Review** from the checked-in definition.
+Runs a scheduled agentic patrol that delegates new-contributor documentation review to the shared Elastic AI workflow.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-docs-new-contributor-review.yml`](../trigger-docs-new-contributor-review.yml) |
-| Trigger | schedule; workflow_dispatch |
+| Source | [`trigger-docs-new-contributor-review.yml`](../trigger-docs-new-contributor-review.yml) |
+| Trigger | Manual dispatch or schedule |
 
 ## Purpose
 
-The workflow is named **Docs New Contributor Review** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The caller invokes the `gh-aw-newbie-contributor-patrol.lock.yml` reusable workflow with repository setup commands.
 
 ## When it runs
 
-Runs on a schedule; consult the workflow source for the current scheduler configuration.
-The configured trigger events and filters are:
-
-- `schedule`
-- `workflow_dispatch`
+Runs on a schedule or when manually dispatched. No branch/path filter is configured.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | Always when triggered | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-newbie-contributor-patrol.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Every matching event | None | Calls the external documentation patrol workflow and installs the listed system libraries and Mage prerequisites. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: read, copilot-requests: write, issues: write, pull-requests: read}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: read`, `copilot-requests: write`, `issues: write`, `pull-requests: read`. |
+| Outputs | Failure-as-issue reporting is disabled by the caller. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The reusable workflow and patrol logic are external and not checked into this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-newbie-contributor-patrol.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-docs-new-contributor-review.yml`](../trigger-docs-new-contributor-review.yml)
+- Workflow: [`trigger-docs-new-contributor-review.yml`](../trigger-docs-new-contributor-review.yml)

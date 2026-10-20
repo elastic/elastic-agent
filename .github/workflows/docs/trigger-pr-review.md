@@ -1,55 +1,40 @@
-# PR Review
+# Review pull requests automatically
 
-This GitHub Actions workflow coordinates **PR Review** from the checked-in definition.
+Invokes the shared PR review workflow for eligible non-draft pull requests from trusted repository collaborators.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-pr-review.yml`](../trigger-pr-review.yml) |
-| Trigger | pull_request: types: opened, synchronize, reopened, ready_for_review, labeled, unlabeled |
+| Source | [`trigger-pr-review.yml`](../trigger-pr-review.yml) |
+| Trigger | Pull request opened, synchronized, reopened, ready for review, labeled, or unlabeled |
 
 ## Purpose
 
-The workflow is named **PR Review** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow delegates automated review to `gh-aw-pr-review.lock.yml` in `elastic/ai-github-actions`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `pull_request: types: opened, synchronize, reopened, ready_for_review, labeled, unlabeled`
+The job requires a non-draft PR, excludes PRs with the `skip-auto-pr-review` label, and limits execution to authors associated as `OWNER`, `MEMBER`, or `COLLABORATOR`.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'skip-auto-pr-review') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-pr-review.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | PR passes all job conditions | None | Calls the external review workflow with repository setup commands and failure-as-issue reporting disabled. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: read, copilot-requests: write, issues: write, pull-requests: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: read`, `copilot-requests: write`, `issues: write`, `pull-requests: write`. |
+| Outputs | Review behavior and any comments are controlled by the external reusable workflow. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The external reviewer implementation is not checked into this repository.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-pr-review.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-pr-review.yml`](../trigger-pr-review.yml)
+- Workflow: [`trigger-pr-review.yml`](../trigger-pr-review.yml)

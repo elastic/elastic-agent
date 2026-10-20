@@ -1,56 +1,40 @@
-# Mention in PR
+# Run AI assistance from a pull request comment
 
-This GitHub Actions workflow coordinates **Mention in PR** from the checked-in definition.
+Invokes the shared PR assistant for explicit commands or mentions in PR conversation and review comments.
 
 ## At a glance
 
 | | |
 | --- | --- |
 | Platform | GitHub Actions |
-| Source | [`.github/workflows/trigger-mention-in-pr.yml`](../trigger-mention-in-pr.yml) |
-| Trigger | issue_comment: types: created; pull_request_review_comment: types: created |
+| Source | [`trigger-mention-in-pr.yml`](../trigger-mention-in-pr.yml) |
+| Trigger | Issue comment or pull-request review comment created |
 
 ## Purpose
 
-The workflow is named **Mention in PR** and is configured to run the declared jobs: `run`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+The workflow routes `/ai` commands or `@claude` mentions on pull requests to `gh-aw-mention-in-pr.lock.yml`.
 
 ## When it runs
 
-The configured trigger events and filters are:
-
-- `issue_comment: types: created`
-- `pull_request_review_comment: types: created`
+It listens for created `issue_comment` and `pull_request_review_comment` events. The job requires a matching comment body and confirms the event is associated with a pull request.
 
 ## Execution flow
 
-| Job | Runs when | Depends on | Runner or reusable workflow |
+| Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `run` | (startsWith(github.event.comment.body, '/ai') \|\| contains(github.event.comment.body, '@claude')) && (github.event.issue.pull_request != null \|\| github.event_name == 'pull_request_review_comment') | None declared | elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr.lock.yml@v0 |
-
-### Steps
-
-#### `run`
-
-| Step | Action or command | Condition |
-| --- | --- | --- |
-
-The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+| `run` | Comment passes the PR and command checks | None | Calls the external PR assistant with setup commands. |
 
 ## Inputs, outputs, and access
 
 | Item | Details |
 | --- | --- |
-| Inputs | No workflow inputs are declared. |
-| Environment | No workflow-level environment variables are declared. |
-| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
-| Permissions | `{actions: read, contents: write, copilot-requests: write, discussions: write, issues: write,   pull-requests: write}` |
-| Deployment environments | No job deployment environment is declared. |
+| Permissions | `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `issues: write`, `pull-requests: write`. |
+| Outputs | The external workflow handles the assistant response and any resulting PR activity. |
 
 ## Operational notes
 
-This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+The reusable assistant implementation is not checked in here. The caller installs repository tooling through its setup commands.
 
 ## Sources
-- External action or reusable workflow: `elastic/ai-github-actions/.github/workflows/gh-aw-mention-in-pr.lock.yml@v0` (implementation not checked in this repository).
 
-- Workflow: [`.github/workflows/trigger-mention-in-pr.yml`](../trigger-mention-in-pr.yml)
+- Workflow: [`trigger-mention-in-pr.yml`](../trigger-mention-in-pr.yml)
