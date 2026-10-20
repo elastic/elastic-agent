@@ -860,6 +860,22 @@ shared:
     <<: *agent_docker_spec
     docker_variant: 'complete-wolfi'
 
+  - &agent_docker_ironbank_spec
+    <<: *agent_docker_spec
+    docker_variant: 'ironbank'
+    extra_vars:
+      dockerfile: '../ironbank/Dockerfile.tmpl'
+      docker_entrypoint: 'docker-entrypoint.elastic-agent.tmpl'
+      # The Ironbank base image needs privileged registry access, so CI builds
+      # this variant on the public UBI image instead. tinit and jq are added to
+      # the build context from hardening_manifest.yaml.tmpl by the Package mage
+      # target.
+      public_build: 'true'
+      build_args: 'BASE_REGISTRY=registry.access.redhat.com,BASE_IMAGE=ubi10/ubi'
+      user: '{{ .BeatName }}'
+      linux_capabilities: ''
+      beats_install_path: "install"
+
   #
   # License modifiers for the Elastic License
   #
@@ -948,6 +964,14 @@ specs:
         <<: *docker_ubi_spec
         <<: *docker_builder_spec
         <<: *agent_docker_complete_spec
+        <<: *docker_elastic_spec
+        <<: *elastic_license_for_binaries
+
+    - os: linux
+      arch: amd64
+      types: [docker]
+      spec:
+        <<: *agent_docker_ironbank_spec
         <<: *docker_elastic_spec
         <<: *elastic_license_for_binaries
 
