@@ -1,0 +1,68 @@
+# release-helm-charts-manual
+
+This GitHub Actions workflow coordinates **release-helm-charts-manual** from the checked-in definition.
+
+## At a glance
+
+| | |
+| --- | --- |
+| Platform | GitHub Actions |
+| Source | [`.github/workflows/release-helm-charts-manual.yml`](../release-helm-charts-manual.yml) |
+| Trigger | workflow_dispatch: inputs: branch: description: Branch the commit belongs to; workflow_dispatch: inputs: branch: required: True; workflow_dispatch: inputs: branch: type: string; workflow_dispatch: inputs: commit: description: Commit to be released; workflow_dispatch: inputs: commit: required: True; workflow_dispatch: inputs: commit: type: string; workflow_dispatch: inputs: repo-env: required: True; workflow_dispatch: inputs: repo-env: type: choice; workflow_dispatch: inputs: repo-env: options: dev, prod |
+
+## Purpose
+
+The workflow is named **release-helm-charts-manual** and is configured to run the declared jobs: `trigger-release`. Its operational purpose is defined by those jobs and their source steps; the checked-in file does not state additional rationale.
+
+## When it runs
+
+The configured trigger events and filters are:
+
+- `workflow_dispatch: inputs: branch: description: Branch the commit belongs to`
+- `workflow_dispatch: inputs: branch: required: True`
+- `workflow_dispatch: inputs: branch: type: string`
+- `workflow_dispatch: inputs: commit: description: Commit to be released`
+- `workflow_dispatch: inputs: commit: required: True`
+- `workflow_dispatch: inputs: commit: type: string`
+- `workflow_dispatch: inputs: repo-env: required: True`
+- `workflow_dispatch: inputs: repo-env: type: choice`
+- `workflow_dispatch: inputs: repo-env: options: dev, prod`
+
+## Execution flow
+
+| Job | Runs when | Depends on | Runner or reusable workflow |
+| --- | --- | --- | --- |
+| `trigger-release` | Always when triggered | None declared | ubuntu-latest |
+
+### Steps
+
+#### `trigger-release`
+
+| Step | Action or command | Condition |
+| --- | --- | --- |
+| step-1 | elastic/oblt-actions/buildkite/run@v1 | Always when job runs |
+|  | Inputs: `branch, commit, pipeline, token, wait-for, env-vars` |  |
+| step-2 | elastic/oblt-actions/slack/send@v1 | ${{ failure()  }} |
+|  | Inputs: `bot-token, channel-id, message` |  |
+
+The tables above summarize the complete job and step structure; action implementations referenced outside this repository are not expanded.
+
+## Inputs, outputs, and access
+
+| Item | Details |
+| --- | --- |
+| Inputs | `workflow_dispatch` input names: branch, commit, repo-env |
+| Environment | No workflow-level environment variables are declared. |
+| Outputs | No job outputs are declared; artifacts, caches, and step outputs are defined by individual steps where present. |
+| Permissions | `{contents: read}` |
+| Deployment environments | `trigger-release`: helmcharts |
+
+## Operational notes
+
+This page documents checked-in configuration only. It does not prove successful runs or that remote action and reusable-workflow implementations match their referenced revisions.
+
+## Sources
+- External action or reusable workflow: `elastic/oblt-actions/buildkite/run@v1` (implementation not checked in this repository).
+- External action or reusable workflow: `elastic/oblt-actions/slack/send@v1` (implementation not checked in this repository).
+
+- Workflow: [`.github/workflows/release-helm-charts-manual.yml`](../release-helm-charts-manual.yml)
