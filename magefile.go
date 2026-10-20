@@ -160,15 +160,12 @@ type Integration mg.Namespace
 // Otel namespace contains Open Telemetry related tasks.
 type Otel mg.Namespace
 
-<<<<<<< HEAD
-=======
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
 
 // Release namespace contains tasks for release automation.
 type Release mg.Namespace
 
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -4376,7 +4373,6 @@ func getMacOSMajorVersion() (int, error) {
 	return majorVer, nil
 }
 
-<<<<<<< HEAD
 func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
 	buildTargets := make([]interface{}, 0, 2)
@@ -4385,7 +4381,7 @@ func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	}
 	buildTargets = append(buildTargets, CrossBuild)
 	return buildTargets
-=======
+
 // loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
 func loadReleaseConfig() (*release.ReleaseConfig, error) {
 	settings, err := devtools.LoadSettings()
@@ -4447,5 +4443,4 @@ func (Release) EnsureIssueTracker() error {
 		return err
 	}
 	return release.EnsureReleaseIssueTracker(cfg, nil)
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 }
