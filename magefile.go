@@ -43,6 +43,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/dev-tools/mage/otel"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
@@ -159,6 +160,15 @@ type Integration mg.Namespace
 // Otel namespace contains Open Telemetry related tasks.
 type Otel mg.Namespace
 
+<<<<<<< HEAD
+=======
+// Devmachine namespace contains tasks related to remote development machines.
+type Devmachine mg.Namespace
+
+// Release namespace contains tasks for release automation.
+type Release mg.Namespace
+
+>>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
 	err := sh.RunV("go", "mod", "tidy", "-v")
@@ -4366,6 +4376,7 @@ func getMacOSMajorVersion() (int, error) {
 	return majorVer, nil
 }
 
+<<<<<<< HEAD
 func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
 	buildTargets := make([]interface{}, 0, 2)
@@ -4374,4 +4385,67 @@ func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	}
 	buildTargets = append(buildTargets, CrossBuild)
 	return buildTargets
+=======
+// loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadSettings()
+	if err != nil {
+		return nil, err
+	}
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	cfg := settings.Release
+	return &cfg, nil
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateDocs updates version references in documentation and K8s manifests
+func (Release) UpdateDocs(version string) error {
+	return release.UpdateDocs(version)
+}
+
+// UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
+func (Release) UpdatePatchDocs(version string) error {
+	return release.UpdatePatchDocs(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
+}
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunMajorMinor() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
+}
+
+// RunPatch orchestrates the complete patch release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunPatch() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
+}
+
+// EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
+// CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
+>>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 }
