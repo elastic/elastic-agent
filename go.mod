@@ -37,12 +37,8 @@ require (
 	github.com/gofrs/uuid/v5 v5.4.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.22.1
-<<<<<<< HEAD
-	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50
-=======
 	github.com/google/go-github/v68 v68.0.0
-	github.com/google/pprof v0.0.0-20261012182904-4ba64fccc330
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
+	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50
 	github.com/gorilla/mux v1.8.1
 	github.com/jaypipes/ghw v0.25.0
 	github.com/jedib0t/go-pretty/v6 v6.8.3
@@ -206,11 +202,7 @@ require (
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gohugoio/hashstructure v0.6.0 // indirect
-<<<<<<< HEAD
-=======
-	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
@@ -232,25 +224,17 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-<<<<<<< HEAD
 	github.com/jaypipes/pcidb v1.1.1 // indirect
-=======
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 	github.com/jcmturner/aescts/v2 v2.0.0 // indirect
 	github.com/jcmturner/dnsutils/v2 v2.0.0 // indirect
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/goidentity/v6 v6.0.1 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
-<<<<<<< HEAD
+	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-=======
-	github.com/kevinburke/ssh_config v1.2.0 // indirect
-	github.com/klauspost/compress v1.20.3 // indirect
-	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
 	github.com/knadh/koanf/providers/confmap v1.0.1 // indirect
 	github.com/knadh/koanf/providers/env v1.1.0 // indirect
@@ -294,12 +278,8 @@ require (
 	github.com/osquery/osquery-go v0.0.0-20260226222546-0cc22f415e57 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
-<<<<<<< HEAD
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
-=======
-	github.com/pierrec/lz4/v4 v4.1.33 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
@@ -318,12 +298,8 @@ require (
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.8 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-<<<<<<< HEAD
 	github.com/sirupsen/logrus v1.9.4 // indirect
-=======
-	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
@@ -408,11 +384,6 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-<<<<<<< HEAD
-	golang.org/x/oauth2 v0.37.0 // indirect
-=======
-	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
->>>>>>> 06f8782 (ci(ff): support feature freeze automation (#15433))
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
 	golang.org/x/tools v0.52.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
