@@ -126,7 +126,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.77.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/proxy-connect-dialer-go v0.1.1 // indirect
-	github.com/elastic/tk-btf v0.2.0 // indirect
+	github.com/elastic/tk-btf v0.3.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
@@ -147,6 +147,11 @@ require (
 	github.com/gosnmp/gosnmp v1.45.0 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
 	github.com/hashicorp/go-metrics v0.6.0 // indirect
+	github.com/hashicorp/go-secure-stdlib/parseutil v0.2.0 // indirect
+	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
+	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
+	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
+	github.com/hashicorp/vault/api v1.23.0 // indirect
 	github.com/honeycombio/dynsampler-go v0.6.4 // indirect
 	github.com/huandu/go-clone v1.7.3 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
@@ -184,6 +189,7 @@ require (
 	github.com/prometheus/client_golang/exp v0.0.0-20260907100614-57bb367da472 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
 	github.com/rdforte/gomaxecs v1.1.2 // indirect
+	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
@@ -352,7 +358,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.73.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.89.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.74.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.338.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.339.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.63.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/health v1.50.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.64.4
@@ -361,7 +367,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lightsail v1.64.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/organizations v1.61.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/organizations v1.62.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/rds v1.130.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.41.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3 // indirect
