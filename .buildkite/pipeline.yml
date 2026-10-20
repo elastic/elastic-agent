@@ -329,8 +329,11 @@ steps:
           - *google_oidc_plugin
 
       # Runs only on main and release branches, like "Unit tests - macOS 13".
+      # Skipped like "Unit tests - macOS 13" due to Orka provider slowness,
+      # see https://github.com/elastic/elastic-agent/pull/17290
       - label: "EDOT unit tests - macOS 13"
         key: "edot-unit-tests-macos13"
+        skip: "Orka slowness, see github.com/elastic/elastic-agent/pull/17290"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: "main 8.* 9.*"
         env:
@@ -379,7 +382,10 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+  # Skipping due to Orka provider slowness
+  # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
   - group: "macOS tests"
+    skip: true
     key: "macos-unit-tests"
     steps:
       # Runs only on main and release branches
