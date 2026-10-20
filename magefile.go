@@ -4381,6 +4381,7 @@ func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	}
 	buildTargets = append(buildTargets, CrossBuild)
 	return buildTargets
+}
 
 // loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
 func loadReleaseConfig() (*release.ReleaseConfig, error) {
