@@ -299,6 +299,10 @@ func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logge
 
 	inputID, _ := input["id"].(string)
 
+	if hasUnsupportedKubernetesVarRef(input, "id", "name", "streams") {
+		return false
+	}
+
 	// The rewrite collapses per-container dynamic inputs — those whose paths or
 	// ids contain ${kubernetes.*} variable references injected by the kubernetes
 	// provider. A fully static input (no such references) was never templated by
@@ -340,6 +344,9 @@ func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logge
 		if _, hasCondition := streamMap["condition"]; hasCondition {
 			return false
 		}
+		if hasUnsupportedKubernetesVarRef(streamMap, "id", "paths", "processors") {
+			return false
+		}
 		procs, _ := streamMap["processors"].([]interface{})
 		for _, proc := range procs {
 			if processorHasUntransformableKubernetesVarRef(proc) {
@@ -363,6 +370,33 @@ func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logge
 		}
 	}
 	return true
+}
+
+// hasUnsupportedKubernetesVarRef reports whether the map references a
+// ${kubernetes.*} variable anywhere the rewrite cannot make static. The keys in
+// handled are the ones the rewrite rewrites itself; an id-like key only counts
+// as handled when stripping its references leaves a usable id. A reference left
+// anywhere else would keep the kubernetes provider rendering the input once per
+// pod, even though its ids and paths no longer differ.
+func hasUnsupportedKubernetesVarRef(m map[string]interface{}, handled ...string) bool {
+	for key, value := range m {
+		if !walkHasKubernetesVarRef(value) {
+			continue
+		}
+		if !slices.Contains(handled, key) {
+			return true
+		}
+		if key == "id" || key == "name" {
+			str, isString := value.(string)
+			if !isString {
+				return true
+			}
+			if _, ok := containerLogGlobID(str); !ok {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // referencesHintsProvider reports whether any string anywhere in the input tree

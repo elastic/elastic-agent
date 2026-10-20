@@ -1348,3 +1348,88 @@ func TestRewriteContainerLogInputs_AnnotationMappingKeepsStaticFields(t *testing
 	assert.Equal(t, map[string]interface{}{"owner": "platform"}, residual["fields"])
 	assert.Equal(t, "kubernetes", residual["target"])
 }
+
+// TestRewriteContainerLogInputs_KubernetesVarInUnsupportedStreamFieldDisqualifiesInput
+// verifies that an input is left unchanged when a ${kubernetes.*} reference
+// exists outside the locations the rewrite knows how to make static. Rewriting
+// this input would collapse its IDs and paths while leaving the fields value
+// dynamic, so the kubernetes provider would still render it once per pod.
+func TestRewriteContainerLogInputs_KubernetesVarInUnsupportedStreamFieldDisqualifiesInput(t *testing.T) {
+	const cfg = `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+        fields:
+          source_pod: '${kubernetes.pod.name}'
+`
+	before := mustConfig(t, cfg)
+	after := mustConfig(t, cfg)
+	RewriteContainerLogInputs(after, true, logp.NewNopLogger())
+
+	assertConfigUnchanged(t, before, after,
+		"input with a kubernetes variable in an unsupported stream field must not be rewritten")
+}
+
+// TestRewriteContainerLogInputs_OtherUnsupportedKubernetesVarsDisqualifyInput
+// covers the same hazard as above for an input-level field and for ids that
+// consist only of a variable, which stripping cannot turn into a static id.
+func TestRewriteContainerLogInputs_OtherUnsupportedKubernetesVarsDisqualifyInput(t *testing.T) {
+	cases := map[string]string{
+		"input level field": `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    meta:
+      pod: '${kubernetes.pod.name}'
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+`,
+		"stream id that is only a variable": `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: '${kubernetes.container.id}'
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+`,
+		"variable in parsers": `
+inputs:
+  - id: filestream-container-logs
+    type: filestream
+    streams:
+      - id: kubernetes-container-logs-${kubernetes.container.id}
+        data_stream:
+          dataset: kubernetes.container_logs
+          type: logs
+        paths:
+          - /var/log/containers/*${kubernetes.container.id}.log
+        parsers:
+          - container:
+              stream: '${kubernetes.pod.name}'
+`,
+	}
+	for name, cfg := range cases {
+		t.Run(name, func(t *testing.T) {
+			before := mustConfig(t, cfg)
+			after := mustConfig(t, cfg)
+			RewriteContainerLogInputs(after, true, logp.NewNopLogger())
+			assertConfigUnchanged(t, before, after, "input must not be rewritten while a kubernetes variable stays dynamic")
+		})
+	}
+}
