@@ -747,10 +747,13 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		}
 
 		if fbfeatures.IsElasticsearchStateStoreEnabled() {
-			// Add elasticsearch state store extension for agentless mode
-			// We paste the config as is, without any translation.
-			// The state store extension will pick up relevant settings from it and ignore the rest.
-			extensionConfig[elasticsearchStateStoreExtensionName] = unitConfigMap
+			// Add the Elasticsearch state store extension for agentless mode and
+			// reuse the output's Beats authenticator for endpoints and transport.
+			extensionConfig[elasticsearchStateStoreExtensionName] = map[string]any{
+				"auth": map[string]any{
+					"authenticator": getBeatsAuthExtensionID(outputName).String(),
+				},
+			}
 		}
 	}
 
