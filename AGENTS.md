@@ -31,7 +31,9 @@ A **Makefile** still exists and CI runs targets such as `make check-ci` and `mak
 mage build:binary   # Main agent binary
 mage build:all      # All binaries for current platform
 mage dev:build      # DEV build (debug symbols)
-mage test:unit      # All unit tests
+mage test:all       # All unit tests: root module + internal/edot, in parallel
+mage test:unit      # Unit tests of the root module only
+mage test:unitEdot  # Unit tests of the internal/edot module only (separate Go module, not covered by test:unit)
 mage fmt            # Format .go and .py files
 mage check:all      # License headers, integration-test define checks, docs file validation
 mage check:lint     # golangci-lint on changed files (see make lint)
@@ -86,12 +88,14 @@ Produced artifacts will be placed in the `build` directory.
 ## Testing
 
 ```bash
-mage test:unit        # All unit tests (typical pre-PR gate)
+mage test:all         # All unit tests of all Go modules (root + internal/edot), in parallel
+mage test:unit        # Unit tests of the root module only (typical pre-PR gate)
+mage test:unitEdot    # Unit tests of the internal/edot module only (EDOT Collector)
 mage test:coverage    # Unit tests with coverage report
 go test -run TestName ./path/to/pkg -v   # Single test / package
 ```
 
-Treat **`mage test:unit` passing** as the minimum bar before considering a change complete. If you add or change integration/E2E behavior, run the relevant mage integration targets and consult the testing docs.
+Treat **`mage test:unit` passing** as the minimum bar before considering a change complete. `internal/edot` is a separate Go module, so `mage test:unit` does not reach its tests; run **`mage test:unitEdot`** as well when touching `internal/edot/`, or **`mage test:all`** to run both (Buildkite runs `test:unit` and `test:unitEdot` as separate jobs so that the two suites do not compete for CPU). If you add or change integration/E2E behavior, run the relevant mage integration targets and consult the testing docs.
 
 Testing artifacts, including outputs and results will be placed in the `build/` directory.
 
