@@ -124,7 +124,7 @@ gpg --no-default-keyring --keyring ./some-file-to-be-the-key-ring --quick-genera
 ```
 Where:
  - `--no-default-keyring`: do not use your keyring
- - `--keyring ./some-file-to-be-the-key-ring`: keyring to use, as the file do not exist, it'll create it
+ - `--keyring ./some-file-to-be-the-key-ring`: keyring to use; if the file does not exist, it will be created
  - `--quick-generate-key`: quick generate the key
  - `atest`: user-id, a.k.a the key identifier
  - `rsa2048`: algorithm to use
