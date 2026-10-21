@@ -218,7 +218,7 @@ RUN echo \
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
-ENV NODE_VERSION=22.23.3
+ENV NODE_VERSION=22.23.4
 ENV PATH="$NODE_PATH/node/bin:$PATH"
 # Install the latest version of @elastic/synthetics forcefully ignoring the previously
 # cached node_modules, heartbeat then calls the global executable to run test suites
@@ -306,7 +306,7 @@ RUN for iter in {1..10}; do \
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
-ENV NODE_VERSION=22.23.3
+ENV NODE_VERSION=22.23.4
 ENV NODE_PATH={{ $beatHome }}/.node
 ENV NPM_CONFIG_PREFIX={{ $beatHome }}/.npm
 ENV PATH="$NPM_CONFIG_PREFIX/bin:$NODE_PATH/node/bin:$PATH"
