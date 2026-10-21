@@ -76,7 +76,7 @@ require (
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.58.0
-	golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49
+	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e
 	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.61.0
 	golang.org/x/sync v0.24.0
@@ -200,7 +200,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-tpm v0.9.8 // indirect
-	github.com/google/licenseclassifier v0.0.0-20250213175939-b5d1a3369749 // indirect
+	github.com/google/licenseclassifier v0.0.0-20260218193730-3cfbab2d0e0d // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -309,7 +309,7 @@ require (
 	go.elastic.co/apm/module/apmelasticsearch/v2 v2.7.12 // indirect
 	go.elastic.co/apm/module/apmhttp/v2 v2.7.12 // indirect
 	go.elastic.co/fastjson v1.5.1 // indirect
-	go.elastic.co/go-licence-detector v0.10.0 // indirect
+	go.elastic.co/go-licence-detector v0.11.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/collector/client v1.67.0 // indirect
 	go.opentelemetry.io/collector/config/configauth v1.67.0 // indirect
