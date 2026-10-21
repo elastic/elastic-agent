@@ -873,6 +873,13 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 	binaryPath := filepath.Join(extractedPackageDir, versionedHome, "elastic-agent") // TODO eventually we will need to support .exe as well
 	require.FileExistsf(t, binaryPath, "Unable to find elastic-agent executable in versioned home in %q", extractedPackageDir)
 
+	// On darwin <versionedHome>/elastic-agent is a shell script (templates/darwin/elastic-agent.tmpl),
+	// the Go binary lives inside the app bundle.
+	darwinBinaryPath := filepath.Join(versionedHomePath, "elastic-agent.app", "Contents", "MacOS", "elastic-agent")
+	if _, err := os.Stat(darwinBinaryPath); err == nil {
+		binaryPath = darwinBinaryPath
+	}
+
 	binaries := []string{binaryPath}
 	componentsDir := filepath.Join(versionedHomePath, "components")
 	entries, err := filepath.Glob(filepath.Join(componentsDir, "*.spec.yml"))
