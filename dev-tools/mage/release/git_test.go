@@ -6,6 +6,7 @@ package release
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -282,6 +283,46 @@ func TestOpenRepo(t *testing.T) {
 	_, err = OpenRepo("/non/existent/path")
 	if err == nil {
 		t.Error("OpenRepo() should fail for non-existent path")
+	}
+}
+
+func TestOpenRepoWithAlternateObjects(t *testing.T) {
+	for _, packed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("packed=%t", packed), func(t *testing.T) {
+			_, source := createTestRepo(t)
+			if packed {
+				runGit(t, source, "repack", "-a", "-d")
+				runGit(t, source, "prune-packed")
+			}
+			clone := filepath.Join(t.TempDir(), "checkout")
+			runGit(t, source, "clone", "--no-local", "--reference", source, source, clone)
+
+			repo, err := OpenRepo(clone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if clean, err := repo.IsClean(); err != nil || !clean {
+				t.Fatalf("IsClean() = %v, %v; want true, nil", clean, err)
+			}
+			if err := repo.EnsureBranchFrom("main", "release"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(clone, "README.md"), []byte("updated"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if clean, err := repo.IsClean(); err != nil || clean {
+				t.Fatalf("IsClean() = %v, %v; want false, nil", clean, err)
+			}
+			if committed, err := repo.CommitAll("Update README", "Test User", "test@example.com"); err != nil || !committed {
+				t.Fatalf("CommitAll() = %v, %v; want true, nil", committed, err)
+			}
+			if clean, err := repo.IsClean(); err != nil || !clean {
+				t.Fatalf("IsClean() after commit = %v, %v; want true, nil", clean, err)
+			}
+			if got := strings.TrimSpace(runGit(t, clone, "log", "-1", "--format=%s")); got != "Update README" {
+				t.Fatalf("commit message = %q, want Update README", got)
+			}
+		})
 	}
 }
 
