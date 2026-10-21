@@ -1,75 +1,63 @@
-<!-- Type of change
-Please label this PR with one of the following labels, depending on the scope of your change:
-- Bug
-- Enhancement
-- Breaking change
-- Deprecation
-- Cleanup
-- Docs
--->
-
-## What does this PR do?
-
-<!-- Mandatory
-Explain here the changes you made on the PR. Please explain the WHAT: patterns used, algorithms implemented, design architecture, message processing, etc.
--->
-
-## Why is it important?
-
-<!-- Mandatory
-Explain here the WHY, or the rationale/motivation for the changes.
--->
-
-## Checklist
-
-<!-- Mandatory
-Add a checklist of things that are required to be reviewed in order to have the PR approved
-
-List here all the items you have verified BEFORE sending this PR. Please DO NOT remove any item, striking through those that do not apply. (Just in case, strikethrough uses two tildes. ~~Scratch this.~~)
--->
-
-- [ ] I have read and understood the [pull request guidelines](https://github.com/elastic/elastic-agent/blob/main/CONTRIBUTING.md#pull-request-guidelines) of this project.
-- [ ] My code follows the style guidelines of this project
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] I have made corresponding change to the default configuration files
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] I have added an entry in `./changelog/fragments` using the [changelog tool](https://github.com/elastic/elastic-agent#changelog)
-- [ ] I have added an integration test or an E2E test
-
-## Disruptive User Impact
-
 <!--
-Will the changes introduced by this PR cause disruption to users in any way? If so, please describe what changes users
-could make on their end to nullify or minimize this disruption. Consider impacts in related systems, not just directly
-when using Elastic Agent.
--->
-
-## How to test this PR locally
-
-<!-- Recommended
-Explain here how this PR will be tested by the reviewer: commands, dependencies, steps, etc.
+Label this PR with its type: Bug, Enhancement, Breaking change, Deprecation, Cleanup, or Docs.
+Add a changelog fragment for user-visible changes (https://github.com/elastic/elastic-agent#changelog) or use the skip-changelog label.
 -->
 
 ## Related issues
 
-<!-- Recommended
-Link related issues below. Insert the issue link or reference after the word "Closes" if merging this should automatically close it.
-
-- Closes #123
-- Relates #123
-- Requires #123
-- Superseds #123
--->
+<!-- e.g. Closes #123, Relates #123 -->
 -
 
-## Questions to ask yourself
+## Risk
 
-- How are we going to support this in production?
-- How are we going to measure its adoption?
-- How are we going to debug this?
-- What are the metrics I should take care of?
-- ...
+<!-- Select exactly one. If unsure, pick the higher level. -->
+
+- [ ] **Low**: isolated change, no effect on Fleet connectivity, policy handling, or upgrades
+- [ ] **Medium**: changes existing behavior, but is feature flagged or a failure does not affect Fleet connectivity, policy handling, or upgrades
+- [ ] **High**: touches Fleet connectivity, policy application, upgrade/rollback, installation, or changes defaults for existing users
+
+## Rationale
+
+<!--
+What problem does this solve, and why this approach?
+Call out any disruption to existing users and how they can mitigate it.
+-->
+
+## Rollout and safety
+
+<!--
+If this change fails or hits an unexpected state (timeouts, unbounded retries, partial application, invalid configuration,
+a component crashing or hanging), the agent must stay connected to Fleet and still be able to receive
+a new policy or upgrade to another version. Describe how failures are contained.
+
+New features should be behind a configuration flag that can safely disable them if the unexpected happens.
+Name the flag and its default. Consider whether the flag needs to be part of our generally available user
+facing configuration, following the guidance below:
+- Use `agent.features.*` for configuration that is user facing and must be passed through to supervised components.
+- Use `agent.*` for configuration that is user facing but applies only to Elastic Agent itself.
+- Use `agent.internal.*` for internal engineering configuration that can be deprecated and removed as needed.
+
+Is downgrading to the previous version safe? Failed upgrades roll back automatically, so call out any
+persisted state, config, or on-disk changes the previous version can't read.
+
+Is the existing content of the diagnostics bundle enough to diagnose failures in the field?
+
+Write "N/A" with a reason if this does not apply
+-->
+
+## Testing
+
+<!--
+Automated coverage (unit, integration) and how a reviewer can verify locally. Note which of the following
+apply and what was tested:
+
+- Platforms and packages: Linux/Windows/macOS (amd64/arm64); .tar.gz, .zip, .rpm, .deb, .msi; containers, Kubernetes, and Helm.
+- Deployment modes: standalone, Fleet managed, unprivileged, behind a network proxy, air gapped, FIPS compatible.
+- Lifecycle: upgrade from previous versions and rollback, restart/reboot, re-enroll, policy reassignment, unenroll, and uninstall.
+- Interactions with Elastic Defend (endpoint-security) and tamper protection.
+
+Provide evidence (screenshots, logs, diagnostics) for behavior changes where needed.
+-->
 
 <!-- CI Cheatsheet
 Trigger comments:
