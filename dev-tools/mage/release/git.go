@@ -50,7 +50,10 @@ func OpenRepo(path string) (*GitRepo, error) {
 	}
 
 	// Buildkite reference clones borrow objects outside the repository's .git directory.
-	storage := repo.Storer.(*filesystem.Storage) // PlainOpen always uses filesystem storage.
+	storage, ok := repo.Storer.(*filesystem.Storage)
+	if !ok {
+		return nil, fmt.Errorf("open repository: unexpected storage type %T", repo.Storer)
+	}
 	root := filepath.VolumeName(storage.Filesystem().Root()) + string(filepath.Separator)
 	repo.Storer = filesystem.NewStorageWithOptions(storage.Filesystem(), cache.NewObjectLRUDefault(), filesystem.Options{
 		AlternatesFS: osfs.New(root),

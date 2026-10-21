@@ -287,10 +287,16 @@ func TestOpenRepo(t *testing.T) {
 }
 
 func TestOpenRepoWithAlternateObjects(t *testing.T) {
-	for _, packed := range []bool{false, true} {
-		t.Run(fmt.Sprintf("packed=%t", packed), func(t *testing.T) {
+	tests := []struct {
+		give bool
+	}{
+		{give: false},
+		{give: true},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("packed=%t", tt.give), func(t *testing.T) {
 			_, source := createTestRepo(t)
-			if packed {
+			if tt.give {
 				runGit(t, source, "repack", "-a", "-d")
 				runGit(t, source, "prune-packed")
 			}
