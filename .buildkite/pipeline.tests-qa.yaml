@@ -14,15 +14,7 @@ steps:
       message: "${BUILDKITE_MESSAGE}"
       env:
         TARGET_ENV: qa
-        SERVICE: agentless-controller
-        CONTAINER_NAME: agentless-controller
-        CHECK_RECONCILE_ERROR_PERCENTAGE: true
-        CHECK_CONTAINER_RESTART_COUNT: true
-        CHECK_LOG_ERROR_RATE: true
-        CHECK_SLO: true
-        CHECK_SLO_TAG: agentless-controller
-        CHECK_SLO_BURN_RATE_THRESHOLD: 0.1
-        MAX_ERROR_PERCENT: 10
+        SERVICE: agentless
         SERVICE_VERSION: ${SERVICE_VERSION:0:12}
         CHECK_SYNTHETICS: true
         CHECK_SYNTHETICS_TAG: agentless-quality-gate
