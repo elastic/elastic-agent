@@ -11,12 +11,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -25,6 +28,32 @@ import (
 	"github.com/elastic/elastic-agent/testing/fleetservertest"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
+
+// ackRecorder records, per action id, whether the agent's acknowledgement
+// carried an error, so a success ack can be distinguished from a failure ack
+// (the mock's Acked only matches the action id and would accept either).
+type ackRecorder struct {
+	mu   sync.Mutex
+	errs map[string]string // actionID -> error ("" means acknowledged without error)
+}
+
+func (r *ackRecorder) record(actionID, errMsg string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.errs == nil {
+		r.errs = map[string]string{}
+	}
+	r.errs[actionID] = errMsg
+}
+
+// ackedWithoutError reports whether the action was acknowledged and its ack
+// carried no error.
+func (r *ackRecorder) ackedWithoutError(actionID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	errMsg, ok := r.errs[actionID]
+	return ok && errMsg == ""
+}
 
 // TestFleetUninstallAction validates the end-to-end UNINSTALL action flow against
 // a Fleet Server: the agent receives an UNINSTALL action on checkin, spawns a
@@ -42,7 +71,7 @@ func TestFleetUninstallAction(t *testing.T) {
 	ctx, cancel := testcontext.WithTimeout(t, t.Context(), time.Minute*10)
 	defer cancel()
 
-	fixture, checkinWithAcker, policy := setupUninstallFleetServer(t, ctx)
+	fixture, checkinWithAcker, recorder, policy := setupUninstallFleetServer(t, ctx)
 
 	// Deliver an UNINSTALL action on the next checkin. The agent enforces a
 	// grace-period window of [created_at+1h, created_at+24h] on the start_time.
@@ -69,19 +98,23 @@ func TestFleetUninstallAction(t *testing.T) {
 
 	// The UNINSTALL action is acknowledged by the detached uninstaller at the
 	// point of no return: after the agent's service and components have been
-	// removed, but before its credentials are removed. Because the uninstall is
-	// terminal, a received ack proves the full spawn -> uninstall -> point-of-
-	// no-return-ack flow worked end-to-end with Fleet Server.
+	// removed, but before its credentials are removed. Assert the ack carried NO
+	// error — a failure before the point of no return would instead produce a
+	// failure ack — so this proves the successful spawn -> uninstall ->
+	// point-of-no-return-ack flow worked end-to-end with Fleet Server.
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		assert.True(collect, checkinWithAcker.Acked(uninstallActionID),
-			"uninstall action has not been acknowledged to Fleet")
-	}, 5*time.Minute, 500*time.Millisecond, "agent did not acknowledge the uninstall action")
+		assert.True(collect, recorder.ackedWithoutError(uninstallActionID),
+			"uninstall action was not acknowledged, or was acknowledged with an error")
+	}, 5*time.Minute, 500*time.Millisecond, "agent did not acknowledge the uninstall action without error")
 
-	// After acking, the uninstall completes and removes the install directory.
-	// The agent must no longer be installed; a status check should fail once the
-	// control socket is gone. This confirms the agent actually uninstalled itself
-	// rather than merely acking.
+	// Independently confirm the agent actually uninstalled itself: the install
+	// directory must be removed. Checking only that the control socket is gone is
+	// insufficient — a stopped-but-still-installed agent also fails ExecStatus.
+	installDir := paths.InstallPath(paths.DefaultBasePath)
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		_, statErr := os.Stat(installDir)
+		assert.Truef(collect, os.IsNotExist(statErr),
+			"install directory %q still exists; agent was acked but not fully uninstalled (stat err: %v)", installDir, statErr)
 		_, statusErr := fixture.ExecStatus(ctx)
 		assert.Error(collect, statusErr, "agent still responds to status; expected it to be uninstalled")
 	}, 5*time.Minute, 1*time.Second, "agent was not uninstalled after acknowledging the action")
@@ -101,7 +134,7 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 	ctx, cancel := testcontext.WithTimeout(t, t.Context(), time.Minute*10)
 	defer cancel()
 
-	fixture, checkinWithAcker, policy := setupUninstallFleetServer(t, ctx)
+	fixture, checkinWithAcker, _, policy := setupUninstallFleetServer(t, ctx)
 
 	// Deliver an UNINSTALL action with a *future* start_time so it is held in the
 	// scheduled-action queue, giving the cancel below a window to remove it before
@@ -181,12 +214,14 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 // for the agent to connect. UNINSTALL requires root/administrator privileges (an
 // unprivileged agent's service runs as a non-root user and cannot remove its own
 // service), so the agent is installed privileged.
-func setupUninstallFleetServer(t *testing.T, ctx context.Context) (*integrationtest.Fixture, *fleetservertest.CheckinActionsWithAcker, fleetservertest.TmplPolicy) {
+func setupUninstallFleetServer(t *testing.T, ctx context.Context) (*integrationtest.Fixture, *fleetservertest.CheckinActionsWithAcker, *ackRecorder, fleetservertest.TmplPolicy) {
 	t.Helper()
 
 	apiKey, policy := createBasicFleetPolicyData(t, "http://fleet-server:8221")
 	checkinWithAcker := fleetservertest.NewCheckinActionsWithAcker()
 	nextActionGenerator := checkinWithAcker.ActionsGenerator()
+	recorder := &ackRecorder{}
+	ackHandler := fleetservertest.NewHandlerAckWithAcker(checkinWithAcker.Acker())
 
 	handlers := &fleetservertest.Handlers{
 		APIKey:          apiKey.Key,
@@ -222,7 +257,16 @@ func setupUninstallFleetServer(t *testing.T, ctx context.Context) (*integrationt
 			return &resp, nil
 		},
 		EnrollFn: fleetservertest.NewHandlerEnroll(policy.AgentID, policy.PolicyID, apiKey),
-		AckFn:    fleetservertest.NewHandlerAckWithAcker(checkinWithAcker.Acker()),
+		AckFn: func(ctx context.Context, h *fleetservertest.Handlers, agentID string,
+			ackRequest fleetservertest.AckRequest,
+		) (*fleetservertest.AckResponse, *fleetservertest.HTTPError) {
+			// Record each ack's error so the test can tell a success ack from a
+			// failure ack, then delegate to the standard acker-backed handler.
+			for _, e := range ackRequest.Events {
+				recorder.record(e.ActionId, e.Error)
+			}
+			return ackHandler(ctx, h, agentID, ackRequest)
+		},
 		StatusFn: fleetservertest.NewHandlerStatusHealthy(),
 	}
 
@@ -253,5 +297,5 @@ func setupUninstallFleetServer(t *testing.T, ctx context.Context) (*integrationt
 	// Wait for the agent to connect to Fleet and report HEALTHY.
 	check.ConnectedToFleet(ctx, t, fixture, 5*time.Minute)
 
-	return fixture, &checkinWithAcker, policy
+	return fixture, &checkinWithAcker, recorder, policy
 }

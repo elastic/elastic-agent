@@ -1167,7 +1167,7 @@ func TestScheduleUninstallActions(t *testing.T) {
 		require.ErrorContains(t, a.Err, "expiration")
 	})
 
-	t.Run("malformed expiration is left for the handler to reject", func(t *testing.T) {
+	t.Run("malformed expiration is rejected on receipt, not silently dropped", func(t *testing.T) {
 		d := newTestDispatcher(t)
 		a := &fleetapi.ActionUninstall{
 			ActionID:         "u1",
@@ -1177,8 +1177,12 @@ func TestScheduleUninstallActions(t *testing.T) {
 			ActionExpiration: "not-a-time",
 		}
 		out := d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		// A valid start_time would otherwise queue the action, and
+		// mergeWithQueuedActions would later drop it on the expiration parse error
+		// without acking. Reject it here so the handler fail-acks it.
 		assert.Equal(t, []fleetapi.Action{a}, out)
-		assert.NoError(t, a.Err, "the dispatcher leaves a malformed expiration for the handler to validate")
+		assert.Empty(t, a.ActionStartTime, "a malformed expiration must not be queued")
+		require.ErrorContains(t, a.Err, "invalid expiration")
 	})
 
 	t.Run("invalid signature is rejected on receipt and not scheduled", func(t *testing.T) {
@@ -1195,6 +1199,28 @@ func TestScheduleUninstallActions(t *testing.T) {
 		a := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall, ActionCreatedAt: rfc(now), ActionStartTime: validStart}
 		d.scheduleUninstallActions(now, []fleetapi.Action{a})
 		assert.Equal(t, validStart, a.ActionStartTime)
+	})
+
+	t.Run("expiration applied by the signature verifier drives the expiration check", func(t *testing.T) {
+		d := newTestDispatcher(t)
+		// The real verifier overwrites the outer expiration with the verified
+		// signed one (see managed_mode.go). Simulate it setting an expired signed
+		// expiration; the dispatcher's expiration check must use it and reject the
+		// action, even though the outer expiration is far in the future.
+		d.SetUninstallSignatureVerifier(func(a *fleetapi.ActionUninstall) error {
+			a.ActionExpiration = rfc(now.Add(-time.Hour))
+			return nil
+		})
+		a := &fleetapi.ActionUninstall{
+			ActionID:         "u1",
+			ActionType:       fleetapi.ActionTypeUninstall,
+			ActionCreatedAt:  rfc(now),
+			ActionStartTime:  validStart,
+			ActionExpiration: rfc(now.Add(24 * time.Hour)),
+		}
+		d.scheduleUninstallActions(now, []fleetapi.Action{a})
+		assert.Empty(t, a.ActionStartTime, "the verifier-applied (signed) expiration must drive rejection")
+		require.ErrorContains(t, a.Err, "expired")
 	})
 
 	t.Run("duplicate of an already-queued uninstall is dropped", func(t *testing.T) {

@@ -71,8 +71,20 @@ func (h *Uninstall) Handle(ctx context.Context, a fleetapi.Action, ack acker.Ack
 	// time, also covering actions restored from the persisted queue on restart.
 	// The error is returned (not acked) so a potentially tampered action is not
 	// acknowledged, mirroring the MIGRATE handler.
-	if _, err := protection.VerifyActionSignature(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID()); err != nil {
+	verified, err := protection.VerifyActionSignature(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID())
+	if err != nil {
 		return fmt.Errorf("uninstall action %s rejected: signature verification failed: %w", action.ActionID, err)
+	}
+	// The expiration is only trustworthy when it comes from the verified signed
+	// envelope: the signature covers the signed payload, not the action's outer
+	// JSON. Trusting the outer expiration would let an attacker strip or extend it
+	// on an otherwise valid, signed action (making an expired action run) or
+	// shorten it (making a valid action fail). Overwrite the outer value with the
+	// verified one so the expiry check below operates on signed data. When the
+	// action is unsigned (no key configured) verified is nil and the outer
+	// expiration is used as-is. Mirrors the RESTART handler.
+	if verified != nil {
+		action.ActionExpiration = verified.Expiration
 	}
 
 	// The dispatcher may have rejected the action on receipt (e.g. its start_time

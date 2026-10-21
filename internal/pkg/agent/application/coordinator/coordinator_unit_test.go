@@ -3162,6 +3162,15 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		default:
 			t.Fatal("expected an override state to be set")
 		}
+
+		// Uninstall spawns a reaping goroutine that, once the (noop) process exits
+		// while the agent is still installed, reads paths.RunningInstalled() and
+		// clears the in-flight flag. Wait for the flag to clear so that goroutine's
+		// read of the global paths finishes before this subtest returns and cleanup
+		// (and the next subtest) calls paths.SetTop — avoiding a data race.
+		require.Eventuallyf(t, func() bool { return !coord.uninstalling.Load() },
+			10*time.Second, 10*time.Millisecond,
+			"reaping goroutine did not clear the in-flight flag")
 	})
 
 	t.Run("duplicate action already in-flight does not spawn a second uninstaller", func(t *testing.T) {

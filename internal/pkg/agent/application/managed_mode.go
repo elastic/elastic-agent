@@ -260,10 +260,18 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 	})
 
 	// Reject an UNINSTALL action with a missing/invalid signature on receipt so it
-	// is never scheduled into the grace-period queue.
+	// is never scheduled into the grace-period queue. On success, overwrite the
+	// outer expiration with the verified signed one so the dispatcher's
+	// expiration checks operate on signed data (the signature covers the signed
+	// payload, not the action's mutable outer JSON). When the action is unsigned
+	// (no key configured) verified is nil and the outer expiration is left as-is.
 	m.dispatcher.SetUninstallSignatureVerifier(func(a *fleetapi.ActionUninstall) error {
-		if _, err := protection.VerifyActionSignature(a, m.coord.Protection().SignatureValidationKey, m.agentInfo.AgentID()); err != nil {
+		verified, err := protection.VerifyActionSignature(a, m.coord.Protection().SignatureValidationKey, m.agentInfo.AgentID())
+		if err != nil {
 			return err
+		}
+		if verified != nil {
+			a.ActionExpiration = verified.Expiration
 		}
 		return nil
 	})

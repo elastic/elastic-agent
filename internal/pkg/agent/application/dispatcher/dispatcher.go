@@ -334,20 +334,23 @@ func (ad *ActionDispatcher) scheduleUninstallActions(now time.Time, input []flee
 			continue
 		}
 
-		// Also reject an action that could never run before it expires — one that
-		// is already expired, or whose start_time is at or after the expiration —
-		// so the queue does not silently drop it once expired. A backdated
-		// created_at can place a valid-window start_time in the past, so the
-		// already-expired case is checked explicitly rather than inferred from the
-		// start_time.
+		// Also reject an action that could never run before it expires — one with a
+		// malformed expiration, one already expired, or one whose start_time is at
+		// or after the expiration. These must be rejected here (start_time cleared,
+		// Err set) so the action is dispatched immediately and the handler
+		// fail-acks it: a valid start_time would otherwise queue it, and
+		// mergeWithQueuedActions would silently drop it on a malformed/expired
+		// value without acknowledging it. A backdated created_at can place a
+		// valid-window start_time in the past, so the already-expired case is
+		// checked explicitly rather than inferred from the start_time. Only a
+		// missing expiration (ErrNoExpiration, the action never expires) stays
+		// eligible for scheduling.
 		exp, experr := ua.Expiration()
-		if experr != nil {
-			// No expiration (never expires) or a malformed expiration: nothing to
-			// reject here; a malformed expiration is validated by the handler on
-			// dispatch.
-			continue
-		}
 		switch {
+		case errors.Is(experr, fleetapi.ErrNoExpiration):
+			// No expiration: the action never expires; nothing more to check.
+		case experr != nil:
+			ua.Err = fmt.Errorf("uninstall action has an invalid expiration: %w", experr)
 		case now.After(exp):
 			ua.Err = fmt.Errorf("uninstall action already expired at %s", ua.ActionExpiration)
 		case !start.Before(exp):

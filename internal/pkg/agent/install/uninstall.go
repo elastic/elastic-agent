@@ -124,6 +124,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		}()
 	}
 
+	// A Fleet-triggered uninstall of an agent that hosts its own Fleet Server
+	// cannot be acknowledged at the point of no return: completing the uninstall
+	// stops the local Fleet Server (and the audit/unenroll below may invalidate
+	// the credentials), so the terminal ack would have no reachable, authenticated
+	// endpoint. Reject it here — before any audit/shutdown, while the local Fleet
+	// Server is still running — so the failure is acknowledged (by the deferred
+	// handler above) and the agent remains operational. A local (non-Fleet)
+	// uninstall is unaffected.
+	if fleetAckActionID != "" && localFleet {
+		return fmt.Errorf("refusing to remotely uninstall an agent running Fleet Server: the acknowledgement endpoint would be unavailable once the uninstall stops the local Fleet Server")
+	}
+
 	// Notify fleet-server while it is still running if it's running locally
 	if notifyFleet && localFleet {
 		// host is set in the agent/cmd/enroll_cmd.go by createFleetServerBootstrapConfig
@@ -169,7 +181,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 		// and the success ack below is skipped. The local uninstall command keeps
 		// its historical best-effort behavior.
 		if fleetAckActionID != "" {
-			return fmt.Errorf("failed to uninstall service: %w", svcErr)
+			svcErr = fmt.Errorf("failed to uninstall service: %w", svcErr)
+			// EnsureStoppedService stopped the agent earlier; since we are not
+			// crossing the point of no return, try to restart it (as the
+			// component-uninstall failure path does) so the agent recovers and
+			// Fleet can retry. The coordinator has already exited, so nothing else
+			// can bring the agent back. Preserve both errors if recovery fails.
+			if status == service.StatusRunning {
+				if startErr := StartService(topPath); startErr != nil {
+					return errors.Join(svcErr, fmt.Errorf("failed to restart service after a failed uninstall: %w", startErr))
+				}
+			}
+			return svcErr
 		}
 	} else {
 		pt.Describe("Successfully uninstalled service")

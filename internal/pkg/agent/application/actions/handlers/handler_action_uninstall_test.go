@@ -6,6 +6,13 @@ package handlers
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -147,6 +154,84 @@ func TestActionUninstallHandler(t *testing.T) {
 		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
 		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
 	})
+
+	// The expiry check must trust the signed expiration, not the mutable outer
+	// one. (&info.AgentInfo{}).AgentID() is "", so the signed payload lists "" as
+	// its agent.
+	t.Run("expired signed expiration rejects even when the outer expiration is in the future", func(t *testing.T) {
+		priv, pubDER := genSignKey(t)
+		action := &fleetapi.ActionUninstall{
+			ActionID:         "u-sig-expired",
+			ActionType:       fleetapi.ActionTypeUninstall,
+			ActionExpiration: time.Now().Add(time.Hour).UTC().Format(time.RFC3339), // outer: not expired
+		}
+		action.Signature = signUninstallAction(t, action.ActionID, "",
+			time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), priv) // signed: expired
+
+		coord := &fakeUninstallCoordinator{protectionConfig: protection.Config{SignatureValidationKey: pubDER}}
+		ack := &fakeAcker{}
+		ack.On("Ack", mock.Anything, action).Return(nil)
+		ack.On("Commit", mock.Anything).Return(nil)
+
+		h := NewUninstall(log, &info.AgentInfo{}, coord)
+		require.NoError(t, h.Handle(t.Context(), action, ack))
+		require.Error(t, action.Err, "the signed (expired) expiration must cause rejection despite a future outer expiration")
+		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
+		ack.AssertCalled(t, "Ack", mock.Anything, action)
+	})
+
+	t.Run("valid signed expiration proceeds even when the outer expiration is in the past", func(t *testing.T) {
+		priv, pubDER := genSignKey(t)
+		action := &fleetapi.ActionUninstall{
+			ActionID:         "u-sig-valid",
+			ActionType:       fleetapi.ActionTypeUninstall,
+			ActionExpiration: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), // outer: expired (untrusted)
+		}
+		action.Signature = signUninstallAction(t, action.ActionID, "",
+			time.Now().Add(time.Hour).UTC().Format(time.RFC3339), priv) // signed: not expired
+
+		coord := &fakeUninstallCoordinator{protectionConfig: protection.Config{SignatureValidationKey: pubDER}}
+		coord.On("Uninstall", mock.Anything, action).Return(nil)
+		ack := &fakeAcker{}
+
+		h := NewUninstall(log, &info.AgentInfo{}, coord)
+		require.NoError(t, h.Handle(t.Context(), action, ack))
+		coord.AssertCalled(t, "Uninstall", mock.Anything, action)
+		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
+	})
+}
+
+// genSignKey returns an ECDSA private key and the DER-encoded PKIX public key to
+// use as protection.Config.SignatureValidationKey.
+func genSignKey(t *testing.T) (*ecdsa.PrivateKey, []byte) {
+	t.Helper()
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	pubDER, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	require.NoError(t, err)
+	return priv, pubDER
+}
+
+// signUninstallAction builds a signed envelope for an UNINSTALL action whose
+// signed payload carries the given expiration, signed with priv. This mirrors
+// how Kibana signs actions so the agent's in-agent verification trusts the
+// signed fields over the mutable outer JSON.
+func signUninstallAction(t *testing.T, actionID, agentID, signedExpiration string, priv *ecdsa.PrivateKey) *fleetapi.Signed {
+	t.Helper()
+	payload, err := json.Marshal(map[string]any{
+		"action_id":  actionID,
+		"type":       fleetapi.ActionTypeUninstall,
+		"agents":     []string{agentID},
+		"expiration": signedExpiration,
+	})
+	require.NoError(t, err)
+	hash := sha256.Sum256(payload)
+	sig, err := ecdsa.SignASN1(rand.Reader, priv, hash[:])
+	require.NoError(t, err)
+	return &fleetapi.Signed{
+		Data:      base64.StdEncoding.EncodeToString(payload),
+		Signature: base64.StdEncoding.EncodeToString(sig),
+	}
 }
 
 type fakeUninstallCoordinator struct {
