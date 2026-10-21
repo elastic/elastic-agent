@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/magefile/mage/mg"
-	"github.com/stretchr/testify/assert"
 )
 
 const envGoTestHelper = "GOTEST_WANT_HELPER"
