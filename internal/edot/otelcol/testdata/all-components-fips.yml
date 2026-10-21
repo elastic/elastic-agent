@@ -122,6 +122,7 @@ service:
         - file_log
         - otlp
         - verifier
+        - elasticmonitoringreceiver
 
     metrics:
       exporters:
@@ -140,7 +141,6 @@ service:
         - otlp
         - http_check
         - span_metrics
-        - elasticmonitoringreceiver
 
     metrics/aggregated:
       receivers:
