@@ -485,8 +485,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/ebpfevents v0.10.0 h1:BnkRxdQX6/OlMp3YKh8daTSTgrFFdFICwqT+FsqoZ1o=
-github.com/elastic/ebpfevents v0.10.0/go.mod h1:qR5AsvbH3Bnldc2EmBnsP5PxsuctUqSuEz6CXwvTMYU=
+github.com/elastic/ebpfevents v0.12.0 h1:RpnBWXNOib9AixRl6Gs0/3wLtZ5/rsnpf7KOZ3wV5nY=
+github.com/elastic/ebpfevents v0.12.0/go.mod h1:qR5AsvbH3Bnldc2EmBnsP5PxsuctUqSuEz6CXwvTMYU=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
 github.com/elastic/elastic-agent-libs v0.47.0 h1:fltOh0mETIlW3LYExX62iacL63sHXSTfDB/8Qi+wXso=
@@ -549,8 +549,8 @@ github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab h1:p33sNyLrsWoI
 github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab/go.mod h1:t8v3y03G3KubyWgYqe+Jcxj/jDddnkp70743iSYrQiU=
 github.com/elastic/lunes v0.2.2 h1:dZFEaebNg9l+mzvOQN6Nd/c9y6y8rUe3tBWsTgvM08U=
 github.com/elastic/lunes v0.2.2/go.mod h1:u3W/BdONWTrh0JjNZ21C907dDc+cUZttZrGa625nf2k=
-github.com/elastic/mito v1.28.0 h1:iYDoOA9oLiUt2RvQ8K1Q1YHElZi4iEF77Kc7KqhbDzs=
-github.com/elastic/mito v1.28.0/go.mod h1:/NBrZUMHUaji05+tjCRD2Jt/nmbZP3/s9dJpgcxF2YY=
+github.com/elastic/mito v1.28.1 h1:mpxKnSIRN5t5C2PDNtnZvElM8a6v22GwAV0oSsbB47I=
+github.com/elastic/mito v1.28.1/go.mod h1:/NBrZUMHUaji05+tjCRD2Jt/nmbZP3/s9dJpgcxF2YY=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb h1:/c+ogW0DBBDchutsS6+GZBpCIwtVdJvr2l7tvI9CHdU=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.77.0 h1:ixNvuRvSYVhsmJDvJfqdSJsIfEJ1l2XOQSj2C9W41m4=
