@@ -46,6 +46,8 @@ steps:
       - elastic/vault-github-token#v0.2.1: ~
     command:
       - make mage
+      # Copy mirror-backed objects locally so go-git can read them.
+      - git repack -a -d
       - mage release:runMajorMinor
     timeout_in_minutes: 60
 
@@ -64,6 +66,8 @@ steps:
       - elastic/vault-github-token#v0.2.1: ~
     command:
       - make mage
+      # Copy mirror-backed objects locally so go-git can read them.
+      - git repack -a -d
       - mage release:runPatch
     timeout_in_minutes: 60
 
