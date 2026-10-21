@@ -6,7 +6,6 @@ package release
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -287,31 +286,26 @@ func TestOpenRepo(t *testing.T) {
 }
 
 func TestOpenRepoWithAlternateObjects(t *testing.T) {
-	tests := []struct {
-		give bool
-	}{
-		{give: false},
-		{give: true},
-	}
-	for _, tt := range tests {
-		t.Run(fmt.Sprintf("packed=%t", tt.give), func(t *testing.T) {
-			_, source := createTestRepo(t)
-			if tt.give {
-				runGit(t, source, "repack", "-a", "-d")
-				runGit(t, source, "prune-packed")
-			}
-			clone := filepath.Join(t.TempDir(), "checkout")
-			runGit(t, source, "clone", "--no-local", "--reference", source, source, clone)
+	_, source := createTestRepo(t)
+	check := func(t *testing.T) {
+		t.Helper()
+		clone := filepath.Join(t.TempDir(), "checkout")
+		runGit(t, source, "clone", "--no-local", "--reference", source, source, clone)
 
-			repo, err := OpenRepo(clone)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if clean, err := repo.IsClean(); err != nil || !clean {
-				t.Fatalf("IsClean() = %v, %v; want true, nil", clean, err)
-			}
-		})
+		repo, err := OpenRepo(clone)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if clean, err := repo.IsClean(); err != nil || !clean {
+			t.Fatalf("IsClean() = %v, %v; want true, nil", clean, err)
+		}
 	}
+	t.Run("loose", check)
+	t.Run("packed", func(t *testing.T) {
+		runGit(t, source, "repack", "-a", "-d")
+		runGit(t, source, "prune-packed")
+		check(t)
+	})
 }
 
 func TestCreateBranch(t *testing.T) {
