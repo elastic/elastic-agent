@@ -291,10 +291,60 @@ func (g *GitRepo) HasCommitsAheadOf(baseBranch string) (bool, error) {
 	return true, nil
 }
 
+// githubHTTPSPushURL converts SSH-style GitHub remotes to HTTPS so
+// http.BasicAuth (GITHUB_TOKEN) can be used. HTTPS/HTTP URLs are unchanged.
+// Returns the URL to use and whether it was rewritten from SSH.
+func githubHTTPSPushURL(remoteURL string) (string, bool) {
+	u := strings.TrimSpace(remoteURL)
+	switch {
+	case strings.HasPrefix(u, "https://"), strings.HasPrefix(u, "http://"):
+		return u, false
+	case strings.HasPrefix(u, "git@github.com:"):
+		return "https://github.com/" + strings.TrimPrefix(u, "git@github.com:"), true
+	case strings.HasPrefix(u, "ssh://git@github.com"):
+		rest := strings.TrimPrefix(u, "ssh://git@github.com")
+		rest = strings.TrimPrefix(rest, ":22")
+		rest = strings.TrimPrefix(rest, "/")
+		return "https://github.com/" + rest, true
+	default:
+		return u, false
+	}
+}
+
+// ensureHTTPSRemote rewrites an SSH GitHub remote to HTTPS when needed.
+// Token-based pushes use http.BasicAuth, which go-git rejects for SSH remotes
+// ("invalid auth method").
+func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
+	remote, err := g.repo.Remote(remoteName)
+	if err != nil {
+		return fmt.Errorf("failed to get remote %s: %w", remoteName, err)
+	}
+	urls := remote.Config().URLs
+	if len(urls) == 0 {
+		return fmt.Errorf("remote %s has no URLs", remoteName)
+	}
+
+	httpsURL, rewritten := githubHTTPSPushURL(urls[0])
+	if !strings.HasPrefix(httpsURL, "https://") && !strings.HasPrefix(httpsURL, "http://") {
+		return fmt.Errorf("remote %s URL %q is not HTTPS; token push requires an HTTPS remote", remoteName, urls[0])
+	}
+	if !rewritten {
+		return nil
+	}
+	if err := g.SetRemoteURL(remoteName, httpsURL); err != nil {
+		return fmt.Errorf("failed to set HTTPS remote for token push: %w", err)
+	}
+	return nil
+}
+
 // Push pushes the current branch to the remote using the given GitHub token.
 func (g *GitRepo) Push(remoteName, token string) error {
 	if token == "" {
 		return fmt.Errorf("GitHub token is required for pushing")
+	}
+
+	if err := g.ensureHTTPSRemote(remoteName); err != nil {
+		return err
 	}
 
 	currentBranch, err := g.GetCurrentBranch()
