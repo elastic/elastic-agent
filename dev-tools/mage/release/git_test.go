@@ -287,7 +287,7 @@ func TestOpenRepo(t *testing.T) {
 
 func TestOpenRepoWithAlternateObjects(t *testing.T) {
 	_, source := createTestRepo(t)
-	check := func(t *testing.T) {
+	assertReferenceCloneIsClean := func(t *testing.T) {
 		t.Helper()
 		clone := filepath.Join(t.TempDir(), "checkout")
 		runGit(t, source, "clone", "--no-local", "--reference", source, source, clone)
@@ -300,11 +300,13 @@ func TestOpenRepoWithAlternateObjects(t *testing.T) {
 			t.Fatalf("IsClean() = %v, %v; want true, nil", clean, err)
 		}
 	}
-	t.Run("loose", check)
-	t.Run("packed", func(t *testing.T) {
+	t.Run("reference clone with loose objects", func(t *testing.T) {
+		assertReferenceCloneIsClean(t)
+	})
+	t.Run("reference clone with packed objects", func(t *testing.T) {
 		runGit(t, source, "repack", "-a", "-d")
 		runGit(t, source, "prune-packed")
-		check(t)
+		assertReferenceCloneIsClean(t)
 	})
 }
 
