@@ -506,6 +506,37 @@ func TestPushRequiresToken(t *testing.T) {
 	}
 }
 
+func TestPushToLocalRemote(t *testing.T) {
+	gitRepo, workDir := createTestRepo(t)
+
+	bareDir := t.TempDir()
+	if _, err := git.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("failed to init bare remote: %v", err)
+	}
+	remoteURL := "file://" + bareDir
+	if err := gitRepo.SetRemoteURL("origin", remoteURL); err != nil {
+		t.Fatalf("SetRemoteURL() error = %v", err)
+	}
+
+	branch := "release-9.6"
+	if err := gitRepo.CreateBranch(branch); err != nil {
+		t.Fatalf("CreateBranch() error = %v", err)
+	}
+	if err := gitRepo.CheckoutBranch(branch); err != nil {
+		t.Fatalf("CheckoutBranch() error = %v", err)
+	}
+
+	// Token is unused for file:// remotes but required by Push.
+	if err := gitRepo.Push("origin", "test-token"); err != nil {
+		t.Fatalf("Push() error = %v", err)
+	}
+
+	remoteHeads := runGit(t, workDir, "ls-remote", "--heads", "origin", branch)
+	if !strings.Contains(remoteHeads, "refs/heads/"+branch) {
+		t.Fatalf("Push() did not create remote branch %s; ls-remote:\n%s", branch, remoteHeads)
+	}
+}
+
 func TestGithubHTTPSPushURL(t *testing.T) {
 	tests := []struct {
 		name      string
