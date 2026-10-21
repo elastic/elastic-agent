@@ -109,6 +109,32 @@ Executes file updates, branch creation, and validation locally. Skips push, PR
 creation, and GitHub API calls (except validation that needs a token when not in
 dry-run).
 
+`DRY_RUN` does **not** exercise Buildkite reference clones or a real token push.
+Before merging changes under `dev-tools/mage/release/`, run the playground
+**release smoke** (below).
+
+## Buildkite release smoke (pre-merge)
+
+Pipeline: [observability-robots-release-smoke](https://buildkite.com/elastic/observability-robots-release-smoke)
+on [`elastic/observability-robots-playground`](https://github.com/elastic/observability-robots-playground).
+
+It clones this repo at a candidate SHA, points `PROJECT_OWNER` /
+`PROJECT_REPO` at the playground, seeds `release-smoke/base` (never playground
+`main`), runs `mage release:runMajorMinor` then `mage release:runPatch` with a
+Vault-minted `GITHUB_TOKEN`, then deletes smoke branches/PRs/issues.
+
+Create a build with:
+
+```text
+SOURCE_REPO=elastic-agent
+SOURCE_SHA=<pr-head-sha>
+```
+
+Optional: `SOURCE_OWNER` (default `elastic`), `WORKFLOWS` (default
+`major-minor,patch`).
+
+Details: playground [README — Release smoke](https://github.com/elastic/observability-robots-playground#release-smoke-mage).
+
 ## Testing
 
 ```bash
