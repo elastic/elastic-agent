@@ -9,14 +9,18 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/go-git/go-billy/v5/osfs"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/cache"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	"github.com/go-git/go-git/v5/storage/filesystem"
 )
 
 const (
@@ -44,6 +48,16 @@ func OpenRepo(path string) (*GitRepo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
+
+	// Buildkite reference clones borrow objects outside the repository's .git directory.
+	storage, ok := repo.Storer.(*filesystem.Storage)
+	if !ok {
+		return nil, fmt.Errorf("open repository: unexpected storage type %T", repo.Storer)
+	}
+	root := filepath.VolumeName(storage.Filesystem().Root()) + string(filepath.Separator)
+	repo.Storer = filesystem.NewStorageWithOptions(storage.Filesystem(), cache.NewObjectLRUDefault(), filesystem.Options{
+		AlternatesFS: osfs.New(root),
+	})
 
 	return &GitRepo{
 		repo: repo,
