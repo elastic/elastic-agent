@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.26.8
+go 1.26.10
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261016070059-4b88e6062e6b
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261021142412-ef256d63c6a5
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
@@ -117,7 +117,7 @@ require (
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
-	github.com/elastic/ebpfevents v0.10.0 // indirect
+	github.com/elastic/ebpfevents v0.12.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20260916061436-646037f10512 // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
@@ -126,7 +126,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.77.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/proxy-connect-dialer-go v0.1.1 // indirect
-	github.com/elastic/tk-btf v0.2.0 // indirect
+	github.com/elastic/tk-btf v0.3.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
@@ -147,6 +147,11 @@ require (
 	github.com/gosnmp/gosnmp v1.45.0 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
 	github.com/hashicorp/go-metrics v0.6.0 // indirect
+	github.com/hashicorp/go-secure-stdlib/parseutil v0.2.0 // indirect
+	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
+	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
+	github.com/hashicorp/hcl v1.0.1-vault-7 // indirect
+	github.com/hashicorp/vault/api v1.23.0 // indirect
 	github.com/honeycombio/dynsampler-go v0.6.4 // indirect
 	github.com/huandu/go-clone v1.7.3 // indirect
 	github.com/insomniacslk/dhcp v0.0.0-20251020182700-175e84fbb167 // indirect
@@ -184,6 +189,7 @@ require (
 	github.com/prometheus/client_golang/exp v0.0.0-20260907100614-57bb367da472 // indirect
 	github.com/puzpuzpuz/xsync/v4 v4.5.0 // indirect
 	github.com/rdforte/gomaxecs v1.1.2 // indirect
+	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/samuel/go-parser v0.0.0-20130731160455-ca8abbf65d0e // indirect
 	github.com/samuel/go-thrift v0.0.0-20140522043831-2187045faa54 // indirect
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
@@ -352,7 +358,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/cloudwatch v1.73.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.89.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/costexplorer v1.74.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.338.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.339.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2 v1.63.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/health v1.50.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/iam v1.64.4
@@ -361,7 +367,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.6 // indirect
 	github.com/aws/aws-sdk-go-v2/service/lightsail v1.64.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/organizations v1.61.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/organizations v1.62.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/rds v1.130.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi v1.41.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3 // indirect
@@ -438,7 +444,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.2 // indirect
-	github.com/elastic/mito v1.28.0 // indirect
+	github.com/elastic/mito v1.28.1 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.77.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.49.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
