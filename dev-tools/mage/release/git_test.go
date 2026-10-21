@@ -506,6 +506,107 @@ func TestPushRequiresToken(t *testing.T) {
 	}
 }
 
+func TestGithubHTTPSPushURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		in        string
+		want      string
+		rewritten bool
+	}{
+		{
+			name:      "scp ssh",
+			in:        "git@github.com:elastic/elastic-agent.git",
+			want:      "https://github.com/elastic/elastic-agent.git",
+			rewritten: true,
+		},
+		{
+			name:      "ssh scheme",
+			in:        "ssh://git@github.com/elastic/elastic-agent.git",
+			want:      "https://github.com/elastic/elastic-agent.git",
+			rewritten: true,
+		},
+		{
+			name:      "ssh scheme with port",
+			in:        "ssh://git@github.com:22/elastic/elastic-agent.git",
+			want:      "https://github.com/elastic/elastic-agent.git",
+			rewritten: true,
+		},
+		{
+			name:      "https unchanged",
+			in:        "https://github.com/elastic/elastic-agent.git",
+			want:      "https://github.com/elastic/elastic-agent.git",
+			rewritten: false,
+		},
+		{
+			name:      "non-github ssh unchanged",
+			in:        "git@gitlab.com:group/repo.git",
+			want:      "git@gitlab.com:group/repo.git",
+			rewritten: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, rewritten := githubHTTPSPushURL(tt.in)
+			if got != tt.want || rewritten != tt.rewritten {
+				t.Errorf("githubHTTPSPushURL(%q) = (%q, %v), want (%q, %v)",
+					tt.in, got, rewritten, tt.want, tt.rewritten)
+			}
+		})
+	}
+}
+
+func TestEnsureHTTPSRemote(t *testing.T) {
+	t.Run("rewrites ssh to https", func(t *testing.T) {
+		gitRepo, _ := createTestRepo(t)
+		if err := gitRepo.SetRemoteURL("origin", "git@github.com:elastic/elastic-agent.git"); err != nil {
+			t.Fatalf("SetRemoteURL() error = %v", err)
+		}
+		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
+			t.Fatalf("ensureHTTPSRemote() error = %v", err)
+		}
+		remote, err := gitRepo.repo.Remote("origin")
+		if err != nil {
+			t.Fatalf("Remote() error = %v", err)
+		}
+		want := "https://github.com/elastic/elastic-agent.git"
+		if got := remote.Config().URLs[0]; got != want {
+			t.Errorf("origin URL = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("leaves https unchanged", func(t *testing.T) {
+		gitRepo, _ := createTestRepo(t)
+		want := "https://github.com/elastic/elastic-agent.git"
+		if err := gitRepo.SetRemoteURL("origin", want); err != nil {
+			t.Fatalf("SetRemoteURL() error = %v", err)
+		}
+		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
+			t.Fatalf("ensureHTTPSRemote() error = %v", err)
+		}
+		remote, err := gitRepo.repo.Remote("origin")
+		if err != nil {
+			t.Fatalf("Remote() error = %v", err)
+		}
+		if got := remote.Config().URLs[0]; got != want {
+			t.Errorf("origin URL = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("rejects non-https remote", func(t *testing.T) {
+		gitRepo, _ := createTestRepo(t)
+		if err := gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"); err != nil {
+			t.Fatalf("SetRemoteURL() error = %v", err)
+		}
+		err := gitRepo.ensureHTTPSRemote("origin")
+		if err == nil {
+			t.Fatal("ensureHTTPSRemote() expected error for non-HTTPS remote")
+		}
+		if !strings.Contains(err.Error(), "not HTTPS") {
+			t.Errorf("ensureHTTPSRemote() error = %v, want mention of not HTTPS", err)
+		}
+	})
+}
+
 func TestSetRemoteURL(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
