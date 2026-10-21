@@ -3185,13 +3185,13 @@ func TestCoordinator_Uninstall(t *testing.T) {
 			overrideStateChan: make(chan *coordinatorOverrideState, 2),
 			specs:             linuxSpecs,
 			logger:            logp.NewLogger("testing"),
-			// Pre-seed the action as already in-flight: a detached uninstaller was
-			// already spawned for it and has not finished. The success ack is
-			// delayed until the point of no return, so Fleet can redeliver the
-			// action before the ack is observed; that redelivery must be dropped
-			// rather than spawning a second, concurrent uninstaller.
-			uninstalling: map[string]struct{}{action.ActionID: {}},
 		}
+		// Pre-seed an uninstall as already in-flight: a detached uninstaller was
+		// already spawned and has not finished. The success ack is delayed until
+		// the point of no return, so Fleet can redeliver the action before the
+		// ack is observed; that redelivery must be dropped rather than spawning a
+		// second, concurrent uninstaller.
+		coord.uninstalling.Store(true)
 
 		// A redelivery of an already-in-flight action is a no-op: it returns nil
 		// (so the handler does not fail-ack it) and does not spawn a second
