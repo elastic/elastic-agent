@@ -5,18 +5,19 @@
 package release
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 const (
@@ -33,6 +34,9 @@ func isSubmoduleIndexLockError(output string) bool {
 }
 
 // GitRepo wraps go-git Repository with helper methods.
+// Worktree mutations that need objects (checkout, status, commit, push, ahead
+// checks) use the git CLI so Buildkite --reference / shared clones work.
+// go-git does not follow objects/info/alternates and returns "object not found".
 type GitRepo struct {
 	repo *git.Repository
 	path string
@@ -49,6 +53,17 @@ func OpenRepo(path string) (*GitRepo, error) {
 		repo: repo,
 		path: path,
 	}, nil
+}
+
+// runGit runs git in the repository path and returns combined stdout/stderr.
+func (g *GitRepo) runGit(args ...string) (string, error) {
+	cmd := exec.CommandContext(context.Background(), "git", args...)
+	cmd.Dir = g.path
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+	}
+	return string(output), nil
 }
 
 // BranchExists reports whether a local branch exists.
@@ -74,16 +89,7 @@ func (g *GitRepo) CreateBranch(branchName string) error {
 		return nil
 	}
 
-	headRef, err := g.repo.Head()
-	if err != nil {
-		return fmt.Errorf("failed to get HEAD: %w", err)
-	}
-
-	refName := plumbing.NewBranchReferenceName(branchName)
-	ref := plumbing.NewHashReference(refName, headRef.Hash())
-
-	err = g.repo.Storer.SetReference(ref)
-	if err != nil {
+	if _, err := g.runGit("branch", branchName); err != nil {
 		return fmt.Errorf("failed to create branch %s: %w", branchName, err)
 	}
 
@@ -146,14 +152,12 @@ func (g *GitRepo) SyncSubmodules() error {
 	var lastErr error
 	var lastOutput string
 	for attempt := 1; attempt <= submoduleSyncAttempts; attempt++ {
-		cmd := exec.CommandContext(context.Background(), "git", "submodule", "update", "--init", "--recursive", "--force")
-		cmd.Dir = g.path
-		output, err := cmd.CombinedOutput()
+		output, err := g.runGit("submodule", "update", "--init", "--recursive", "--force")
 		if err == nil {
 			return nil
 		}
 		lastErr = err
-		lastOutput = string(output)
+		lastOutput = output
 		if !isSubmoduleIndexLockError(lastOutput) || attempt == submoduleSyncAttempts {
 			break
 		}
@@ -171,18 +175,9 @@ func (g *GitRepo) CheckoutBranch(branchName string) error {
 		return g.SyncSubmodules()
 	}
 
-	w, err := g.repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(branchName),
-		// Force discards unstaged submodule drift left by the previous branch's
-		// gitlink; SyncSubmodules immediately after restores HEAD's pins.
-		Force: true,
-	})
-	if err != nil {
+	// Force discards unstaged submodule drift left by the previous branch's
+	// gitlink; SyncSubmodules immediately after restores HEAD's pins.
+	if _, err := g.runGit("checkout", "-f", branchName); err != nil {
 		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
 	}
 
@@ -196,37 +191,36 @@ func (g *GitRepo) CheckoutBranch(branchName string) error {
 
 // CommitAll stages all changes and creates a commit.
 func (g *GitRepo) CommitAll(message, authorName, authorEmail string) (bool, error) {
-	w, err := g.repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	err = w.AddGlob(".")
-	if err != nil {
+	if _, err := g.runGit("add", "-A"); err != nil {
 		return false, fmt.Errorf("failed to stage changes: %w", err)
 	}
 
-	status, err := w.Status()
+	clean, err := g.IsClean()
 	if err != nil {
-		return false, fmt.Errorf("failed to get status: %w", err)
+		return false, err
 	}
-	if status.IsClean() {
+	if clean {
 		fmt.Println("No changes to commit")
 		return false, nil
 	}
 
-	commit, err := w.Commit(message, &git.CommitOptions{
-		Author: &object.Signature{
-			Name:  authorName,
-			Email: authorEmail,
-			When:  time.Now(),
-		},
-	})
+	cmd := exec.CommandContext(context.Background(), "git",
+		"-c", "user.name="+authorName,
+		"-c", "user.email="+authorEmail,
+		"commit", "-F", "-",
+	)
+	cmd.Dir = g.path
+	cmd.Stdin = strings.NewReader(message)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return false, fmt.Errorf("failed to commit: %w", err)
+		return false, fmt.Errorf("failed to commit: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
-	fmt.Printf("Created commit: %s\n", commit.String())
+	hash, err := g.runGit("rev-parse", "HEAD")
+	if err != nil {
+		return false, fmt.Errorf("failed to resolve new commit: %w", err)
+	}
+	fmt.Printf("Created commit: %s\n", strings.TrimSpace(hash))
 	return true, nil
 }
 
@@ -234,47 +228,19 @@ func (g *GitRepo) CommitAll(message, authorName, authorEmail string) (bool, erro
 // Equal or behind returns false; ahead or diverged returns true.
 // A missing base branch is treated as ahead (true).
 func (g *GitRepo) HasCommitsAheadOf(baseBranch string) (bool, error) {
-	headRef, err := g.repo.Head()
-	if err != nil {
-		return false, fmt.Errorf("failed to get HEAD: %w", err)
+	if _, err := g.runGit("rev-parse", "--verify", "--quiet", "refs/heads/"+baseBranch); err != nil {
+		return true, nil
 	}
 
-	baseRef, err := g.repo.Reference(plumbing.NewBranchReferenceName(baseBranch), true)
-	if err != nil {
-		if errors.Is(err, plumbing.ErrReferenceNotFound) {
-			return true, nil
-		}
-		return false, fmt.Errorf("failed to get base branch %s: %w", baseBranch, err)
-	}
-
-	if headRef.Hash() == baseRef.Hash() {
-		return false, nil
-	}
-
-	headCommit, err := g.repo.CommitObject(headRef.Hash())
-	if err != nil {
-		return false, fmt.Errorf("failed to get HEAD commit: %w", err)
-	}
-	baseCommit, err := g.repo.CommitObject(baseRef.Hash())
-	if err != nil {
-		return false, fmt.Errorf("failed to get base commit %s: %w", baseBranch, err)
-	}
-
-	// HEAD has commits not on base iff HEAD is not a merge-base of (HEAD, base).
-	// Behind/equal: merge-base is HEAD. Ahead/diverged: merge-base is not HEAD.
-	bases, err := headCommit.MergeBase(baseCommit)
+	out, err := g.runGit("rev-list", "--count", baseBranch+"..HEAD")
 	if err != nil {
 		return false, fmt.Errorf("failed to compare commits with %s: %w", baseBranch, err)
 	}
-	if len(bases) == 0 {
-		return true, nil
+	count, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return false, fmt.Errorf("failed to parse rev-list count for %s: %w", baseBranch, err)
 	}
-	for _, mb := range bases {
-		if mb.Hash == headRef.Hash() {
-			return false, nil
-		}
-	}
-	return true, nil
+	return count > 0, nil
 }
 
 // Push pushes the current branch to the remote using the given GitHub token.
@@ -288,18 +254,21 @@ func (g *GitRepo) Push(remoteName, token string) error {
 		return err
 	}
 
-	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", currentBranch, currentBranch))
-
-	err = g.repo.Push(&git.PushOptions{
-		RemoteName: remoteName,
-		RefSpecs:   []config.RefSpec{refSpec},
-		Auth: &http.BasicAuth{
-			Username: "git",
-			Password: token,
-		},
-	})
-	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return fmt.Errorf("failed to push: %w", err)
+	refSpec := fmt.Sprintf("refs/heads/%s:refs/heads/%s", currentBranch, currentBranch)
+	auth := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
+	cmd := exec.CommandContext(context.Background(), "git",
+		"-c", "http.extraHeader=Authorization: Basic "+auth,
+		"push", remoteName, refSpec,
+	)
+	cmd.Dir = g.path
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// Match prior go-git behavior: already up-to-date is success.
+		if bytes.Contains(output, []byte("Everything up-to-date")) {
+			fmt.Printf("Pushed branch %s to remote: %s\n", currentBranch, remoteName)
+			return nil
+		}
+		return fmt.Errorf("failed to push: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
 	fmt.Printf("Pushed branch %s to remote: %s\n", currentBranch, remoteName)
@@ -308,31 +277,24 @@ func (g *GitRepo) Push(remoteName, token string) error {
 
 // GetCurrentBranch returns the name of the current branch.
 func (g *GitRepo) GetCurrentBranch() (string, error) {
-	headRef, err := g.repo.Head()
+	out, err := g.runGit("rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("failed to get HEAD: %w", err)
 	}
-
-	if !headRef.Name().IsBranch() {
+	name := strings.TrimSpace(out)
+	if name == "" || name == "HEAD" {
 		return "", fmt.Errorf("HEAD is not a branch")
 	}
-
-	return headRef.Name().Short(), nil
+	return name, nil
 }
 
 // IsClean checks if the working directory is clean.
 func (g *GitRepo) IsClean() (bool, error) {
-	w, err := g.repo.Worktree()
-	if err != nil {
-		return false, fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	status, err := w.Status()
+	out, err := g.runGit("status", "--porcelain")
 	if err != nil {
 		return false, fmt.Errorf("failed to get status: %w", err)
 	}
-
-	return status.IsClean(), nil
+	return strings.TrimSpace(out) == "", nil
 }
 
 // SetRemoteURL sets the URL for a remote.

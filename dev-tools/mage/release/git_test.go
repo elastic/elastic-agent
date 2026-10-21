@@ -407,6 +407,68 @@ func TestCommitAllWithSubmoduleDirectory(t *testing.T) {
 	}
 }
 
+// TestGitOpsWithSharedClone covers Buildkite --reference clones: objects live in
+// alternates, which go-git cannot read (Status/CommitObject => "object not found").
+func TestGitOpsWithSharedClone(t *testing.T) {
+	_, objectRepoDir := createTestRepo(t)
+	runGit(t, objectRepoDir, "branch", "9.6")
+
+	sharedDir := t.TempDir()
+	runGit(t, filepath.Dir(sharedDir), "clone", "--shared", objectRepoDir, sharedDir)
+	alternates := filepath.Join(sharedDir, ".git", "objects", "info", "alternates")
+	if _, err := os.Stat(alternates); err != nil {
+		t.Fatalf("shared clone missing alternates file: %v", err)
+	}
+
+	gitRepo, err := OpenRepo(sharedDir)
+	if err != nil {
+		t.Fatalf("OpenRepo() error = %v", err)
+	}
+
+	// Prove go-git still cannot resolve objects through alternates.
+	headRef, err := gitRepo.repo.Head()
+	if err != nil {
+		t.Fatalf("Head() error = %v", err)
+	}
+	if _, err := gitRepo.repo.CommitObject(headRef.Hash()); err == nil {
+		t.Fatal("expected go-git CommitObject to fail on shared clone; test would not catch regressions")
+	}
+
+	clean, err := gitRepo.IsClean()
+	if err != nil {
+		t.Fatalf("IsClean() error = %v", err)
+	}
+	if !clean {
+		t.Fatal("IsClean() = false, want true on a fresh shared clone")
+	}
+
+	if err := gitRepo.CheckoutBranch("9.6"); err != nil {
+		t.Fatalf("CheckoutBranch(9.6) error = %v", err)
+	}
+	if err := gitRepo.CheckoutBranch("main"); err != nil {
+		t.Fatalf("CheckoutBranch(main) error = %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(sharedDir, "bump.txt"), []byte("9.6.0"), 0644); err != nil {
+		t.Fatalf("write bump.txt: %v", err)
+	}
+	committed, err := gitRepo.CommitAll("bump version", "Test Author", "test@example.com")
+	if err != nil {
+		t.Fatalf("CommitAll() error = %v", err)
+	}
+	if !committed {
+		t.Fatal("CommitAll() should create a commit")
+	}
+
+	ahead, err := gitRepo.HasCommitsAheadOf("9.6")
+	if err != nil {
+		t.Fatalf("HasCommitsAheadOf() error = %v", err)
+	}
+	if !ahead {
+		t.Fatal("HasCommitsAheadOf(9.6) = false, want true after commit on main")
+	}
+}
+
 func TestCommitAll(t *testing.T) {
 	gitRepo, tmpDir := createTestRepo(t)
 
@@ -435,8 +497,8 @@ func TestCommitAll(t *testing.T) {
 		t.Fatalf("failed to get commit: %v", err)
 	}
 
-	if commit.Message != "Test commit" {
-		t.Errorf("CommitAll() commit message = %s, want %s", commit.Message, "Test commit")
+	if got := strings.TrimSpace(commit.Message); got != "Test commit" {
+		t.Errorf("CommitAll() commit message = %q, want %q", got, "Test commit")
 	}
 }
 
