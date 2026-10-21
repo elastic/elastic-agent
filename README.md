@@ -138,7 +138,7 @@ exec /crossbuild: exec format error
 
 If that happens, enable
 [`multiarch/qemu-user-static`](https://github.com/multiarch/qemu-user-static)
-is to enable execution of multi-architecture containers
+to allow execution of multi-architecture containers
 by QEMU and binfmt_misc:
 
 ```
