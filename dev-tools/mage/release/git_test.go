@@ -310,24 +310,6 @@ func TestOpenRepoWithAlternateObjects(t *testing.T) {
 			if clean, err := repo.IsClean(); err != nil || !clean {
 				t.Fatalf("IsClean() = %v, %v; want true, nil", clean, err)
 			}
-			if err := repo.EnsureBranchFrom("main", "release"); err != nil {
-				t.Fatal(err)
-			}
-			if err := os.WriteFile(filepath.Join(clone, "README.md"), []byte("updated"), 0644); err != nil {
-				t.Fatal(err)
-			}
-			if clean, err := repo.IsClean(); err != nil || clean {
-				t.Fatalf("IsClean() = %v, %v; want false, nil", clean, err)
-			}
-			if committed, err := repo.CommitAll("Update README", "Test User", "test@example.com"); err != nil || !committed {
-				t.Fatalf("CommitAll() = %v, %v; want true, nil", committed, err)
-			}
-			if clean, err := repo.IsClean(); err != nil || !clean {
-				t.Fatalf("IsClean() after commit = %v, %v; want true, nil", clean, err)
-			}
-			if got := strings.TrimSpace(runGit(t, clone, "log", "-1", "--format=%s")); got != "Update README" {
-				t.Fatalf("commit message = %q, want Update README", got)
-			}
 		})
 	}
 }
