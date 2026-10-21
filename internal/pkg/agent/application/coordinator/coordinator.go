@@ -821,6 +821,11 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 		return ErrUninstallRequiresRoot
 	}
 
+	actionID := ""
+	if action != nil {
+		actionID = action.ActionID
+	}
+
 	// Guard against spawning more than one detached uninstaller. The detached
 	// process delays its success ack until the point of no return, so Fleet can
 	// redeliver the action (which is no longer in the scheduled-action queue once
@@ -831,10 +836,6 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 	// already in flight by returning nil (not an error) so the handler does not
 	// fail-ack it; the in-flight uninstaller owns the acknowledgement.
 	if !c.uninstalling.CompareAndSwap(false, true) {
-		actionID := ""
-		if action != nil {
-			actionID = action.ActionID
-		}
 		c.logger.Infow("Uninstall already in progress, ignoring duplicate action",
 			"action.id", actionID)
 		return nil
@@ -860,8 +861,8 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 		"--path.home", paths.Top(),
 		"--path.config", paths.Config(),
 	}
-	if action != nil && action.ActionID != "" {
-		args = append(args, "--"+UninstallFleetAckActionIDFlag, action.ActionID)
+	if actionID != "" {
+		args = append(args, "--"+UninstallFleetAckActionIDFlag, actionID)
 	}
 	// No --uninstall-token is passed: a tamper-protected (Elastic Defend) agent
 	// is uninstalled by handling the preceding UNENROLL action, which removes
