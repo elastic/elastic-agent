@@ -94,6 +94,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.163.0/exporter/nopexporter/README.md) | v0.163.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.163.0/exporter/otlpexporter/README.md) | v0.163.0 |
 | [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.163.0/exporter/otlphttpexporter/README.md) | v0.163.0 |
+| [prometheusremotewriteexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/prometheusremotewriteexporter/v0.163.0/exporter/prometheusremotewriteexporter/README.md) | v0.163.0 |
 
 ### Processors
 
