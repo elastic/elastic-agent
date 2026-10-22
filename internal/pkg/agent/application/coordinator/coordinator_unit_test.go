@@ -732,7 +732,7 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 
-	require.Error(t, coord.componentModelErr)
+	require.Error(t, coord.componentGenErr)
 	assert.False(t, coord.state.PolicyApplied, "PolicyApplied must stay false when component model generation fails")
 	<-stateChan // drain the Failed state update
 
@@ -742,7 +742,7 @@ inputs:
 	configChan <- cfgChange
 	coord.runLoopIteration(ctx)
 
-	assert.NoError(t, coord.componentModelErr)
+	assert.NoError(t, coord.componentGenErr)
 	assert.True(t, coord.state.PolicyApplied, "PolicyApplied must be set once a policy is applied successfully")
 }
 
