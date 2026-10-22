@@ -20,6 +20,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/go-units"
+
 	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -48,19 +50,6 @@ func getArchiveReservation(archiveDir string) string {
 
 func getInstallReservation() string {
 	return filepath.Join(paths.Data(), ".elastic-agent-install.reserved.tmp")
-}
-
-func formatSize(b uint64) string {
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := uint64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 func checkSameVolume(pathA, pathB string) bool {
@@ -98,12 +87,12 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 			// Report both requirements so the user doesn't free up just the install
 			// size and then fail again on the archive reservation
 			return false, upgradeErrors.DiskSpaceLowError{
-				fmt.Sprintf("need %s at %s", formatSize(installSize), paths.Data()),
-				fmt.Sprintf("need %s at %s", formatSize(artifactsSize), archiveDir),
+				fmt.Sprintf("need %s at %s", units.HumanSize(float64(installSize)), paths.Data()),
+				fmt.Sprintf("need %s at %s", units.HumanSize(float64(artifactsSize)), archiveDir),
 			}
 		}
 
-		spaceReqs = append(spaceReqs, fmt.Sprintf("need %s at %s", formatSize(installSize), paths.Data()))
+		spaceReqs = append(spaceReqs, fmt.Sprintf("need %s at %s", units.HumanSize(float64(installSize)), paths.Data()))
 	} else if err != nil {
 		errs = append(errs, err)
 	}
@@ -118,14 +107,14 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 			// mechanics and it would appear as if X is already available
 			errs = append(errs,
 				upgradeErrors.DiskSpaceLowError{
-					fmt.Sprintf("need %s at %s", formatSize(installSize), paths.Data()),
-					fmt.Sprintf("need %s at %s", formatSize(artifactsSize), archiveDir),
+					fmt.Sprintf("need %s at %s", units.HumanSize(float64(installSize)), paths.Data()),
+					fmt.Sprintf("need %s at %s", units.HumanSize(float64(artifactsSize)), archiveDir),
 				},
 			)
 			return false, goerrors.Join(errs...)
 		}
 
-		spaceReqs = append(spaceReqs, fmt.Sprintf("need %s at %s", formatSize(artifactsSize), archiveDir))
+		spaceReqs = append(spaceReqs, fmt.Sprintf("need %s at %s", units.HumanSize(float64(artifactsSize)), archiveDir))
 	} else if err != nil {
 		errs = append(errs, err)
 	}
@@ -170,7 +159,7 @@ func reserveDiskSpace(path string, size int64) error {
 			needed := uint64(size - reservedSize) //nolint:gosec // G115: size is greater than reservedSize
 			if needed > available {
 				return upgradeErrors.DiskSpaceLowError{
-					fmt.Sprintf("need %s at %s, %s available", formatSize(needed), filepath.Dir(path), formatSize(available)),
+					fmt.Sprintf("need %s at %s, %s available", units.HumanSize(float64(needed)), filepath.Dir(path), units.HumanSize(float64(available))),
 				}
 			}
 		}
