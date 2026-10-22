@@ -13,7 +13,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
-	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
 const defaultMaxRetries = 5
@@ -48,8 +47,8 @@ func New(acker BatchAcker, log *logger.Logger, opts ...Option) *Retrier {
 	r := &Retrier{
 		acker:                acker,
 		log:                  log,
-		initialRetryInterval: pkgfleetapi.AckBackoffInit,
-		maxRetryInterval:     pkgfleetapi.AckBackoffMax,
+		initialRetryInterval: fleetapi.AckBackoffInit,
+		maxRetryInterval:     fleetapi.AckBackoffMax,
 		maxRetries:           defaultMaxRetries,
 		kickCh:               make(chan struct{}, 1),
 		doneCh:               make(chan struct{}, 1),
