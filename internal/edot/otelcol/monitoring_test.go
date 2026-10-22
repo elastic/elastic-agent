@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -30,6 +31,10 @@ func TestMonitoringReceiver(t *testing.T) {
 	cfg := `receivers:
   elasticmonitoringreceiver:
     interval: 1s
+processors:
+  elasticmonitoringprocessor:
+    exporter_names:
+      elasticsearch/1: elasticsearch/1
 connectors:
   elasticmonitoringconnector: {}
 exporters:
@@ -58,6 +63,7 @@ service:
   pipelines:
     metrics:
       receivers: [elasticmonitoringreceiver]
+      processors: [elasticmonitoringprocessor]
       exporters: [elasticmonitoringconnector]
     logs:
       receivers: [elasticmonitoringconnector]
@@ -78,7 +84,7 @@ service:
 		// If we've already failed this event once, succeed on retry
 		if _, alreadyFailed := failedEvents[timestamp]; alreadyFailed {
 			// Check if this is a beat.stats event and we have enough events processed
-			if ok, _ := curEvent.HasKey("beat.stats"); ok && eventCount > 3 {
+			if _, ok := curEvent["beat.stats.libbeat.pipeline.queue.max_events"]; ok && eventCount > 3 {
 				monitoringReceived <- curEvent
 				return http.StatusOK
 			}
@@ -155,6 +161,10 @@ func TestMonitoringReceiverRequestLevelErrors(t *testing.T) {
 	cfg := `receivers:
   elasticmonitoringreceiver:
     interval: 1s
+processors:
+  elasticmonitoringprocessor:
+    exporter_names:
+      elasticsearch/1: elasticsearch/1
 connectors:
   elasticmonitoringconnector: {}
 exporters:
@@ -184,6 +194,7 @@ service:
   pipelines:
     metrics:
       receivers: [elasticmonitoringreceiver]
+      processors: [elasticmonitoringprocessor]
       exporters: [elasticmonitoringconnector]
     logs:
       receivers: [elasticmonitoringconnector]
@@ -200,7 +211,7 @@ service:
 		var curEvent mapstr.M
 		require.NoError(t, json.Unmarshal(event, &curEvent))
 
-		if ok, _ := curEvent.HasKey("beat.stats"); ok {
+		if _, ok := curEvent["beat.stats.libbeat.pipeline.queue.max_events"]; ok {
 			// Only capture after the startup event and first interval event have been processed,
 			// so the captured event reflects cumulative metrics from both prior deliveries.
 			if ingestedDocsCount >= 2 {
@@ -228,9 +239,15 @@ service:
 
 	// Wrap with HTTP-level request failure logic
 	httpLevelHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only fail bulk requests, so that other requests made by the exporter
+		// (e.g. version detection at startup) do not consume the failure budget.
+		if !strings.HasSuffix(r.URL.Path, "/_bulk") {
+			baseHandler.ServeHTTP(w, r)
+			return
+		}
 		httpRequestCount++
 
-		// Fail the first 3 HTTP requests: initial request + retries
+		// Fail the first 3 bulk requests: initial request + retries
 		if httpRequestCount <= 3 {
 			// force a retry
 			w.WriteHeader(http.StatusTooManyRequests)

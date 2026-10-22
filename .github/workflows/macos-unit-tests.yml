@@ -2,8 +2,7 @@ name: macos-unit-tests
 
 on:
   workflow_dispatch:
-  # Temporary disabled for PRs
-  # pull_request:
+  pull_request:
   push:
     branches:
       - main
@@ -21,7 +20,13 @@ concurrency:
 
 jobs:
   unit-tests:
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [xcode-27]
+        mage_target: ["test:unit", "test:unitEdot"]
+    name: macos-unit-tests (${{ matrix.os }}, ${{ matrix.mage_target }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
@@ -42,5 +47,5 @@ jobs:
       - name: Install mage
         run: make mage
 
-      - name: mage unitTest
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage unitTest
+      - name: mage ${{ matrix.mage_target }}
+        run: RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}

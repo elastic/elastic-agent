@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.6.0
+
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
 apiVersion: v1
@@ -29,7 +30,16 @@ stringData:
       otlphttp:
         endpoint: ${env:AUTOOPS_OTEL_URL}
         headers:
-          Authorization: AutoOpsToken ${env:AUTOOPS_TOKEN}
+          Authorization: ApiKey ${env:ELASTIC_CLOUD_CONNECTED_MODE_API_KEY}
+        sending_queue:
+          batch:
+            flush_timeout: 11s
+            max_size: 4194304
+            min_size: 1048576
+            sizer: bytes
+          block_on_overflow: true
+          enabled: true
+          queue_size: 52428800
     receivers:
       metricbeatreceiver:
         metricbeat:
@@ -53,12 +63,6 @@ stringData:
             period: 24h
         output:
           otelconsumer: null
-        processors:
-        - add_fields:
-            fields:
-              temp_resource_id: ${env:AUTOOPS_TEMP_RESOURCE_ID}
-              token: ${env:AUTOOPS_TOKEN}
-            target: autoops_es
         telemetry_types:
         - logs
     service:
@@ -71,6 +75,7 @@ stringData:
       telemetry:
         logs:
           encoding: json
+
 ---
 # Source: elastic-agent/templates/integrations/_auto_ops/secret.yaml
 apiVersion: v1
@@ -84,13 +89,12 @@ metadata:
     app.kubernetes.io/instance: example
     app.kubernetes.io/version: 9.6.0
 stringData:
-  autoops-token: "REPLACE_ME_TOKEN"
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
-  temp-resource-id: "REPLACE_ME_RESOURCE_ID"
   otel-url: "https://otel.example.com:4318"
   es-api-key: "REPLACE_ME_API_KEY"
   cloud-connected-mode-api-key: "CCM-API-KEY"
   cloud-connected-mode-api-url: "CCM-API-URL"
+
 ---
 # Source: elastic-agent/templates/agent/k8s/deployment.yaml
 apiVersion: apps/v1
@@ -112,7 +116,7 @@ spec:
       labels:
         name: agent-autoops-example
       annotations:
-        checksum/config: e89ad87aab4abdf0b266914a815ddd71744340acbec3678f63b018cfe85334df
+        checksum/config: c0b5a2c9ba9bb1fb13cf9ae9ab5fd4eec39219759e106fd3f937ba158d30035a
     spec:
       automountServiceAccountToken: true
       containers:
@@ -133,15 +137,10 @@ spec:
               fieldPath: metadata.name
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        - name: AUTOOPS_TOKEN
+        - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
           valueFrom:
             secretKeyRef:
-              key: autoops-token
-              name: agent-autoops-example-autoops
-        - name: AUTOOPS_TEMP_RESOURCE_ID
-          valueFrom:
-            secretKeyRef:
-              key: temp-resource-id
+              key: cloud-connected-mode-api-key
               name: agent-autoops-example-autoops
         - name: AUTOOPS_OTEL_URL
           valueFrom:
@@ -157,11 +156,6 @@ spec:
           valueFrom:
             secretKeyRef:
               key: es-api-key
-              name: agent-autoops-example-autoops
-        - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
-          valueFrom:
-            secretKeyRef:
-              key: cloud-connected-mode-api-key
               name: agent-autoops-example-autoops
         - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL
           valueFrom:
@@ -192,3 +186,4 @@ spec:
         secret:
           defaultMode: 292
           secretName: agent-autoops-example
+

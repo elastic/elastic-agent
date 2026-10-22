@@ -36,6 +36,11 @@ The OpenTelemetry components deployed within the `Gateway` Deployment collectors
 - DEPRECATED: [Elastic Infra Metrics processor](https://github.com/elastic/opentelemetry-collector-components/tree/main/processor/elasticinframetricsprocessor): The Elastic Infra Metrics Processor is used to bridge the gap between OTEL and Elastic Infra Metrics. This processor is deprecated and will be removed in 9.2.0.
 - [Elastic APM connector](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector): The Elastic APM connector produces aggregated Elastic APM-specific metrics from all telemetry signals.
 
+Exporters:
+
+- **Metrics** (`metrics` and `metrics/aggregated-otel-metrics` pipelines): exported via the [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) to Elasticsearch's native OTLP endpoint (`<elastic_endpoint>/_otlp`).
+- **Logs and Traces**: exported via the [Elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md).
+
 ### Auto-instrumentation
 
 The Helm Chart is configured to enable zero-code instrumentation using the [Operator's Instrumentation resource](https://github.com/open-telemetry/opentelemetry-operator/?tab=readme-ov-file#opentelemetry-auto-instrumentation-injection) for the following programming languages:
@@ -61,8 +66,14 @@ $ kubectl create namespace opentelemetry-operator-system
      --from-literal=elastic_api_key='YOUR_ELASTICSEARCH_API_KEY'
    ```
    Don't forget to replace
-   - `YOUR_ELASTICSEARCH_ENDPOINT`: your Elasticsearch endpoint (*with* `https://` prefix example: `https://1234567.us-west2.gcp.elastic-cloud.com:443`).
-   - `YOUR_ELASTICSEARCH_API_KEY`: your Elasticsearch API Key
+   - `YOUR_ELASTICSEARCH_ENDPOINT`: your Elasticsearch endpoint (*with* `https://` prefix example: `https://1234567.us-west2.gcp.elastic-cloud.com:443`). In Elastic Cloud, find it under your deployment → **Elasticsearch** → **Copy endpoint**. Note: this is the standard Elasticsearch REST endpoint, not the OTLP-specific ingest URL (`*.ingest.*.elastic-cloud.com`) provided by some onboarding flows.
+   - `YOUR_ELASTICSEARCH_API_KEY`: your Elasticsearch API Key (use the `encoded` field from the API key creation response).
+
+   The API key must have the following index privileges on `logs-*-*`, `metrics-*-*`, and `traces-*-*`:
+   - `auto_configure`: allows automatic creation and configuration of data stream templates.
+   - `create_doc`: allows writing documents via the Bulk API and the OTLP native endpoint.
+
+   Refer to the [Elasticsearch exporter documentation](../../docs/reference/edot-collector/components/elasticsearchexporter.md#creating-an-api-key-for-the-es-exporter) for an example API key creation request.
 
 3. Execute the following commands to deploy the Helm Chart.
 
@@ -102,6 +113,17 @@ $ helm upgrade --install --namespace opentelemetry-operator-system \
     --values ./openshift/values.yaml \
     --set crds.installOtel=false \
     --set opentelemetry-operator.enabled=false \
+    --version 0.16.0
+```
+
+By default, the daemon collector runs as root (UID 0) to read the host files. The [`./openshift/rootless-values.yaml`](./openshift/rootless-values.yaml) file runs the daemon collector as non-root. An init container changes the permissions of `/var/lib/otelcol` on the node, so the collector can save the filelog checkpoints. To run the daemon collector as non-root, apply the file after the OpenShift values file:
+
+```shell
+$ helm upgrade --install --namespace opentelemetry-operator-system \
+  opentelemetry-kube-stack open-telemetry/opentelemetry-kube-stack \
+    --values ./values.yaml \
+    --values ./openshift/values.yaml \
+    --values ./openshift/rootless-values.yaml \
     --version 0.16.0
 ```
 

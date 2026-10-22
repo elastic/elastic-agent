@@ -4,6 +4,9 @@ scm:
   repository: elastic-agent
   branch: main
   commitusingapi: true
+  # No policy reads beats. Cloning it breaks checkouts of working branches with an older
+  # beats pin and exposes beats/updatecli-compose.yaml to autodiscovery.
+  submodules: false
   # begin updatecli-compose policy values
   user: 'github-actions[bot]'
   email: '41898282+github-actions[bot]@users.noreply.github.com'

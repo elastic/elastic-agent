@@ -14,7 +14,6 @@ import (
 	"io/fs"
 	"math/rand/v2"
 	"os"
-	"strings"
 	"time"
 
 	"gopkg.in/yaml.v2"
@@ -169,7 +168,7 @@ func enroll(
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: options.UserProvidedMetadata,
-			Tags:         cleanTags(options.Tags),
+			Tags:         info.NormalizeTags(options.Tags),
 		},
 	}
 
@@ -543,20 +542,4 @@ func fleetHashToken(token string) (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(enrollmentHashBytes), nil
-}
-
-func cleanTags(tags []string) []string {
-	var r []string
-	// Create a map to store unique elements
-	seen := make(map[string]bool)
-	for _, str := range tags {
-		tag := strings.TrimSpace(str)
-		if tag != "" {
-			if _, ok := seen[tag]; !ok {
-				seen[tag] = true
-				r = append(r, tag)
-			}
-		}
-	}
-	return r
 }

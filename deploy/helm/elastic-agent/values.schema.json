@@ -322,6 +322,11 @@
                                     "type": "boolean",
                                     "description": "enable rotated logs ingestion. WARNING: enabling it might cause data re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs)."
                                 },
+                                "single_input": {
+                                    "type": "boolean",
+                                    "description": "Use a single filestream input with a glob path for all container logs. Set to false to use one input per container. Not supported with dynamic provider variables (${kubernetes.*}, ${docker.*}) in the logs vars, kubernetes.namespace or kubernetes.onboardingID.",
+                                    "default": true
+                                },
                                 "vars": {
                                     "type": "object",
                                     "description": "Stream variables.",
@@ -431,18 +436,18 @@
             "properties": {
                 "enabled": { "type": "boolean", "description": "Enable AutoOps integration." },
 
-                "autoops_token": { "type": "string", "description": "Token to register into AutoOps" },
                 "autoops_otel_url": { "type": "string", "description": "OTel server URL" },
-                "autoops_temp_resource_id": { "type": "string", "description": "Temporary resource ID" },
 
                 "es_api_key": { "type": "string", "description": "Monitored ES cluster API key" },
                 "es_username": { "type": "string", "description": "Monitored ES cluster username" },
                 "es_password": { "type": "string", "description": "Monitored ES cluster password" },
                 "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" },
 
-
                 "elastic_cloud_connected_mode_api_key": { "type": "string", "description": "Cloud Connected Mode API key" },
-                "elastic_cloud_connected_mode_api_url": { "type": "string", "description": "Cloud Connected Mode API URL" }
+                "elastic_cloud_connected_mode_api_url": { "type": "string", "description": "Cloud Connected Mode API URL" },
+
+                "autoops_temp_resource_id": { "type": "string", "description": "Deprecated: no longer used, kept for backwards compatibility" },
+                "autoops_token": { "type": "string", "description": "Deprecated: no longer used, kept for backwards compatibility" }
             },
 
             "if": {
@@ -450,13 +455,12 @@
                 "required": ["enabled"]
             },
             "then": {
-                "required": ["autoops_token", "autoops_otel_url", "autoops_temp_resource_id"],
+                "required": ["autoops_otel_url", "elastic_cloud_connected_mode_api_key"],
                 "allOf": [
                     {
                         "properties": {
-                            "autoops_token": { "type": "string", "minLength": 1 },
+                            "elastic_cloud_connected_mode_api_key": { "type": "string", "minLength": 1 },
                             "autoops_otel_url": { "type": "string", "minLength": 1 },
-                            "autoops_temp_resource_id": { "type": "string", "minLength": 1 },
                             "autoops_es_url": { "type": "string", "description": "Monitored ES cluster URL" }
                         }
                     }
@@ -546,6 +550,31 @@
                 "unprivileged": {
                     "type": "boolean",
                     "description": "Enable unprivileged mode."
+                },
+                "openshift": {
+                    "type": "object",
+                    "description": "OpenShift-specific configuration.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "enabled": {
+                            "type": ["string", "boolean"],
+                            "enum": ["auto", "true", "false", true, false],
+                            "description": "OpenShift detection mode. auto detects via API groups, true always enables, false always disables.",
+                            "default": "auto"
+                        },
+                        "securityContextConstraints": {
+                            "type": "object",
+                            "description": "SCC configuration.",
+                            "additionalProperties": false,
+                            "properties": {
+                                "create": {
+                                    "type": "boolean",
+                                    "description": "Create SCC RoleBindings granting the privileged SCC to agent and kube-state-metrics service accounts.",
+                                    "default": true
+                                }
+                            }
+                        }
+                    }
                 },
                 "fleet": {
                     "type": "object",

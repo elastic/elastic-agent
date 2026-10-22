@@ -516,6 +516,50 @@ func TestBuildInputMetrics_DifferentComponents(t *testing.T) {
 	assert.Equal(t, int64(20), findMetricValue(t, out, idxMonitoring, "filebeat_input.beat.input.events.published"))
 }
 
+// TestBuildInputMetrics_StripsStreamSuffix verifies that a per-stream OTel
+// component ID (e.g. filestream-default/stream-078) is collapsed to the base
+// component ID (filestream-default) in the output event.
+func TestBuildInputMetrics_StripsStreamSuffix(t *testing.T) {
+	md, sm := newMetricsWithReceiverScope(
+		fbreceiverScopeName,
+		"filebeatreceiver/_agent-component/filestream-default/stream-078",
+	)
+	appendGaugeIntWithAttrs(sm, "beat.input.events.published", 99, otelInputIDKey, "stream-078")
+
+	out := pmetric.NewMetrics()
+	buildInputMetrics(pcommon.NewResource(), md, out)
+
+	require.Equal(t, 1, out.ResourceMetrics().Len())
+	compID, _ := out.ResourceMetrics().At(0).ScopeMetrics().At(0).Scope().Attributes().Get(internaltelemetry.ComponentIDAttr)
+	assert.Equal(t, "filestream-default", compID.Str(), "stream suffix must be stripped from component.id")
+}
+
+// TestBuildInputMetrics_FiltersSystemMetrics verifies that metrics matching the
+// system-level prefixes (process stats, cgroup, memory) are dropped even when
+// they carry an input_id attribute.
+func TestBuildInputMetrics_FiltersSystemMetrics(t *testing.T) {
+	md, sm := newMetricsWithReceiverScope(fbreceiverScopeName, "filebeatreceiver/_agent-component/filestream-default/stream-001")
+	appendGaugeIntWithAttrs(sm, "system.process.cpu.total.pct", 50, otelInputIDKey, "stream-001")
+	appendGaugeIntWithAttrs(sm, "beat.cgroup.cpu.cfs.period.us", 100000, otelInputIDKey, "stream-001")
+	appendGaugeIntWithAttrs(sm, "beat.memstats.rss", 1024*1024, otelInputIDKey, "stream-001")
+	// A legitimate per-input metric must still be included.
+	appendGaugeIntWithAttrs(sm, "beat.input.events.published", 5, otelInputIDKey, "stream-001")
+
+	out := pmetric.NewMetrics()
+	buildInputMetrics(pcommon.NewResource(), md, out)
+
+	require.Equal(t, 1, out.ResourceMetrics().Len())
+	compID, _ := out.ResourceMetrics().At(0).ScopeMetrics().At(0).Scope().Attributes().Get(internaltelemetry.ComponentIDAttr)
+	assert.Equal(t, "filestream-default", compID.Str())
+	assert.Equal(t, int64(5), findMetricValue(t, out, 0, "filebeat_input.beat.input.events.published"))
+	// System metrics must have been dropped.
+	smOut := out.ResourceMetrics().At(0).ScopeMetrics().At(0)
+	for i := 0; i < smOut.Metrics().Len(); i++ {
+		name := smOut.Metrics().At(i).Name()
+		assert.False(t, isInputSystemMetric(name), "system metric must not appear in input events: %s", name)
+	}
+}
+
 func TestBeatTypeFromOtelID(t *testing.T) {
 	tests := []struct {
 		input    string

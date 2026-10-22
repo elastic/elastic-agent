@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -28,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -170,14 +172,15 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 		// filebeat input metrics: in OTel mode the elasticmonitoringreceiver emits per-input
 		// metrics with metricset.name "stats" (from its event template), not "json" which is
 		// what the classic http/metrics-monitoring metricbeat uses when scraping /inputs/.
-		// The component.id includes the stream suffix because each stream has its own receiver.
+		// The component.id is the base component ID (stream suffix stripped) so all streams
+		// of the same receiver aggregate under a single component.
 		{
 			dsType:          "metrics",
 			dsDataset:       "elastic_agent.filebeat_input",
 			onlyCompareKeys: true,
 			query: []map[string]any{
 				{"match_phrase": map[string]any{"metricset.name": "stats"}},
-				{"match_phrase": map[string]any{"component.id": "filestream-monitoring/filestream-monitoring-agent"}},
+				{"match_phrase": map[string]any{"component.id": "filestream-monitoring"}},
 				{"exists": map[string]any{"field": "filebeat_input.bytes_processed_total"}},
 			},
 		},
@@ -761,7 +764,9 @@ func TestBeatsReceiverLogs(t *testing.T) {
 
 	type configOptions struct {
 		RuntimeExperimental string
+		OutputURL           string
 	}
+	mockESURL := integration.StartMockES(t, 0, 0, 0, 0)
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
 agent.logging.to_files: false
@@ -778,7 +783,7 @@ outputs:
   default:
     type: elasticsearch
     preset: latency
-    hosts: [http://localhost:9200]
+    hosts: ["{{.OutputURL}}"]
     api_key: placeholder
 agent.monitoring.enabled: false
 `
@@ -788,19 +793,21 @@ agent.monitoring.enabled: false
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
 				RuntimeExperimental: string(component.ProcessRuntimeManager),
+				OutputURL:           mockESURL.String(),
 			}))
 	processConfig := configBuffer.Bytes()
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
 				RuntimeExperimental: string(component.OtelRuntimeManager),
+				OutputURL:           mockESURL.String(),
 			}))
 	receiverConfig := configBuffer.Bytes()
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
+	// Wait for the component and both of its units to be healthy.
 	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
 		t.Helper()
 
@@ -815,17 +822,31 @@ agent.monitoring.enabled: false
 		// we don't actually care about anything here other than the receiver itself
 		assert.Equal(t, 1, len(status.Components))
 
-		// all the components should be degraded, their output units should be degraded, the input units should be healthy,
-		// and should identify themselves appropriately via their version info
+		// The component and its input and output units should be healthy, and the component
+		// should identify itself appropriately via its version info.
 		for _, comp := range status.Components {
+			assert.Equal(t, int(cproto.State_HEALTHY), comp.State)
 			assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
+			var inputUnits, outputUnits int
 			for _, unit := range comp.Units {
-				if unit.UnitType == int(cproto.UnitType_INPUT) {
-					assert.Equal(t, int(cproto.State_HEALTHY), unit.State,
-						"expected state of unit %s to be %s, got %s",
-						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String()) //nolint:gosec // G115 always under 32-bit
+				switch unit.UnitType {
+				case int(cproto.UnitType_INPUT):
+					inputUnits++
+				case int(cproto.UnitType_OUTPUT):
+					outputUnits++
 				}
+				assert.Equal(
+					t,
+					int(cproto.State_HEALTHY),
+					unit.State,
+					"expected state of unit %s to be %s, got %d",
+					unit.UnitID,
+					cproto.State_HEALTHY.String(),
+					unit.State,
+				)
 			}
+			assert.Equal(t, 1, inputUnits, "expected exactly one input unit")
+			assert.Equal(t, 1, outputUnits, "expected exactly one output unit")
 		}
 	}
 
@@ -859,12 +880,14 @@ agent.monitoring.enabled: false
 		assertBeatsReady(collect, &status, component.OtelRuntimeManager)
 	}, 2*time.Minute, 5*time.Second)
 
-	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
-	require.NoError(t, err, "failed to read logs: %v", err)
+	var beatStartLogs []map[string]any
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		logsBytes, logsErr := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+		require.NoError(collect, logsErr, "failed to read logs: %v", logsErr)
+		beatStartLogs = getBeatStartLogRecords(string(logsBytes))
+		assert.Len(collect, beatStartLogs, 2, "expected to find one log line for each configuration")
+	}, 30*time.Second, time.Second)
 
-	beatStartLogs := getBeatStartLogRecords(string(logsBytes))
-
-	require.Len(t, beatStartLogs, 2, "expected to find one log line for each configuration")
 	processLog, receiverLog := beatStartLogs[0], beatStartLogs[1]
 
 	// Check that the process log is a subset of the receiver log.
@@ -2188,4 +2211,183 @@ func componentVersionInfoNameForRuntime(runtime component.RuntimeManager) string
 		componentVersionInfoName = componentVersionInfoNameForRuntime(component.DefaultRuntimeManager)
 	}
 	return componentVersionInfoName
+}
+
+// TestDefaultProcessorFeatureFlags verifies that the default beat metadata processors
+// injected by the beats receiver pipeline can be disabled both per-output (via
+// default_processors in the output config) and globally (via
+// agent.features.default_processors). A baseline sub-test confirms host.architecture
+// is present by default; the remaining sub-tests confirm disabling removes it.
+func TestDefaultProcessorFeatureFlags(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			{Type: define.Windows},
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
+
+	type configOptions struct {
+		InputPath        string
+		Dataset          string
+		ESEndpoint       string
+		ESApiKey         string
+		DisablePerOutput bool
+		DisableGlobal    bool
+	}
+
+	const configTemplate = `
+inputs:
+  - type: filestream
+    id: filestream-dp-test
+    use_output: default
+    streams:
+      - id: dp-test
+        data_stream:
+          dataset: {{.Dataset}}
+        paths:
+          - {{.InputPath}}
+        prospector.scanner.fingerprint.enabled: false
+        file_identity.native: ~
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.ESEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: latency
+    ssl.enabled: true
+    ssl.verification_mode: full{{if .DisablePerOutput}}
+    default_processors:
+      add_host_metadata: false{{end}}
+agent:{{if .DisableGlobal}}
+  features:
+    default_processors:
+      add_host_metadata: false{{end}}
+  monitoring:
+    metrics: false
+    logs: false
+agent.internal.runtime.filebeat.filestream: otel
+`
+
+	cases := []struct {
+		name             string
+		dataset          string
+		disablePerOutput bool
+		disableGlobal    bool
+		wantHostArch     bool
+	}{
+		{
+			name:         "add_host_metadata_present_by_default",
+			dataset:      "dp.default",
+			wantHostArch: true,
+		},
+		{
+			name:             "per_output_add_host_metadata_disabled",
+			dataset:          "dp.peroutput",
+			disablePerOutput: true,
+			wantHostArch:     false,
+		},
+		{
+			name:          "agent_features_add_host_metadata_disabled",
+			dataset:       "dp.agentfeatures",
+			disableGlobal: true,
+			wantHostArch:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			inputFilePath := filepath.Join(tmpDir, "input.log")
+			require.NoError(t, os.WriteFile(inputFilePath, []byte("test line\n"), 0o600))
+
+			var configBuffer bytes.Buffer
+			require.NoError(t,
+				template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+					configOptions{
+						InputPath:        inputFilePath,
+						Dataset:          tc.dataset,
+						ESEndpoint:       esEndpoint,
+						ESApiKey:         decodedApiKey,
+						DisablePerOutput: tc.disablePerOutput,
+						DisableGlobal:    tc.disableGlobal,
+					}))
+
+			fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+			require.NoError(t, err)
+
+			ctx, cancel := testcontext.WithTimeout(t, t.Context(), 5*time.Minute)
+			defer cancel()
+
+			require.NoError(t, fixture.Prepare(ctx))
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				_ = fixture.Run(ctx, atesting.State{
+					Configure: configBuffer.String(),
+					Reached: func(_ *client.AgentState) bool {
+						return false
+					},
+				})
+			}()
+			t.Cleanup(func() {
+				if t.Failed() {
+					diagCtx := context.WithoutCancel(t.Context())
+					diagPath, diagErr := fixture.ExecDiagnostics(diagCtx)
+					if diagErr != nil {
+						t.Logf("failed to collect diagnostics: %s", diagErr)
+					} else {
+						fixture.MoveToDiagnosticsDir(diagPath)
+					}
+				}
+				cancel()
+				wg.Wait()
+			})
+
+			require.Eventually(t, func() bool {
+				if err := fixture.IsHealthy(ctx); err != nil {
+					t.Logf("waiting for agent healthy: %s", err)
+					return false
+				}
+				return true
+			}, 2*time.Minute, 5*time.Second)
+
+			index := ".ds-logs-" + tc.dataset + "-*"
+			var docs estools.Documents
+			require.EventuallyWithT(t,
+				func(collect *assert.CollectT) {
+					findCtx, findCancel := context.WithTimeout(t.Context(), 10*time.Second)
+					defer findCancel()
+
+					docs, err = estools.GetLogsForIndexWithContext(findCtx, info.ESClient, index, map[string]any{
+						"log.file.path": inputFilePath,
+					})
+					require.NoError(collect, err)
+					assert.Equal(collect, 1, docs.Hits.Total.Value)
+				},
+				2*time.Minute, 5*time.Second,
+				"expected 1 log in index %s", index)
+
+			require.Len(t, docs.Hits.Hits, 1)
+			doc := mapstr.M(docs.Hits.Hits[0].Source)
+
+			_, archErr := doc.GetValue("host.architecture")
+			if tc.wantHostArch {
+				require.NoError(t, archErr, "host.architecture should be present when add_host_metadata is enabled by default")
+			} else {
+				require.Error(t, archErr, "host.architecture should be absent when add_host_metadata is disabled")
+			}
+		})
+	}
 }
