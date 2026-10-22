@@ -96,7 +96,7 @@ func TestReserveFileSpace(t *testing.T) {
 		const size = int64(1024*1024 + 123)
 		path := filepath.Join(t.TempDir(), "reservation")
 
-		require.NoError(t, reserveDiskSpace(path, size))
+		require.NoError(t, reserveDiskSpace(t.Context(), path, size))
 
 		info, err := os.Stat(path)
 		require.NoError(t, err)
@@ -107,8 +107,8 @@ func TestReserveFileSpace(t *testing.T) {
 		const size = int64(1024 * 1024)
 		path := filepath.Join(t.TempDir(), "reservation")
 
-		require.NoError(t, reserveDiskSpace(path, size))
-		require.NoError(t, reserveDiskSpace(path, 2*size))
+		require.NoError(t, reserveDiskSpace(t.Context(), path, size))
+		require.NoError(t, reserveDiskSpace(t.Context(), path, 2*size))
 
 		info, err := os.Stat(path)
 		require.NoError(t, err)
@@ -119,8 +119,8 @@ func TestReserveFileSpace(t *testing.T) {
 		const size = int64(1024 * 1024)
 		path := filepath.Join(t.TempDir(), "reservation")
 
-		require.NoError(t, reserveDiskSpace(path, 2*size))
-		require.NoError(t, reserveDiskSpace(path, size))
+		require.NoError(t, reserveDiskSpace(t.Context(), path, 2*size))
+		require.NoError(t, reserveDiskSpace(t.Context(), path, size))
 
 		info, err := os.Stat(path)
 		require.NoError(t, err)
@@ -130,7 +130,7 @@ func TestReserveFileSpace(t *testing.T) {
 	t.Run("remove failed reservation", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "reservation")
 
-		require.Error(t, reserveDiskSpace(path, math.MaxInt64))
+		require.Error(t, reserveDiskSpace(t.Context(), path, math.MaxInt64))
 
 		require.NoFileExists(t, path)
 	})
@@ -139,8 +139,8 @@ func TestReserveFileSpace(t *testing.T) {
 		const size = int64(1024 * 1024)
 		path := filepath.Join(t.TempDir(), "reservation")
 
-		require.NoError(t, reserveDiskSpace(path, size))
-		require.Error(t, reserveDiskSpace(path, math.MaxInt64))
+		require.NoError(t, reserveDiskSpace(t.Context(), path, size))
+		require.Error(t, reserveDiskSpace(t.Context(), path, math.MaxInt64))
 
 		info, err := os.Stat(path)
 		require.NoError(t, err)
@@ -274,7 +274,7 @@ func TestReserveDiskSpace(t *testing.T) {
 		archive, payloadSize := makeGzipArtifact(t, "some artifact content")
 		archiveDir := t.TempDir()
 
-		hasSpace, err := ReserveDiskSpace(archiveDir, uint64(len(archive)), payloadSize)
+		hasSpace, err := ReserveDiskSpace(t.Context(), archiveDir, uint64(len(archive)), payloadSize)
 		require.NoError(t, err)
 		require.True(t, hasSpace)
 		archiveReservation := getArchiveReservation(archiveDir)
@@ -293,7 +293,7 @@ func TestReserveDiskSpace(t *testing.T) {
 		archive, payloadSize := makeGzipArtifact(t, "some artifact content")
 		archiveDir := t.TempDir()
 
-		hasSpace, err := ReserveDiskSpace(archiveDir, uint64(len(archive)), payloadSize)
+		hasSpace, err := ReserveDiskSpace(t.Context(), archiveDir, uint64(len(archive)), payloadSize)
 		require.NoError(t, err)
 		require.True(t, hasSpace)
 		require.FileExists(t, getArchiveReservation(archiveDir))
@@ -315,7 +315,7 @@ func TestReserveDiskSpace(t *testing.T) {
 		require.NoError(t, os.WriteFile(filepath.Join(runSubdir, "testfile"), runFileContent, 0o644))
 		t.Cleanup(func() { _ = os.RemoveAll(runSubdir) })
 
-		hasSpace, err := ReserveDiskSpace(archiveDir, uint64(len(archive)), payloadSize)
+		hasSpace, err := ReserveDiskSpace(t.Context(), archiveDir, uint64(len(archive)), payloadSize)
 		require.NoError(t, err)
 		require.True(t, hasSpace)
 		installInfo, err := os.Stat(getInstallReservation())
@@ -332,7 +332,7 @@ func TestReserveDiskSpace(t *testing.T) {
 
 		archiveSize, payloadSize, err := GetLocalUpgradeSize("file://" + target)
 		require.NoError(t, err)
-		hasSpace, err := ReserveDiskSpace(archiveDir, archiveSize, payloadSize)
+		hasSpace, err := ReserveDiskSpace(t.Context(), archiveDir, archiveSize, payloadSize)
 		require.False(t, hasSpace)
 		var diskSpaceErr upgradeErrors.DiskSpaceLowError
 		require.ErrorAs(t, err, &diskSpaceErr)

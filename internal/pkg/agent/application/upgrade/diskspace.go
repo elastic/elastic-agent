@@ -70,7 +70,7 @@ type readRangeFunc func(uri string, offset, length int64) ([]byte, error)
 
 // ReserveDiskSpace reserves upgrade space at the download archive path and install directory.
 // Pre-existing reservation files are resized to the required size.
-func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (bool, error) {
+func ReserveDiskSpace(ctx context.Context, archiveDir string, archiveSize, decompressedSize uint64) (bool, error) {
 	installSize := min(decompressedSize+ExtraInstallSize+getRunSize(), math.MaxInt64)
 	artifactsSize := min(archiveSize+ChecksumSize, math.MaxInt64)
 
@@ -81,7 +81,7 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 	var errs []error
 	var spaceReqs []string
 
-	err := reserveDiskSpace(installPath, int64(installSize)) //nolint:gosec // G115: installSize is clamped to MaxInt64
+	err := reserveDiskSpace(ctx, installPath, int64(installSize)) //nolint:gosec // G115: installSize is clamped to MaxInt64
 	if upgradeErrors.IsDiskSpaceLowError(err) {
 		if onSameVolume {
 			// Report both requirements so the user doesn't free up just the install
@@ -97,7 +97,7 @@ func ReserveDiskSpace(archiveDir string, archiveSize, decompressedSize uint64) (
 		errs = append(errs, err)
 	}
 
-	err = reserveDiskSpace(archivePath, int64(artifactsSize)) //nolint:gosec // G115: artifactsSize is clamped to MaxInt64
+	err = reserveDiskSpace(ctx, archivePath, int64(artifactsSize)) //nolint:gosec // G115: artifactsSize is clamped to MaxInt64
 	if upgradeErrors.IsDiskSpaceLowError(err) {
 		if onSameVolume {
 			// Report both requirements here even though the install reservation
@@ -146,7 +146,7 @@ func getRunSize() uint64 {
 	return size
 }
 
-func reserveDiskSpace(path string, size int64) error {
+func reserveDiskSpace(ctx context.Context, path string, size int64) error {
 	info, statErr := os.Stat(path)
 	fresh := goerrors.Is(statErr, os.ErrNotExist)
 
@@ -170,7 +170,7 @@ func reserveDiskSpace(path string, size int64) error {
 		return err
 	}
 
-	if err := fillReservation(file, size); err != nil {
+	if err := fillReservation(ctx, file, size); err != nil {
 		_ = file.Close()
 		if fresh {
 			_ = os.Remove(path)
@@ -193,7 +193,7 @@ func reserveDiskSpace(path string, size int64) error {
 	return nil
 }
 
-func fillReservation(file *os.File, size int64) error {
+func fillReservation(ctx context.Context, file *os.File, size int64) error {
 	info, err := file.Stat()
 	if err != nil {
 		return err
@@ -210,6 +210,9 @@ func fillReservation(file *os.File, size int64) error {
 		buf[i] = reservationFillByte
 	}
 	for offset := info.Size(); offset < size; {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		n := min(int64(len(buf)), size-offset)
 		if _, err := file.WriteAt(buf[:n], offset); err != nil {
 			return err

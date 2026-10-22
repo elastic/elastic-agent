@@ -46,7 +46,7 @@ type artifactDownloader struct {
 	fleetServerURI   string
 	getPGPSources    func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
 	getUpgradeSize   func(context.Context, *artifact.Config, string) (uint64, uint64, error)
-	reserveDiskSpace func(string, uint64, uint64) (bool, error)
+	reserveDiskSpace func(context.Context, string, uint64, uint64) (bool, error)
 	retryTimeout     time.Duration
 	totalTimeout     time.Duration
 	fileOps          download.FileOps
@@ -203,7 +203,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				}
 
 				a.log.Infow("Reserving disk space for upgrade", "source_uri", sourceURI, "archive_size", archiveSize, "decompressed_size", decompressedSize)
-				hasDiskSpace, err := a.reserveDiskSpace(settings.TargetDirectory, archiveSize, decompressedSize)
+				hasDiskSpace, err := a.reserveDiskSpace(ctx, settings.TargetDirectory, archiveSize, decompressedSize)
 				if err != nil {
 					e := fmt.Errorf("error reserving disk space for %s: %w", src, err)
 					a.log.Warnf("%v", e)

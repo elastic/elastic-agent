@@ -332,7 +332,7 @@ func TestDownloadArtifact(t *testing.T) {
 			run: func(t *testing.T, fx *fixture) {
 				dropPath := t.TempDir()
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return false, goerrors.New("disk space reservation failed")
 				}
 
@@ -347,7 +347,7 @@ func TestDownloadArtifact(t *testing.T) {
 			run: func(t *testing.T, fx *fixture) {
 				dropPath := t.TempDir()
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 
@@ -362,7 +362,7 @@ func TestDownloadArtifact(t *testing.T) {
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
 				reservationCalls := 0
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					reservationCalls++
 					if reservationCalls == 1 {
 						return true, nil
@@ -385,7 +385,7 @@ func TestDownloadArtifact(t *testing.T) {
 			name: "remote sourceURI succeeds when disk space reservation succeeds",
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.DropPath = t.TempDir()
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 
@@ -413,7 +413,7 @@ func TestDownloadArtifact(t *testing.T) {
 					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
 				}
 				var reservedArchiveSize uint64
-				fx.downloader.reserveDiskSpace = func(_ string, archiveSize, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, archiveSize, _ uint64) (bool, error) {
 					reservedArchiveSize = archiveSize
 					return true, nil
 				}
@@ -445,7 +445,7 @@ func TestDownloadArtifact(t *testing.T) {
 					}
 					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
 				}
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 
@@ -610,7 +610,7 @@ func TestDownloadArtifact(t *testing.T) {
 				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
 					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
 				}
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
@@ -670,7 +670,7 @@ func TestDownloadArtifact(t *testing.T) {
 		{
 			name: "multiple remote sourceURIs times out when every source keeps failing transiently",
 			run: func(t *testing.T, fx *fixture) {
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 				fx.downloader.retryTimeout = 200 * time.Millisecond
@@ -706,7 +706,7 @@ func TestDownloadArtifact(t *testing.T) {
 			run: func(t *testing.T, fx *fixture) {
 				fx.settings.Timeout = 10 * time.Second
 				fx.downloader.totalTimeout = 500 * time.Millisecond
-				fx.downloader.reserveDiskSpace = func(_ string, _, _ uint64) (bool, error) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
 					return true, nil
 				}
 				testLogger, logs := loggertest.New(t.Name())
