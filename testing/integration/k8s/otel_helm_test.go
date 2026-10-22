@@ -146,7 +146,7 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				// validates pod logs are being pushed
 				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
-					k8sStepCheckNamespaceFilelogDatastreamHits(info, "logs", "generic.otel", "default")(t, ctx, kCtx, namespace)
+					k8sStepCheckNamespaceFilelogDatastreamHits(info, "logs", "filelogreceiver.otel", "default")(t, ctx, kCtx, namespace)
 				},
 				// validate filelog checkpoints are persisted across restarts
 				k8sStepRestartPods("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container"),
