@@ -294,7 +294,8 @@ var (
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
 )
 
-func parseAgentCoreVersion(data []byte) (string, error) {
+// ParseAgentCoreVersion extracts defaultBeatVersion from version/version.go contents.
+func ParseAgentCoreVersion(data []byte) (string, error) {
 	matches := agentCoreVersionRegex.FindSubmatch(data)
 	if len(matches) == 2 {
 		return string(matches[1]), nil
@@ -631,6 +632,9 @@ type Settings struct {
 	// Fmt settings
 	Fmt FmtSettings
 
+	// Release settings for feature-freeze / patch automation.
+	Release ReleaseSettings
+
 	// PlatformFilters holds additional platform filters to apply.
 	// These are applied after the base platform list is determined.
 	PlatformFilters []string
@@ -694,6 +698,7 @@ func (s *Settings) setDefaults() {
 	s.setKubernetesDefaults()
 	s.setDevMachineDefaults()
 	s.setFmtDefaults()
+	s.setReleaseDefaults()
 }
 
 // setBuildDefaults sets default values for BuildSettings.
@@ -795,6 +800,10 @@ func (s *Settings) Clone() *Settings {
 	if s.SelectedDockerVariants != nil {
 		clone.SelectedDockerVariants = make([]DockerVariant, len(s.SelectedDockerVariants))
 		copy(clone.SelectedDockerVariants, s.SelectedDockerVariants)
+	}
+	if s.Release.ProjectReviewers != nil {
+		clone.Release.ProjectReviewers = make([]string, len(s.Release.ProjectReviewers))
+		copy(clone.Release.ProjectReviewers, s.Release.ProjectReviewers)
 	}
 	return &clone
 }
@@ -1016,20 +1025,6 @@ func (s *Settings) WithInstanceProvisioner(provisioner string) *Settings {
 func (s *Settings) WithTestGroups(groups string) *Settings {
 	clone := s.Clone()
 	clone.IntegrationTest.Groups = groups
-	return clone
-}
-
-// WithAgentBuildDir returns a copy of the settings with the specified agent build directory.
-func (s *Settings) WithAgentBuildDir(path string) *Settings {
-	clone := s.Clone()
-	clone.IntegrationTest.AgentBuildDir = path
-	return clone
-}
-
-// WithTestBinaryName returns a copy of the settings with the specified test binary name.
-func (s *Settings) WithTestBinaryName(name string) *Settings {
-	clone := s.Clone()
-	clone.IntegrationTest.BinaryName = name
 	return clone
 }
 
@@ -1315,9 +1310,6 @@ type IntegrationTestSettings struct {
 	// DefineTests specifies the tests to run (from TEST_DEFINE_TESTS env var)
 	DefineTests string
 
-	// BinaryName is the binary name for testing (from TEST_BINARY_NAME env var)
-	BinaryName string
-
 	// RepoPath is the repository path for testing (from TEST_INTEG_REPO_PATH env var)
 	RepoPath string
 
@@ -1457,6 +1449,9 @@ func LoadSettingsWithOptions(opts LoadOptions) (*Settings, error) {
 	s.loadKubernetesSettingsFromEnv()
 	s.loadDevMachineSettingsFromEnv()
 	s.loadFmtSettingsFromEnv()
+	if err := s.loadReleaseSettingsFromEnv(); err != nil {
+		return nil, fmt.Errorf("loading release settings: %w", err)
+	}
 
 	// Initialize elastic beats dir and build variables.
 	// These depend on the filesystem and must be initialized in order.
@@ -1731,9 +1726,6 @@ func (s *Settings) loadIntegrationTestSettingsFromEnv() error {
 	if v := os.Getenv("TEST_DEFINE_TESTS"); v != "" {
 		s.IntegrationTest.DefineTests = v
 	}
-	if v := os.Getenv("TEST_BINARY_NAME"); v != "" {
-		s.IntegrationTest.BinaryName = v
-	}
 	if v := os.Getenv("TEST_INTEG_REPO_PATH"); v != "" {
 		s.IntegrationTest.RepoPath = v
 	}
@@ -1890,7 +1882,7 @@ func (s *Settings) initBuildVariables() error {
 	if err != nil {
 		return fmt.Errorf("failed to read agent-core version file=%v: %w", agentCoreVersionFile, err)
 	}
-	s.agentCoreVersion, err = parseAgentCoreVersion(data)
+	s.agentCoreVersion, err = ParseAgentCoreVersion(data)
 	if err != nil {
 		return fmt.Errorf("failed to parse agent-core version: %w", err)
 	}

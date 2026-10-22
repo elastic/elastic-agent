@@ -48,7 +48,7 @@ type GoListModule struct {
 // by running `go list -json` and parsing the output
 func extractComponentsFromDeps() ([]string, error) {
 	// Run go list -json to get the dependencies
-	cmd := exec.Command("go", "list", "-json", "github.com/elastic/elastic-agent")
+	cmd := exec.Command("go", "list", "-json", "github.com/elastic/elastic-agent/internal/edot")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run go list command: %w", err)
@@ -107,7 +107,7 @@ func loadCoreComponentsYAML() ([]string, error) {
 		return nil, fmt.Errorf("failed to get current file path")
 	}
 	dir := filepath.Dir(filename)
-	yamlPath := filepath.Join(dir, "components.yml")
+	yamlPath := filepath.Join(dir, "..", "components.yml")
 
 	yamlFile, err := os.ReadFile(yamlPath)
 	if err != nil {

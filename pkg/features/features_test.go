@@ -159,3 +159,186 @@ func TestFQDNCallbacks(t *testing.T) {
 	RemoveFQDNOnChangeCallback("cb2")
 	require.Len(t, current.fqdnCallbacks, 0)
 }
+
+func TestDefaultProcessors(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want DefaultProcessors
+	}{
+		{
+			name: "default when absent",
+			yaml: `agent:
+  features:`,
+			want: DefaultProcessors{
+				AddHostMetadata:       true,
+				AddCloudMetadata:      true,
+				AddDockerMetadata:     true,
+				AddKubernetesMetadata: true,
+			},
+		},
+		{
+			name: "enabled: false normalizes to all processors disabled",
+			yaml: `agent:
+  features:
+    default_processors:
+      enabled: false`,
+			want: DefaultProcessors{
+				AddHostMetadata:       false,
+				AddCloudMetadata:      false,
+				AddDockerMetadata:     false,
+				AddKubernetesMetadata: false,
+			},
+		},
+		{
+			name: "add_host_metadata disabled",
+			yaml: `agent:
+  features:
+    default_processors:
+      add_host_metadata: false`,
+			want: DefaultProcessors{
+				AddHostMetadata:       false,
+				AddCloudMetadata:      true,
+				AddDockerMetadata:     true,
+				AddKubernetesMetadata: true,
+			},
+		},
+		{
+			name: "add_cloud_metadata and add_kubernetes_metadata disabled",
+			yaml: `agent:
+  features:
+    default_processors:
+      add_cloud_metadata: false
+      add_kubernetes_metadata: false`,
+			want: DefaultProcessors{
+				AddHostMetadata:       true,
+				AddCloudMetadata:      false,
+				AddDockerMetadata:     true,
+				AddKubernetesMetadata: false,
+			},
+		},
+		{
+			name: "all individual processors disabled",
+			yaml: `agent:
+  features:
+    default_processors:
+      add_host_metadata: false
+      add_cloud_metadata: false
+      add_docker_metadata: false
+      add_kubernetes_metadata: false`,
+			want: DefaultProcessors{
+				AddHostMetadata:       false,
+				AddCloudMetadata:      false,
+				AddDockerMetadata:     false,
+				AddKubernetesMetadata: false,
+			},
+		},
+		{
+			name: "individual flags override enabled: true",
+			yaml: `agent:
+  features:
+    default_processors:
+      enabled: true
+      add_host_metadata: false
+      add_cloud_metadata: false`,
+			want: DefaultProcessors{
+				AddHostMetadata:       false,
+				AddCloudMetadata:      false,
+				AddDockerMetadata:     true,
+				AddKubernetesMetadata: true,
+			},
+		},
+		{
+			name: "individual flags override enabled: false",
+			yaml: `agent:
+  features:
+    default_processors:
+      enabled: false
+      add_cloud_metadata: true`,
+			want: DefaultProcessors{
+				AddHostMetadata:       false,
+				AddCloudMetadata:      true,
+				AddDockerMetadata:     false,
+				AddKubernetesMetadata: false,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := config.NewConfigFrom(tc.yaml)
+			require.NoError(t, err)
+
+			flags, err := Parse(c)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, flags.DefaultProcessors())
+		})
+	}
+}
+
+func TestIncludeTagsInEvents(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{
+			name: "absent block uses default",
+			yaml: `
+agent:
+  features:`,
+			want: false,
+		},
+		{
+			name: "explicitly disabled",
+			yaml: `
+agent:
+  features:
+    include_tags_in_events:
+      enabled: false`,
+			want: false,
+		},
+		{
+			name: "enabled",
+			yaml: `
+agent:
+  features:
+    include_tags_in_events:
+      enabled: true`,
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := config.NewConfigFrom(tt.yaml)
+			require.NoError(t, err)
+
+			flags, err := Parse(c)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, flags.IncludeTagsInEvents())
+		})
+	}
+}
+
+func TestIncludeTagsInEventsReachesProtoSource(t *testing.T) {
+	c, err := config.NewConfigFrom(`
+agent:
+  features:
+    include_tags_in_events:
+      enabled: true
+`)
+	require.NoError(t, err)
+
+	flags, err := Parse(c)
+	require.NoError(t, err)
+	require.True(t, flags.IncludeTagsInEvents())
+
+	src := flags.AsProto().Source.AsMap()
+	features, ok := src["agent"].(map[string]any)["features"].(map[string]any)
+	require.True(t, ok, "features key must be present in proto source")
+
+	block, ok := features["include_tags_in_events"].(map[string]any)
+	require.True(t, ok, "include_tags_in_events must be present in proto source")
+	require.Equal(t, true, block["enabled"])
+}
