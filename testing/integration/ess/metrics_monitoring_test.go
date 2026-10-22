@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
+	"github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
