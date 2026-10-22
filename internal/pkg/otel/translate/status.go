@@ -312,6 +312,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		for receiverOtelID := range receiverStatuses {
 			if receiverOtelID.Type().String() == NoEnabledStreamsReceiverType {
 				noEnabledStreams = true
+				compState.State = client.UnitStateDegraded
 				compState.Message = noEnabledStreamsMessage
 				break
 			}
@@ -368,7 +369,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 				// directly. Fleet shows unit statuses but not the component message, so the
 				// message is repeated here to make the reason visible.
 				compState.Units[unitKey] = runtime.ComponentUnitState{
-					State:   client.UnitStateHealthy,
+					State:   client.UnitStateDegraded,
 					Message: noEnabledStreamsMessage,
 				}
 			} else if len(receiverByInputID) > 0 {

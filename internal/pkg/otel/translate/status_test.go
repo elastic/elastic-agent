@@ -591,14 +591,14 @@ func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
 
 	result, err := getComponentState(otelStatus, comp)
 	require.NoError(t, err)
-	assert.Equal(t, client.UnitStateHealthy, result.State.State)
+	assert.Equal(t, client.UnitStateDegraded, result.State.State)
 	assert.Equal(t, noEnabledStreamsMessage, result.State.Message)
 
 	for _, unit := range comp.Units[:2] {
 		unitKey := runtime.ComponentUnitKey{UnitID: unit.ID, UnitType: client.UnitTypeInput}
 		unitState, found := result.State.Units[unitKey]
 		require.True(t, found, "input unit %s must have a status entry, not be silently absent", unit.ID)
-		assert.Equal(t, client.UnitStateHealthy, unitState.State)
+		assert.Equal(t, client.UnitStateDegraded, unitState.State)
 		assert.Equal(t, noEnabledStreamsMessage, unitState.Message)
 	}
 }
