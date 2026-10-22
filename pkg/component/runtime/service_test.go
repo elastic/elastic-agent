@@ -349,10 +349,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	}()
 
 	// Run the service
-	go func() {
-		err := service.Run(ctx, comm)
-		require.EqualError(t, err, context.Canceled.Error())
-	}()
+	startServiceRuntime(t, ctx, cancel, service, comm)
 
 	service.actionCh <- actionModeSigned{
 		actionMode: actionStart,
@@ -438,10 +435,7 @@ func TestServiceStartRetry(t *testing.T) {
 	}()
 
 	// Run the service runtime
-	go func() {
-		err := service.Run(ctx, comm)
-		require.EqualError(t, err, context.Canceled.Error())
-	}()
+	startServiceRuntime(t, ctx, cancel, service, comm)
 
 	// Start the service
 	service.actionCh <- actionModeSigned{
@@ -462,6 +456,34 @@ func TestServiceStartRetry(t *testing.T) {
 		}
 		return false
 	}, service.serviceRestartDelay+1*time.Second, 500*time.Millisecond)
+}
+
+// startServiceRuntime runs service.Run in the background and registers a cleanup
+// that cancels ctx and waits for Run to return. Cancelling the context alone does not
+// wait for the connection-info server to close, and tests share socket names across
+// runs; Run's deferred cleanup closes the server before it returns, so waiting for it
+// guarantees no server outlives the test.
+func startServiceRuntime(t *testing.T, ctx context.Context, cancel context.CancelFunc, service *serviceRuntime, comm Communicator) {
+	t.Helper()
+	runDone := make(chan error, 1)
+	go func() { runDone <- service.Run(ctx, comm) }()
+	t.Cleanup(func() {
+		cancel()
+		// No local timeout: a fixed deadline could fail spuriously on a loaded CI
+		// runner, and a real hang is already caught by the go test timeout.
+		//
+		// Keep draining the unbuffered state channel while waiting: the tests'
+		// observer goroutines exit on ctx.Done(), and Run may still publish a final
+		// state while shutting down, which would otherwise block it forever.
+		for {
+			select {
+			case <-service.ch:
+			case err := <-runDone:
+				require.ErrorIs(t, err, context.Canceled)
+				return
+			}
+		}
+	})
 }
 
 func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, checkTimeout time.Duration) *serviceRuntime {
@@ -676,7 +698,7 @@ func TestConnInfoServerClosedDuringInstall(t *testing.T) {
 		}
 	}()
 
-	go func() { _ = service.Run(ctx, comm) }()
+	startServiceRuntime(t, ctx, cancel, service, comm)
 
 	service.actionCh <- actionModeSigned{actionMode: actionStart}
 
@@ -776,7 +798,7 @@ func TestStaleCheckinDrainedOnInstallRetry(t *testing.T) {
 		}
 	}()
 
-	go func() { _ = service.Run(ctx, comm) }()
+	startServiceRuntime(t, ctx, cancel, service, comm)
 
 	service.actionCh <- actionModeSigned{actionMode: actionStart}
 
