@@ -3680,7 +3680,6 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 // a no-op receiver instead of an error, so the pipeline stays valid and the component
 // remains OTel-managed and healthy. The receiver is named after the component.
 func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
-	testAgentInfo := &info.AgentInfo{}
 	nopType := otelcomponent.MustNewType(NoEnabledStreamsReceiverType)
 	tests := []struct {
 		name               string
@@ -3748,7 +3747,7 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := getReceiversConfigForComponent(tt.component, testAgentInfo, nil)
+			result, err := getReceiversConfigForComponent(tt.component, nil, nil)
 			require.NoError(t, err)
 			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
 		})
