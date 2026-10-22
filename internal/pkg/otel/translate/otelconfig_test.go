@@ -4403,6 +4403,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
