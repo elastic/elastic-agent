@@ -5,6 +5,7 @@
 package fleetservertest
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -94,7 +95,7 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 		address = optns.address
 	}
 
-	l, err := net.Listen("tcp", address) //nolint:gosec // it's a test
+	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", address)
 	if err != nil {
 		panic(fmt.Sprintf("NewServer failed to create a net.Listener: %v", err))
 	}
