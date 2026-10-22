@@ -194,6 +194,7 @@ func (r *Retrier) updateRetriesMap(retries map[string]int, actions []fleetapi.Ac
 				retries[action.ID()] = n
 				failed = append(failed, action)
 			} else {
+				r.log.Warnf("ack retrier: dropping ack for action id %q of type %q after %d failed retries, Fleet will not be notified of its completion", action.ID(), action.Type(), r.maxRetries)
 				delete(retries, action.ID())
 			}
 		} else {
