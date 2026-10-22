@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261020114606-f51e2ed78994
+Version: v7.0.0-alpha2.0.20261021184346-733ccc63957b
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -76698,11 +76698,11 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/ebpfevents
-Version: v0.10.0
+Version: v0.12.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/ebpfevents@v0.10.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/ebpfevents@v0.12.0/LICENSE.txt:
 
 The https://github.com/elastic/ebpfevents repository contains source code under
 various licenses:
@@ -80096,11 +80096,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/proxy-connect-d
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/tk-btf
-Version: v0.2.0
+Version: v0.3.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/tk-btf@v0.2.0/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/tk-btf@v0.3.0/LICENSE.txt:
 
 
                                  Apache License
