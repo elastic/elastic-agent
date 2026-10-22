@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent
 
-go 1.26.8
+go 1.26.10
 
 replace github.com/elastic/beats/v7 => ./beats
 
@@ -17,7 +17,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261020114606-f51e2ed78994
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261021201928-d02d92dfd9a2
 	github.com/elastic/cloud-on-k8s/v3 v3.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
 	github.com/elastic/elastic-agent-libs v0.47.0
