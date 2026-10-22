@@ -72,6 +72,7 @@ import (
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor"
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
@@ -240,6 +241,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			ratelimitprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
+			adaptivetailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
 			elasticmonitoringprocessor.NewFactory(),
