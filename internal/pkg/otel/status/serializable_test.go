@@ -1081,4 +1081,3 @@ func TestCompareStatuses_NilEvent(t *testing.T) {
 		})
 	})
 }
-
