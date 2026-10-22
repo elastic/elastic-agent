@@ -284,7 +284,17 @@ func getCollectorConfigForComponent(
 	if err != nil {
 		return nil, err
 	}
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig)
+
+	// Compute the effective default processor flags: start from the global feature flags,
+	// then restrict further with any per-output default_processors config. This must be
+	// done before building receivers so that per-input strip logic uses the same set.
+	effectiveFlags, err := effectiveDefaultProcessorFlags(comp)
+	if err != nil {
+		return nil, fmt.Errorf("could not read per-output default_processors: %w", err)
+	}
+	effectiveDefaultProcessors := filterDefaultProcessors(GetDefaultProcessors(comp.BeatName()), effectiveFlags)
+
+	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, effectiveDefaultProcessors)
 	if err != nil {
 		return nil, err
 	}
@@ -305,10 +315,9 @@ func getCollectorConfigForComponent(
 	// Each pipeline gets its own default-processor definition (scoped by comp.ID) rather
 	// than sharing one across all pipelines, since different beats can have different
 	// default processors.
-	beatDefaultProcessors := GetDefaultProcessors(comp.BeatName())
 	beatProcessorID := GetProcessorID(comp.ID).String()
 	var pipelineProcessors []string
-	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
+	if len(effectiveDefaultProcessors) > 0 {
 		pipelineProcessors = append(pipelineProcessors, beatProcessorID)
 	}
 
@@ -365,9 +374,9 @@ func getCollectorConfigForComponent(
 
 	allProcessorsConfig := map[string]any{}
 	maps.Copy(allProcessorsConfig, processorConfig)
-	if features.DefaultProcessors() && len(beatDefaultProcessors) > 0 {
+	if len(effectiveDefaultProcessors) > 0 {
 		allProcessorsConfig[beatProcessorID] = map[string]any{
-			"processors": beatDefaultProcessors,
+			"processors": effectiveDefaultProcessors,
 		}
 	}
 	if len(allProcessorsConfig) > 0 {
@@ -381,10 +390,13 @@ func getCollectorConfigForComponent(
 // By default each input stream produces its own receiver. When the component's InputSpec has
 // SingleReceiver set, all streams are merged into one receiver keyed by the component ID with
 // the placeholder SingleReceiverStreamID as the stream suffix.
+// effectiveDefaultProcessors is the filtered list of default processors for this component's
+// pipeline; it is used to strip duplicate per-input processor entries.
 func getReceiversConfigForComponent(
 	comp *component.Component,
 	info info.Agent,
 	outputQueueConfig map[string]any,
+	effectiveDefaultProcessors []map[string]any,
 ) (map[string]any, error) {
 	receiverType, err := getReceiverTypeForComponent(comp)
 	if err != nil {
@@ -400,7 +412,7 @@ func getReceiversConfigForComponent(
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput && unit.Config != nil {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp)
+			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp, effectiveDefaultProcessors)
 			if err != nil {
 				return nil, err
 			}
@@ -450,6 +462,11 @@ func getReceiversConfigForComponent(
 
 	if comp.OutputType == "kafka" || comp.OutputType == "logstash" {
 		sharedConfig["include_metadata"] = true
+	}
+	if beatName == "heartbeat" && comp.OutputType == "elasticsearch" {
+		sharedConfig["monitor_state"] = map[string]any{
+			"elasticsearch": getBeatsAuthExtensionID(comp.OutputName).String(),
+		}
 	}
 	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
@@ -620,7 +637,18 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	if !ok {
 		return nil, nil, nil, nil, nil
 	}
-	return unitToExporterConfig(outputUnit, comp.OutputName, exporterType, logger)
+
+	exporterCfg, queueCfg, extensionCfg, processors, err = unitToExporterConfig(
+		outputUnit,
+		comp.OutputName,
+		exporterType,
+		logger,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return exporterCfg, queueCfg, extensionCfg, processors, nil
 }
 
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
@@ -772,7 +800,7 @@ func resolveStreamID(streamID string, streamSource map[string]any, unitID string
 	return fmt.Sprintf("%s-%d", unitID, index)
 }
 
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component) ([]receiverInput, error) {
+func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component, effectiveDefaultProcessors []map[string]any) ([]receiverInput, error) {
 	agentInfo := &client.AgentInfo{
 		ID:           info.AgentID(),
 		Version:      info.Version(),
@@ -816,9 +844,11 @@ func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamTyp
 		}
 
 		// Strip per-input copies of default processors already run by the beatprocessor.
-		if features.DefaultProcessors() {
+		// Only strip processors that are actually in the effective set for this pipeline;
+		// if a processor was disabled globally or per-output it won't be stripped.
+		if len(effectiveDefaultProcessors) > 0 {
 			if _, ok := input["processors"]; ok {
-				input["processors"] = stripDefaultProcessors(comp.BeatName(), input["processors"])
+				input["processors"] = stripDefaultProcessors(effectiveDefaultProcessors, input["processors"])
 			}
 		}
 
@@ -872,15 +902,15 @@ func keepScheduledMonitors(inputs []receiverInput) []receiverInput {
 }
 
 // stripDefaultProcessors removes per-input processor entries that exactly match
-// (same name and config) a default processor handled by the beatprocessor, so
-// they don't run twice. Entries with a matching name but different config are
-// kept so user customisations are not silently discarded.
-func stripDefaultProcessors(beatName string, raw any) []any {
+// (same name and config) a processor in the effective defaults handled by the
+// beatprocessor, so they don't run twice. Entries with a matching name but
+// different config are kept so user customisations are not silently discarded.
+// defaults is the already-filtered list of processors the beatprocessor will run.
+func stripDefaultProcessors(defaults []map[string]any, raw any) []any {
 	list, ok := raw.([]any)
 	if !ok {
 		return nil
 	}
-	defaults := GetDefaultProcessors(beatName)
 	if len(defaults) == 0 {
 		return list
 	}
@@ -905,6 +935,83 @@ func stripDefaultProcessors(beatName string, raw any) []any {
 		filtered = append(filtered, item)
 	}
 	return filtered
+}
+
+// EffectiveDefaultMonitoringProcessors returns the generic (beat-agnostic) default processor
+// list filtered by the effective default_processors flags — global feature flags AND
+// any per-output restriction configured on comp's output unit. If comp is nil, only
+// the global flags are applied.
+//
+// The list is deliberately independent of comp's beat: it is used for the monitoring
+// pipelines that may source data from many beats but can only have one set of global processors.
+func EffectiveDefaultMonitoringProcessors(comp *component.Component) ([]map[string]any, error) {
+	flags := features.GetDefaultProcessors()
+	if comp != nil {
+		var err error
+		flags, err = effectiveDefaultProcessorFlags(comp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return filterDefaultProcessors(GetDefaultProcessors(""), flags), nil
+}
+
+// effectiveDefaultProcessorFlags returns the DefaultProcessorFlags to use for the
+// given component. It merges the global feature flags with an optional per-output
+// default_processors block from the output unit config. Per-output settings can
+// only further restrict the global flags, not re-enable globally disabled processors.
+func effectiveDefaultProcessorFlags(comp *component.Component) (features.DefaultProcessors, error) {
+	global := features.GetDefaultProcessors()
+
+	outputUnit, ok := comp.OutputUnit()
+	if !ok {
+		return global, nil
+	}
+
+	// Fast-path: avoid the expensive AsMap() allocation when default_processors
+	// is absent from the output config (the common case).
+	if _, ok := outputUnit.Config.GetSource().GetFields()["default_processors"]; !ok {
+		return global, nil
+	}
+
+	unitConfigMap := outputUnit.Config.GetSource().AsMap()
+	outputCfg, err := config.NewConfigFrom(unitConfigMap)
+	if err != nil {
+		return features.DefaultProcessors{}, fmt.Errorf("error translating config for output %s: %w", comp.OutputName, err)
+	}
+
+	dpChild, err := outputCfg.Child("default_processors", -1)
+	if err != nil {
+		return features.DefaultProcessors{}, fmt.Errorf("error reading default_processors for output %s: %w", comp.OutputName, err)
+	}
+
+	var dpCfg features.DefaultProcessors
+	if err := dpChild.Unpack(&dpCfg); err != nil {
+		return features.DefaultProcessors{}, fmt.Errorf("error parsing default_processors for output %s: %w", comp.OutputName, err)
+	}
+
+	return global.Restrict(dpCfg), nil
+}
+
+// filterDefaultProcessors returns the subset of processors that are enabled by flags.
+// Individual add_x_metadata processors are filtered via flags.IsEnabled; processors
+// with a name not tracked by a dedicated flag are always kept.
+func filterDefaultProcessors(processors []map[string]any, flags features.DefaultProcessors) []map[string]any {
+	result := make([]map[string]any, 0, len(processors))
+	for _, p := range processors {
+		if len(p) != 1 {
+			result = append(result, p)
+			continue
+		}
+		var name string
+		for k := range p {
+			name = k
+		}
+		if flags.IsEnabled(name) {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 // injectOsqueryConfig replicates what osquerybeatCfgFromStreams does in process
