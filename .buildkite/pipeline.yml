@@ -307,7 +307,10 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+  # Skipping due to Orka provider slowness
+  # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
   - group: "macOS tests"
+    skip: true
     key: "macos-unit-tests"
     steps:
       # Runs only on main and release branches
