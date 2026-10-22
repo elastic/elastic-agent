@@ -3715,7 +3715,6 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := getReceiversConfigForComponent(
 				newHeartbeatComponent(tt.outputType, tt.singleReceiver),
-				&info.AgentInfo{},
 				nil,
 				nil,
 			)
