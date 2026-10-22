@@ -14,7 +14,6 @@ helm install ./deploy/helm/elastic-agent -n kube-system \
   --set kube-state-metrics.enabled=false \
   --set kubernetes.enabled=false \
   --set autoOps.enabled=true \
-  --set-string autoOps.autoops_token="tok-123" \
   --set-string autoOps.autoops_otel_url="https://otel.example.com:4318" \
   --set-string autoOps.elastic_cloud_connected_mode_api_key="CCM_API_KEY" \
   --set-string autoOps.es_api_key="API_KEY_123"
@@ -27,7 +26,6 @@ helm install ./deploy/helm/elastic-agent -n kube-system \
   --set kube-state-metrics.enabled=false \
   --set kubernetes.enabled=false \
   --set autoOps.enabled=true \
-  --set-string autoOps.autoops_token="tok-123" \
   --set-string autoOps.autoops_otel_url="https://otel.example.com:4318" \
   --set-string autoOps.elastic_cloud_connected_mode_api_key="CCM_API_KEY" \
   --set-string autoOps.es_username="elastic" \
