@@ -88,8 +88,10 @@ func runAgentInfoInEventsStandalone(t *testing.T, info *define.Info, runtime, es
 	t.Run("agent tags are updated", func(t *testing.T) {
 		err := updateAgentTags(ctx, agentFixture, esHost, esAPIKey, logFilePath, runtime, integrationTags, newTags)
 		require.NoError(t, err, "error updating the agent tags")
+
+		updated := time.Now()
 		expectedTags := slices.Concat(integrationTags, newTags)
-		requireAgentInfoInEvents(t, ctx, info, status, logFilePath, expectedTags)
+		requireAgentInfoInEventsAfter(t, ctx, info, status, logFilePath, expectedTags, updated)
 	})
 
 	t.Run("agent tags survive a restart", func(t *testing.T) {
@@ -168,8 +170,10 @@ func runAgentInfoInEventsFleetManaged(t *testing.T, info *define.Info, runtime s
 		// to the long poll timeout (about 5 minutes).
 		err := updateAgentTagsFleet(ctx, info, status.Info.ID, newTags)
 		require.NoError(t, err, "error updating the agent tags")
+
+		updated := time.Now()
 		expectedTags := slices.Concat(integrationTags, newTags)
-		requireAgentInfoInEvents(t, ctx, info, status, logFilePath, expectedTags)
+		requireAgentInfoInEventsAfter(t, ctx, info, status, logFilePath, expectedTags, updated)
 	})
 
 	t.Run("agent tags survive a restart", func(t *testing.T) {
@@ -254,8 +258,10 @@ func runAgentInfoInEventsFleetManagedContainer(t *testing.T, info *define.Info, 
 		// to the long poll timeout (about 5 minutes).
 		err := updateAgentTagsFleet(ctx, info, status.Info.ID, newTags)
 		require.NoError(t, err, "error updating the agent tags")
+
+		updated := time.Now()
 		expectedTags := slices.Concat(integrationTags, newTags)
-		requireAgentInfoInEvents(t, ctx, info, status, logFilePath, expectedTags)
+		requireAgentInfoInEventsAfter(t, ctx, info, status, logFilePath, expectedTags, updated)
 	})
 
 	t.Run("agent tags survive a restart", func(t *testing.T) {
