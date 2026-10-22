@@ -31,6 +31,7 @@ type options struct {
 	address string
 	logFn   func(format string, a ...any)
 	agentID string
+	tls     bool
 }
 
 // NewServerWithHandlers returns a Fleet Server ready for use to Agent's
@@ -103,7 +104,13 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 			Listener: l,
 			Config:   &http.Server{Handler: mux}}, //nolint:gosec // it's a test
 	}
-	s.Start()
+	scheme := "http"
+	if optns.tls {
+		scheme = "https"
+		s.StartTLS()
+	} else {
+		s.Start()
+	}
 
 	u, err := url.Parse(s.URL)
 	if err != nil {
@@ -111,9 +118,15 @@ func NewServer(h *Handlers, opts ...Option) *Server {
 	}
 
 	s.Port = u.Port()
-	s.LocalhostURL = "http://localhost:" + s.Port
+	s.LocalhostURL = scheme + "://localhost:" + s.Port
 
 	return &s
+}
+
+func WithTLS() Option {
+	return func(o *options) {
+		o.tls = true
+	}
 }
 
 // WithRequestLog sets the server to log every request using logFn.
