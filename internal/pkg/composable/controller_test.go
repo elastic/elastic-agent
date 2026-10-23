@@ -97,6 +97,17 @@ func TestController(t *testing.T) {
 			setVars1 = vars
 			setVars2, err = c.Observe(ctx, []string{"local.vars.key1", "local_dynamic.vars.key1"}) // observed local and local_dynamic
 			require.NoError(t, err)
+			// Providers publish their state asynchronously after being started, so the result of
+			// Observe can be a snapshot taken before they published. Later updates are delivered
+			// on the Watch channel; wait for them until the expected state is complete.
+			for !controllerVarsComplete(setVars2) {
+				select {
+				case <-ctx.Done():
+					return
+				case vars := <-c.Watch():
+					setVars2 = vars
+				}
+			}
 			setVars3, err = c.Observe(ctx, nil) // no observed (will turn off those providers)
 			require.NoError(t, err)
 		}
@@ -112,9 +123,9 @@ func TestController(t *testing.T) {
 	}
 	require.NoError(t, err)
 
-	assert.Len(t, setVars1, 1)
-	assert.Len(t, setVars2, 3)
-	assert.Len(t, setVars3, 1)
+	require.Len(t, setVars1, 1)
+	require.Len(t, setVars2, 3)
+	require.Len(t, setVars3, 1)
 
 	vars1map, err := setVars1[0].Map()
 	require.NoError(t, err)
@@ -142,6 +153,18 @@ func TestController(t *testing.T) {
 	vars3map, err := setVars3[0].Map()
 	require.NoError(t, err)
 	assert.Len(t, vars3map, 0) // should be empty after empty Observe
+}
+
+// controllerVarsComplete reports whether vars holds the state TestController expects once the
+// observed local and local_dynamic providers have published: the context vars (with the
+// local provider's key1 set) plus one vars set for each of the two local_dynamic items.
+func controllerVarsComplete(vars []*transpiler.Vars) bool {
+	if len(vars) != 3 {
+		return false
+	}
+	local, _ := vars[0].Lookup("local")
+	localMap, ok := local.(map[string]interface{})
+	return ok && localMap["key1"] == "value1"
 }
 
 func TestControllerWithFetchProvider(t *testing.T) {
