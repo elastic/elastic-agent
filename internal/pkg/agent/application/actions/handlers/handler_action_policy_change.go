@@ -436,6 +436,9 @@ func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configurati
 	return nil
 }
 
+// clientEqual reports whether the Fleet client settings in the policy (k2) would change
+// the agent's current ones (k1). The argument order matters: TLS settings that the
+// policy omits are not a difference.
 func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	if k1.Protocol != k2.Protocol {
 		return false
@@ -479,6 +482,50 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 		k1.Transport.Proxy.Disable != k2.Transport.Proxy.Disable ||
 		!headersEqual(k1.Transport.Proxy.Headers, k2.Transport.Proxy.Headers) {
 		return false
+	}
+
+	// different TLS settings (certificate/key or CAs) in the policy, e.g. a Fleet Server CA rotation
+	if !tlsClientEqual(k1.Transport.TLS, k2.Transport.TLS) {
+		return false
+	}
+
+	return true
+}
+
+// tlsClientEqual reports whether applying the policy's TLS settings to the current ones
+// would change anything. A certificate or CA list that is empty in the policy is not a
+// difference, even when the agent has its own value, for example one set at enrollment.
+func tlsClientEqual(current, policy *tlscommon.Config) bool {
+	if policy == nil {
+		return true
+	}
+	if current == nil {
+		// Applying the policy creates the agent's TLS settings. Afterwards they are
+		// not nil, so this is only a change the first time.
+		return false
+	}
+
+	if policy.Certificate != emptyCertificateConfig() && current.Certificate != policy.Certificate {
+		return false
+	}
+
+	if len(policy.CAs) == 0 {
+		return true
+	}
+	if len(current.CAs) != len(policy.CAs) {
+		return false
+	}
+
+	// Compare as a set: the order of the CAs is not meaningful. Sort copies to avoid
+	// mutating the caller's slices.
+	currentCAs := append([]string(nil), current.CAs...)
+	policyCAs := append([]string(nil), policy.CAs...)
+	sort.Strings(currentCAs)
+	sort.Strings(policyCAs)
+	for i, v := range currentCAs {
+		if v != policyCAs[i] {
+			return false
+		}
 	}
 
 	return true
