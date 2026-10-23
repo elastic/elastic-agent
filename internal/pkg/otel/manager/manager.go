@@ -463,7 +463,7 @@ func (m *OTelManager) buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
