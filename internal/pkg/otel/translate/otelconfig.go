@@ -45,6 +45,21 @@ const (
 	outputOtelOverrideExporterFieldName   = "exporter"
 	outputOtelOverrideExtensionsFieldName = "extensions"
 	elasticsearchStateStoreExtensionName  = "elasticsearch_storage"
+<<<<<<< HEAD
+=======
+	// SingleReceiverStreamID is the placeholder stream ID used in receiver names for
+	// components with single_receiver: true, so that all receiver names uniformly have
+	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
+	SingleReceiverStreamID = "single"
+	// NoEnabledStreamsReceiverType is the receiver type used in place of a component's
+	// normal receivers when it has no enabled streams. The OTel collector rejects a
+	// pipeline with zero receivers, so a no-op receiver keeps the pipeline valid
+	// (and the component healthy, collecting no data) instead of crashing the collector.
+	NoEnabledStreamsReceiverType = "nop"
+	// noEnabledStreamsMessage is the status message reported for a component, and its input
+	// units, whose policy has no enabled streams.
+	noEnabledStreamsMessage = "Component has no enabled streams, no data will be collected"
+>>>>>>> 519dce2 (fix(otel): fall back to a no-op receiver when a component has no enabled streams (#16900))
 )
 
 // BeatMonitoringConfigGetter is a function that returns the monitoring configuration for a beat receiver.
@@ -399,7 +414,20 @@ func getReceiversConfigForComponent(
 		}
 	}
 
+<<<<<<< HEAD
 	receiverId := GetReceiverID(receiverType, comp.ID)
+=======
+	// A component whose policy has all streams disabled produces zero inputs. An empty
+	// receivers list would cause the OTel collector to reject the pipeline and crash, so
+	// fall back to a no-op receiver: the component stays OTel-managed and healthy, just
+	// collecting no data. The receiver is named after the component so it is unique, and
+	// getComponentState reports the status of every input unit itself.
+	if len(inputs) == 0 {
+		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), comp.ID)
+		return map[string]any{receiverID.String(): map[string]any{}}, nil
+	}
+
+>>>>>>> 519dce2 (fix(otel): fall back to a no-op receiver when a component has no enabled streams (#16900))
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
