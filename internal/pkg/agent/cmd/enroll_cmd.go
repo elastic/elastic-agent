@@ -330,7 +330,7 @@ func (c *enrollCmd) writeDelayEnroll(streams *cli.IOStreams) error {
 	if err != nil {
 		return errors.New(
 			err,
-			"failed to marshall enrollment options",
+			"failed to marshal enrollment options",
 			errors.TypeConfig,
 			errors.M("path", enrollPath))
 	}
