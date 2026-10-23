@@ -339,30 +339,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-  - group: "macOS tests"
-    skip: true
-    key: "macos-unit-tests"
-    steps:
-      # Runs only on main and release branches
-      - label: "Unit tests - macOS 13"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: "main 8.* 9.*"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-x64
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
   - group: "Desktop Windows tests"
     key: "extended-windows"
     steps:
@@ -459,8 +435,6 @@ steps:
       - step: "unit-tests-win2022"
         allow_failure: true
       - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "macos-unit-tests"
         allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
