@@ -96,8 +96,8 @@ The Kubernetes Integration is an additional package to be installed in your Elas
 ![Integration](./images/2.png)
 
 - Choose Elastic Agent Installation:
-  - a) For Managed Elastic Agent choose `Add Elastic Agent to your Hosts` . Once butoon cliked, the required  `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN` will be provided for later usage inside Elastic Managed Manifest.
-  - b) For Stanadlone Elastic Agent choose `Add Elastic Agent Later`
+  - a) For Managed Elastic Agent choose `Add Elastic Agent to your Hosts` . Once the button is clicked, the required `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN` will be provided for later usage inside Elastic Managed Manifest.
+  - b) For Standalone Elastic Agent choose `Add Elastic Agent Later`
 
 ![Agent](./images/3.png)
 
@@ -105,7 +105,7 @@ The Kubernetes Integration is an additional package to be installed in your Elas
 
 4. **Step 4: Edit provided Agent Manifest**
 
-Depending on the Elastc agent mode chosen, pick relevant manifest below:
+Depending on the Elastic Agent mode chosen, pick the relevant manifest below:
 
 1. [Elastic Agent Managed Manifest](./manifests/elastic-agent-managed-gke-autopilot.yaml)
 
@@ -117,7 +117,7 @@ containers:
       image: docker.elastic.co/beats/elastic-agent:8.5.3
 ```
 
-- Provide Elastic Cloud Credentials (In managed scenario you only neeed `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN`)
+- Provide Elastic Cloud Credentials (In managed scenario you only need `FLEET_URL` and `FLEET_ENROLLMENT_TOKEN`)
   
 ```yaml
 - name: FLEET_URL
@@ -128,7 +128,7 @@ containers:
   value: "WmpQbUVJVUJnX0kE6aDg0OGVtNG1TTDJqWlM2VGp"
   ```
 
-2. [Elastic Agent Stanadlone Manifest](./manifests/elastic-agent-standalone-gke-autopilot.yaml)
+2. [Elastic Agent Standalone Manifest](./manifests/elastic-agent-standalone-gke-autopilot.yaml)
 
 - Set Container Image version of Elastic Agent
 
