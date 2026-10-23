@@ -529,12 +529,12 @@ agent.download.sourceURI:
 	assert.True(t, cfgChange.failed, "Policy with invalid field should have reported failed config change")
 	require.ErrorContainsf(t,
 		cfgChange.err,
-		"failed to reload upgrade manager configuration",
-		"wrong error message, expected 'failed to reload upgrade manager configuration...' got %v",
+		"invalid configuration",
+		"wrong error message, expected 'invalid configuration...' got %v",
 		cfgChange.err)
 	require.ErrorContainsf(t,
 		coord.configErr,
-		"failed to reload upgrade manager configuration",
+		"invalid configuration",
 		"configErr should match policy failure, got %v", coord.configErr)
 
 	stateChangeTimeout := 5 * time.Second
