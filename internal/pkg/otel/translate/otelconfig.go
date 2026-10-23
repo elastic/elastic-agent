@@ -49,6 +49,14 @@ const (
 	// components with single_receiver: true, so that all receiver names uniformly have
 	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
 	SingleReceiverStreamID = "single"
+	// NoEnabledStreamsReceiverType is the receiver type used in place of a component's
+	// normal receivers when it has no enabled streams. The OTel collector rejects a
+	// pipeline with zero receivers, so a no-op receiver keeps the pipeline valid
+	// (and the component healthy, collecting no data) instead of crashing the collector.
+	NoEnabledStreamsReceiverType = "nop"
+	// noEnabledStreamsMessage is the status message reported for a component, and its input
+	// units, whose policy has no enabled streams.
+	noEnabledStreamsMessage = "Component has no enabled streams, no data will be collected"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -432,6 +440,16 @@ func getReceiversConfigForComponent(
 			}
 			inputs = append(inputs, unitInputs...)
 		}
+	}
+
+	// A component whose policy has all streams disabled produces zero inputs. An empty
+	// receivers list would cause the OTel collector to reject the pipeline and crash, so
+	// fall back to a no-op receiver: the component stays OTel-managed and healthy, just
+	// collecting no data. The receiver is named after the component so it is unique, and
+	// getComponentState reports the status of every input unit itself.
+	if len(inputs) == 0 {
+		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), comp.ID)
+		return map[string]any{receiverID.String(): map[string]any{}}, nil
 	}
 
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
