@@ -64,6 +64,13 @@ checkout_merge() {
         git merge --abort
         exit ${merge_result}
     }
+
+    # The merge can change submodule pins after Buildkite initialized them at
+    # the PR commit. Leave sparse checkouts without initialized submodules alone.
+    if [[ -e beats/.git ]]; then
+        "${git[@]}" submodule sync --recursive
+        "${git[@]}" submodule update --init --recursive
+    fi
 }
 
 pull_request="${BUILDKITE_PULL_REQUEST:-false}"

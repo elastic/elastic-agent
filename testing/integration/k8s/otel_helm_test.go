@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -97,6 +98,11 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
 					k8sStepCheckNamespaceDatastreamHits(info, "traces", "generic.otel", "default")(t, ctx, kCtx, namespace)
+
+					// The .NET fixture is pinned to an AMD64-specific image digest.
+					if runtime.GOARCH == define.AMD64 {
+						k8sStepCheckDotNetAutoInstrumentation(info)(t, ctx, kCtx, namespace)
+					}
 				},
 			},
 		},
@@ -384,6 +390,22 @@ func k8sStepCheckPodsLogContains(podLabelSelector string, containerName string, 
 
 func k8sStepDeployJavaApp() k8sTestStep {
 	return k8sStepDeployApp("java_app.yaml")
+}
+
+func k8sStepCheckDotNetAutoInstrumentation(info *define.Info) k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		started := time.Now().UTC().Format(time.RFC3339Nano)
+		k8sStepDeployApp("dotnet_app.yaml")(t, ctx, kCtx, namespace)
+
+		// Upstream instrumentation also emits traces; the distro attributes require the Elastic plugin.
+		k8sCheckDatastreamHits(t, ctx, info, "traces", "generic.otel", "default", "k8s.namespace.name", namespace,
+			map[string]any{"term": map[string]any{"resource.attributes.service.name": "dotnet-app"}},
+			map[string]any{"term": map[string]any{"resource.attributes.telemetry.sdk.language": "dotnet"}},
+			map[string]any{"term": map[string]any{"resource.attributes.telemetry.distro.name": "elastic"}},
+			map[string]any{"exists": map[string]any{"field": "resource.attributes.telemetry.distro.version"}},
+			map[string]any{"range": map[string]any{"@timestamp": map[string]any{"gte": started}}},
+		)
+	}
 }
 
 func k8sStepDeployApp(manifest string) func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
