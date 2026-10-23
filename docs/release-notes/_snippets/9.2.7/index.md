@@ -8,7 +8,7 @@
 * Add OpAMP extension to EDOT Collector. [#12857](https://github.com/elastic/elastic-agent/pull/12857) 
 * Enrolling fleet-server uses internal port. [#12917](https://github.com/elastic/elastic-agent/pull/12917) 
 
-  The bootstraping process to enroll an agent into a local fleet-server instance
+  The bootstrapping process to enroll an agent into a local fleet-server instance
   now uses the internal port (https://localhost:8221) instead of the URL flag.
   
 * Update OTel Collector components to v0.145.0. [#13109](https://github.com/elastic/elastic-agent/pull/13109) 
