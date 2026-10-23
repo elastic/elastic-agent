@@ -519,6 +519,89 @@ func TestGetComponentStatus(t *testing.T) {
 	}
 }
 
+// TestGetComponentStatusNoEnabledStreams verifies that a component whose input units have no
+// enabled streams (see getReceiversConfigForComponent's no-op receiver fallback) gets both a
+// component-level diagnostic message and a real status on every input unit, rather than
+// units being silently absent from State.Units or stuck in Starting.
+func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
+	comp := component.Component{
+		ID:         "linux-metrics-default",
+		InputType:  "linux/metrics",
+		OutputType: "elasticsearch",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"metricbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "linux-metrics-default-linux-metrics-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":      "linux/metrics-linux-metrics-default",
+					"type":    "linux/metrics",
+					"streams": []any{}, // all streams disabled
+				}),
+			},
+			{
+				// A second integration using the same input type lands in the same component.
+				ID:   "linux-metrics-default-other-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":      "linux/metrics-other",
+					"type":    "linux/metrics",
+					"streams": []any{},
+				}),
+			},
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"type":  "elasticsearch",
+					"hosts": []any{"localhost:9200"},
+				}),
+			},
+		},
+	}
+
+	// Derive the receiver key from the config translation so the test covers it end to end.
+	receiversConfig, err := getReceiversConfigForComponent(&comp, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, receiversConfig, 1, "expected exactly one fallback receiver")
+	var nopReceiverKey string
+	for k := range receiversConfig {
+		nopReceiverKey = k
+	}
+
+	otelStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			fmt.Sprintf("receiver:%s", nopReceiverKey): {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+			fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+		},
+	}
+
+	result, err := getComponentState(otelStatus, comp)
+	require.NoError(t, err)
+	assert.Equal(t, client.UnitStateDegraded, result.State.State)
+	assert.Equal(t, noEnabledStreamsMessage, result.State.Message)
+
+	for _, unit := range comp.Units[:2] {
+		unitKey := runtime.ComponentUnitKey{UnitID: unit.ID, UnitType: client.UnitTypeInput}
+		unitState, found := result.State.Units[unitKey]
+		require.True(t, found, "input unit %s must have a status entry, not be silently absent", unit.ID)
+		assert.Equal(t, client.UnitStateDegraded, unitState.State)
+		assert.Equal(t, noEnabledStreamsMessage, unitState.Message)
+	}
+}
+
 // TestUpdateStatusPartialReloadReceiverRemoved covers the workaround for the upstream
 // aggregation bug: a pipeline with one healthy receiver and one receiver stuck at a terminal
 // Stopped (as left behind by a partial receiver reload) must resolve to StatusOK overall, since

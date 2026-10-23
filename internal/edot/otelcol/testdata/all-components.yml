@@ -12,6 +12,8 @@ exporters:
   nop:
   logstash:
     hosts: ["localhost:5044"]
+  prometheus_remote_write:
+    endpoint: http://localhost:9090/api/v1/write
 
 extensions:
   health_check:
@@ -296,6 +298,7 @@ service:
         - nop
         - debug
         - otlp_grpc
+        - prometheus_remote_write
       processors:
         - attributes
         - batch

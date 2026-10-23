@@ -29,7 +29,7 @@ entries:
     - kind: enhancement
       summary: Enrolling fleet-server uses internal port
       description: |
-        The bootstraping process to enroll an agent into a local fleet-server instance
+        The bootstrapping process to enroll an agent into a local fleet-server instance
         now uses the internal port (https://localhost:8221) instead of the URL flag.
       component: elastic-agent
       pr:
