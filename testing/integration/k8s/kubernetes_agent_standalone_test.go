@@ -1260,7 +1260,7 @@ func k8sStepCreateNamespace() k8sTestStep {
 		}
 
 		t.Cleanup(func() {
-			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
+			err := k8sDeleteObjects(context.WithoutCancel(ctx), kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
 			assert.NoError(t, err, "failed to delete namespace")
 		})
 
@@ -1521,7 +1521,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 
 		t.Cleanup(func() {
 			if t.Failed() {
-				k8sDumpPods(t, ctx, kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
+				k8sDumpPods(t, context.WithoutCancel(ctx), kCtx.client, t.Name(), namespace, kCtx.logsBasePath, kCtx.createdAt)
 			}
 
 			uninstallAction := action.NewUninstall(actionConfig)
