@@ -6,7 +6,6 @@ package mage
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -64,10 +63,9 @@ func componentDestination(dest, component string) string {
 
 // componentCopyOptions returns the copy options used to merge the root dir of a component into the
 // shared drop path. Metadata files are renamed per component (see componentMetadataFiles). When a
-// component overwrites any other file that already exists in the drop path, a warning is written to
-// warnOut, because only the last copy ends up in the package. The warning is not sent through the log
-// package: mage discards it unless running with -v.
-func componentCopyOptions(component string, warnOut io.Writer) copy.Options {
+// component would overwrite any other file that already exists in the drop path, the copy fails,
+// because only the last copy would end up in the package.
+func componentCopyOptions(component string) copy.Options {
 	return copy.Options{
 		OnSymlink: func(_ string) copy.SymlinkAction {
 			return copy.Shallow
@@ -83,7 +81,7 @@ func componentCopyOptions(component string, warnOut io.Writer) copy.Options {
 			dest = componentDestination(dest, component)
 			// Lstat, as the destination can be a symlink copied shallowly from another component
 			if _, err := os.Lstat(dest); err == nil {
-				fmt.Fprintf(warnOut, "WARNING: component %s overwrites existing file %s\n", component, dest)
+				return false, fmt.Errorf("component %s overwrites existing file %s", component, dest)
 			}
 			return false, nil
 		},
@@ -127,7 +125,7 @@ func ChecksumsWithoutManifest(platform string, dependenciesVersion string, versi
 			log.Printf("> prepare to copy %s into %s ", srcDir, versionedDropPath)
 		}
 
-		err := copy.Copy(srcDir, versionedDropPath, componentCopyOptions(dep.BinaryName, os.Stderr))
+		err := copy.Copy(srcDir, versionedDropPath, componentCopyOptions(dep.BinaryName))
 		if err != nil {
 			panic(fmt.Errorf("copying dependency %s files from %q to %q: %w", dep.BinaryName, srcDir, versionedDropPath, err))
 		}
@@ -198,7 +196,7 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 		}
 
 		// Do the copy
-		err = copy.Copy(fullPath, versionedDropPath, componentCopyOptions(spec.BinaryName, os.Stderr))
+		err = copy.Copy(fullPath, versionedDropPath, componentCopyOptions(spec.BinaryName))
 		if err != nil {
 			panic(err)
 		}

@@ -5,7 +5,6 @@
 package mage
 
 import (
-	"bytes"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -89,59 +88,57 @@ func TestComponentCopyOptions_RenamesMetadataFiles(t *testing.T) {
 	// the result must not depend on the order the components are copied in
 	for _, order := range [][]string{{"comp-a", "comp-b"}, {"comp-b", "comp-a"}} {
 		t.Run(strings.Join(order, ","), func(t *testing.T) {
-			var logs bytes.Buffer
 			dropPath := filepath.Join(t.TempDir(), "drop")
 			for _, comp := range order {
-				require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, &logs)))
+				require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp)))
 			}
 
 			assert.Equal(t, expected, readFiles(t, dropPath))
-			assert.Empty(t, warningLines(logs.String()))
 		})
 	}
 }
 
-func TestComponentCopyOptions_WarnsOnOverwrite(t *testing.T) {
-	var logs bytes.Buffer
-
-	root := t.TempDir()
-	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{
-		"shared/clash.yml":     "a",
-		"NOTICE.comp-b.txt":    "comp-a ships a file named after comp-b",
-		"NOTICE.comp-a.txt":    "unique notice a",
-		"shared/only-comp-a.x": "a",
-	})
-	writeFiles(t, filepath.Join(root, "comp-b"), map[string]string{
-		"shared/clash.yml": "b",
-		"NOTICE.txt":       "notice b",
-	})
-
-	dropPath := filepath.Join(root, "drop")
-	for _, comp := range []string{"comp-a", "comp-b"} {
-		require.NoError(t, copy.Copy(filepath.Join(root, comp), dropPath, componentCopyOptions(comp, &logs)))
-	}
-
-	assert.ElementsMatch(t, []string{
-		"WARNING: component comp-b overwrites existing file " + filepath.Join(dropPath, "shared", "clash.yml"),
+func TestComponentCopyOptions_FailsOnOverwrite(t *testing.T) {
+	tests := []struct {
+		name     string
+		compA    map[string]string
+		compB    map[string]string
+		conflict string
+	}{{
+		name:     "same file in both components",
+		compA:    map[string]string{"shared/clash.yml": "a", "shared/only-a.yml": "a"},
+		compB:    map[string]string{"shared/clash.yml": "b"},
+		conflict: filepath.Join("shared", "clash.yml"),
+	}, {
 		// the renamed destination is checked, not the original name
-		"WARNING: component comp-b overwrites existing file " + filepath.Join(dropPath, "NOTICE.comp-b.txt"),
-	}, warningLines(logs.String()))
+		name:     "renamed metadata file",
+		compA:    map[string]string{"NOTICE.comp-b.txt": "comp-a ships a file named after comp-b", "NOTICE.comp-a.txt": "a"},
+		compB:    map[string]string{"NOTICE.txt": "notice b"},
+		conflict: "NOTICE.comp-b.txt",
+	}}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeFiles(t, filepath.Join(root, "comp-a"), tc.compA)
+			writeFiles(t, filepath.Join(root, "comp-b"), tc.compB)
+			dropPath := filepath.Join(root, "drop")
+
+			require.NoError(t, copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a")))
+			err := copy.Copy(filepath.Join(root, "comp-b"), dropPath, componentCopyOptions("comp-b"))
+			require.ErrorContains(t, err, "component comp-b overwrites existing file "+filepath.Join(dropPath, tc.conflict))
+		})
+	}
 }
 
-func TestComponentCopyOptions_WarnsOnFileLeftInDropPath(t *testing.T) {
-	var logs bytes.Buffer
-
+func TestComponentCopyOptions_FailsOnFileLeftInDropPath(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{"NOTICE.txt": "notice a"})
 	// the drop path is not cleaned between builds, e.g. with KEEP_ARCHIVE
 	dropPath := filepath.Join(root, "drop")
 	writeFiles(t, dropPath, map[string]string{"NOTICE.comp-a.txt": "left from a previous build"})
 
-	require.NoError(t, copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a", &logs)))
-
-	assert.Equal(t,
-		[]string{"WARNING: component comp-a overwrites existing file " + filepath.Join(dropPath, "NOTICE.comp-a.txt")},
-		warningLines(logs.String()))
+	err := copy.Copy(filepath.Join(root, "comp-a"), dropPath, componentCopyOptions("comp-a"))
+	require.ErrorContains(t, err, "component comp-a overwrites existing file "+filepath.Join(dropPath, "NOTICE.comp-a.txt"))
 }
 
 func writeFiles(t *testing.T, dir string, files map[string]string) {
@@ -170,14 +167,4 @@ func readFiles(t *testing.T, dir string) map[string]string {
 		return nil
 	}))
 	return files
-}
-
-func warningLines(logs string) []string {
-	var lines []string
-	for _, line := range strings.Split(logs, "\n") {
-		if strings.Contains(line, "WARNING: component") {
-			lines = append(lines, line)
-		}
-	}
-	return lines
 }
