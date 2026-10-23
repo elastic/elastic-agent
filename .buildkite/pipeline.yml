@@ -6,7 +6,7 @@ common:
   - google_oidc_plugin: &google_oidc_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
-      elastic/oblt-google-auth#v1.3.1:
+      elastic/oblt-google-auth#v1.3.5:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
@@ -203,19 +203,28 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-  - group: "macOS tests"
-    key: "macos-unit-tests"
+  # Unit tests of the EDOT Collector module, selected by GO_MODULE_DIR.
+  # internal/edot is a separate Go module, so its unit tests are not reached by
+  # `mage test:unit`. They run here on their own agents: running them alongside
+  # the root-module tests on one agent starves the timing-sensitive root-module
+  # tests of CPU and makes them flaky.
+  - group: "EDOT unit tests"
+    key: "edot-unit-tests"
     steps:
-      - label: "Unit tests - macOS 15 ARM"
+      - label: "EDOT unit tests - Ubuntu 22.04"
+        key: "edot-unit-tests-2204"
         command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
-          provider: orka
-          imagePrefix: generic-base-15-arm-002
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
         retry:
           automatic:
             limit: 1
@@ -224,10 +233,164 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+      - label: "EDOT unit tests - fips140=only Ubuntu 22.04"
+        key: "edot-unit-tests-2204-fips140-only"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Ubuntu 22.04 ARM64"
+        key: "edot-unit-tests-2204-arm64"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+          diskSizeGb: 200
+          instanceType: "m6g.xlarge"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Windows 2022"
+        key: "edot-unit-tests-win2022"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - fips140=only Windows 2022"
+        key: "edot-unit-tests-win2022-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      # Runs only on main and release branches, like "Unit tests - macOS 13".
+      # Skipped like "Unit tests - macOS 13" due to Orka provider slowness,
+      # see https://github.com/elastic/elastic-agent/pull/17290
+      - label: "EDOT unit tests - macOS 13"
+        key: "edot-unit-tests-macos13"
+        skip: "Orka slowness, see github.com/elastic/elastic-agent/pull/17290"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: "main 8.* 9.*"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-x64
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      # The EDOT module does not compile on the Windows arm64 Buildkite agents.
+      # Remove `skip` once https://github.com/elastic/elastic-agent/issues/17227 is resolved.
+      - label: "EDOT unit tests - Windows 11 arm64"
+        key: "edot-unit-tests-win11-arm64"
+        # Buildkite limits the skip reason to 70 characters.
+        skip: "Doesn't compile, see github.com/elastic/elastic-agent/issues/17227"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+  # Skipping due to Orka provider slowness
+  # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
+  - group: "macOS tests"
+    skip: true
+    key: "macos-unit-tests"
+    steps:
       # Runs only on main and release branches
       - label: "Unit tests - macOS 13"
         command: ".buildkite/scripts/steps/unit-tests.sh"
-        skip: "Ongoing issues with MacOS 13 CI runners. Unskip after resolved."
         branches: "main 8.* 9.*"
         artifact_paths:
           - "build/TEST-*.html"
@@ -378,6 +541,8 @@ steps:
         allow_failure: true
       - step: "unit-tests-win11-arm64-fips140-only"
         allow_failure: true
+      - step: "edot-unit-tests"
+        allow_failure: true
 
   - group: "K8s tests"
     key: "k8s-tests"
@@ -474,22 +639,6 @@ steps:
     plugins:
     - *sparse_checkout_plugin
 
-  # Trigger for pull requests - Serverless Beats Tests
-  # this should help detecting issues earlier in the development cycle
-  - label: "Trigger Serverless Beats Tests"
-    if: build.pull_request.id != null
-    trigger: "beats-agent-serverless-tests"
-    build:
-      commit: "${BUILDKITE_COMMIT}"
-      branch: "${BUILDKITE_BRANCH}"
-      env:
-        BUILDKITE_PULL_REQUEST_BASE_BRANCH: "${BUILDKITE_PULL_REQUEST_BASE_BRANCH}"
-    if_changed:
-      include:
-        - .buildkite/serverless.beats.tests.yml
-        - .buildkite/scripts/steps/beats_tests.sh
-        - .buildkite/hooks/pre-command
-
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
@@ -542,7 +691,9 @@ steps:
   # NOTE: Tests the unified-release staging packaging workflow against the latest
   # staging manifest, to catch regressions before they reach the release pipeline.
   # See https://buildkite.com/elastic/unified-release-staging
+  # Temporarily skipping until new artifacts available in staging. See https://github.com/elastic/elastic-agent/pull/17099#issuecomment-6213275037
   - label: "Trigger Elastic Agent Package (unified-release staging)"
+    skip: true
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh

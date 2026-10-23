@@ -9,6 +9,8 @@ exporters:
     endpoint: localhots:4317
   otlp_http:
     endpoint: https://localhost.com:4318
+  prometheus_remote_write:
+    endpoint: http://localhost:9090/api/v1/write
 
 extensions:
   health_check:
@@ -42,6 +44,11 @@ processors:
     rate: 1
     burst: 1
   tail_sampling:
+  adaptive_tail_sampling:
+    rules:
+      - name: default
+        sampler:
+          type: always_sample
   beat:
 
 receivers:
@@ -127,6 +134,7 @@ service:
       exporters:
         - debug
         - otlp_grpc
+        - prometheus_remote_write
       processors:
         - attributes
         - batch
@@ -166,6 +174,7 @@ service:
         - resource_detection
         - transform
         - elasticapm
+        - adaptive_tail_sampling
       receivers:
         - otlp
         - jaeger

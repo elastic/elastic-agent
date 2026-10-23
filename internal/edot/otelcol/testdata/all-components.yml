@@ -12,6 +12,8 @@ exporters:
   nop:
   logstash:
     hosts: ["localhost:5044"]
+  prometheus_remote_write:
+    endpoint: http://localhost:9090/api/v1/write
 
 extensions:
   health_check:
@@ -65,6 +67,11 @@ processors:
     rate: 1
     burst: 1
   tail_sampling:
+  adaptive_tail_sampling:
+    rules:
+      - name: default
+        sampler:
+          type: always_sample
   log_dedup:
   beat:
 
@@ -125,7 +132,7 @@ receivers:
     region: us-east-1
     logs:
       initial_lookback: 1h
-      poll_interval: 1m
+      poll_interval: 1h
       groups:
         autodiscover:
           limit: 1
@@ -291,6 +298,7 @@ service:
         - nop
         - debug
         - otlp_grpc
+        - prometheus_remote_write
       processors:
         - attributes
         - batch
@@ -352,6 +360,7 @@ service:
         - resource_detection
         - transform
         - elasticapm
+        - adaptive_tail_sampling
       receivers:
         - nop
         - otlp
