@@ -17,6 +17,7 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	serializablestatus "github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -568,7 +569,7 @@ func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
 	}
 
 	// Derive the receiver key from the config translation so the test covers it end to end.
-	receiversConfig, err := getReceiversConfigForComponent(&comp, nil, nil)
+	receiversConfig, err := getReceiversConfigForComponent(&comp, &info.AgentInfo{}, false, nil)
 	require.NoError(t, err)
 	require.Len(t, receiversConfig, 1, "expected exactly one fallback receiver")
 	var nopReceiverKey string

@@ -2959,132 +2959,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-=======
-func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) {
-	newHeartbeatComponent := func(outputType string, singleReceiver bool) *component.Component {
-		return &component.Component{
-			ID:         "heartbeat-auth-test-id",
-			InputType:  "synthetics/http",
-			OutputType: outputType,
-			OutputName: "default",
-			InputSpec: &component.InputRuntimeSpec{
-				BinaryName: "elastic-otel-collector",
-				Spec: component.InputSpec{
-					Name: "synthetics/http",
-					Command: &component.CommandSpec{
-						Args: []string{"heartbeat"},
-					},
-					SingleReceiver: singleReceiver,
-				},
-			},
-			Units: []component.Unit{
-				{
-					ID:   "heartbeat-auth-test-id-unit",
-					Type: client.UnitTypeInput,
-					Config: component.MustExpectedConfig(map[string]any{
-						"id":         "test",
-						"use_output": "default",
-						"type":       "synthetics/http",
-						"streams": []any{
-							map[string]any{
-								"id": "http-1",
-								"data_stream": map[string]any{
-									"dataset": "synthetics.http",
-								},
-								"urls":     []any{"https://example.com/one"},
-								"schedule": "@every 5s",
-							},
-							map[string]any{
-								"id": "http-2",
-								"data_stream": map[string]any{
-									"dataset": "synthetics.http",
-								},
-								"urls":     []any{"https://example.com/two"},
-								"schedule": "@every 10s",
-							},
-						},
-					}),
-				},
-			},
-		}
-	}
-
-	tests := []struct {
-		name                string
-		outputType          string
-		singleReceiver      bool
-		expectedReceiverIDs []string
-		expectedAuth        string
-	}{
-		{
-			name:           "elasticsearch per-stream receivers",
-			outputType:     "elasticsearch",
-			singleReceiver: false,
-			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
-			},
-			expectedAuth: "beatsauth/_agent-component/default",
-		},
-		{
-			name:           "elasticsearch single receiver",
-			outputType:     "elasticsearch",
-			singleReceiver: true,
-			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/single",
-			},
-			expectedAuth: "beatsauth/_agent-component/default",
-		},
-		{
-			name:           "logstash",
-			outputType:     "logstash",
-			singleReceiver: false,
-			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
-			},
-		},
-		{
-			name:           "kafka",
-			outputType:     "kafka",
-			singleReceiver: false,
-			expectedReceiverIDs: []string{
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
-				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := getReceiversConfigForComponent(
-				newHeartbeatComponent(tt.outputType, tt.singleReceiver),
-				nil,
-				nil,
-			)
-			require.NoError(t, err, "heartbeat receiver translation must succeed")
-			require.Len(t, result, len(tt.expectedReceiverIDs), "translation must generate the expected receiver count")
-
-			for _, receiverID := range tt.expectedReceiverIDs {
-				require.Contains(t, result, receiverID, "translation must generate receiver %q", receiverID)
-			}
-
-			for receiverID, rawConfig := range result {
-				receiverConfig, ok := rawConfig.(map[string]any)
-				require.True(t, ok, "receiver %q config must be a map", receiverID)
-				if tt.expectedAuth == "" {
-					assert.NotContains(t, receiverConfig, "monitor_state", "receiver %q must omit monitor state for %s output", receiverID, tt.outputType)
-					continue
-				}
-				monitorState, ok := receiverConfig["monitor_state"].(map[string]any)
-				require.True(t, ok, "receiver %q monitor state config must be a map", receiverID)
-				assert.Equal(t, tt.expectedAuth, monitorState["elasticsearch"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
-			}
-		})
-	}
-}
-
 // TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
 // enabled streams (either no input units, or input units with nil config) falls back to
 // a no-op receiver instead of an error, so the pipeline stays valid and the component
@@ -3157,14 +3031,13 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := getReceiversConfigForComponent(tt.component, nil, nil)
+			result, err := getReceiversConfigForComponent(tt.component, &info.AgentInfo{}, false, nil)
 			require.NoError(t, err)
 			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
 		})
 	}
 }
 
->>>>>>> 519dce2 (fix(otel): fall back to a no-op receiver when a component has no enabled streams (#16900))
 // TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
 // monitor, which compiles into a single synthetics/browser input with a scheduled
 // "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
