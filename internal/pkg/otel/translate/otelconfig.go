@@ -52,7 +52,7 @@ const (
 	NoEnabledStreamsReceiverType = "nop"
 	// noEnabledStreamsMessage is the status message reported for a component, and its input
 	// units, whose policy has no enabled streams.
-	noEnabledStreamsMessage = "Degraded: component has no enabled streams, no data will be collected"
+	noEnabledStreamsMessage = "Component has no enabled streams, no data will be collected"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
