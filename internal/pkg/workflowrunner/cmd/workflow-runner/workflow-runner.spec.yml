@@ -1,0 +1,26 @@
+version: 2
+inputs:
+  - name: workflow/http
+    description: "Kibana Workflows HTTP runner for a private location"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - darwin/amd64
+      - darwin/arm64
+      - windows/amd64
+      - container/amd64
+      - container/arm64
+    outputs:
+      - elasticsearch
+    # The request (URL, headers, body) carries credentials; acks keep only identifiers.
+    ack_action_data:
+      fields:
+        - space_id
+        - execution_id
+        - step_id
+    command:
+      restart_monitoring_period: 5s
+      maximum_restarts_per_period: 1
+      timeouts:
+        restart: 1s
+      args: []

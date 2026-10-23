@@ -2921,3 +2921,9 @@ func computeEnrollOptions(ctx context.Context, cfgPath string, cfgFleetPath stri
 func (c *Coordinator) isContainerizedEnvironment() bool {
 	return c.specs.Platform().OS == component.Container
 }
+
+// InputSpec returns the loaded specification for an input type, whether or not
+// a unit for it is currently running.
+func (c *Coordinator) InputSpec(inputType string) (component.InputRuntimeSpec, error) {
+	return c.specs.GetInput(inputType)
+}
