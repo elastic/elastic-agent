@@ -1475,6 +1475,11 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		if err := os.MkdirAll(versionedFlatPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned flat dir %q: %w", versionedFlatPath, err))
 		}
+		// KEEP_ARCHIVE only caches the downloaded archives: the versioned drop dir is rebuilt from them on
+		// every run, so remove what a previous build left there instead of merging into it
+		if err := os.RemoveAll(versionedDropPath); err != nil {
+			panic(fmt.Errorf("cleaning versioned drop dir %q: %w", versionedDropPath, err))
+		}
 		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
 		}
