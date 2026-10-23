@@ -8,16 +8,20 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
 
 	"github.com/go-viper/mapstructure/v2"
+	otelcomponent "go.opentelemetry.io/collector/component"
 
+	"github.com/elastic/beats/v7/libbeat/cloudid"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
@@ -131,13 +135,22 @@ var defaultOptions = esToOTelOptions{
 }
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
-func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string]any, map[string]any, error) {
+// Note: This method may override output queue settings defined by user.
+func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
 	escfg := defaultOptions
 
-	// check for unsupported config
-	err := checkUnsupportedConfig(output)
+	// Cloud resolution returns a copy, but effective queue settings must be
+	// written back for unitToExporterConfig.
+	originalOutput := output
+	output, err = resolveElasticsearchOutputCloudConfig(output)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	// check for unsupported config
+	err = checkUnsupportedConfig(output)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
 	// Preset must be applied before unpacking the config because it can override output fields.
@@ -155,7 +168,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 
 		overriddenFields, presetConfig, applyErr := elasticsearch.ApplyPreset(preset, output)
 		if applyErr != nil {
-			return nil, nil, applyErr
+			return nil, nil, nil, applyErr
 		}
 		// output now has all preset values applied (including worker count), so
 		// getTotalNumConnections reads the correct connection count for sizing.
@@ -187,7 +200,7 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		// Write the OTel-adjusted queue size back into output so the subsequent
 		// decode picks up the correct value.
 		if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
-			return nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+			return nil, nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
 		}
 
 		// Build a log copy with the OTel-effective queue.mem.events. storedPresetConfig
@@ -210,10 +223,23 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		}
 	}
 
+	// unitToExporterConfig promotes the effective output queue into the receiver
+	// configuration after translation. Preserve that write-back while keeping
+	// Cloud ID resolution isolated from the policy-derived output config.
+	if output.HasField("queue") {
+		queueConfig, err := output.Child("queue", -1)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed reading effective output queue config: %w", err)
+		}
+		if err := originalOutput.SetChild("queue", -1, queueConfig); err != nil {
+			return nil, nil, nil, fmt.Errorf("failed updating effective output queue config: %w", err)
+		}
+	}
+
 	unpackedMap := make(map[string]any)
 	// unpack and validate ES config
 	if err := output.Unpack(&unpackedMap); err != nil {
-		return nil, nil, fmt.Errorf("failed unpacking config. %w", err)
+		return nil, nil, nil, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -223,21 +249,21 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		DecodeHook:      cfgDecodeHookFunc(),
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed creating decoder. %w", err)
+		return nil, nil, nil, fmt.Errorf("failed creating decoder. %w", err)
 	}
 
 	err = decoder.Decode(&unpackedMap)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed decoding config. %w", err)
+		return nil, nil, nil, fmt.Errorf("failed decoding config. %w", err)
 	}
 
 	if err := escfg.Validate(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
-	hosts, err := getURL(escfg, output)
+	hosts, err := getURL(escfg.ElasticsearchConfig, output)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating hosts:%w", err)
+		return nil, nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
 
 	otelYAMLCfg := map[string]any{
@@ -306,11 +332,25 @@ func ESToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[string
 		otelYAMLCfg["timeout"] = escfg.Transport.Timeout
 	}
 
-	// ssl block, idle_connection_timeout, proxy_url, proxy_headers, and proxy_disable
-	// are handled by beatsauthextension https://github.com/elastic/opentelemetry-collector-components/tree/main/extension/beatsauthextension
-	// caller of this method should take care of integrating the extension
+	// idle_connection_timeout, timeout, ssl block,
+	// proxy_url, proxy_headers, proxy_disable are handled by beatsauthextension
+	extensionID := getBeatsAuthExtensionID(outputName)
+	extensionConfig, err := getBeatsAuthExtensionConfig(output)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, error: %w", outputName, err)
+	}
 
-	return otelYAMLCfg, nil, nil
+	// sets extensionCfg
+	extensionCfg = map[string]any{
+		extensionID.String(): extensionConfig,
+	}
+
+	// add authenticator to ES config
+	otelYAMLCfg["auth"] = map[string]any{
+		"authenticator": extensionID.String(),
+	}
+
+	return otelYAMLCfg, nil, extensionCfg, nil
 }
 
 // calcNamedPresetSizing computes the OTel queue size and consumer count for a
@@ -384,7 +424,7 @@ func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	return retryCfg
 }
 
-func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
+func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string, error) {
 	// Create url using host name, protocol and path
 	outputHosts, err := outputs.ReadHostList(output)
 	if err != nil {
@@ -397,27 +437,189 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
 		}
+		hostURL, err := url.Parse(esURL)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse generated Elasticsearch URL: %w", err)
+		}
+		if hostURL.User != nil {
+			return nil, errors.New("credentials in Elasticsearch host URLs are unsupported; configure username and password separately")
+		}
 		if !slices.Contains(hosts, esURL) {
 			hosts = append(hosts, esURL)
 		}
 	}
 
 	if len(escfg.Params) != 0 {
-		// convert params to map[string][]string
-		params := make(map[string][]string, 0)
-		for key, value := range escfg.Params {
-			params[key] = []string{value}
-		}
-
-		decodedParam := url.Values(params)
-		// It is enough to add params as encoded query to any one host
-		// Elasticsearch exporter will make sure to add these for every outgoing request
+		// Each endpoint may be selected independently, so every URL needs the output parameters.
 		for i := range hosts {
-			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+			hostURL, err := url.Parse(hosts[i])
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse generated Elasticsearch URL %q: %w", hosts[i], err)
+			}
+			query := hostURL.Query()
+			for key, value := range escfg.Params {
+				query.Set(key, value)
+			}
+			hostURL.RawQuery = query.Encode()
+			hosts[i] = hostURL.String()
 		}
 	}
 
 	return hosts, nil
+}
+
+// resolveElasticsearchOutputCloudConfig returns an independently owned,
+// environment-resolved output config and applies output-scoped Cloud ID fields
+// without changing the policy-derived source map.
+func resolveElasticsearchOutputCloudConfig(output *config.C) (*config.C, error) {
+	var resolvedMap map[string]any
+	if err := output.Unpack(&resolvedMap); err != nil {
+		return nil, fmt.Errorf("failed resolving Elasticsearch output config: %w", err)
+	}
+	resolvedOutput, err := config.NewConfigFrom(resolvedMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed copying Elasticsearch output config: %w", err)
+	}
+
+	cloudID, err := firstConfiguredString(resolvedOutput, "cloud_id", "cloud.id")
+	if err != nil {
+		return nil, err
+	}
+	cloudAuth, err := firstConfiguredString(resolvedOutput, "cloud_auth", "cloud.auth")
+	if err != nil {
+		return nil, err
+	}
+	if cloudID == "" {
+		if cloudAuth != "" {
+			return nil, errors.New("cloud_auth is configured but cloud_id is empty")
+		}
+		return resolvedOutput, nil
+	}
+
+	cloudConfig, err := cloudid.NewCloudID(cloudID, cloudAuth)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cloud_id: %w", err)
+	}
+	resolvedMap["hosts"] = []string{cloudConfig.ElasticsearchURL()}
+	if cloudAuth != "" {
+		resolvedMap["username"] = cloudConfig.Username()
+		resolvedMap["password"] = cloudConfig.Password()
+	}
+
+	resolvedOutput, err = config.NewConfigFrom(resolvedMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed applying cloud_id to Elasticsearch output config: %w", err)
+	}
+	return resolvedOutput, nil
+}
+
+func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
+	for _, field := range fields {
+		if !cfg.HasField(field) {
+			continue
+		}
+		value, err := cfg.String(field, -1)
+		if err != nil {
+			return "", fmt.Errorf("%s must be a string: %w", field, err)
+		}
+		if value != "" {
+			return value, nil
+		}
+	}
+	return "", nil
+}
+
+// getBeatsAuthExtensionID returns the id for beatsauth extension
+// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
+func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
+}
+
+// getBeatsAuthExtensionConfig translates an Elasticsearch output into the
+// beatsauth configuration shared by the Elasticsearch exporter and Heartbeat.
+func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
+	authSettings := beatsauthextension.BeatsAuthConfig{
+		Transport: elasticsearch.ESDefaultTransportSettings(),
+	}
+
+	if err := outputCfg.Unpack(&authSettings); err != nil {
+		return nil, err
+	}
+
+	newConfig, err := config.NewConfigFrom(authSettings)
+	if err != nil {
+		return nil, err
+	}
+
+	// proxy_url on newConfig is of type url.URL. Beatsauth extension expects it to be of string type instead
+	// this logic here converts url.URL to string type similar to what a user would set on filebeat config
+	if authSettings.Transport.Proxy.URL != nil {
+		err = newConfig.SetString("proxy_url", -1, authSettings.Transport.Proxy.URL.String())
+		if err != nil {
+			return nil, fmt.Errorf("error settingg proxy url:%w ", err)
+		}
+	}
+
+	if authSettings.Kerberos != nil {
+		err = newConfig.SetString("kerberos.auth_type", -1, authSettings.Kerberos.AuthType.String())
+		if err != nil {
+			return nil, fmt.Errorf("error setting kerberos auth type url:%w ", err)
+		}
+	}
+
+	var newMap map[string]any
+	err = newConfig.Unpack(&newMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// required to make the extension not cause the collector to fail and exit on startup
+	newMap["continue_on_error"] = true
+
+	esConfig := elasticsearch.DefaultConfig()
+	if err := outputCfg.Unpack(&esConfig); err != nil {
+		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
+	}
+	if err := esConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
+	}
+
+	if outputCfg.HasField("hosts") || outputCfg.HasField("cloud_id") || outputCfg.HasField("cloud.id") {
+		endpoints, err := getURL(esConfig, outputCfg)
+		if err != nil {
+			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)
+		}
+		newMap["endpoints"] = endpoints
+	}
+
+	auth := map[string]any{}
+	if esConfig.Username != "" || esConfig.Password != "" {
+		if esConfig.Username == "" || esConfig.Password == "" {
+			return nil, errors.New("username and password must be configured together for the beatsauth extension")
+		}
+		auth["username"] = esConfig.Username
+		auth["password"] = esConfig.Password
+	}
+	if esConfig.APIKey != "" {
+		auth["api_key"] = base64.StdEncoding.EncodeToString([]byte(esConfig.APIKey))
+	}
+	if len(esConfig.Headers) > 0 {
+		headerNames := slices.Sorted(maps.Keys(esConfig.Headers))
+		headers := make([]map[string]string, 0, len(headerNames))
+		for _, name := range headerNames {
+			headers = append(headers, map[string]string{
+				"key":   name,
+				"value": esConfig.Headers[name],
+			})
+		}
+		auth["headers"] = headers
+	}
+	if len(auth) > 0 {
+		newMap["auth"] = auth
+	}
+
+	return newMap, nil
 }
 
 // log warning for unsupported config

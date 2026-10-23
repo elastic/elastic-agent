@@ -264,6 +264,12 @@ func (b *dockerBuilder) dockerBuild() (string, []string, error) {
 	args = append(args,
 		"-t", mainTag,
 	)
+	// build_args is a comma-separated list of KEY=VALUE docker build arguments.
+	if buildArgs := b.ExtraVars["build_args"]; buildArgs != "" {
+		for _, buildArg := range strings.Split(buildArgs, ",") {
+			args = append(args, "--build-arg", buildArg)
+		}
+	}
 	extraTags := []string{}
 	for _, tag := range b.ExtraTags {
 		extraTag := fmt.Sprintf("%s:%s", b.imageName, tag)

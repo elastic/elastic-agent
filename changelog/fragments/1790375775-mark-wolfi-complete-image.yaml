@@ -1,0 +1,5 @@
+kind: bug-fix
+
+summary: Mark the elastic-agent-wolfi-complete image as complete
+
+component: elastic-agent

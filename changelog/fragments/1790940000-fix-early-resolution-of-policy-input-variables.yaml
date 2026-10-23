@@ -1,0 +1,10 @@
+kind: bug-fix
+summary: Fix variables in Fleet policy inputs and outputs being resolved too early outside of the main agent process
+description: |
+  When loading the full agent configuration, the Fleet policy was merged without protecting inputs and outputs
+  from go-ucfg variable expansion. Variables referencing values present in the agent's own configuration
+  (`agent.*`, `host.id`, `path.*`, `runtime.*`) were substituted as unquoted text before the transpiler
+  evaluated them. This broke `elastic-agent uninstall`, `elastic-agent inspect`, and switching between
+  privileged and unprivileged mode for policies using such variables, for example the
+  `${agent.id} == '<id>'` input conditions that Synthetics private locations assign to agents.
+component: elastic-agent

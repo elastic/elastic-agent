@@ -24,6 +24,51 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
+func TestHostnameOverrideArgs(t *testing.T) {
+	cases := []struct {
+		name     string
+		beatName string
+		hostname string
+		wantArgs []string
+	}{
+		{
+			name:     "filebeat_with_hostname_appends_flag",
+			beatName: "filebeat",
+			hostname: "my-node",
+			wantArgs: []string{"--hostname", "my-node"},
+		},
+		{
+			name:     "metricbeat_with_hostname_appends_flag",
+			beatName: "metricbeat",
+			hostname: "my-node",
+			wantArgs: []string{"--hostname", "my-node"},
+		},
+		{
+			name:     "cloudbeat_does_not_support_hostname_override_flag",
+			beatName: "cloudbeat",
+			hostname: "my-node",
+			wantArgs: nil,
+		},
+		{
+			name:     "non_beat_component_no_flag",
+			beatName: "",
+			hostname: "my-node",
+			wantArgs: nil,
+		},
+		{
+			name:     "empty_hostname_no_flag",
+			beatName: "metricbeat",
+			hostname: "",
+			wantArgs: nil,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.wantArgs, hostnameOverrideArgs(tc.beatName, tc.hostname))
+		})
+	}
+}
+
 func TestAddToBucket(t *testing.T) {
 	testCases := map[string]struct {
 		bucketSize int
@@ -210,6 +255,63 @@ func TestSyncExpected(t *testing.T) {
 		}
 	})
 
+	t.Run("TestAgentInfo", func(t *testing.T) {
+		testcases := []struct {
+			name             string
+			initialAgentInfo *proto.AgentInfo
+			updatedAgentInfo *proto.AgentInfo
+			syncExpected     bool
+		}{
+			{
+				name:             "No agent info (both nil)",
+				initialAgentInfo: nil,
+				updatedAgentInfo: nil,
+				syncExpected:     false,
+			},
+			{
+				name:             "Agent info added",
+				initialAgentInfo: nil,
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				syncExpected:     true,
+			},
+			{
+				name:             "Same agent info",
+				initialAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				syncExpected:     false,
+			},
+			{
+				name:             "Added tag",
+				initialAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production", "team-payments"}},
+				syncExpected:     true,
+			},
+			{
+				name:             "Removed tags",
+				initialAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1"},
+				syncExpected:     true,
+			},
+		}
+
+		for _, tt := range testcases {
+			t.Run(tt.name, func(t *testing.T) {
+				compState := ComponentState{
+					expectedAgentInfo: tt.initialAgentInfo,
+				}
+
+				actualSyncExpected := compState.syncExpected(&component.Component{
+					ID:        "fakecomponent",
+					AgentInfo: tt.updatedAgentInfo,
+				})
+
+				assert.Equal(t, tt.syncExpected, actualSyncExpected)
+				gotAgentInfo := compState.toCheckinExpected().GetAgentInfo()
+				assert.Equal(t, tt.updatedAgentInfo.GetId(), gotAgentInfo.GetId())
+				assert.Equal(t, tt.updatedAgentInfo.GetTags(), gotAgentInfo.GetTags())
+			})
+		}
+	})
 }
 
 // TestProcessCheckinIgnoredAfterStop verifies that a late observed check-in is

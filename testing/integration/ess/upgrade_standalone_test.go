@@ -22,6 +22,9 @@ import (
 	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
+// TestStandaloneUpgrade runs the privileged half of the standalone upgrade matrix.
+// The unprivileged half lives in TestStandaloneUpgradeUnprivileged so that each half runs
+// in its own CI group (and on its own VM), halving the wall-clock time of the longest test.
 func TestStandaloneUpgrade(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.StandaloneUpgrade,
@@ -35,24 +38,45 @@ func TestStandaloneUpgrade(t *testing.T) {
 		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 
+	testStandaloneUpgradeMatrix(t, false)
+}
+
+// TestStandaloneUpgradeUnprivileged runs the unprivileged half of the standalone upgrade
+// matrix, see TestStandaloneUpgrade.
+func TestStandaloneUpgradeUnprivileged(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.StandaloneUpgradeUnprivileged,
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+		// See TestStandaloneUpgrade.
+		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
+	})
+
+	testStandaloneUpgradeMatrix(t, true)
+}
+
+// testStandaloneUpgradeMatrix upgrades from every version in the upgrade test version list
+// to the version under test, either privileged or unprivileged. Start versions that do not
+// support unprivileged mode are skipped when unprivileged is true.
+func testStandaloneUpgradeMatrix(t *testing.T, unprivileged bool) {
 	versionList, err := upgradetest.GetUpgradableVersions()
 	require.NoError(t, err)
 	endVersion, err := version.ParseVersion(define.Version())
 	require.NoError(t, err)
 
+	mode := "privileged"
+	if unprivileged {
+		mode = "unprivileged"
+	}
+
 	for _, startVersion := range versionList {
-		unprivilegedAvailable := false
-		if upgradetest.SupportsUnprivileged(startVersion, endVersion) {
-			unprivilegedAvailable = true
+		if unprivileged && !upgradetest.SupportsUnprivileged(startVersion, endVersion) {
+			t.Logf("Skipping %s to %s (unprivileged): start version does not support unprivileged mode", startVersion, define.Version())
+			continue
 		}
-		t.Run(fmt.Sprintf("Upgrade %s to %s (privileged)", startVersion, define.Version()), func(t *testing.T) {
-			testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(false))
+		t.Run(fmt.Sprintf("Upgrade %s to %s (%s)", startVersion, define.Version(), mode), func(t *testing.T) {
+			testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(unprivileged))
 		})
-		if unprivilegedAvailable {
-			t.Run(fmt.Sprintf("Upgrade %s to %s (unprivileged)", startVersion, define.Version()), func(t *testing.T) {
-				testStandaloneUpgrade(t, startVersion, define.Version(), atesting.ArtifactFetcher(), upgradetest.WithUnprivileged(true))
-			})
-		}
 	}
 }
 

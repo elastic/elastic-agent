@@ -606,14 +606,8 @@ func newAuthenticator(t *testing.T, config beatsauthextension.Config) extension.
 func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exporter.Logs) {
 
 	f := elasticsearchexporter.NewFactory()
-	cfg := &elasticsearchexporter.Config{
-		Mapping: elasticsearchexporter.MappingsSettings{
-			// we have to set allowed modes
-			// this is set on default config in ES exporter but it is not a public type
-			Mode:         "bodymap",
-			AllowedModes: []string{"bodymap", "ecs", "none", "otel", "raw"},
-		},
-	}
+	cfg := f.CreateDefaultConfig().(*elasticsearchexporter.Config)
+	cfg.Mapping.Mode = "bodymap" //nolint:staticcheck // we need it for testing
 
 	esConf := confmap.NewFromStringMap(exporterCfg)
 

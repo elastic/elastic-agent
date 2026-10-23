@@ -28,15 +28,26 @@ jobs:
     needs: [filter]
     permissions:
       contents: write
+      id-token: write
       pull-requests: write
     strategy:
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
+      # Mint before checkout so push/gh pr create use the Vault app (not GITHUB_TOKEN /
+      # github-actions[bot]), avoiding Approve-and-run on the opened PRs.
+      - name: Create ephemeral GitHub token
+        id: github-token
+        uses: elastic/oblt-actions/github/create-token@v1
+        with:
+          # Wildcard policy bump-*.yml@* (catalog token-policy-7821ae69db47)
+          token-policy: token-policy-7821ae69db47
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
           submodules: true
           ref: "${{ matrix.branch }}"
+          token: ${{ steps.github-token.outputs.token }}
 
           # no depth limit
           # so, we can generate snapshot versions based on release branches
@@ -61,7 +72,7 @@ jobs:
       - name: Update versions
         id: update
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.github-token.outputs.token }}
         run: ./.github/workflows/bump-agent-versions.sh
 
       - if: ${{ failure()  }}

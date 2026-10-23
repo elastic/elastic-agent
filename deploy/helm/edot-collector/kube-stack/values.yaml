@@ -1,7 +1,7 @@
-# For installation and configuration options, refer to the [installation instructions](https://github.com/elastic/opentelemetry/blob/main/docs/kubernetes/operator/README.md)
+# For installation and configuration options, refer to the [installation instructions](https://www.elastic.co/docs/solutions/observability/get-started/opentelemetry/quickstart/ech/k8s#manual-installation)
 
-# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-kube-stack/values.yaml)
-# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.3.3
+# For advanced configuration options, refer to the [official OpenTelemetry Helm chart](https://github.com/open-telemetry/opentelemetry-helm-charts/blob/opentelemetry-kube-stack-0.16.0/charts/opentelemetry-kube-stack/values.yaml)
+# This file has been tested together with opentelemetry-kube-stack helm chart version: 0.16.0
 opentelemetry-operator:
   manager:
     extraArgs:
@@ -17,7 +17,7 @@ crds:
 defaultCRConfig:
   image:
     repository: "docker.elastic.co/elastic-agent/elastic-agent"
-    tag: "9.6.0"
+    tag: "9.7.0"
   targetAllocator:
     enabled: false # Enable/disable the Operator's Target allocator.
     # Refer to: https://github.com/open-telemetry/opentelemetry-operator/tree/main/cmd/otel-allocator
@@ -83,6 +83,15 @@ collectors:
           timeout: 2s
           override: true
           aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/openshift:
+          # Detects resources from OpenShift. Does nothing on other distributions.
+          detectors: [openshift]
+          timeout: 2s
+          override: true
+          openshift:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
@@ -166,6 +175,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
             receivers:
               - k8s_cluster
@@ -177,6 +187,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
             exporters:
               - debug
@@ -245,6 +256,15 @@ collectors:
           timeout: 2s
           override: true
           aks:
+            resource_attributes:
+              k8s.cluster.name:
+                enabled: true
+        resourcedetection/openshift:
+          # Detects resources from OpenShift. Does nothing on other distributions.
+          detectors: [openshift]
+          timeout: 2s
+          override: true
+          openshift:
             resource_attributes:
               k8s.cluster.name:
                 enabled: true
@@ -357,7 +377,7 @@ collectors:
             enabled: true
           start_at: end
           exclude:
-            # exlude collector logs
+            # exclude collector logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
           include:
             - /var/log/pods/*/*/*.log
@@ -494,6 +514,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
               - resource/cloud
             exporters:
@@ -510,6 +531,7 @@ collectors:
               - resourcedetection/eks
               - resourcedetection/gcp
               - resourcedetection/aks
+              - resourcedetection/openshift
               - resource/hostname
               - resource/cloud
             exporters:
@@ -610,6 +632,19 @@ collectors:
           #   insecure_skip_verify: true
           mapping:
             mode: otel
+        # [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter)
+        # Elasticsearch exposes OTLP over HTTP only (no gRPC) at <es_endpoint>/_otlp.
+        # The exporter appends the signal path (/v1/metrics) to the configured endpoint.
+        otlp_http/ingest_metrics:
+          endpoint: ${env:ELASTIC_ENDPOINT}/_otlp
+          headers:
+            Authorization: ApiKey ${env:ELASTIC_API_KEY}
+          sending_queue:
+            enabled: true
+            sizer: bytes
+            queue_size: 50000000 # 50MB uncompressed
+            block_on_overflow: true
+          timeout: 15s
       extensions:
         cgroup_runtime: {}
         health_check:
@@ -620,7 +655,7 @@ collectors:
           metrics:
             receivers: [otlp]
             processors: [batch/metrics]
-            exporters: [debug, elasticsearch/otel]
+            exporters: [debug, otlp_http/ingest_metrics]
           logs:
             receivers: [otlp]
             processors: [batch]
@@ -635,7 +670,7 @@ collectors:
             processors: []
             exporters:
               - debug
-              - elasticsearch/otel
+              - otlp_http/ingest_metrics
 # For more details on OpenTelemetry's zero-code instrumentation, see:
 # https://opentelemetry.io/docs/concepts/instrumentation/zero-code/
 instrumentation:
@@ -652,12 +687,12 @@ instrumentation:
     type: parentbased_traceidratio # Sampler type
     argument: "1.0" # Sampling rate set to 100% (all traces are sampled).
   java:
-    image: docker.elastic.co/observability/elastic-otel-javaagent:1.11.0
+    image: docker.elastic.co/observability/elastic-otel-javaagent:1.14.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.11.0
+    image: docker.elastic.co/observability/elastic-otel-node:1.20.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:1.4.0
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.0
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.12.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.18.0
   go:
     image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0

@@ -1,0 +1,9 @@
+kind: enhancement
+
+summary: Pass Elastic Agent information to beat receivers in the OTel runtime
+
+description: 
+
+component: elastic-agent
+
+issue: https://github.com/elastic/beats/issues/53390

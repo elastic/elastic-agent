@@ -86,7 +86,7 @@ func (wf *wrappedFactory) CreateMeterProvider(
 	// We call through to the baseline resource creation so we get standard
 	// fields, but we need to backconvert it to a config in order to assemble
 	// the final meter provider with our manual reader added.
-	res, err := wf.CreateResource(ctx, set.Settings, cfg)
+	res, schemaURL, err := wf.CreateResource(ctx, set.Settings, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (wf *wrappedFactory) CreateMeterProvider(
 	// configuration, but adding the manual reader after any baseline
 	// configured ones.
 	sdkConf := otelconf.OpenTelemetryConfiguration{
-		Resource:      configFromCommonResource(res),
+		Resource:      configFromCommonResource(res, schemaURL),
 		MeterProvider: ptr(cfg.Metrics.MeterProvider),
 	}
 	sdk, err := otelconf.NewSDK(
@@ -113,14 +113,19 @@ func (wf *wrappedFactory) CreateMeterProvider(
 	return sdk.MeterProvider().(telemetry.MeterProvider), nil
 }
 
-// Given a pcommon.Resource, return the resource configuration
-// (otelconf.Resource) to reproduce the same resource, ignoring any non-string
-// values. (Current callers can't produce non-string values since the resource
-// is created by the collector's default telemetry factory, but this could
-// change if the default telemetry factory starts using non-strings in its
-// resources. However, their absence is a strong enough assumption that the
-// default telemetry factory itself intentionally panics if this happens.)
-func configFromCommonResource(res pcommon.Resource) *otelconf.Resource {
+// Given a pcommon.Resource and its schema URL, return the resource
+// configuration (otelconf.Resource) to reproduce the same resource, ignoring
+// any non-string values. (Current callers can't produce non-string values
+// since the resource is created by the collector's default telemetry factory,
+// but this could change if the default telemetry factory starts using
+// non-strings in its resources. However, their absence is a strong enough
+// assumption that the default telemetry factory itself intentionally panics
+// if this happens.)
+// If schemaURL is empty, the semconv schema URL is used as a fallback.
+func configFromCommonResource(res pcommon.Resource, schemaURL string) *otelconf.Resource {
+	if schemaURL == "" {
+		schemaURL = semconv.SchemaURL
+	}
 	var attrs []otelconf.AttributeNameValue
 	res.Attributes().Range(
 		func(k string, v pcommon.Value) bool {
@@ -133,7 +138,7 @@ func configFromCommonResource(res pcommon.Resource) *otelconf.Resource {
 			return true
 		})
 	return &otelconf.Resource{
-		SchemaUrl:  ptr(semconv.SchemaURL),
+		SchemaUrl:  ptr(schemaURL),
 		Attributes: attrs,
 	}
 }

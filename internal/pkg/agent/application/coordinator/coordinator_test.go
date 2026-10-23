@@ -575,7 +575,7 @@ func TestUpgradeSameErrorAcked(t *testing.T) {
 	acker.On("Ack", mock.Anything, actionUpgrade).Return(nil)
 	acker.On("Commit", mock.Anything).Return(nil)
 
-	require.NoError(t, coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
+	require.NoError(t, coord.Upgrade(t.Context(), "9.0", []string{"http://localhost"}, actionUpgrade, WithSkipVerifyOverride(true), WithSkipDefaultPgp(true)))
 
 	acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 	acker.AssertCalled(t, "Commit", mock.Anything)
@@ -620,7 +620,7 @@ func TestReplayedRollbackActionAcked(t *testing.T) {
 		acker.On("Commit", mock.Anything).Return(nil)
 
 		// A rollback targeting the current version should be detected as replayed and acked without processing
-		require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), "", actionUpgrade, WithRollback(true)))
+		require.NoError(t, coord.Upgrade(t.Context(), release.VersionWithSnapshot(), nil, actionUpgrade, WithRollback(true)))
 
 		acker.AssertCalled(t, "Ack", mock.Anything, actionUpgrade)
 		acker.AssertCalled(t, "Commit", mock.Anything)
@@ -675,7 +675,7 @@ func TestPreUpgradeCallback(t *testing.T) {
 
 	preUpgradeCallbackErr := errors.New("pre upgrade callback error")
 
-	upgradeErr := coord.Upgrade(t.Context(), "9.0", "http://localhost", actionUpgrade,
+	upgradeErr := coord.Upgrade(t.Context(), "9.0", []string{"http://localhost"}, actionUpgrade,
 		WithSkipVerifyOverride(true), WithSkipDefaultPgp(true),
 		WithPreUpgradeCallback(func(ctx context.Context, log *logger.Logger, action *fleetapi.ActionUpgrade) error {
 			return preUpgradeCallbackErr
@@ -1066,7 +1066,7 @@ func TestCoordinator_Upgrade(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
+	err = coord.Upgrade(ctx, "9.0.0", nil, nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, err, ErrNotUpgradable)
 	cancel()
 
@@ -1103,7 +1103,7 @@ func TestCoordinator_UpgradeDetails(t *testing.T) {
 	require.NoError(t, err)
 	cfgMgr.Config(ctx, cfg)
 
-	err = coord.Upgrade(ctx, "9.0.0", "", nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
+	err = coord.Upgrade(ctx, "9.0.0", nil, nil, WithSkipVerifyOverride(true), WithSkipDefaultPgp(false))
 	require.ErrorIs(t, expectedErr, err)
 	cancel()
 
@@ -1531,14 +1531,54 @@ exporters:
 	}
 }
 
+func TestProcessConfig_TagsAreApplied(t *testing.T) {
+	tests := []struct {
+		name       string
+		standalone bool
+	}{
+		{name: "standalone mode", standalone: true},
+		{name: "managed mode", standalone: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockAgent := info.NewMockAgent(t)
+			mockAgent.EXPECT().IsStandalone().Return(tt.standalone).Once()
+			mockAgent.EXPECT().SetTags([]string{"tag1", "tag2"}).Return().Once()
+			mockAgent.EXPECT().GetTags().Return([]string{"tag1", "tag2"}).Once()
+
+			coord := &Coordinator{
+				logger:           logp.NewLogger("testing"),
+				agentInfo:        mockAgent,
+				secretMarkerFunc: testSecretMarkerFunc,
+			}
+
+			cfg := config.MustNewConfigFrom(map[string]interface{}{
+				// tag1 should be deduplicated since it appears twice and has leading/trailing spaces.
+				"agent.tags": []string{"tag1", "tag2", " tag1 "},
+			})
+			err := coord.processConfig(t.Context(), cfg)
+			require.NoError(t, err)
+
+			assert.Equal(t, []string{"tag1", "tag2"}, coord.state.Tags)
+			assert.Equal(t, []string{"tag1", "tag2"}, coord.agentInfo.GetTags())
+		})
+	}
+}
+
 // fakeCapabilities implements the capabilities.Capabilities interface for testing
 type fakeCapabilities struct {
 	mock.Mock
 }
 
-func (f *fakeCapabilities) AllowUpgrade(version string, sourceURI string) bool {
-	args := f.Called(version, sourceURI)
+func (f *fakeCapabilities) AllowUpgrade(version string, sources []string) bool {
+	args := f.Called(version, sources)
 	return args.Bool(0)
+}
+
+func (f *fakeCapabilities) FilterUpgradeSources(version string, sources []string) []string {
+	args := f.Called(version, sources)
+	return args.Get(0).([]string)
 }
 
 func (f *fakeCapabilities) AllowInput(name string) bool {
@@ -1762,7 +1802,7 @@ func (f *fakeUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (f *fakeUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	f.upgradeCalled = true
 	if cbErr := upgrade.InvokePreSymlinkCallback(opts, ctx, nil, action); cbErr != nil {
 		return nil, cbErr

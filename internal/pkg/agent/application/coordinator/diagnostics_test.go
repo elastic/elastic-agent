@@ -176,12 +176,17 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 				Platform: "darwin",
 			},
 		},
-	}}
+	},
+		stateBroadcaster: broadcaster.New(State{Tags: []string{"tag1", "tag2"}}, 0, 0),
+	}
 
 	expected := `
 headers:
   header1: value1
   header2: value2
+tags:
+  - tag1
+  - tag2
 log_level: trace
 log_level_policy: info
 log_level_override: trace
@@ -748,6 +753,7 @@ func mapFromRawYAML(t *testing.T, str string) map[string]interface{} {
 type fakeAgentInfo struct {
 	agentID          string
 	headers          map[string]string
+	tags             []string
 	LogLevelPolicy   string
 	LogLevelOverride string
 	snapshot         bool
@@ -805,6 +811,8 @@ func (a fakeAgentInfo) SetLogLevelOverride(ctx context.Context, level string) er
 	panic("implement me")
 }
 func (a fakeAgentInfo) SetLogLevelPolicy(level string) { panic("implement me") }
+func (a fakeAgentInfo) GetTags() []string              { return a.tags }
+func (a fakeAgentInfo) SetTags(tags []string)          {}
 
 func TestCoordinatorPerformDiagnostics(t *testing.T) {
 	tests := []struct {

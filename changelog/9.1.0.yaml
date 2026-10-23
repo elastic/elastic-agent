@@ -440,7 +440,7 @@ entries:
         name: 1751037802-Stop-logging-that-unprivileged-installations-are-in-beta.yaml
         checksum: 2c2f731f90638eaf61e8ec021ce3c4dd8885ff3a
     - kind: enhancement
-      summary: Include the forwardconnector as an EDOT collector commponent.
+      summary: Include the forwardconnector as an EDOT collector component.
       description: https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector
       component: elastic-agent
       pr:

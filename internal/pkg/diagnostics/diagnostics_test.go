@@ -542,6 +542,35 @@ func TestZipArchiveUnitDirSkip(t *testing.T) {
 	}
 }
 
+func TestZipArchiveComponentStreamSubdir(t *testing.T) {
+	topPath := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data"), 0o700))
+
+	compDiags := []client.DiagnosticComponentResult{{
+		ComponentID: "filestream-default",
+		Results: []client.DiagnosticFileResult{
+			{Filename: "stream-a/beat_metrics.json", ContentType: "application/json", Content: []byte(`{"a":1}`)},
+			{Filename: "stream-b/beat_metrics.json", ContentType: "application/json", Content: []byte(`{"b":2}`)},
+			{Filename: "system-cpu/input_metrics.json", ContentType: "application/json", Content: []byte(`{"c":3}`)},
+		},
+	}}
+
+	buf := new(bytes.Buffer)
+	err := ZipArchive(io.Discard, buf, topPath, nil, nil, compDiags, true)
+	require.NoError(t, err)
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+
+	var paths []string
+	for _, f := range r.File {
+		paths = append(paths, f.Name)
+	}
+	assert.Contains(t, paths, "components/filestream-default/stream-a/beat_metrics.json")
+	assert.Contains(t, paths, "components/filestream-default/stream-b/beat_metrics.json")
+	assert.Contains(t, paths, "components/filestream-default/system-cpu/input_metrics.json")
+}
+
 func TestZipLogs(t *testing.T) {
 	topPath := t.TempDir()
 	dir := filepath.Join(paths.HomeFrom(topPath), "logs", "sub-dir")

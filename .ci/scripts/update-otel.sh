@@ -18,18 +18,64 @@ next_stable_core=${2:-}
 
 next_contrib=${3:-$next_beta_core}
 
+# Issue GitHub API requests, using GITHUB_TOKEN for authentication if available.
+curl_github() {
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" "$@"
+  else
+    curl -sf "$@"
+  fi
+}
+
+# Build a module→version map from the otelcol-contrib manifest for $next_contrib.
+# Packages that have graduated to v1.x appear in the manifest with their actual
+# v1.x version rather than the v0.x $next_contrib, so the manifest is the
+# authoritative source of truth per-package.
+declare -A contrib_manifest_versions
+echo "=> Fetching otelcol-contrib manifest for ${next_contrib}"
+manifest_url="https://raw.githubusercontent.com/open-telemetry/opentelemetry-collector-releases/${next_contrib}/distributions/otelcol-contrib/manifest.yaml"
+if manifest=$(curl_github "$manifest_url" 2>/dev/null); then
+  while IFS= read -r line; do
+    line="${line#"${line%%[![:space:]]*}"}"  # ltrim
+    if [[ "$line" == "- gomod: "* ]]; then
+      gomod="${line#- gomod: }"
+      module="${gomod% *}"
+      version="${gomod##* }"
+      contrib_manifest_versions["$module"]="$version"
+    fi
+  done <<< "$manifest"
+  echo "=> Loaded ${#contrib_manifest_versions[@]} entries from manifest"
+else
+  echo "Warning: could not fetch otelcol-contrib manifest for ${next_contrib}; falling back to uniform ${next_contrib} for all contrib packages"
+fi
+
 GOMOD_FILES=("internal/edot/go.mod" "go.mod")
 
 for gomod_file in "${GOMOD_FILES[@]}"; do
   echo "=> Updating core to $next_beta_core/$next_stable_core in $gomod_file"
-  echo "=> Updating contrib to $next_contrib in $gomod_file"
 
-  # Rewrite every collector/contrib line to the target version regardless of its current value (release or pseudo-version).
+  # Rewrite every collector core line to the target version regardless of its current value (release or pseudo-version).
   # `replace` directives (lines containing `=>`) are left alone so deliberate pins are preserved.
   sed -i.bak -E "/=>/!s|(go\\.opentelemetry\\.io/collector[^[:space:]]*) v0\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_beta_core|" "$gomod_file"
   sed -i.bak -E "/=>/!s|(go\\.opentelemetry\\.io/collector[^[:space:]]*) v1\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_stable_core|" "$gomod_file"
-  sed -i.bak -E "/=>/!s|(github\\.com/open-telemetry/opentelemetry-collector-contrib/[^[:space:]]*) v[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.+-]*)?|\\1 $next_contrib|" "$gomod_file"
   rm "${gomod_file}.bak"
+
+  echo "=> Updating contrib to ${next_contrib} (manifest-based) in $gomod_file"
+
+  # Update each contrib package individually using the manifest version when
+  # available, falling back to $next_contrib for packages not in the manifest.
+  while IFS=' ' read -r module_path current_version; do
+    [[ "$current_version" == *"=>"* ]] && continue  # skip replace directives
+    target_version="${contrib_manifest_versions[$module_path]:-$next_contrib}"
+    if [[ "$current_version" == "$target_version" ]]; then
+      continue
+    fi
+    # Escape special sed characters in module path and version strings.
+    escaped_module=$(printf '%s' "$module_path" | sed 's/[.[\*^$\/]/\\&/g')
+    escaped_current=$(printf '%s' "$current_version" | sed 's/[.[\*^$\/]/\\&/g')
+    sed -i.bak "s|${escaped_module} ${escaped_current}|${module_path} ${target_version}|g" "$gomod_file"
+    rm "${gomod_file}.bak"
+  done < <(\grep -v '=>' "$gomod_file" | \grep 'github\.com/open-telemetry/opentelemetry-collector-contrib/' | awk '{print $1, $2}')
 done
 
 # Update elastic/opentelemetry-collector-components in internal/edot/go.mod.
@@ -47,15 +93,6 @@ if grep -q 'github\.com/elastic/opentelemetry-collector-components/' "$EDOT_GOMO
     echo "Error: jq is required to look up elastic/opentelemetry-collector-components versions" >&2
     exit 6
   fi
-
-  # Issue GitHub API requests, using GITHUB_TOKEN for authentication if available.
-  curl_github() {
-    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
-      curl -sf -H "Authorization: Bearer $GITHUB_TOKEN" "$@"
-    else
-      curl -sf "$@"
-    fi
-  }
 
   echo "=> Fetching tags from elastic/opentelemetry-collector-components"
   elastic_components_tags=""
@@ -111,9 +148,14 @@ if grep -q 'github\.com/elastic/opentelemetry-collector-components/' "$EDOT_GOMO
           return 0
         fi
       done <<< "$module_tags"
+      # Module has module-specific tags but none match — do not fall back to
+      # repo-level tags. Repo-level tags produce versions the Go module proxy
+      # cannot resolve for modules that have ever used module-specific tagging.
+      echo "Warning: ${module_subpath} has module-specific tags but none are compatible with OTel ${target_beta}/${target_stable}; keeping current version" >&2
+      return 1
     fi
 
-    # Fall back to repo-level tags (vX.Y.Z without a subpath prefix)
+    # No module-specific tags exist — fall back to repo-level tags (vX.Y.Z).
     local repo_tags
     repo_tags=$(echo "$elastic_components_tags" | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -rV)
 
@@ -140,8 +182,8 @@ if grep -q 'github\.com/elastic/opentelemetry-collector-components/' "$EDOT_GOMO
 
     if ! new_version=$(find_elastic_components_version \
         "$module_subpath" "$next_beta_core" "$next_stable_core"); then
-      echo "Error: could not find a compatible version for ${module_subpath}" >&2
-      exit 8
+      echo "Warning: could not find a compatible version for ${module_subpath}; keeping current version" >&2
+      continue
     fi
 
     if [[ "$old_version" == "$new_version" ]]; then

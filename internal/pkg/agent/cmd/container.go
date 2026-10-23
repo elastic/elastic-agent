@@ -150,6 +150,7 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_FLEET_PASSWORD - Kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
   KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
+  ELASTIC_AGENT_HOSTNAME - override the hostname reported by Elastic Agent and supported supervised Beat workloads (Cloudbeat unaffected)
 
 * Beats Receivers
   The following experimental environment variables can be set to enable using Beats Receivers.
@@ -166,7 +167,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(streams); err != nil && !errors.Is(err, context.Canceled) {
 				logError(streams, err)
 				os.Exit(1)
 			}

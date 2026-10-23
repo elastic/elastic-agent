@@ -9,8 +9,6 @@ package components
 import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 
-	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
-	kafkareceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/kafkareceiver"
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 
 	osqreceiver "github.com/elastic/beats/v7/x-pack/osquerybeat/osqreceiver"
@@ -21,16 +19,15 @@ import (
 )
 
 func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
-	return append(receivers,
-		kafkareceiver.NewFactory(),
+	receivers = append(receivers,
 		prometheusreceiver.NewFactory(),
 		osqreceiver.NewFactoryWithSettings(osqreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 		pbreceiver.NewFactoryWithSettings(pbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 	)
+
+	return receivers
 }
 
 func addNonFipsExporters(exporters []exporter.Factory) []exporter.Factory {
-	return append(exporters,
-		kafkaexporter.NewFactory(),
-	)
+	return exporters
 }

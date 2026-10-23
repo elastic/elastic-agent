@@ -1,0 +1,7 @@
+kubernetes:
+  enabled: true
+
+agent:
+  unprivileged: false
+  openshift:
+    enabled: true

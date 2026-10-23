@@ -8,10 +8,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
-	"github.com/jaypipes/ghw"
-	"github.com/jaypipes/ghw/pkg/block"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,52 +18,6 @@ import (
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
-
-func TestHasAllSSDs(t *testing.T) {
-	cases := map[string]struct {
-		block    ghw.BlockInfo
-		expected bool
-	}{
-		"no_ssds": {
-			block: ghw.BlockInfo{Disks: []*block.Disk{
-				{DriveType: ghw.DRIVE_TYPE_HDD},
-				{DriveType: ghw.DRIVE_TYPE_ODD},
-				{DriveType: ghw.DRIVE_TYPE_FDD},
-			}},
-			expected: false,
-		},
-		"some_ssds": {
-			block: ghw.BlockInfo{Disks: []*block.Disk{
-				{DriveType: ghw.DRIVE_TYPE_SSD},
-				{DriveType: ghw.DRIVE_TYPE_HDD},
-				{DriveType: ghw.DRIVE_TYPE_ODD},
-				{DriveType: ghw.DRIVE_TYPE_FDD},
-			}},
-			expected: false,
-		},
-		"all_ssds": {
-			block: ghw.BlockInfo{Disks: []*block.Disk{
-				{DriveType: ghw.DRIVE_TYPE_SSD},
-				{DriveType: ghw.DRIVE_TYPE_SSD},
-				{DriveType: ghw.DRIVE_TYPE_SSD},
-			}},
-			expected: true,
-		},
-		"unknown": {
-			block: ghw.BlockInfo{Disks: []*block.Disk{
-				{DriveType: ghw.DRIVE_TYPE_UNKNOWN},
-			}},
-			expected: false,
-		},
-	}
-
-	for name, test := range cases {
-		t.Run(name, func(t *testing.T) {
-			actual := hasAllSSDs(test.block)
-			require.Equal(t, test.expected, actual)
-		})
-	}
-}
 
 func TestUnprivilegedUser(t *testing.T) {
 	testCases := []struct {
@@ -218,6 +171,47 @@ func TestCopyFiles(t *testing.T) {
 		})
 	}
 
+}
+
+// BenchmarkCopyFiles measures copyFiles throughput at several concurrency levels
+// against a real agent package so we can pick a concurrency value that is fast
+// on the hardware that actually matters (bare-metal SSDs, VMs, CI workers).
+//
+// Usage:
+//
+//	AGENT_PACKAGE_DIR=/path/to/extracted-agent go test -run=^$ -bench=BenchmarkCopyFiles \
+//	    -benchtime=3x ./internal/pkg/agent/install/
+//
+// AGENT_PACKAGE_DIR must point to an already-extracted agent package directory
+// (the directory that contains manifest.yaml).  Build one with:
+//
+//	EXTERNAL=true PACKAGES=tar.gz mage package
+//	tar -xzf build/distributions/elastic-agent-*.tar.gz -C /tmp/agent-pkg --strip-components=1
+func BenchmarkCopyFiles(b *testing.B) {
+	srcDir := os.Getenv("AGENT_PACKAGE_DIR")
+	if srcDir == "" {
+		b.Skip("AGENT_PACKAGE_DIR not set; point it at an extracted agent package directory")
+	}
+
+	manifest, err := readPackageManifest(srcDir)
+	if err != nil {
+		b.Fatalf("reading package manifest from %s: %v", srcDir, err)
+	}
+
+	concurrencies := []int{1, 2, 4, runtime.NumCPU(), runtime.NumCPU() * 4}
+	for _, workers := range concurrencies {
+		b.Run(fmt.Sprintf("workers=%d", workers), func(b *testing.B) {
+			for b.Loop() {
+				b.StopTimer()
+				dst := b.TempDir()
+				b.StartTimer()
+				err := copyFiles(workers, manifest.Package.PathMappings, srcDir, dst, nil)
+				if err != nil {
+					b.Fatalf("copyFiles: %v", err)
+				}
+			}
+		})
+	}
 }
 
 func TestSetupInstallPath(t *testing.T) {

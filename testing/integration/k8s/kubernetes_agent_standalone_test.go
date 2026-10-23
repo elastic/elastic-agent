@@ -21,10 +21,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"helm.sh/helm/v3/pkg/cli/values"
+	"helm.sh/helm/v4/pkg/cli/values"
 
+	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -33,16 +35,22 @@ import (
 	"sigs.k8s.io/e2e-framework/klient"
 	"sigs.k8s.io/e2e-framework/klient/k8s"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
-	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	helmchartcommon "helm.sh/helm/v4/pkg/chart/common"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
+	helmkube "helm.sh/helm/v4/pkg/kube"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/testing/integration"
 )
 
 func TestKubernetesAgentStandaloneKustomize(t *testing.T) {
@@ -843,6 +851,80 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				k8sStepLogstashCheckStatus("app.kubernetes.io/name=logstash-agent", false),
 			},
 		},
+		{
+			name: "helm managed agent hostname override via ELASTIC_AGENT_HOSTNAME env var",
+			steps: []k8sTestStep{
+				k8sStepCreateNamespace(),
+				k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+					"agent": map[string]any{
+						"unprivileged": false,
+						"image": map[string]any{
+							"repository": kCtx.agentImageRepo,
+							"tag":        kCtx.agentImageTag,
+							"pullPolicy": "Never",
+						},
+						"fleet": map[string]any{
+							"enabled": true,
+							"url":     kCtx.enrollParams.FleetURL,
+							"token":   kCtx.enrollParams.EnrollmentToken,
+							"preset":  "perNode",
+						},
+						"presets": map[string]any{
+							"perNode": map[string]any{
+								// hostNetwork: false so the pod hostname is a generated name, not the node name.
+								"hostNetwork": false,
+								// Inject the node name as ELASTIC_AGENT_HOSTNAME via the downward API.
+								"extraEnvs": []any{
+									map[string]any{
+										"name":  "ELASTIC_NETINFO",
+										"value": "false",
+									},
+									map[string]any{
+										"name": "ELASTIC_AGENT_HOSTNAME",
+										"valueFrom": map[string]any{
+											"fieldRef": map[string]any{
+												"fieldPath": "spec.nodeName",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}),
+				k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", nil),
+				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+					// For each agent pod, verify that the Fleet-reported hostname matches
+					// the Kubernetes node the pod is running on.
+					podList := &corev1.PodList{}
+					err := kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
+						opt.LabelSelector = "name=agent-pernode-helm-agent"
+					})
+					require.NoError(t, err, "failed to list perNode agent pods")
+					require.NotEmpty(t, podList.Items)
+					require.Equal(t, schedulableNodeCount, len(podList.Items), "unexpected pod count")
+
+					var stdout, stderr bytes.Buffer
+					for _, pod := range podList.Items {
+						nodeName := pod.Spec.NodeName
+						require.NotEmpty(t, nodeName, "pod %s has no node assigned", pod.Name)
+
+						id, err := k8sGetAgentID(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent")
+						require.NoError(t, err, "failed to get agent ID for pod %s", pod.Name)
+						require.NotEmpty(t, id)
+
+						require.EventuallyWithT(t, func(collect *assert.CollectT) {
+							resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+							assert.NoError(collect, err)
+							if resp != nil {
+								assert.Equal(collect, nodeName, resp.LocalMetadata.Host.Hostname,
+									"agent %s on node %s reported wrong hostname", id, nodeName)
+							}
+						}, 2*time.Minute, 5*time.Second, "agent %s hostname did not match node %s", id, nodeName)
+					}
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -858,6 +940,163 @@ func TestKubernetesAgentHelm(t *testing.T) {
 				step(t, ctx, kCtx, testNamespace)
 			}
 		})
+	}
+}
+
+func TestKubernetesAgentBeatsHostnameOverride(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  false,
+		OS: []define.OS{
+			// Slim images do not contain the Metricbeat process exercised by this test.
+			{Type: define.Kubernetes, DockerVariant: "basic"},
+			{Type: define.Kubernetes, DockerVariant: "wolfi"},
+		},
+		Group: define.Kubernetes,
+	})
+
+	ctx := context.Background() //nolint:forbidigo // ctx is captured by step cleanups and must outlive the test
+	kCtx := k8sGetContext(t, info)
+
+	schedulableNodeCount, err := k8sSchedulableNodeCount(ctx, kCtx)
+	require.NoError(t, err, "error at getting schedulable node count")
+	require.NotZero(t, schedulableNodeCount, "no schedulable Kubernetes nodes found")
+
+	policyUUID := uuid.Must(uuid.NewV4()).String()
+	policyResp, err := info.KibanaClient.CreatePolicy(ctx, kibana.AgentPolicy{
+		ID:          "test-hostname-override-" + policyUUID,
+		Name:        "test-hostname-override-" + policyUUID,
+		Namespace:   "default",
+		Description: "Temporary policy for TestKubernetesAgentBeatsHostnameOverride",
+		Overrides: map[string]interface{}{
+			"agent": map[string]interface{}{
+				"internal": map[string]interface{}{
+					"runtime": map[string]interface{}{
+						"metricbeat": map[string]interface{}{
+							"system/metrics": string(component.ProcessRuntimeManager),
+						},
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err, "failed to create dedicated agent policy")
+	t.Cleanup(func() {
+		if err := info.KibanaClient.DeletePolicy(ctx, policyResp.ID); err != nil {
+			t.Logf("failed to delete agent policy %q: %v", policyResp.ID, err)
+		}
+	})
+
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "system",
+		integration.PreinstalledPackages["system"],
+		filepath.Join("..", "ess", "testdata", "system_integration_setup.json"),
+		uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	require.NoError(t, err, "failed to install System integration")
+
+	enrollToken, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policyResp.ID)
+	require.NoError(t, err, "failed to create enrollment token for dedicated policy")
+
+	namespace := kCtx.getNamespace(t)
+	k8sStepCreateNamespace()(t, ctx, kCtx, namespace)
+	k8sStepHelmDeploy(AgentHelmChartPath, "helm-agent", map[string]any{
+		"agent": map[string]any{
+			"unprivileged": false,
+			"image": map[string]any{
+				"repository": kCtx.agentImageRepo,
+				"tag":        kCtx.agentImageTag,
+				"pullPolicy": "Never",
+			},
+			"fleet": map[string]any{
+				"enabled": true,
+				"url":     kCtx.enrollParams.FleetURL,
+				"token":   enrollToken.APIKey,
+				"preset":  "perNode",
+			},
+			"presets": map[string]any{
+				"perNode": map[string]any{
+					// hostNetwork: false so the pod hostname is a generated name, not the node name.
+					"hostNetwork": false,
+					"extraEnvs": []any{
+						map[string]any{
+							"name":  "ELASTIC_NETINFO",
+							"value": "false",
+						},
+						map[string]any{
+							"name": "ELASTIC_AGENT_HOSTNAME",
+							"valueFrom": map[string]any{
+								"fieldRef": map[string]any{
+									"fieldPath": "spec.nodeName",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	})(t, ctx, kCtx, namespace)
+	k8sStepCheckAgentStatus("name=agent-pernode-helm-agent", schedulableNodeCount, "agent", map[string]bool{
+		"system/metrics": true,
+	})(t, ctx, kCtx, namespace)
+
+	// For each agent pod, verify that both Fleet metadata and Beats-produced
+	// System metrics use the Kubernetes node name.
+	podList := &corev1.PodList{}
+	err = kCtx.client.Resources(namespace).List(ctx, podList, func(opt *metav1.ListOptions) {
+		opt.LabelSelector = "name=agent-pernode-helm-agent"
+	})
+	require.NoError(t, err, "failed to list perNode agent pods")
+	require.NotEmpty(t, podList.Items)
+	require.Equal(t, schedulableNodeCount, len(podList.Items), "unexpected pod count")
+
+	var stdout, stderr bytes.Buffer
+	for _, pod := range podList.Items {
+		nodeName := pod.Spec.NodeName
+		require.NotEmpty(t, nodeName, "pod %s has no node assigned", pod.Name)
+
+		status, err := k8sGetAgentStatus(ctx, kCtx.client, &stdout, &stderr, namespace, pod.Name, "agent")
+		require.NoError(t, err, "failed to get agent status for pod %s", pod.Name)
+		id := status.Info.ID
+		require.NotEmpty(t, id)
+		t.Cleanup(func() {
+			cleanCtx, cancel := context.WithTimeout(context.Background(), time.Minute) //nolint:forbidigo // t.Context() is cancelled at cleanup time
+			defer cancel()
+			if err := fleettools.UnEnrollAgent(cleanCtx, info.KibanaClient, id); err != nil {
+				t.Logf("failed to unenroll agent %q: %v", id, err)
+			}
+		})
+
+		var foundSystemMetrics bool
+		for _, comp := range status.Components {
+			if comp.ID == "system/metrics-default" {
+				foundSystemMetrics = true
+				require.Equal(t, "beat-v2-client", comp.VersionInfo.Name,
+					"System metrics component in pod %s is not running as a Metricbeat process", pod.Name)
+				break
+			}
+		}
+		require.True(t, foundSystemMetrics, "System metrics component not found in pod %s", pod.Name)
+
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			resp, err := kibanaGetAgent(ctx, info.KibanaClient, id)
+			assert.NoError(collect, err)
+			if resp != nil {
+				assert.Equal(collect, nodeName, resp.LocalMetadata.Host.Hostname,
+					"agent %s on node %s reported wrong hostname", id, nodeName)
+			}
+		}, 2*time.Minute, 5*time.Second, "agent %s hostname did not match node %s", id, nodeName)
+
+		docs := integration.FindESDocs(t, func() (estools.Documents, error) {
+			return estools.GetResultsForAgentAndDatastream(ctx, info.ESClient, "system.cpu", id)
+		})
+		for _, doc := range docs.Hits.Hits {
+			host, ok := doc.Source["host"].(map[string]interface{})
+			require.True(t, ok, "system.cpu document for agent %s has no host object", id)
+			hostname, ok := host["name"].(string)
+			require.True(t, ok, "system.cpu document for agent %s has no host.name", id)
+			require.Equal(t, nodeName, hostname,
+				"system.cpu document for agent %s reported the wrong host.name", id)
+		}
 	}
 }
 
@@ -1022,9 +1261,7 @@ func k8sStepCreateNamespace() k8sTestStep {
 
 		t.Cleanup(func() {
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, k8sNamespace)
-			if err != nil {
-				t.Logf("failed to delete namespace: %v", err)
-			}
+			assert.NoError(t, err, "failed to delete namespace")
 		})
 
 		err := k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true}, k8sNamespace)
@@ -1053,7 +1290,12 @@ type k8sKustomizeOverrides struct {
 // to further adjust the k8s objects
 func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverrides, forEachObject func(object k8s.Object)) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		kustomizeYaml, err := os.ReadFile(AgentKustomizePath)
+		kustomizePath := AgentKustomizePath
+		if kCtx.openshift {
+			kustomizePath = AgentKustomizeOpenShiftPath
+		}
+
+		kustomizeYaml, err := os.ReadFile(kustomizePath)
 		require.NoError(t, err, "failed to read kustomize manifest")
 
 		objects, err := testK8s.LoadFromYAML(bufio.NewReader(bytes.NewReader(kustomizeYaml)))
@@ -1133,7 +1375,25 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 					}
 				}
 				pod.Volumes = append(pod.Volumes, overrides.agentPodVolumes...)
-			})
+			},
+		)
+
+		// The overlay ships an SCC that only admits the daemonset as it is. Widen it
+		// for the security context that overrides requests.
+		for _, object := range objects {
+			scc, ok := object.(*securityv1.SecurityContextConstraints)
+			if !ok {
+				continue
+			}
+			if overrides.agentContainerRunUser != nil && *overrides.agentContainerRunUser != 0 {
+				scc.RunAsUser = securityv1.RunAsUserStrategyOptions{Type: securityv1.RunAsUserStrategyRunAsAny}
+			}
+			if len(overrides.agentContainerCapabilitiesAdd) > 0 {
+				allowPrivilegeEscalation := true
+				scc.AllowedCapabilities = overrides.agentContainerCapabilitiesAdd
+				scc.AllowPrivilegeEscalation = &allowPrivilegeEscalation
+			}
+		}
 
 		t.Cleanup(func() {
 			if t.Failed() {
@@ -1141,9 +1401,7 @@ func k8sStepDeployKustomize(containerName string, overrides k8sKustomizeOverride
 			}
 
 			err := k8sDeleteObjects(ctx, kCtx.client, k8sDeleteOpts{wait: true}, objects...)
-			if err != nil {
-				t.Logf("failed to delete objects: %v", err)
-			}
+			assert.NoError(t, err, "failed to delete objects")
 		})
 
 		err = k8sCreateObjects(ctx, kCtx.client, k8sCreateOpts{wait: true, namespace: namespace}, objects...)
@@ -1236,12 +1494,13 @@ func k8sStepHelmUninstall(releaseName string) k8sTestStep {
 		settings.SetNamespace(namespace)
 		actionConfig := &action.Configuration{}
 
-		err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err := actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		uninstallAction := action.NewUninstall(actionConfig)
-		uninstallAction.Wait = true
+		uninstallAction.WaitStrategy = helmkube.LegacyStrategy
+		uninstallAction.Timeout = 2 * time.Minute
+		uninstallAction.DeletionPropagation = "foreground"
 		_, err = uninstallAction.Run(releaseName)
 		require.NoError(t, err, "failed to uninstall helm chart")
 	}
@@ -1257,8 +1516,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		helmChart, err := loader.Load(chartPath)
 		require.NoError(t, err, "failed to load helm chart")
 
-		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		t.Cleanup(func() {
@@ -1267,7 +1525,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 			}
 
 			uninstallAction := action.NewUninstall(actionConfig)
-			uninstallAction.Wait = true
+			uninstallAction.WaitStrategy = helmkube.LegacyStrategy
 			_, _ = uninstallAction.Run(releaseName)
 		})
 
@@ -1277,7 +1535,7 @@ func k8sStepHelmDeploy(chartPath string, releaseName string, values map[string]a
 		installAction.UseReleaseName = true
 		installAction.ReleaseName = releaseName
 		installAction.Timeout = 2 * time.Minute
-		installAction.Wait = true
+		installAction.WaitStrategy = helmkube.LegacyStrategy
 		installAction.WaitForJobs = true
 		_, err = installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to install helm chart")
@@ -1295,33 +1553,33 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 		helmChart, err := loader.Load(chartPath)
 		require.NoError(t, err, "failed to load helm chart")
 
-		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		installAction := action.NewInstall(actionConfig)
 		installAction.Namespace = namespace
 		installAction.ReleaseName = releaseName
 		installAction.UseReleaseName = true
-		// DryRun to create the manifest without installing the chart
-		installAction.DryRun = true
+		// DryRunClient to create the manifest without installing the chart
+		installAction.DryRunStrategy = action.DryRunClient
 		installAction.Replace = true
-		installAction.ClientOnly = true
 		installAction.IncludeCRDs = true
 		installAction.DisableHooks = false
 
-		installAction.KubeVersion = &chartutil.KubeVersion{Version: "1.27.0"}
+		installAction.KubeVersion = &helmchartcommon.KubeVersion{Version: "1.27.0"}
 
-		release, err := installAction.Run(helmChart, values)
+		relResult, err := installAction.Run(helmChart, values)
 		require.NoError(t, err, "failed to render helm chart")
+		rel, ok := relResult.(*releasev1.Release)
+		require.True(t, ok, "unexpected release type: %T", relResult)
 
 		manifestFile, err := os.CreateTemp("", "helm-template-*.yaml")
 		require.NoError(t, err, "failed to create temp manifest file")
 		manifestPath := manifestFile.Name()
-		_, err = manifestFile.WriteString(release.Manifest)
+		_, err = manifestFile.WriteString(rel.Manifest)
 		require.NoError(t, err, "failed to write manifest")
-		for _, hook := range release.Hooks {
-			// Hooks are not included in the release.Manifest, so we need to add them manually
+		for _, hook := range rel.Hooks {
+			// Hooks are not included in the rel.Manifest, so we need to add them manually
 			// to match `helm template` output.
 			_, err = manifestFile.WriteString("\n---\n")
 			require.NoError(t, err, "failed to write hook manifest")
@@ -1340,6 +1598,7 @@ func k8sStepHelmTemplateApply(chartPath string, releaseName string, values map[s
 			delCmd := exec.CommandContext(ctx, "kubectl", "delete", "-f", manifestPath, "--ignore-not-found", "--wait", "--timeout=120s")
 			_ = delCmd.Run()
 		})
+
 		// Use kubectl apply -f to apply the manifest.
 		applyCmd := exec.CommandContext(ctx, "kubectl", "apply", "-f", manifestPath)
 		applyOut, applyErr := applyCmd.CombinedOutput()
@@ -1492,8 +1751,7 @@ func k8sStepHelmUpgrade(chartPath string, releaseName string, values values.Opti
 		helmChart, err := loader.Load(chartPath)
 		require.NoError(t, err, "failed to load helm chart")
 
-		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "",
-			func(format string, v ...interface{}) {})
+		err = actionConfig.Init(settings.RESTClientGetter(), settings.Namespace(), "")
 		require.NoError(t, err, "failed to init helm action config")
 
 		t.Cleanup(func() {
@@ -1502,14 +1760,14 @@ func k8sStepHelmUpgrade(chartPath string, releaseName string, values values.Opti
 			}
 
 			uninstallAction := action.NewUninstall(actionConfig)
-			uninstallAction.Wait = true
+			uninstallAction.WaitStrategy = helmkube.LegacyStrategy
 			_, _ = uninstallAction.Run(releaseName)
 		})
 
 		upgradeAction := action.NewUpgrade(actionConfig)
 		upgradeAction.Namespace = namespace
 		upgradeAction.Timeout = 2 * time.Minute
-		upgradeAction.Wait = true
+		upgradeAction.WaitStrategy = helmkube.LegacyStrategy
 		upgradeAction.WaitForJobs = true
 		_, err = upgradeAction.Run(
 			releaseName, helmChart, mergeValues(t, namespace, values))

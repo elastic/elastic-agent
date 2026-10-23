@@ -19,7 +19,6 @@ type localFetcher struct {
 	dir          string
 	snapshotOnly bool
 	fipsOnly     bool
-	binaryName   string
 }
 
 type LocalFetcherOpt func(f *localFetcher)
@@ -38,18 +37,10 @@ func WithLocalFIPSOnly() LocalFetcherOpt {
 	}
 }
 
-// WithCustomBinaryName sets the binary to a custom name, the default is `elastic-agent`
-func WithCustomBinaryName(name string) LocalFetcherOpt {
-	return func(f *localFetcher) {
-		f.binaryName = name
-	}
-}
-
 // LocalFetcher returns a fetcher that pulls the binary of the Elastic Agent from a local location.
 func LocalFetcher(dir string, opts ...LocalFetcherOpt) Fetcher {
 	f := &localFetcher{
-		dir:        dir,
-		binaryName: "elastic-agent",
+		dir: dir,
 	}
 	for _, o := range opts {
 		o(f)
@@ -75,7 +66,7 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 		return nil, fmt.Errorf("invalid version: %q: %w", ver, err)
 	}
 
-	mainBuildfmt := "%s-%s%s-%s"
+	mainBuildfmt := "elastic-agent-%s%s-%s"
 	if f.snapshotOnly && !ver.IsSnapshot() {
 		if ver.Prerelease() == "" {
 			ver = semver.NewParsedSemVer(ver.Major(), ver.Minor(), ver.Patch(), "SNAPSHOT", ver.BuildMetadata())
@@ -94,10 +85,10 @@ func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architec
 	}
 
 	if ver.IsSnapshot() && !matchesEarlyReleaseVersion {
-		build := fmt.Sprintf(mainBuildfmt, f.binaryName, prefix, ver.VersionWithPrerelease(), suffix)
+		build := fmt.Sprintf(mainBuildfmt, prefix, ver.VersionWithPrerelease(), suffix)
 		buildPath = filepath.Join(ver.BuildMetadata(), build)
 	} else {
-		buildPath = fmt.Sprintf(mainBuildfmt, f.binaryName, prefix, ver.String(), suffix)
+		buildPath = fmt.Sprintf(mainBuildfmt, prefix, ver.String(), suffix)
 	}
 
 	fullPath := filepath.Join(f.dir, buildPath)

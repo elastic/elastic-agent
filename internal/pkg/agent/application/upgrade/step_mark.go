@@ -65,21 +65,29 @@ func (um UpdateMarker) GetActionID() string {
 
 // MarkerActionUpgrade adapter struct compatible with pre 8.3 version of the marker file format
 type MarkerActionUpgrade struct {
-	ActionID   string `yaml:"id"`
-	ActionType string `yaml:"type"`
-	Version    string `yaml:"version"`
-	SourceURI  string `yaml:"source_uri,omitempty"`
+	ActionID   string   `yaml:"id"`
+	ActionType string   `yaml:"type"`
+	Version    string   `yaml:"version"`
+	SourceURI  string   `yaml:"source_uri,omitempty"` // backward compatibility
+	Sources    []string `yaml:"sources,omitempty"`
 }
 
 func convertToMarkerAction(a *fleetapi.ActionUpgrade) *MarkerActionUpgrade {
 	if a == nil {
 		return nil
 	}
+
+	sourceURI := ""
+	if len(a.Data.Sources) > 0 {
+		sourceURI = a.Data.Sources[0]
+	}
+
 	return &MarkerActionUpgrade{
 		ActionID:   a.ActionID,
 		ActionType: a.ActionType,
 		Version:    a.Data.Version,
-		SourceURI:  a.Data.SourceURI,
+		SourceURI:  sourceURI,
+		Sources:    a.Data.Sources,
 	}
 }
 
@@ -87,12 +95,18 @@ func convertToActionUpgrade(a *MarkerActionUpgrade) *fleetapi.ActionUpgrade {
 	if a == nil {
 		return nil
 	}
+
+	sources := a.Sources
+	if len(sources) == 0 && a.SourceURI != "" {
+		sources = []string{a.SourceURI}
+	}
+
 	return &fleetapi.ActionUpgrade{
 		ActionID:   a.ActionID,
 		ActionType: a.ActionType,
 		Data: fleetapi.ActionUpgradeData{
-			Version:   a.Version,
-			SourceURI: a.SourceURI,
+			Version: a.Version,
+			Sources: sources,
 		},
 	}
 }

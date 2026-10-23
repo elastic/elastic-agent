@@ -138,6 +138,9 @@ func TestCommandWithProfileUsesSavedProfile(t *testing.T) {
 	if !slices.Contains(cmd.Env, epProfileEnv+"=saved-profile") {
 		t.Errorf("cmd.Env missing %s=saved-profile; got %v", epProfileEnv, cmd.Env)
 	}
+	if !slices.Contains(cmd.Env, "COMPOSE_ANSI=never") {
+		t.Errorf("cmd.Env missing COMPOSE_ANSI=never; got %v", cmd.Env)
+	}
 }
 
 func TestReadCACert(t *testing.T) {

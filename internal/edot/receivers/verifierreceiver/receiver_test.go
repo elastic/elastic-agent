@@ -38,9 +38,9 @@ func TestReceiver_StartShutdown(t *testing.T) {
 				PolicyName: "AWS Security Monitoring",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate:  "cloudtrail",
+						PolicyTemplate:  "cspm",
 						PackageName:     "aws",
-						PackagePolicyID: "pp-cloudtrail-001",
+						PackagePolicyID: "pp-cspm-001",
 						PackageTitle:    "AWS",
 						Config: map[string]interface{}{
 							"account_id": "123456789012",
@@ -115,7 +115,7 @@ func TestReceiver_StartShutdown(t *testing.T) {
 	// Integration context (Fleet package metadata)
 	policyTemplate, ok := record.Attributes().Get("policy_template")
 	require.True(t, ok)
-	assert.Equal(t, "cloudtrail", policyTemplate.Str())
+	assert.Equal(t, "cspm", policyTemplate.Str())
 
 	packageName, ok := record.Attributes().Get("package.name")
 	require.True(t, ok)
@@ -142,7 +142,7 @@ func TestReceiver_WithoutAWSCredentials(t *testing.T) {
 				PolicyID: "policy-1",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate: "cloudtrail",
+						PolicyTemplate: "cspm",
 						PackageName:    "aws",
 						PackageTitle:   "AWS",
 					},
@@ -253,15 +253,15 @@ func TestReceiver_MultipleIntegrations(t *testing.T) {
 				PolicyID:   "policy-1",
 				PolicyName: "AWS Security",
 				Integrations: []IntegrationConfig{
-					{PolicyTemplate: "cloudtrail", PackageName: "aws"},
-					{PolicyTemplate: "guardduty", PackageName: "aws"},
+					{PolicyTemplate: "cspm", PackageName: "aws"},
+					{PolicyTemplate: "asset_inventory", PackageName: "aws"},
 				},
 			},
 			{
 				PolicyID:   "policy-2",
-				PolicyName: "AWS Storage",
+				PolicyName: "AWS Posture",
 				Integrations: []IntegrationConfig{
-					{PolicyTemplate: "s3", PackageName: "aws"},
+					{PolicyTemplate: "cspm", PackageName: "aws"},
 				},
 			},
 		},
@@ -288,7 +288,7 @@ func TestReceiver_MultipleIntegrations(t *testing.T) {
 	require.NotEmpty(t, logs)
 
 	logRecords := logs[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
-	assert.GreaterOrEqual(t, logRecords.Len(), 10, "expected log records for all integration permissions")
+	assert.Equal(t, 3, logRecords.Len(), "expected one log record per integration permission")
 
 	// Collect unique policy IDs and policy templates
 	policyIDs := make(map[string]bool)
@@ -306,9 +306,8 @@ func TestReceiver_MultipleIntegrations(t *testing.T) {
 
 	assert.True(t, policyIDs["policy-1"])
 	assert.True(t, policyIDs["policy-2"])
-	assert.True(t, policyTemplates["cloudtrail"])
-	assert.True(t, policyTemplates["guardduty"])
-	assert.True(t, policyTemplates["s3"])
+	assert.True(t, policyTemplates["cspm"])
+	assert.True(t, policyTemplates["asset_inventory"])
 }
 
 func TestReceiver_AzureIntegrations(t *testing.T) {
@@ -329,17 +328,17 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 		Policies: []PolicyConfig{
 			{
 				PolicyID:   "policy-azure-1",
-				PolicyName: "Azure Activity Monitoring",
+				PolicyName: "Azure Posture",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate:  "activitylogs",
+						PolicyTemplate:  "cspm",
 						PackageName:     "azure",
-						PackagePolicyID: "pp-activitylogs-001",
+						PackagePolicyID: "pp-cspm-001",
 						PackageTitle:    "Azure",
 						PackageVersion:  "1.5.0",
 					},
 					{
-						PolicyTemplate: "auditlogs",
+						PolicyTemplate: "asset_inventory",
 						PackageName:    "azure",
 						PackageTitle:   "Azure",
 					},
@@ -407,8 +406,8 @@ func TestReceiver_AzureIntegrations(t *testing.T) {
 		}
 	}
 
-	assert.True(t, policyTemplates["activitylogs"], "expected activitylogs policy_template")
-	assert.True(t, policyTemplates["auditlogs"], "expected auditlogs policy_template")
+	assert.True(t, policyTemplates["cspm"], "expected cspm policy_template")
+	assert.True(t, policyTemplates["asset_inventory"], "expected asset_inventory policy_template")
 }
 
 func TestReceiver_GCPIntegrations(t *testing.T) {
@@ -429,22 +428,17 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 		Policies: []PolicyConfig{
 			{
 				PolicyID:   "policy-gcp-1",
-				PolicyName: "GCP Audit Monitoring",
+				PolicyName: "GCP Posture",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate:  "audit",
+						PolicyTemplate:  "cspm",
 						PackageName:     "gcp",
-						PackagePolicyID: "pp-audit-001",
+						PackagePolicyID: "pp-cspm-001",
 						PackageTitle:    "GCP",
 						PackageVersion:  "1.2.0",
 					},
 					{
-						PolicyTemplate: "pubsub",
-						PackageName:    "gcp",
-						PackageTitle:   "GCP",
-					},
-					{
-						PolicyTemplate: "storage",
+						PolicyTemplate: "asset_inventory",
 						PackageName:    "gcp",
 						PackageTitle:   "GCP",
 					},
@@ -500,9 +494,8 @@ func TestReceiver_GCPIntegrations(t *testing.T) {
 		}
 	}
 
-	assert.True(t, policyTemplates["audit"], "expected audit policy_template")
-	assert.True(t, policyTemplates["pubsub"], "expected pubsub policy_template")
-	assert.True(t, policyTemplates["storage"], "expected storage policy_template")
+	assert.True(t, policyTemplates["cspm"], "expected cspm policy_template")
+	assert.True(t, policyTemplates["asset_inventory"], "expected asset_inventory policy_template")
 }
 
 func TestReceiver_MultiProviderIntegrations(t *testing.T) {
@@ -534,12 +527,12 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 		Policies: []PolicyConfig{
 			{
 				PolicyID:   "policy-aws",
-				PolicyName: "AWS Security",
+				PolicyName: "AWS Posture",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate:  "cloudtrail",
+						PolicyTemplate:  "cspm",
 						PackageName:     "aws",
-						PackagePolicyID: "pp-ct-001",
+						PackagePolicyID: "pp-aws-cspm-001",
 						PackageTitle:    "AWS",
 						PackageVersion:  "2.17.0",
 					},
@@ -547,24 +540,24 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 			},
 			{
 				PolicyID:   "policy-azure",
-				PolicyName: "Azure Monitoring",
+				PolicyName: "Azure Assets",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate:  "activitylogs",
+						PolicyTemplate:  "asset_inventory",
 						PackageName:     "azure",
-						PackagePolicyID: "pp-al-001",
+						PackagePolicyID: "pp-azure-ai-001",
 						PackageTitle:    "Azure",
 					},
 				},
 			},
 			{
 				PolicyID:   "policy-gcp",
-				PolicyName: "GCP Audit",
+				PolicyName: "GCP Posture",
 				Integrations: []IntegrationConfig{
 					{
-						PolicyTemplate:  "audit",
+						PolicyTemplate:  "cspm",
 						PackageName:     "gcp",
-						PackagePolicyID: "pp-ga-001",
+						PackagePolicyID: "pp-gcp-cspm-001",
 						PackageTitle:    "GCP",
 					},
 				},
@@ -636,10 +629,8 @@ func TestReceiver_MultiProviderIntegrations(t *testing.T) {
 	assert.True(t, packageNames["azure"])
 	assert.True(t, packageNames["gcp"])
 
-	// Verify all three policy templates
-	assert.True(t, policyTemplates["cloudtrail"])
-	assert.True(t, policyTemplates["activitylogs"])
-	assert.True(t, policyTemplates["audit"])
+	assert.True(t, policyTemplates["cspm"])
+	assert.True(t, policyTemplates["asset_inventory"])
 
 	// Verify all three policies
 	assert.True(t, policyIDs["policy-aws"])
@@ -652,21 +643,16 @@ func TestPermissionRegistry(t *testing.T) {
 	registry := NewPermissionRegistry()
 
 	t.Run("supported integration - no version (latest)", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "")
+		perms := registry.GetPermissions("aws_cspm", "")
 		require.NotNil(t, perms)
 		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-		assert.NotEmpty(t, perms.Permissions)
+		require.Len(t, perms.Permissions, 1)
 
-		actionFound := false
-		for _, p := range perms.Permissions {
-			if p.Action == "cloudtrail:LookupEvents" {
-				actionFound = true
-				assert.True(t, p.Required)
-				assert.Equal(t, MethodAPICall, p.Method)
-				break
-			}
-		}
-		assert.True(t, actionFound, "expected cloudtrail:LookupEvents permission")
+		p := perms.Permissions[0]
+		assert.Equal(t, "arn:aws:iam::aws:policy/SecurityAudit", p.Action)
+		assert.True(t, p.Required)
+		assert.Equal(t, MethodPolicyAttachmentCheck, p.Method)
+		assert.Equal(t, "security_posture", p.Category)
 	})
 
 	t.Run("unsupported integration", func(t *testing.T) {
@@ -675,23 +661,8 @@ func TestPermissionRegistry(t *testing.T) {
 		assert.False(t, registry.IsSupported("unknown_integration"))
 	})
 
-	t.Run("all AWS integrations registered", func(t *testing.T) {
-		awsIntegrations := []string{
-			"aws_cloudtrail",
-			"aws_guardduty",
-			"aws_securityhub",
-			"aws_s3",
-			"aws_ec2",
-			"aws_vpcflow",
-			"aws_waf",
-			"aws_route53",
-			"aws_elb",
-			"aws_cloudfront",
-			"aws_cspm",
-			"aws_asset_inventory",
-		}
-
-		for _, integration := range awsIntegrations {
+	t.Run("AWS integrations registered", func(t *testing.T) {
+		for _, integration := range []string{"aws_cspm", "aws_asset_inventory"} {
 			assert.True(t, registry.IsSupported(integration), "expected %s to be supported", integration)
 			perms := registry.GetPermissions(integration, "")
 			require.NotNil(t, perms, "expected permissions for %s", integration)
@@ -700,15 +671,7 @@ func TestPermissionRegistry(t *testing.T) {
 	})
 
 	t.Run("Azure integrations registered", func(t *testing.T) {
-		azureIntegrations := []string{
-			"azure_activitylogs",
-			"azure_auditlogs",
-			"azure_blob_storage",
-			"azure_cspm",
-			"azure_asset_inventory",
-		}
-
-		for _, integration := range azureIntegrations {
+		for _, integration := range []string{"azure_cspm", "azure_asset_inventory"} {
 			assert.True(t, registry.IsSupported(integration), "expected %s to be supported", integration)
 			perms := registry.GetPermissions(integration, "")
 			require.NotNil(t, perms, "expected permissions for %s", integration)
@@ -717,15 +680,7 @@ func TestPermissionRegistry(t *testing.T) {
 	})
 
 	t.Run("GCP integrations registered", func(t *testing.T) {
-		gcpIntegrations := []string{
-			"gcp_audit",
-			"gcp_storage",
-			"gcp_pubsub",
-			"gcp_cspm",
-			"gcp_asset_inventory",
-		}
-
-		for _, integration := range gcpIntegrations {
+		for _, integration := range []string{"gcp_cspm", "gcp_asset_inventory"} {
 			assert.True(t, registry.IsSupported(integration), "expected %s to be supported", integration)
 			perms := registry.GetPermissions(integration, "")
 			require.NotNil(t, perms, "expected permissions for %s", integration)
@@ -740,80 +695,33 @@ func TestPermissionRegistry(t *testing.T) {
 
 	t.Run("supported integrations by provider", func(t *testing.T) {
 		byProvider := registry.SupportedIntegrationsByProvider()
-		assert.NotEmpty(t, byProvider[verifier.ProviderAWS])
-		assert.NotEmpty(t, byProvider[verifier.ProviderAzure])
-		assert.NotEmpty(t, byProvider[verifier.ProviderGCP])
+		assert.ElementsMatch(t, []string{"aws_cspm", "aws_asset_inventory"}, byProvider[verifier.ProviderAWS])
+		assert.ElementsMatch(t, []string{"azure_cspm", "azure_asset_inventory"}, byProvider[verifier.ProviderAzure])
+		assert.ElementsMatch(t, []string{"gcp_cspm", "gcp_asset_inventory"}, byProvider[verifier.ProviderGCP])
 		// assert.Empty(t, byProvider[verifier.ProviderOkta])
 	})
 
-	// Version-aware permission lookup tests
-	t.Run("cloudtrail v2 - SQS permissions required", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0")
+	t.Run("GCP CSPM requires both roles", func(t *testing.T) {
+		perms := registry.GetPermissions("gcp_cspm", "")
 		require.NotNil(t, perms)
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-
-		// In v2+, sqs:ReceiveMessage and sqs:DeleteMessage should be required
+		actions := make([]string, 0, len(perms.Permissions))
 		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "sqs:ReceiveMessage should be required in v2+")
-			}
-			if p.Action == "sqs:DeleteMessage" {
-				assert.True(t, p.Required, "sqs:DeleteMessage should be required in v2+")
-			}
+			assert.True(t, p.Required)
+			assert.Equal(t, MethodPolicyAttachmentCheck, p.Method)
+			actions = append(actions, p.Action)
 		}
+		assert.ElementsMatch(t, []string{"roles/cloudasset.viewer", "roles/browser"}, actions)
 	})
 
-	t.Run("cloudtrail v1 - SQS permissions optional", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "1.5.0")
-		require.NotNil(t, perms)
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-
-		// In v1.x, sqs:ReceiveMessage and sqs:DeleteMessage should be optional
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.False(t, p.Required, "sqs:ReceiveMessage should be optional in v1.x")
-			}
-			if p.Action == "sqs:DeleteMessage" {
-				assert.False(t, p.Required, "sqs:DeleteMessage should be optional in v1.x")
-			}
-		}
-	})
-
-	t.Run("cloudtrail no version - defaults to latest (v2+)", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "")
-		require.NotNil(t, perms)
-
-		// Should get v2+ permissions (latest)
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "default (latest) should have sqs:ReceiveMessage required")
-			}
-		}
-	})
-
-	t.Run("cloudtrail invalid version - falls back to latest", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "not-a-version")
-		require.NotNil(t, perms)
-		// Should fall back to the first (latest) entry
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "invalid version should fall back to latest")
-			}
-		}
-	})
-
-	t.Run("guardduty with version - matches >=0.0.0", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "3.0.0")
+	t.Run("cspm with version - matches >=0.0.0", func(t *testing.T) {
+		perms := registry.GetPermissions("aws_cspm", "3.0.0")
 		require.NotNil(t, perms)
 		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
 	})
 
 	t.Run("version constraints are returned", func(t *testing.T) {
-		constraints := registry.GetVersionConstraints("aws_cloudtrail")
-		require.NotNil(t, constraints)
-		assert.Len(t, constraints, 2)
-		assert.Equal(t, ">=2.0.0", constraints[0])
-		assert.Equal(t, ">=1.0.0,<2.0.0", constraints[1])
+		constraints := registry.GetVersionConstraints("aws_cspm")
+		assert.Equal(t, []string{">=0.0.0"}, constraints)
 	})
 
 	t.Run("version constraints for unknown integration", func(t *testing.T) {
@@ -821,73 +729,85 @@ func TestPermissionRegistry(t *testing.T) {
 		assert.Nil(t, constraints)
 	})
 
-	// Pre-release version tests: fallback to release constraints
-	t.Run("beta version falls back to release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0-beta1")
-		require.NotNil(t, perms, "2.17.0-beta1 should match via fallback to >=2.0.0")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "beta version should fall back to v2+ permissions")
-			}
-		}
-	})
-
-	t.Run("beta.N version falls back to release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0-beta.2")
-		require.NotNil(t, perms, "2.17.0-beta.2 should match via fallback to >=2.0.0")
-	})
-
 	t.Run("preview version falls back to release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "3.0.0-preview05")
+		perms := registry.GetPermissions("aws_cspm", "3.0.0-preview05")
 		require.NotNil(t, perms, "3.0.0-preview05 should match via fallback to >=0.0.0")
 		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
 	})
 
-	t.Run("rc version falls back to v1 release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "1.5.0-rc1")
-		require.NotNil(t, perms, "1.5.0-rc1 should match via fallback to >=1.0.0,<2.0.0")
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.False(t, p.Required, "rc v1 should get v1 permissions (SQS optional)")
-			}
-		}
-	})
-
-	t.Run("boundary beta version matches release constraint", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.0.0-beta1")
-		require.NotNil(t, perms, "2.0.0-beta1 should match via fallback to >=2.0.0")
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "2.0.0-beta1 should get v2+ permissions")
-			}
-		}
-	})
-
 	t.Run("preview with timestamp suffix", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "2.26.0-preview-1747764883")
+		perms := registry.GetPermissions("azure_cspm", "2.26.0-preview-1747764883")
 		require.NotNil(t, perms, "version with timestamp preview suffix should match")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
-	})
-
-	t.Run("version with build metadata", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_cloudtrail", "2.17.0+build123")
-		require.NotNil(t, perms, "version with build metadata should match >=2.0.0")
-
-		for _, p := range perms.Permissions {
-			if p.Action == "sqs:ReceiveMessage" {
-				assert.True(t, p.Required, "build metadata version should get v2+ permissions")
-			}
-		}
+		assert.Equal(t, verifier.ProviderAzure, perms.Provider)
 	})
 
 	t.Run("0.x version treated as preview", func(t *testing.T) {
-		perms := registry.GetPermissions("aws_guardduty", "0.5.0")
+		perms := registry.GetPermissions("gcp_asset_inventory", "0.5.0")
 		require.NotNil(t, perms, "0.5.0 should match via fallback to >=0.0.0")
-		assert.Equal(t, verifier.ProviderAWS, perms.Provider)
+		assert.Equal(t, verifier.ProviderGCP, perms.Provider)
+	})
+}
+
+func TestPermissionRegistry_VersionRanges(t *testing.T) {
+	registry := &PermissionRegistry{
+		integrations: make(map[string][]VersionedPermissions),
+	}
+
+	// Mirrors a package whose v2 made a previously optional permission required.
+	registry.register("test_versioned", ">=2.0.0", IntegrationPermissions{
+		Provider: verifier.ProviderAWS,
+		Permissions: []Permission{
+			{Action: "test:Read", Required: true, Method: MethodAPICall},
+			{Action: "test:Delete", Required: true, Method: MethodAPICall},
+		},
+	})
+	registry.register("test_versioned", ">=1.0.0,<2.0.0", IntegrationPermissions{
+		Provider: verifier.ProviderAWS,
+		Permissions: []Permission{
+			{Action: "test:Read", Required: true, Method: MethodAPICall},
+			{Action: "test:Delete", Required: false, Method: MethodAPICall},
+		},
+	})
+
+	deleteRequired := func(t *testing.T, perms *IntegrationPermissions) bool {
+		t.Helper()
+		require.NotNil(t, perms)
+		for _, p := range perms.Permissions {
+			if p.Action == "test:Delete" {
+				return p.Required
+			}
+		}
+		require.Fail(t, "test:Delete permission not found")
+		return false
+	}
+
+	tests := []struct {
+		name     string
+		version  string
+		required bool
+	}{
+		{"v2 release", "2.17.0", true},
+		{"v1 release", "1.5.0", false},
+		{"no version defaults to latest", "", true},
+		{"invalid version falls back to latest", "not-a-version", true},
+		{"beta falls back to v2 release constraint", "2.17.0-beta1", true},
+		{"beta.N falls back to v2 release constraint", "2.17.0-beta.2", true},
+		{"rc falls back to v1 release constraint", "1.5.0-rc1", false},
+		{"boundary beta matches v2 release constraint", "2.0.0-beta1", true},
+		{"build metadata matches v2 release constraint", "2.17.0+build123", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.required, deleteRequired(t, registry.GetPermissions("test_versioned", tc.version)))
+		})
+	}
+
+	t.Run("version below all constraints", func(t *testing.T) {
+		assert.Nil(t, registry.GetPermissions("test_versioned", "0.9.0"))
+	})
+
+	t.Run("version constraints are returned in registration order", func(t *testing.T) {
+		assert.Equal(t, []string{">=2.0.0", ">=1.0.0,<2.0.0"}, registry.GetVersionConstraints("test_versioned"))
 	})
 }
 

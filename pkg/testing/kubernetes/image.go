@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -45,8 +46,114 @@ type Endpoint struct {
 	Host string `json:"Host"`
 }
 
-// AddK8STestsToImage compiles and adds the k8s-inner-tests binary to the given image
-func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage string, arch string) (string, error) {
+// NewDockerClient returns an instance of the Docker client. It first checks
+// if there is a current context inside $/.docker/config.json and instantiates
+// a client based on it. Otherwise, it fallbacks to a docker client with values
+// from environment variables.
+func NewDockerClient() (*client.Client, error) {
+
+	envClient := func() (*client.Client, error) {
+		return client.New(client.FromEnv)
+	}
+
+	type DockerConfig struct {
+		CurrentContext string `json:"currentContext"`
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return envClient()
+	}
+
+	configFile := filepath.Join(home, ".docker", "config.json")
+	file, err := os.Open(configFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return envClient()
+		}
+		return nil, err
+	}
+	defer file.Close()
+
+	var config DockerConfig
+	decoder := json.NewDecoder(file)
+	err = decoder.Decode(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	if config.CurrentContext == "" {
+		return envClient()
+	}
+
+	contextDir := filepath.Join(home, ".docker", "contexts", "meta")
+	files, err := os.ReadDir(contextDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return envClient()
+		}
+		return nil, fmt.Errorf("unable to read Docker contexts directory: %w", err)
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			metaFile := filepath.Join(contextDir, f.Name(), "meta.json")
+			if _, err := os.Stat(metaFile); err == nil {
+				var dockerContext DockerContext
+				content, err := os.ReadFile(metaFile)
+				if err != nil {
+					return nil, fmt.Errorf("unable to read Docker context meta file: %w", err)
+				}
+				if err := json.Unmarshal(content, &dockerContext); err != nil {
+					return nil, fmt.Errorf("unable to parse Docker context meta file: %w", err)
+				}
+				if dockerContext.Name != config.CurrentContext {
+					continue
+				}
+
+				endpoint, ok := dockerContext.Endpoints["docker"]
+				if !ok {
+					return nil, fmt.Errorf("docker endpoint not found in context")
+				}
+
+				return client.New(
+					client.WithHost(endpoint.Host),
+				)
+			}
+		}
+	}
+
+	return envClient()
+}
+
+// FindVariantImage returns the image the Docker daemon holds for the given variant.
+func FindVariantImage(ctx context.Context, cli *client.Client, variant string, version string, arch string) (string, error) {
+	repo, err := variantRepository(variant)
+	if err != nil {
+		return "", err
+	}
+
+	candidates := []string{
+		fmt.Sprintf("%s:%s", repo, version),
+		fmt.Sprintf("%s:%s-%s", repo, version, arch),
+	}
+
+	for _, candidate := range candidates {
+		if _, err := cli.ImageInspect(ctx, candidate); err != nil {
+			if cerrdefs.IsNotFound(err) {
+				continue
+			}
+			return "", fmt.Errorf("inspecting image %s: %w", candidate, err)
+		}
+		return candidate, nil
+	}
+
+	return "", fmt.Errorf("no image found for variant %s at version %s", variant, version)
+}
+
+// BuildInnerTestsImage builds an image from the given base image with the
+// k8s-inner-tests binary added.
+func BuildInnerTestsImage(ctx context.Context, logger common.Logger, cli *client.Client, baseImage string, arch string) (string, error) {
 	// compile k8s test with tag kubernetes_inner
 	buildBase, err := filepath.Abs("build")
 	if err != nil {
@@ -69,11 +176,6 @@ func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage str
 	}
 
 	if err := devtools.GoTestBuild(ctx, params); err != nil {
-		return "", err
-	}
-
-	cli, err := getDockerClient()
-	if err != nil {
 		return "", err
 	}
 
@@ -163,82 +265,4 @@ func AddK8STestsToImage(ctx context.Context, logger common.Logger, baseImage str
 	}
 
 	return outputImage, nil
-}
-
-// getDockerClient returns an instance of the Docker client. It first checks
-// if there is a current context inside $/.docker/config.json and instantiates
-// a client based on it. Otherwise, it fallbacks to a docker client with values
-// from environment variables.
-func getDockerClient() (*client.Client, error) {
-
-	envClient := func() (*client.Client, error) {
-		return client.New(client.FromEnv)
-	}
-
-	type DockerConfig struct {
-		CurrentContext string `json:"currentContext"`
-	}
-
-	configFile := filepath.Join(os.Getenv("HOME"), ".docker", "config.json")
-	file, err := os.Open(configFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return envClient()
-		}
-		return nil, err
-	}
-	defer file.Close()
-
-	var config DockerConfig
-	decoder := json.NewDecoder(file)
-	err = decoder.Decode(&config)
-	if err != nil {
-		return nil, err
-	}
-
-	if config.CurrentContext == "" {
-		return envClient()
-	}
-
-	contextDir := filepath.Join(os.Getenv("HOME"), ".docker", "contexts", "meta")
-	files, err := os.ReadDir(contextDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return envClient()
-		}
-		return nil, fmt.Errorf("unable to read Docker contexts directory: %w", err)
-	}
-
-	for _, f := range files {
-		if f.IsDir() {
-			metaFile := filepath.Join(contextDir, f.Name(), "meta.json")
-			if _, err := os.Stat(metaFile); err == nil {
-				if os.IsNotExist(err) {
-					return envClient()
-				}
-				var dockerContext DockerContext
-				content, err := os.ReadFile(metaFile)
-				if err != nil {
-					return nil, fmt.Errorf("unable to read Docker context meta file: %w", err)
-				}
-				if err := json.Unmarshal(content, &dockerContext); err != nil {
-					return nil, fmt.Errorf("unable to parse Docker context meta file: %w", err)
-				}
-				if dockerContext.Name != config.CurrentContext {
-					continue
-				}
-
-				endpoint, ok := dockerContext.Endpoints["docker"]
-				if !ok {
-					return nil, fmt.Errorf("docker endpoint not found in context")
-				}
-
-				return client.New(
-					client.WithHost(endpoint.Host),
-				)
-			}
-		}
-	}
-
-	return envClient()
 }

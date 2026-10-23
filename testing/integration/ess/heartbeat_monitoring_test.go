@@ -108,23 +108,20 @@ func (runner *HeartbeatRunner) SetupSuite() {
 	// Create a Synthetics private location backed by the Fleet policy so that
 	// Kibana can push a heartbeat monitor to the agent via Fleet.
 	locationLabel := fmt.Sprintf("test-location-%s", policyUUID)
-	_, err = createSyntheticsPrivateLocation(ctx, runner.info.KibanaClient, locationLabel, policyResp.ID)
+	locationID, err := createSyntheticsPrivateLocation(ctx, runner.info.KibanaClient, locationLabel, policyResp.ID)
 	require.NoError(t, err)
 
-	// Push one HTTP monitor targeting the local test server.
-	monitors := []syntheticsMonitorSchema{
-		{
-			ID:               "heartbeat-http-monitor-" + policyUUID,
-			Type:             "http",
-			Name:             "Test HTTP Monitor",
-			Enabled:          true,
-			Schedule:         1, // 1-minute polling interval
-			PrivateLocations: []string{locationLabel},
-			URLs:             runner.httpServer.URL,
-		},
-	}
-	projectName := fmt.Sprintf("heartbeat-test-%s", policyUUID)
-	require.NoError(t, bulkPushSyntheticsMonitors(ctx, t, runner.info.KibanaClient, projectName, monitors))
+	// Push one HTTP monitor targeting the local test server via the UI API.
+	// The project API (_bulk_update) is only available in certain Kibana
+	// configurations; the UI API works on all stateful deployments.
+	require.NoError(t, createSyntheticsUIMonitor(ctx, runner.info.KibanaClient, map[string]any{
+		"type":              "http",
+		"name":              "heartbeat-http-monitor-" + policyUUID,
+		"enabled":           true,
+		"private_locations": []string{locationID},
+		"schedule":          1,
+		"url":               runner.httpServer.URL,
+	}))
 }
 
 // validateHeartbeatEvents polls Elasticsearch until at least one heartbeat HTTP
@@ -152,6 +149,7 @@ func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context
 			{"exists", "field", "monitor.status"},
 			{"exists", "field", "state.id"},
 			{"exists", "field", "state.started_at"},
+			{"exists", "field", "state.checks"},
 		})
 		query["query"].(map[string]interface{})["bool"].(map[string]interface{})["filter"] = map[string]any{
 			"range": map[string]any{
@@ -171,7 +169,7 @@ func (runner *HeartbeatRunner) validateHeartbeatEvents(t *testing.T, ctx context
 func (runner *HeartbeatRunner) TestBeatsMetrics() {
 	t := runner.T()
 
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 60*time.Minute)
 	defer cancel()
 
 	agentStatus, err := runner.agentFixture.ExecStatus(ctx)
@@ -201,20 +199,7 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		processDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, testStart)
 
 		t.Run("restores monitor state from Elasticsearch after restart", func(t *testing.T) {
-			stateIDBefore := heartbeatStateField(t, processDoc, "state.id")
-			stateStartedAtBefore := heartbeatStateField(t, processDoc, "state.started_at")
-
-			require.NoError(t, runner.agentFixture.ExecRestart(ctx), "could not restart agent")
-			restartedAt := time.Now()
-			require.EventuallyWithT(t, func(collect *assert.CollectT) {
-				assert.NoError(collect, runner.agentFixture.IsHealthy(ctx))
-			}, 2*time.Minute, 5*time.Second, "agent did not become healthy after restart")
-
-			afterRestartDoc := runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, restartedAt)
-			assert.Equal(t, stateIDBefore, heartbeatStateField(t, afterRestartDoc, "state.id"),
-				"Heartbeat should continue the monitor state loaded from Elasticsearch")
-			assert.Equal(t, stateStartedAtBefore, heartbeatStateField(t, afterRestartDoc, "state.started_at"),
-				"Heartbeat should preserve the monitor state start time loaded from Elasticsearch")
+			runner.validateMonitorStateAfterRestart(t, ctx, agentStatus.Info.ID, processDoc)
 		})
 	})
 
@@ -248,6 +233,10 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 		}, 2*time.Minute, 5*time.Second, "heartbeat component should be running as beats receiver")
 
 		otelDoc = runner.validateHeartbeatEvents(t, ctx, agentStatus.Info.ID, otelSince)
+
+		t.Run("restores monitor state from Elasticsearch after restart", func(t *testing.T) {
+			runner.validateMonitorStateAfterRestart(t, ctx, agentStatus.Info.ID, otelDoc)
+		})
 	})
 
 	t.Run("compare", func(t *testing.T) {
@@ -259,11 +248,62 @@ func (runner *HeartbeatRunner) TestBeatsMetrics() {
 	})
 }
 
+func (runner *HeartbeatRunner) validateMonitorStateAfterRestart(
+	t *testing.T,
+	ctx context.Context,
+	agentID string,
+	beforeRestartDoc mapstr.M,
+) {
+	t.Helper()
+
+	stateIDBefore := heartbeatStateField(t, beforeRestartDoc, "state.id")
+	stateStartedAtBefore := heartbeatStateField(t, beforeRestartDoc, "state.started_at")
+	stateChecksBefore := heartbeatStateChecks(t, beforeRestartDoc)
+
+	require.NoError(t, runner.agentFixture.ExecRestart(ctx), "could not restart agent")
+	restartedAt := time.Now()
+	require.EventuallyWithT(
+		t,
+		func(collect *assert.CollectT) {
+			assert.NoError(collect, runner.agentFixture.IsHealthy(ctx))
+		},
+		2*time.Minute, 5*time.Second, "agent did not become healthy after restart")
+
+	afterRestartDoc := runner.validateHeartbeatEvents(t, ctx, agentID, restartedAt)
+
+	assert.Equal(
+		t,
+		stateIDBefore,
+		heartbeatStateField(t, afterRestartDoc, "state.id"),
+		"Heartbeat should continue the monitor state loaded from Elasticsearch",
+	)
+	assert.Equal(
+		t,
+		stateStartedAtBefore,
+		heartbeatStateField(t, afterRestartDoc, "state.started_at"),
+		"Heartbeat should preserve the monitor state start time loaded from Elasticsearch",
+	)
+	assert.Greater(
+		t,
+		heartbeatStateChecks(t, afterRestartDoc),
+		stateChecksBefore,
+		"Heartbeat should continue incrementing the restored monitor state checks",
+	)
+}
+
 func heartbeatStateField(t *testing.T, doc mapstr.M, field string) interface{} {
 	t.Helper()
 	value, err := doc.GetValue(field)
 	require.NoError(t, err, "heartbeat event is missing %s", field)
 	return value
+}
+
+func heartbeatStateChecks(t *testing.T, doc mapstr.M) int {
+	t.Helper()
+	value := heartbeatStateField(t, doc, "state.checks")
+	checks, ok := value.(float64)
+	require.True(t, ok, "heartbeat state.checks has type %T, expected float64", value)
+	return int(checks)
 }
 
 // scheduleMissingErr is the Permanent failure message emitted by the OTel

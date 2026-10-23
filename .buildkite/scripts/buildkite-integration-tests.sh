@@ -70,7 +70,7 @@ if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
 fi
 GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
 set +e
-TEST_BINARY_NAME="elastic-agent" AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
+AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
   gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
 TESTS_EXIT_STATUS=$?
 set -e

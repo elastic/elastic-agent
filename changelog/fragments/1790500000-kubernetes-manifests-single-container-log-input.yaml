@@ -1,0 +1,3 @@
+kind: enhancement
+summary: Use a single glob filestream input for container logs in standalone Kubernetes manifests
+component: elastic-agent

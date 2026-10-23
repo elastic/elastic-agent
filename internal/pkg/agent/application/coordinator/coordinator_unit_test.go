@@ -64,6 +64,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
@@ -693,6 +694,67 @@ inputs:
 	}
 }
 
+func TestCoordinatorPolicyAppliedNotSetOnComponentModelError(t *testing.T) {
+	// PolicyApplied must only become true once a policy has been successfully
+	// turned into a component model. If generateComponentModel fails, callers
+	// relying on PolicyApplied (e.g. the upgrade action handler waiting for
+	// Endpoint to appear) must keep waiting for a usable policy instead of
+	// concluding no component is configured.
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	agentInfo, err := info.NewAgentInfo(t.Context(), false)
+	require.NoError(t, err)
+
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+	coord := &Coordinator{
+		logger: logger,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		runtimeMgr:         &fakeRuntimeManager{},
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		ast:                emptyAST(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
+	}
+
+	// Invalid EQL condition makes generateComponentModel fail.
+	cfg := config.MustNewConfigFrom(`
+inputs:
+  - type: filestream
+    condition: invalidExpression
+`)
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	require.Error(t, coord.componentModelErr)
+	assert.False(t, coord.state.PolicyApplied, "PolicyApplied must stay false when component model generation fails")
+	<-stateChan // drain the Failed state update
+
+	// A subsequent valid policy should succeed and set PolicyApplied.
+	cfg = config.MustNewConfigFrom("")
+	cfgChange = &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.componentModelErr)
+	assert.True(t, coord.state.PolicyApplied, "PolicyApplied must be set once a policy is applied successfully")
+}
+
 func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it generates the right component model and sends it to the
@@ -978,6 +1040,117 @@ service:
 	assert.Empty(t, components, "empty policy should produce empty component model")
 	assert.True(t, otelUpdated, "empty policy should cause otel manager update")
 	assert.Nil(t, otelConfig, "empty policy should cause otel manager to get nil config")
+}
+
+func TestCoordinatorPolicyChangeUpdatesComponentAgentInfo(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	originalValue := features.IncludeTagsInEvents()
+	t.Cleanup(func() {
+		err := features.Apply(config.MustNewConfigFrom(map[string]any{
+			"agent.features.include_tags_in_events.enabled": originalValue,
+		}))
+		require.NoError(t, err)
+	})
+
+	configChan := make(chan ConfigChange, 1)
+	var components []pkgcomponent.Component
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []pkgcomponent.Component) error {
+			components = comp
+			return nil
+		},
+	}
+	coord := &Coordinator{
+		logger:           logp.NewLogger("testing"),
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	newPolicy := func(enabled bool, tags string) *config.Config {
+		return config.MustNewConfigFrom(fmt.Sprintf(`
+agent:
+  features:
+    include_tags_in_events:
+      enabled: %t
+  tags: %s
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`, enabled, tags))
+	}
+
+	// applyPolicy sends the policy and returns the agent info of the component model
+	// that the runtime manager gets.
+	applyPolicy := func(cfg *config.Config) (*proto.AgentInfo, error) {
+		components = nil
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		if !cfgChange.acked {
+			return nil, errors.New("policy change was not acked")
+		}
+		if cfgChange.err != nil {
+			return nil, fmt.Errorf("policy change failed: %w", cfgChange.err)
+		}
+		if len(components) != 1 {
+			return nil, fmt.Errorf("got %d components, want 1", len(components))
+		}
+		if components[0].AgentInfo == nil {
+			return nil, errors.New("component has no agent info")
+		}
+		return components[0].AgentInfo, nil
+	}
+
+	// The steps run in sequence on one coordinator. Each step depends on the previous one.
+	t.Run("sends the tags to the components", func(t *testing.T) {
+		policy := newPolicy(true, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, proto.AgentManagedMode_MANAGED, agentInfo.GetMode())
+		assert.Equal(t, []string{"production"}, agentInfo.GetTags())
+	})
+
+	t.Run("sends a new tag", func(t *testing.T) {
+		policy := newPolicy(true, "[production, team-payments]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"production", "team-payments"}, agentInfo.GetTags())
+	})
+
+	t.Run("clears the tags when the policy has none", func(t *testing.T) {
+		policy := newPolicy(true, "[]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Empty(t, agentInfo.GetTags())
+	})
+
+	t.Run("sends the tags again when they come back", func(t *testing.T) {
+		policy := newPolicy(true, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"production"}, agentInfo.GetTags())
+	})
+
+	t.Run("drops the tags when the feature is off", func(t *testing.T) {
+		policy := newPolicy(false, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Empty(t, agentInfo.GetTags(), "the tags are not sent when include_tags_in_events is off")
+	})
 }
 
 func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t *testing.T) {
@@ -1984,7 +2157,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
+	err := coord.Upgrade(ctx, "1.2.3", nil, nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -2663,7 +2836,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 
@@ -2723,7 +2896,7 @@ func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
 		wg.Done()
 	}()
 
-	err := coord.Upgrade(t.Context(), "", "", nil)
+	err := coord.Upgrade(t.Context(), "", nil, nil)
 	require.Error(t, err)
 	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
 
@@ -2922,6 +3095,58 @@ func TestGetDynamicInputs(t *testing.T) {
 				}, tt.staticVariables)
 				assert.Equal(t, tt.wantDynamic, result["input-1"])
 			})
+		}
+	})
+}
+
+type recordingReExecManager struct {
+	called bool
+}
+
+func (r *recordingReExecManager) ReExec(_ reexec.ShutdownCallbackFn, _ ...string) {
+	r.called = true
+}
+
+func TestCoordinator_Restart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	action := &fleetapi.ActionRestart{ActionID: "r1", ActionType: fleetapi.ActionTypeRestart}
+
+	t.Run("not restartable returns ErrNotRestartable and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			// buffered so SetOverrideState (via ReExec) never blocks without a run loop
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canReExec:         func() bool { return false },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrNotRestartable)
+		assert.False(t, reexecMgr.called, "should not re-exec when not restartable")
+	})
+
+	t.Run("restartable triggers re-exec and override state", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canReExec:         func() bool { return true },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.NoError(t, err)
+		assert.True(t, reexecMgr.called, "should re-exec when restartable")
+
+		select {
+		case os := <-coord.overrideStateChan:
+			require.NotNil(t, os, "restart should set an override state")
+			assert.Equal(t, agentclient.Stopping, os.state)
+		default:
+			t.Fatal("expected an override state to be set")
 		}
 	})
 }

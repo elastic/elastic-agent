@@ -47,7 +47,7 @@ try {
     }
 } finally {
     # ess_down will destroy the ESS stack if this is a BK retry (cluster was created in this step)
-    if ($Env:BUILDKITE_RETRY_COUNT -gt 0) {
+    if ($Env:BUILDKITE_RETRY_COUNT -gt 0 -and $Env:BUILDKITE_RETRY_TYPE -ne "automatic") {
         ess_down
     }
 }

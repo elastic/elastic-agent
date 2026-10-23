@@ -722,8 +722,8 @@ func TestActionDispatcher(t *testing.T) {
 			ActionType:      fleetapi.ActionTypeUpgrade,
 			ActionStartTime: time.Now().Add(1 * time.Hour).Format(time.RFC3339),
 			Data: fleetapi.ActionUpgradeData{
-				Version:   "9.3.0",
-				SourceURI: "https://test-uri.test.com",
+				Version: "9.3.0",
+				Sources: []string{"https://test-uri.test.com"},
 			},
 		}
 
@@ -771,8 +771,8 @@ func TestActionDispatcher(t *testing.T) {
 			ActionID:   "upgrade-action-id",
 			ActionType: fleetapi.ActionTypeUpgrade,
 			Data: fleetapi.ActionUpgradeData{
-				Version:   "9.3.0",
-				SourceURI: "https://test-uri.test.com",
+				Version: "9.3.0",
+				Sources: []string{"https://test-uri.test.com"},
 			},
 		}
 		def.On("Handle",
