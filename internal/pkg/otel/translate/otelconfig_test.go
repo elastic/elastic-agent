@@ -3341,7 +3341,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		component          *component.Component
 		outputQueueConfig  map[string]any
 		expectedError      string
-		expectedReceiverID string // full receiver ID, empty for no-inputs case
+		expectedReceiverID string // full receiver ID; must be non-empty unless expectedError is set
 		expectedBeatName   string
 		verifyBeatConfig   func(t *testing.T, beatConfig map[string]any)
 	}{
@@ -3479,65 +3479,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			expectedBeatName:   "packetbeat",
 		},
 		{
-			name: "component with no input units",
-			component: &component.Component{
-				ID:        "no-inputs-test-id",
-				InputType: "filestream",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "elastic-otel-collector",
-					Spec: component.InputSpec{
-						Name: "filestream",
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:   "output-unit",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-			outputQueueConfig: nil,
-			// No expectedReceiverID - no inputs means no receivers
-		},
-		{
-			name: "input unit with nil config is skipped without panic",
-			component: &component.Component{
-				ID:        "nil-config-test-id",
-				InputType: "filestream",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "elastic-otel-collector",
-					Spec: component.InputSpec{
-						Name: "filestream",
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:     "input-unit",
-						Type:   client.UnitTypeInput,
-						Config: nil,
-					},
-					{
-						ID:   "output-unit",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-			outputQueueConfig: nil,
-			// No expectedReceiverID - nil config input is skipped
-		},
-		{
 			name: "unsupported component type",
 			component: &component.Component{
 				ID:        "unsupported-test-id",
@@ -3565,12 +3506,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.NotNil(t, result)
-
-			// Component with no inputs produces no receivers
-			if tt.expectedReceiverID == "" {
-				assert.Empty(t, result)
-				return
-			}
 
 			// Verify the receiver ID is present
 			assert.Contains(t, result, tt.expectedReceiverID)
@@ -3606,6 +3541,212 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
+<<<<<<< HEAD
+=======
+func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) {
+	newHeartbeatComponent := func(outputType string, singleReceiver bool) *component.Component {
+		return &component.Component{
+			ID:         "heartbeat-auth-test-id",
+			InputType:  "synthetics/http",
+			OutputType: outputType,
+			OutputName: "default",
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "elastic-otel-collector",
+				Spec: component.InputSpec{
+					Name: "synthetics/http",
+					Command: &component.CommandSpec{
+						Args: []string{"heartbeat"},
+					},
+					SingleReceiver: singleReceiver,
+				},
+			},
+			Units: []component.Unit{
+				{
+					ID:   "heartbeat-auth-test-id-unit",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]any{
+						"id":         "test",
+						"use_output": "default",
+						"type":       "synthetics/http",
+						"streams": []any{
+							map[string]any{
+								"id": "http-1",
+								"data_stream": map[string]any{
+									"dataset": "synthetics.http",
+								},
+								"urls":     []any{"https://example.com/one"},
+								"schedule": "@every 5s",
+							},
+							map[string]any{
+								"id": "http-2",
+								"data_stream": map[string]any{
+									"dataset": "synthetics.http",
+								},
+								"urls":     []any{"https://example.com/two"},
+								"schedule": "@every 10s",
+							},
+						},
+					}),
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                string
+		outputType          string
+		singleReceiver      bool
+		expectedReceiverIDs []string
+		expectedAuth        string
+	}{
+		{
+			name:           "elasticsearch per-stream receivers",
+			outputType:     "elasticsearch",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+			expectedAuth: "beatsauth/_agent-component/default",
+		},
+		{
+			name:           "elasticsearch single receiver",
+			outputType:     "elasticsearch",
+			singleReceiver: true,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/single",
+			},
+			expectedAuth: "beatsauth/_agent-component/default",
+		},
+		{
+			name:           "logstash",
+			outputType:     "logstash",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+		},
+		{
+			name:           "kafka",
+			outputType:     "kafka",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(
+				newHeartbeatComponent(tt.outputType, tt.singleReceiver),
+				nil,
+				nil,
+			)
+			require.NoError(t, err, "heartbeat receiver translation must succeed")
+			require.Len(t, result, len(tt.expectedReceiverIDs), "translation must generate the expected receiver count")
+
+			for _, receiverID := range tt.expectedReceiverIDs {
+				require.Contains(t, result, receiverID, "translation must generate receiver %q", receiverID)
+			}
+
+			for receiverID, rawConfig := range result {
+				receiverConfig, ok := rawConfig.(map[string]any)
+				require.True(t, ok, "receiver %q config must be a map", receiverID)
+				if tt.expectedAuth == "" {
+					assert.NotContains(t, receiverConfig, "monitor_state", "receiver %q must omit monitor state for %s output", receiverID, tt.outputType)
+					continue
+				}
+				monitorState, ok := receiverConfig["monitor_state"].(map[string]any)
+				require.True(t, ok, "receiver %q monitor state config must be a map", receiverID)
+				assert.Equal(t, tt.expectedAuth, monitorState["elasticsearch"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
+			}
+		})
+	}
+}
+
+// TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
+// enabled streams (either no input units, or input units with nil config) falls back to
+// a no-op receiver instead of an error, so the pipeline stays valid and the component
+// remains OTel-managed and healthy. The receiver is named after the component.
+func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
+	nopType := otelcomponent.MustNewType(NoEnabledStreamsReceiverType)
+	tests := []struct {
+		name               string
+		component          *component.Component
+		expectedReceiverID otelcomponent.ID
+	}{
+		{
+			name: "component with no input units",
+			component: &component.Component{
+				ID:        "no-inputs-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			expectedReceiverID: GetReceiverID(nopType, "no-inputs-test-id"),
+		},
+		{
+			name: "input unit with nil config",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "nil-config-test-id-input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			expectedReceiverID: GetReceiverID(nopType, "nil-config-test-id"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(tt.component, nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
+		})
+	}
+}
+
+>>>>>>> 519dce2 (fix(otel): fall back to a no-op receiver when a component has no enabled streams (#16900))
 // TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
 // monitor, which compiles into a single synthetics/browser input with a scheduled
 // "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
@@ -3998,7 +4139,9 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
 		{
-			name: "input unit with nil config does not panic",
+			// A unit with nil Config contributes no inputs. The component falls back to
+			// the no-op receiver and remains supported.
+			name: "input unit with nil config is supported",
 			component: &component.Component{
 				ID:         "nil-config-comp",
 				InputType:  "filestream",
@@ -4029,6 +4172,45 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Fleet can compile streams: [] when the input is enabled but all its streams
+			// are disabled. The component falls back to the no-op receiver and remains supported.
+			name: "all streams disabled produces no inputs - supported via no-op receiver",
+			component: &component.Component{
+				ID:         "linux-metrics-default",
+				InputType:  "linux/metrics",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"metricbeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						// Empty streams list: all streams are disabled.
+						ID:   "linux-metrics-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"id":      "linux/metrics-linux-metrics-default",
+							"type":    "linux/metrics",
+							"streams": []any{},
+						}),
+					},
+					{
+						ID:   "linux-metrics-output",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -4036,7 +4218,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			err := VerifyComponentIsOtelSupported(tt.component)
 			if tt.expectedError != "" {
 				require.Error(t, err)
-				assert.Equal(t, err.Error(), tt.expectedError)
+				assert.Equal(t, tt.expectedError, err.Error())
 			} else {
 				require.NoError(t, err)
 			}
