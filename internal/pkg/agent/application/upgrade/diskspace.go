@@ -381,7 +381,7 @@ func readRangeHTTP(ctx context.Context, client *http.Client, uri string, offset,
 				fmt.Errorf("requested byte range %d-%d of %q is out of range", offset, offset+length-1, uri),
 				upgradeErrors.ErrPermanentHTTP)
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
-			http.StatusNotFound, http.StatusGone:
+			http.StatusNotFound, http.StatusGone, http.StatusMethodNotAllowed, http.StatusNotImplemented:
 			return nil, goerrors.Join(err, upgradeErrors.ErrPermanentHTTP)
 		}
 		return nil, err
@@ -449,7 +449,7 @@ func fetchHTTPArchiveSize(ctx context.Context, client *http.Client, uri string) 
 		err := errors.New(fmt.Sprintf("fetching %q returned unsuccessful status code: %d", uri, resp.StatusCode), errors.TypeNetwork, errors.M(errors.MetaKeyURI, uri))
 		switch resp.StatusCode {
 		case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
-			http.StatusNotFound, http.StatusGone:
+			http.StatusNotFound, http.StatusGone, http.StatusMethodNotAllowed, http.StatusNotImplemented:
 			return 0, goerrors.Join(err, upgradeErrors.ErrPermanentHTTP)
 		}
 		return 0, err
