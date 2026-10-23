@@ -54,6 +54,20 @@ func NewEncryptedDiskStore(ctx context.Context, target string, opts ...Encrypted
 	}
 	if !hasRoot {
 		unprivileged = true
+	} else if runtime.GOOS == darwin {
+		// an agent installed with --unprivileged keeps its secret in the file vault instead of the
+		// System keychain, so it must be read from there even when running as root (e.g. sudo inspect)
+		// honour a custom vault path passed through the options
+		probe := &EncryptedDiskStore{vaultPath: paths.AgentVaultPath()}
+		for _, opt := range opts {
+			opt(probe)
+		}
+		unprivileged, err = secret.HasUnprivilegedVault(ctx, vault.WithVaultPath(probe.vaultPath))
+		if err != nil {
+			return nil, fmt.Errorf("error checking for unprivileged vault: %w", err)
+		}
+	}
+	if unprivileged {
 		opts = append([]EncryptedOptionFunc{WithUnprivileged(unprivileged)}, opts...)
 	}
 	s := &EncryptedDiskStore{
@@ -135,7 +149,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 
 	tmpFile := d.target + ".tmp"
 
-	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask) //nolint:gosec // target is the agent store path chosen by the caller, not user input
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
