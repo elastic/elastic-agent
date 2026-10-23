@@ -1570,6 +1570,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 			mgr := &OTelManager{
 				healthCheckExtComponentID: "healthcheckv2/test-uuid",
 				collectorMetricsPort:      8888,
+				hostInfo:                  testHostInfo,
 			}
 			result, err := mgr.buildMergedConfig(t.Context(), cfgUpdate, commonAgentInfo, logptest.NewTestingLogger(t, ""))
 
@@ -1616,6 +1617,7 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	m := &OTelManager{
 		healthCheckExtComponentID: "healthcheckv2/test",
 		collectorMetricsPort:      0,
+		hostInfo:                  testHostInfo,
 	}
 
 	agentInfo := &info.AgentInfo{}
@@ -1729,6 +1731,7 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	m := &OTelManager{
 		healthCheckExtComponentID: "healthcheckv2/test",
 		collectorMetricsPort:      0,
+		hostInfo:                  testHostInfo,
 	}
 
 	collectorCfg := confmap.NewFromStringMap(map[string]any{

@@ -1,0 +1,157 @@
+// Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+// or more contributor license agreements. Licensed under the Elastic License 2.0;
+// you may not use this file except in compliance with the Elastic License 2.0.
+
+package manager
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/confmap"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+)
+
+func testAgentInfo(t *testing.T) *info.MockAgent {
+	agentInfo := info.NewMockAgent(t)
+	agentInfo.EXPECT().AgentID().Return("test-agent-id").Maybe()
+	agentInfo.EXPECT().Version().Return("9.6.0").Maybe()
+	agentInfo.EXPECT().Snapshot().Return(true).Maybe()
+	return agentInfo
+}
+
+func TestInjectAgentMetadataProcessor(t *testing.T) {
+	newCfg := func() *confmap.Conf {
+		return confmap.NewFromStringMap(map[string]any{
+			"receivers": map[string]any{"nop": map[string]any{}},
+			"processors": map[string]any{
+				"batch": map[string]any{},
+			},
+			"exporters": map[string]any{"nop": map[string]any{}},
+			"service": map[string]any{
+				"pipelines": map[string]any{
+					"logs": map[string]any{
+						"receivers": []any{"nop"},
+						"exporters": []any{"nop"},
+					},
+					"logs/with_processors": map[string]any{
+						"receivers":  []any{"nop"},
+						"processors": []any{"batch"},
+						"exporters":  []any{"nop"},
+					},
+					"metrics": map[string]any{
+						"receivers":  []any{"nop"},
+						"processors": []any{"batch"},
+						"exporters":  []any{"nop"},
+					},
+					"logs/typed": map[string]any{
+						"receivers":  []string{"nop"},
+						"processors": []string{"batch"},
+						"exporters":  []string{"nop"},
+					},
+					"traces/foo": map[string]any{
+						"receivers": []any{"nop"},
+						"exporters": []any{"nop"},
+					},
+				},
+			},
+		})
+	}
+	input := newCfg()
+
+	result, err := injectAgentMetadataProcessor(input, testAgentInfo(t), "Test-Host")
+	require.NoError(t, err)
+
+	assert.Equal(t, newCfg().ToStringMap(), input.ToStringMap(), "input config must not be modified")
+
+	assert.Equal(t, []any{agentMetadataProcessorID}, result.Get("service::pipelines::logs::processors"))
+	assert.Equal(t, []any{"batch", agentMetadataProcessorID}, result.Get("service::pipelines::logs/with_processors::processors"))
+	assert.Equal(t, []any{"batch", agentMetadataProcessorID}, result.Get("service::pipelines::logs/typed::processors"))
+	assert.Equal(t, []any{"batch"}, result.Get("service::pipelines::metrics::processors"))
+	assert.False(t, result.IsSet("service::pipelines::traces/foo::processors"))
+
+	assert.True(t, result.IsSet("processors::batch"), "existing processors must be kept")
+	expected := AgentMetadataProcessorConfig(AgentMetadata{
+		ID:       "test-agent-id",
+		Version:  "9.6.0",
+		Snapshot: true,
+		Name:     "Test-Host",
+	})
+	assert.Equal(t, confmap.NewFromStringMap(expected).ToStringMap(),
+		result.Get("processors::"+agentMetadataProcessorID))
+
+	t.Run("idempotent", func(t *testing.T) {
+		again, err := injectAgentMetadataProcessor(result, testAgentInfo(t), "Test-Host")
+		require.NoError(t, err)
+		assert.Equal(t, result.ToStringMap(), again.ToStringMap())
+	})
+}
+
+func TestInjectAgentMetadataProcessorNoHostname(t *testing.T) {
+	agentInfo := info.NewMockAgent(t)
+	agentInfo.EXPECT().AgentID().Return("test-agent-id")
+	agentInfo.EXPECT().Version().Return("9.6.0")
+	agentInfo.EXPECT().Snapshot().Return(false)
+	cfg := confmap.NewFromStringMap(map[string]any{
+		"service": map[string]any{
+			"pipelines": map[string]any{
+				"logs": map[string]any{
+					"receivers": []any{"nop"},
+					"exporters": []any{"nop"},
+				},
+			},
+		},
+	})
+
+	result, err := injectAgentMetadataProcessor(cfg, agentInfo, "")
+	require.NoError(t, err)
+	expected := AgentMetadataProcessorConfig(AgentMetadata{ID: "test-agent-id", Version: "9.6.0"})
+	assert.Equal(t, confmap.NewFromStringMap(expected).ToStringMap(), result.Get("processors::"+agentMetadataProcessorID),
+		"agent.name must be skipped when the hostname is unknown")
+}
+
+func TestInjectAgentMetadataProcessorNoLogsPipelines(t *testing.T) {
+	cfg := confmap.NewFromStringMap(map[string]any{
+		"receivers": map[string]any{"nop": map[string]any{}},
+		"exporters": map[string]any{"nop": map[string]any{}},
+		"service": map[string]any{
+			"pipelines": map[string]any{
+				"metrics": map[string]any{
+					"receivers": []any{"nop"},
+					"exporters": []any{"nop"},
+				},
+			},
+		},
+	})
+
+	result, err := injectAgentMetadataProcessor(cfg, testAgentInfo(t), "Test-Host")
+	require.NoError(t, err)
+	assert.Same(t, cfg, result)
+	assert.False(t, result.IsSet("processors"), "processor must not be defined when no pipeline uses it")
+}
+
+func TestAgentMetadataProcessorConfig(t *testing.T) {
+	cfg := AgentMetadataProcessorConfig(AgentMetadata{
+		ID:      `id-with-"quotes"`,
+		Version: "9.6.0",
+	})
+	all := strings.Join(toStrings(t, cfg), "\n")
+	assert.Contains(t, all, `set(log.body["agent"]["id"], "id-with-\"quotes\"")`)
+	assert.Contains(t, all, `set(log.body["elastic_agent"]["snapshot"], false)`)
+	assert.NotContains(t, all, `["name"]`, "agent.name must be skipped when the name is empty")
+	assert.NotContains(t, all, "resource", "only bodymap log bodies may be modified")
+}
+
+func toStrings(t *testing.T, cfg map[string]any) []string {
+	t.Helper()
+	var out []string
+	for _, group := range cfg["log_statements"].([]any) {
+		for _, s := range group.(map[string]any)["statements"].([]any) {
+			out = append(out, s.(string))
+		}
+	}
+	return out
+}
