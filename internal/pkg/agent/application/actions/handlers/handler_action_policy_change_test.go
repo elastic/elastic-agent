@@ -200,22 +200,12 @@ func TestPolicyAcked(t *testing.T) {
 	})
 }
 
-// TestClientEqual_FieldCoverage guards against the bug class fixed for
-// https://github.com/elastic/elastic-agent/issues/17015: clientEqual compared only
-// a hand-picked subset of remote.Config's fields, so a policy change to a
-// field it didn't know about (TLS/CAs) was treated as "no connectivity
-// change" and silently dropped for already-enrolled agents, even though
-// updateFleetConfig (which clientEqual gates, see validateFleetServerHosts)
-// did know how to apply it.
-//
-// This test enumerates the fields of remote.Config, httpcommon.HTTPTransportSettings,
-// and tlscommon.Config via reflection and fails if one isn't accounted for in
-// either the "covered" list (compared by clientEqual/tlsClientEqual) or the
-// "ignored" list (not read by updateFleetConfig, so a difference wouldn't
-// change what's applied to the live client). If this test fails after adding
-// a field, don't just add it to the ignored list: check whether
-// updateFleetConfig should propagate the new field, and if so, make
-// clientEqual/tlsClientEqual compare it too.
+// TestClientEqual_FieldCoverage fails when a field of remote.Config,
+// httpcommon.HTTPTransportSettings or tlscommon.Config is neither compared by
+// clientEqual/tlsClientEqual nor listed as ignored. Ignored fields are not applied to
+// the live client, so a difference in them is not a connection change. When adding a
+// field, decide which list it belongs to instead of adding it to the ignored list by
+// default.
 func TestClientEqual_FieldCoverage(t *testing.T) {
 	assertFieldsAccountedFor(t, reflect.TypeOf(remote.Config{}),
 		map[string]bool{"Protocol": true, "Path": true, "Host": true, "Hosts": true, "Transport": true},
@@ -697,10 +687,8 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				},
 			},
 			{
-				// Regression test for https://github.com/elastic/elastic-agent/issues/17015:
-				// a CA added to the Fleet Server host via the Fleet UI, without the
-				// Fleet Server hosts list itself changing, must still be applied to
-				// an already-enrolled agent's Fleet client.
+				// A CA added to the Fleet Server host, without the Fleet Server hosts
+				// list changing, is applied to an already-enrolled agent's Fleet client.
 				name: "certificate_authorities change is applied even when Fleet hosts are unchanged",
 				originalCfg: &configuration.Configuration{
 					Fleet: &configuration.FleetAgentConfig{
@@ -779,6 +767,32 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
 						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				// A policy without TLS settings and with the same Fleet host does not
+				// change the connection, so the client is not replaced.
+				name: "certificate_authorities is kept when the policy has none and the host is unchanged",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetNomTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.host": fleetNomTLSServer.URL,
+				},
+				setterCalledCount: 0,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"a policy that does not change the connection must be applied")
 				},
 			},
 			{
@@ -1034,8 +1048,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assert.Equal(t, tc.setterCalledCount, setterCalledCount,
 					"setter was not called")
 				if assert.NotNil(t, h.config.Fleet.Client.Transport.TLS, "TLS settings in fleet client config should not be null") {
-					// CA order is not meaningful: a trust pool is a set, and
-					// updateFleetConfig makes no ordering guarantee.
+					// The order of the CAs is not meaningful.
 					assert.ElementsMatch(t,
 						tc.wantCAs, h.config.Fleet.Client.Transport.TLS.CAs,
 						"unexpected CAs")
@@ -1046,6 +1059,83 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			})
 		}
 	})
+}
+
+func TestTLSClientEqual(t *testing.T) {
+	cert := tlscommon.CertificateConfig{Certificate: "cert", Key: "key"}
+	otherCert := tlscommon.CertificateConfig{Certificate: "other cert", Key: "other key"}
+
+	tcs := []struct {
+		name    string
+		current *tlscommon.Config
+		policy  *tlscommon.Config
+		want    bool
+	}{
+		{name: "both nil", want: true},
+		{
+			name:    "policy without TLS keeps the local CAs and certificate",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			want:    true,
+		},
+		{
+			name:    "policy with empty CAs and certificate keeps the local ones",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			policy:  &tlscommon.Config{},
+			want:    true,
+		},
+		{
+			name:    "policy repeats the local CAs and certificate",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			policy:  &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			want:    true,
+		},
+		{
+			name:    "policy repeats the local certificate and has no CAs",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			policy:  &tlscommon.Config{Certificate: cert},
+			want:    true,
+		},
+		{
+			name:    "same CAs in another order",
+			current: &tlscommon.Config{CAs: []string{"ca1", "ca2"}},
+			policy:  &tlscommon.Config{CAs: []string{"ca2", "ca1"}},
+			want:    true,
+		},
+		{
+			name:   "empty policy TLS block is applied once to an agent without TLS settings",
+			policy: &tlscommon.Config{},
+			want:   false,
+		},
+		{
+			name:   "policy adds CAs to an agent without TLS settings",
+			policy: &tlscommon.Config{CAs: []string{"ca"}},
+			want:   false,
+		},
+		{
+			name:    "policy rotates the CA",
+			current: &tlscommon.Config{CAs: []string{"ca"}},
+			policy:  &tlscommon.Config{CAs: []string{"new ca"}},
+			want:    false,
+		},
+		{
+			name:    "policy adds a CA",
+			current: &tlscommon.Config{CAs: []string{"ca"}},
+			policy:  &tlscommon.Config{CAs: []string{"ca", "new ca"}},
+			want:    false,
+		},
+		{
+			name:    "policy changes the certificate",
+			current: &tlscommon.Config{Certificate: cert},
+			policy:  &tlscommon.Config{Certificate: otherCert},
+			want:    false,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tlsClientEqual(tc.current, tc.policy))
+		})
+	}
 }
 
 type testAcker struct {
