@@ -117,7 +117,7 @@ func defaultRetryOnStatus() []int {
 // order of gigabytes. This ceiling exists purely to put a roof on that.
 //
 // It is deliberately set well above any concurrency the presets reach on a single host
-// (the throughput preset asks for 25,600), so it does not interfere with normal sizing --
+// (the throughput preset asks for 16,000), so it does not interfere with normal sizing --
 // it only engages on large host lists, where it trades some connection utilisation for a
 // bounded footprint. Raising it costs memory roughly linearly; at typical event sizes this
 // value corresponds to on the order of a gigabyte of in-flight events.
@@ -204,8 +204,8 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 			logger.Infof("Applying performance preset '%v': %v", storedPreset, config.DebugString(storedPresetConfig, false))
 		}
 		// num_consumers has no beats equivalent (users never set it) so apply the
-		// same two-per-connection staging model regardless of preset.
-		numConsumers = 2 * maxConns
+		// same one-spare-consumer staging model regardless of preset.
+		numConsumers = maxConns + 1
 		// queue.mem.events is user-configurable in beats and must not be overridden.
 		queueSize = getQueueSize(logger, output)
 		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
@@ -268,7 +268,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 			"queue_size":        queueSize,
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     numConsumers, // two per connection
+			"num_consumers":     numConsumers, // one per connection plus one spare
 		},
 
 		"logs_dynamic_pipeline": map[string]any{
@@ -343,15 +343,15 @@ func calcNamedPresetSizing(maxConns, batchSize, floor int) (queueSize, numConsum
 		// divide-by-zero if config parsing somehow yields an empty value.
 		batchSize = 1
 	}
-	// Two consumers per connection: one sends while the other stages the next
-	// batch, keeping each connection continuously fed without stalling.
-	numConsumers = 2 * maxConns
+	// One consumer per connection plus one spare that stages the next batch
+	// while the others send, keeping every connection continuously fed.
+	numConsumers = maxConns + 1
 	// Two batches per consumer in the queue at any moment so no consumer ever
 	// stalls waiting for the queue to produce the next batch.
 	queueSize = 2 * batchSize * numConsumers
 	if queueSize > maxQueueEvents {
 		// Large host lists would otherwise demand unbounded in-flight events.
-		// Scale back proportionally: halving numConsumers also halves connections,
+		// Scale back proportionally: fewer numConsumers also means fewer connections,
 		// keeping the queue-to-batch ratio constant at the memory ceiling.
 		queueSize = maxQueueEvents
 		numConsumers = max(1, queueSize/(2*batchSize))
@@ -364,7 +364,7 @@ func calcNamedPresetSizing(maxConns, batchSize, floor int) (queueSize, numConsum
 		}
 	} else if floor > queueSize {
 		// The floor is above the formula result but below the memory ceiling.
-		// Only the queue size needs to grow; numConsumers stays at 2*maxConns
+		// Only the queue size needs to grow; numConsumers stays at maxConns+1
 		// because the cap path has not changed it from the connection-model value.
 		queueSize = floor
 	}
