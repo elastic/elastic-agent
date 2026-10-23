@@ -97,6 +97,7 @@ import (
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -258,6 +259,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			elasticsearchexporter.NewFactory(),
 			kafkaexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
+			prometheusremotewriteexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),
 			logstashexporter.NewFactory(),
