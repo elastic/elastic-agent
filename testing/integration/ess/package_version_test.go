@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -99,22 +99,19 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 
 		status, err = f.ExecStatus(ctx)
 		if err != nil {
-			stateBuff.WriteString(fmt.Sprintf("failed to get agent status: %v",
-				err))
+			fmt.Fprintf(&stateBuff, "failed to get agent status: %v", err)
 			return false
 		}
 
-		if client.State(status.State) != client.Healthy {
-			stateBuff.WriteString(fmt.Sprintf(
-				"agent isn't healthy: %s-%s",
-				client.State(status.State), status.Message))
+		if client.State(status.State) != client.Healthy { //nolint:gosec // G115: protobuf int32 cast is safe
+			fmt.Fprintf(&stateBuff, "agent isn't healthy: %s-%s",
+				client.State(status.State), status.Message) //nolint:gosec // G115: protobuf int32 cast is safe
 			return false
 		}
 
 		if len(status.Components) == 0 {
-			stateBuff.WriteString(fmt.Sprintf(
-				"healthy but without components: agent status: %s-%s",
-				client.State(status.State), status.Message))
+			fmt.Fprintf(&stateBuff, "healthy but without components: agent status: %s-%s",
+				client.State(status.State), status.Message)
 			return false
 		}
 
@@ -125,17 +122,15 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		for _, c := range status.Components {
 			bs, err := json.MarshalIndent(status, "", "  ")
 			if err != nil {
-				stateBuff.WriteString(fmt.Sprintf(
-					"%s not healthy, could not marshal status outptu: %v",
-					c.Name, err))
+				fmt.Fprintf(&stateBuff, "%s not healthy, could not marshal status outptu: %v",
+					c.Name, err)
 				return false
 			}
 
-			state := client.State(c.State)
+			state := client.State(c.State) //nolint:gosec // G115: protobuf int32 cast is safe
 			if state != client.Healthy {
-				stateBuff.WriteString(fmt.Sprintf(
-					"%s not health, agent status output: %s",
-					c.Name, bs))
+				fmt.Fprintf(&stateBuff, "%s not health, agent status output: %s",
+					c.Name, bs)
 				return false
 			}
 
@@ -145,9 +140,8 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 			// diagnostics fetch this information in the same way, it guarantees
 			// the version info is up-to-date before proceeding with the test.
 			if c.VersionInfo.Meta.Commit == "" {
-				stateBuff.WriteString(fmt.Sprintf(
-					"%s health, but no versionInfo. agent status output: %s",
-					c.Name, bs))
+				fmt.Fprintf(&stateBuff, "%s health, but no versionInfo. agent status output: %s",
+					c.Name, bs)
 				return false
 			}
 		}
@@ -178,7 +172,7 @@ func TestComponentBuildHashInDiagnostics(t *testing.T) {
 		"glob pattern \"%s\": found %d paths to elastic-otel-collector, can only have 1",
 		glob, len(compPaths))
 
-	cmdVer := exec.Command(compPaths[0], "filebeat", "version")
+	cmdVer := exec.Command(compPaths[0], "filebeat", "version") //nolint:gosec,noctx // path from Glob, no context needed
 	output, err = cmdVer.CombinedOutput()
 	require.NoError(t, err, "failed to get filebeat version")
 	outStr := string(output)

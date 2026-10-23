@@ -16,7 +16,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 )
@@ -67,41 +67,36 @@ func PerformActionExt(ctx context.Context, componentID string, name string, para
 		return nil, fmt.Errorf("failed to marshal action request: %w", err)
 	}
 
-	// backoff.WithContext makes NextBackOff() stop as soon as ctx is done, on
-	// top of ExponentialBackOff's own MaxElapsedTime -- whichever comes first
-	// -- with no extra goroutine needed to bridge ctx into the backoff.
-	expBo := backoff.NewExponentialBackOff(
-		backoff.WithInitialInterval(actionDialRetryInitialInterval),
-		backoff.WithMaxInterval(actionDialRetryMaxInterval),
-		backoff.WithMaxElapsedTime(actionDialRetryMaxTime),
-	)
-	boCtx := backoff.WithContext(expBo, ctx)
+	// backoff.Retry stops as soon as ctx is done or MaxElapsedTime elapses,
+	// whichever comes first, with no extra goroutine needed.
+	expBo := backoff.NewExponentialBackOff()
+	expBo.InitialInterval = actionDialRetryInitialInterval
+	expBo.MaxInterval = actionDialRetryMaxInterval
 
-	resp, err := backoff.RetryNotifyWithData(
-		func() (*http.Response, error) {
-			// The request itself uses ctx, not the retry max time: once connected, a
-			// legitimately long-running action must not be cut short by it.
-			req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/actions", bytes.NewReader(body))
-			if reqErr != nil {
-				return nil, backoff.Permanent(fmt.Errorf("failed to create request: %w", reqErr))
-			}
-			resp, doErr := httpClient.Do(req)
-			if doErr == nil {
-				return resp, nil
-			}
-			if !IsCollectorUnavailable(doErr) {
-				return nil, backoff.Permanent(fmt.Errorf("failed to perform request: %w", doErr))
-			}
-			return nil, fmt.Errorf("failed to perform request: %w", doErr)
-		},
-		boCtx,
-		func(error, time.Duration) {
-			if onDialRetry != nil {
-				onDialRetry()
-			}
-		},
-	)
+	resp, err := backoff.Retry(ctx, func() (*http.Response, error) {
+		// The request itself uses ctx, not the retry max time: once connected, a
+		// legitimately long-running action must not be cut short by it.
+		req, reqErr := http.NewRequestWithContext(ctx, http.MethodPost, "http://localhost/actions", bytes.NewReader(body))
+		if reqErr != nil {
+			return nil, backoff.Permanent(fmt.Errorf("failed to create request: %w", reqErr))
+		}
+		resp, doErr := httpClient.Do(req)
+		if doErr == nil {
+			return resp, nil
+		}
+		if !IsCollectorUnavailable(doErr) {
+			return nil, backoff.Permanent(fmt.Errorf("failed to perform request: %w", doErr))
+		}
+		return nil, fmt.Errorf("failed to perform request: %w", doErr)
+	}, backoff.WithBackOff(expBo), backoff.WithMaxElapsedTime(actionDialRetryMaxTime), backoff.WithNotify(func(error, time.Duration) {
+		if onDialRetry != nil {
+			onDialRetry()
+		}
+	}))
 	if err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return nil, re.LastErr
+		}
 		return nil, err
 	}
 	defer resp.Body.Close()

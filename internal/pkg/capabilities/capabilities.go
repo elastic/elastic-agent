@@ -10,7 +10,7 @@ import (
 	"io/fs"
 	"os"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
