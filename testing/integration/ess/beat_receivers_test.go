@@ -795,8 +795,7 @@ agent.monitoring.enabled: false
 				RuntimeExperimental: string(component.ProcessRuntimeManager),
 				OutputURL:           mockESURL.String(),
 			}))
-	processConfig := bytes.Clone(configBuffer.Bytes())
-	configBuffer.Reset()
+	processConfig := configBuffer.Bytes()
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
@@ -1372,8 +1371,7 @@ agent.monitoring.enabled: false
 			configOptions{
 				RuntimeExperimental: string(component.ProcessRuntimeManager),
 			}))
-	processConfig := bytes.Clone(configBuffer.Bytes())
-	configBuffer.Reset()
+	processConfig := configBuffer.Bytes()
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
