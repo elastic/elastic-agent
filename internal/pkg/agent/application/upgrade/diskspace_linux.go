@@ -28,18 +28,6 @@ func disableCompression(file *os.File) {
 	_ = unix.IoctlSetPointerInt(fd, unix.FS_IOC_SETFLAGS, flags|fsNoCompFl|fsNoCowFl)
 }
 
-func getVolumeNameAt(dir string) (string, error) {
-	info, err := os.Stat(dir)
-	if err != nil {
-		return "", err
-	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return "", fmt.Errorf("could not determine filesystem for %s", dir)
-	}
-	return fmt.Sprint(stat.Dev), nil
-}
-
 func getAvailableDiskSpaceAt(dir string) (uint64, error) {
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(dir, &stat); err != nil {

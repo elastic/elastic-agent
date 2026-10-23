@@ -7,24 +7,11 @@
 package upgrade
 
 import (
-	"fmt"
 	"os"
 	"syscall"
 )
 
 func disableCompression(*os.File) {}
-
-func getVolumeNameAt(dir string) (string, error) {
-	info, err := os.Stat(dir)
-	if err != nil {
-		return "", err
-	}
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return "", fmt.Errorf("could not determine filesystem for %s", dir)
-	}
-	return fmt.Sprint(stat.Dev), nil
-}
 
 func getAvailableDiskSpaceAt(dir string) (uint64, error) {
 	var stat syscall.Statfs_t
