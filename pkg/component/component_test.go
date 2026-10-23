@@ -4558,6 +4558,42 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 	}
 }
 
+func TestToComponentsWithAgentInfo(t *testing.T) {
+	platform := PlatformDetail{Platform: Platform{OS: Linux, Arch: AMD64, GOOS: Linux}}
+	specs, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), platform, SkipBinaryCheck())
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		inputType    string
+		isolateUnits bool
+	}{
+		{name: "input with shared units", inputType: "filestream", isolateUnits: false},
+		{name: "input with isolated units", inputType: "cloudbeat/cis_k8s", isolateUnits: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{"type": "elasticsearch", "enabled": true},
+				},
+				"inputs": []any{
+					map[string]any{"id": "input", "type": tt.inputType, "use_output": "default", "enabled": true},
+				},
+			}
+			agentInfo := &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}}
+
+			got, err := specs.ToComponents(
+				policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil,
+				map[string]uint64{}, map[string]bool{}, WithAgentInfo(agentInfo))
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Equal(t, tt.isolateUnits, got[0].InputSpec.Spec.IsolateUnits)
+			require.Same(t, agentInfo, got[0].AgentInfo)
+		})
+	}
+}
+
 func TestToComponentsWithDynamicInputs(t *testing.T) {
 	linuxAMD64Platform := PlatformDetail{
 		Platform: Platform{
