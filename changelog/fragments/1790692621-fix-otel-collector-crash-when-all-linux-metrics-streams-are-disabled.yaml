@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: fix OTel collector crash when all streams for a component are disabled
+component: elastic-agent
