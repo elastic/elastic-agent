@@ -339,6 +339,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, error: %w", outputName, err)
 	}
+	extensionConfig["endpoints"] = hosts
 
 	// sets extensionCfg
 	extensionCfg = map[string]any{

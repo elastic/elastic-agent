@@ -19,6 +19,7 @@ import (
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
@@ -2852,6 +2853,44 @@ func applyDefaultProcessorFlags(t *testing.T, f features.DefaultProcessors) {
 	})))
 }
 
+func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
+	t.Cleanup(fbfeatures.ReinitForTest)
+	t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "filestream")
+	fbfeatures.ReinitForTest()
+
+	const outputName = "state"
+	model := &component.Model{
+		Components: []component.Component{
+			testFilebeatComp("filestream-state", outputName),
+		},
+	}
+
+	conf, err := GetOtelConfig(model, &info.AgentInfo{}, logp.NewNopLogger())
+	require.NoError(t, err)
+
+	configMap := conf.ToStringMap()
+	extensions := configMap["extensions"].(map[string]any)
+	beatsAuth := extensions["beatsauth/_agent-component/state"].(map[string]any)
+	assert.Equal(t, []string{"http://localhost:9200"}, beatsAuth["endpoints"])
+	assert.Equal(t, map[string]any{
+		"auth": map[string]any{
+			"authenticator": "beatsauth/_agent-component/state",
+		},
+	}, extensions[elasticsearchStateStoreExtensionName])
+
+	service := configMap["service"].(map[string]any)
+	assert.Equal(t, []any{
+		"beatsauth/_agent-component/state",
+		elasticsearchStateStoreExtensionName,
+	}, service["extensions"])
+
+	receivers := configMap["receivers"].(map[string]any)
+	for _, receiver := range receivers {
+		receiverConfig := receiver.(map[string]any)
+		assert.Equal(t, elasticsearchStateStoreExtensionName, receiverConfig["storage"])
+	}
+}
+
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 	filebeatComp := testFilebeatComp("filestream-default", "default")
 
@@ -4292,6 +4331,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 		expectedQueueSettings map[string]any
 		expectedExtensionCfg  map[string]any
 		expectedError         string
+		stateStoreEnabled     bool
 	}{
 		{
 			name:          "error on input unit type",
@@ -4346,6 +4386,39 @@ func TestUnitToExporterConfig(t *testing.T) {
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
+				},
+			},
+		},
+		{
+			name: "Elasticsearch state store uses Beats authenticator",
+			unit: component.Unit{
+				ID:     "filestream-default",
+				Type:   client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{"hosts": []any{"es:9200"}}),
+			},
+			exporterType:      esExporterType,
+			outputName:        "default",
+			stateStoreEnabled: true,
+			expectedExporterCfg: map[string]any{
+				"hosts":      []interface{}{"es:9200"},
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
+				},
+			},
+			expectedQueueSettings: nil,
+			expectedExtensionCfg: map[string]any{
+				"beatsauth/_agent-component/default": map[string]any{
+					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
+					"idle_connection_timeout": "3s",
+					"proxy_disable":           false,
+					"timeout":                 "1m30s",
+				},
+				"elasticsearch_storage": map[string]any{
+					"auth": map[string]any{
+						"authenticator": "beatsauth/_agent-component/default",
+					},
 				},
 			},
 		},
@@ -4652,6 +4725,12 @@ func TestUnitToExporterConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.stateStoreEnabled {
+				t.Cleanup(fbfeatures.ReinitForTest)
+				t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "filestream")
+				fbfeatures.ReinitForTest()
+			}
+
 			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {

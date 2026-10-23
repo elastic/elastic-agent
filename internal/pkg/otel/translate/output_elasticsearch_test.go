@@ -273,13 +273,16 @@ logs_dynamic_pipeline:
 			"hosts":      []any{"es-1:9200", "es-2:9200", "es-3:9200"},
 			"parameters": map[string]any{"somekey": "somevalue"},
 		})
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, extensions, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
-		assert.Equal(t, []string{
+		expectedEndpoints := []string{
 			"http://es-1:9200?somekey=somevalue",
 			"http://es-2:9200?somekey=somevalue",
 			"http://es-3:9200?somekey=somevalue",
-		}, got["endpoints"])
+		}
+		assert.Equal(t, expectedEndpoints, got["endpoints"])
+		beatsAuthConfig := extensions["beatsauth/_agent-component/"].(map[string]any)
+		assert.Equal(t, expectedEndpoints, beatsAuthConfig["endpoints"])
 	})
 
 	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
