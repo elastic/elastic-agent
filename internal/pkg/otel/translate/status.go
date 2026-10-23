@@ -304,6 +304,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		return runtime.ComponentComponentState{}, err
 	}
 
+<<<<<<< HEAD
 	// We either have one receiver and exporter, or none. Multiple receivers or exporters are a logic error.
 	// If there's no receiver or exporter, we simply don't set a status for it.
 	var receiverStatus, exporterStatus *status.AggregateStatus
@@ -311,6 +312,53 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		return runtime.ComponentComponentState{}, fmt.Errorf("expected at most one receiver for component %s, found %d", comp.ID, len(receiverStatuses))
 	} else if len(receiverStatuses) == 1 {
 		receiverStatus = slices.Collect(maps.Values(receiverStatuses))[0]
+=======
+	// A pipeline built with the no-op receiver means the component's policy has no
+	// enabled streams: it collects no data. Only override the message when the pipeline
+	// is otherwise healthy (e.g. not when the exporter side is degraded/failed), so the
+	// message never contradicts the state.
+	noEnabledStreams := false
+	if pipelineState == client.UnitStateHealthy {
+		for receiverOtelID := range receiverStatuses {
+			if receiverOtelID.Type().String() == NoEnabledStreamsReceiverType {
+				noEnabledStreams = true
+				compState.State = client.UnitStateDegraded
+				compState.Message = noEnabledStreamsMessage
+				break
+			}
+		}
+	}
+
+	// Build a map from input ID to receiver status.
+	receiverByInputID := make(map[string]*status.AggregateStatus)
+	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
+		// single_receiver: true means all streams share one receiver named after the
+		// component ID with a placeholder stream suffix. Map every stream's resolved ID to it.
+		singleReceiverName := OtelNamePrefix + comp.ID + "/" + SingleReceiverStreamID
+		for receiverOtelID, rs := range receiverStatuses {
+			if receiverOtelID.Name() != singleReceiverName {
+				continue
+			}
+			for _, u := range comp.Units {
+				if u.Type != client.UnitTypeInput || u.Config == nil {
+					continue
+				}
+				for i, stream := range u.Config.Streams {
+					src := stream.GetSource().AsMap()
+					streamID := resolveStreamID(stream.Id, src, u.ID, i)
+					receiverByInputID[receiverStreamSuffix(comp.ID, u.ID, streamID)] = rs
+				}
+			}
+		}
+	} else {
+		// Default: each receiver is named compID/streamID.
+		receiverPrefix := OtelNamePrefix + comp.ID + "/"
+		for receiverOtelID, rs := range receiverStatuses {
+			if inputID, found := strings.CutPrefix(receiverOtelID.Name(), receiverPrefix); found {
+				receiverByInputID[inputID] = rs
+			}
+		}
+>>>>>>> 519dce2 (fix(otel): fall back to a no-op receiver when a component has no enabled streams (#16900))
 	}
 
 	if len(exporterStatuses) > 1 {
@@ -326,8 +374,21 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		}
 		switch unit.Type {
 		case client.UnitTypeInput:
+<<<<<<< HEAD
 			if receiverStatus != nil {
 				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit)
+=======
+			if noEnabledStreams {
+				// The no-op receiver is not tied to any one unit, so report every input unit
+				// directly. Fleet shows unit statuses but not the component message, so the
+				// message is repeated here to make the reason visible.
+				compState.Units[unitKey] = runtime.ComponentUnitState{
+					State:   client.UnitStateDegraded,
+					Message: noEnabledStreamsMessage,
+				}
+			} else if len(receiverByInputID) > 0 {
+				compState.Units[unitKey] = getComponentUnitState(nil, receiversForUnit(receiverByInputID, unit, &comp), unit, &comp)
+>>>>>>> 519dce2 (fix(otel): fall back to a no-op receiver when a component has no enabled streams (#16900))
 			}
 		case client.UnitTypeOutput:
 			if exporterStatus != nil {
