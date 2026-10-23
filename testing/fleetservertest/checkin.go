@@ -83,7 +83,7 @@ func NewActionWithEmptyPolicyChange(actionID string, data TmplPolicy) (AckableAc
 
 const actionTemplate = `{
       "agent_id": "{{.AgentID}}",
-      "created_at": "2023-05-31T11:37:50.607Z",
+      "created_at": "{{.CreatedAt}}",
       "data": {{.Data}},
       "id": "{{.ActionID}}",
       "input_type": "",
@@ -92,7 +92,15 @@ const actionTemplate = `{
       "expiration": "{{.Expiration}}"
     }`
 
+// defaultActionCreatedAt is used when ActionTmpl.CreatedAt is not set, preserving
+// the historical fixed created_at timestamp for existing callers.
+const defaultActionCreatedAt = "2023-05-31T11:37:50.607Z"
+
 func NewAction(data ActionTmpl) (AckableAction, error) {
+	if data.CreatedAt == "" {
+		data.CreatedAt = defaultActionCreatedAt
+	}
+
 	t := template.Must(template.New("actionTemplate").
 		Parse(actionTemplate))
 
