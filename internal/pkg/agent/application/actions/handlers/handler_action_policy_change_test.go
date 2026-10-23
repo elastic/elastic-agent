@@ -196,6 +196,51 @@ func TestPolicyAcked(t *testing.T) {
 	})
 }
 
+// TestClientEqual_FieldCoverage fails when a field of remote.Config,
+// httpcommon.HTTPTransportSettings or tlscommon.Config is neither compared by
+// clientEqual/tlsClientEqual nor listed as ignored. Ignored fields are not applied to
+// the live client, so a difference in them is not a connection change. When adding a
+// field, decide which list it belongs to instead of adding it to the ignored list by
+// default.
+func TestClientEqual_FieldCoverage(t *testing.T) {
+	assertFieldsAccountedFor(t, reflect.TypeOf(remote.Config{}),
+		map[string]bool{"Protocol": true, "Path": true, "Host": true, "Hosts": true, "Transport": true},
+		map[string]bool{"SpaceID": true, "Headers": true},
+	)
+
+	assertFieldsAccountedFor(t, reflect.TypeOf(httpcommon.HTTPTransportSettings{}),
+		map[string]bool{"TLS": true, "Proxy": true},
+		map[string]bool{"Auth": true, "Timeout": true, "IdleConnTimeout": true},
+	)
+
+	assertFieldsAccountedFor(t, reflect.TypeOf(tlscommon.Config{}),
+		map[string]bool{"Certificate": true, "CAs": true},
+		map[string]bool{
+			"Enabled":              true,
+			"VerificationMode":     true,
+			"Versions":             true,
+			"CipherSuites":         true,
+			"CurveTypes":           true,
+			"Renegotiation":        true,
+			"CASha256":             true,
+			"CATrustedFingerprint": true,
+			"CertificateReload":    true,
+		},
+	)
+}
+
+func assertFieldsAccountedFor(t *testing.T, typ reflect.Type, covered, ignored map[string]bool) {
+	t.Helper()
+	for i := 0; i < typ.NumField(); i++ {
+		name := typ.Field(i).Name
+		if covered[name] || ignored[name] {
+			continue
+		}
+		t.Errorf("%s.%s is neither compared by clientEqual nor explicitly listed as ignored; "+
+			"see TestClientEqual_FieldCoverage", typ.Name(), name)
+	}
+}
+
 func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T) {
 	mockProxy := httptest.NewServer(
 		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -604,6 +649,7 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 		defer fleetNomTLSServer.Close()
 
 		trueVar := true
+		caRotationWantCAs := []string{string(fleetRootPair.Cert), string(wrongRootPair.Cert)}
 		tcs := []struct {
 			name                     string
 			originalCfg              *configuration.Configuration
@@ -634,6 +680,34 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
 						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				// A CA added to the Fleet Server host, without the Fleet Server hosts
+				// list changing, is applied to an already-enrolled agent's Fleet client.
+				name: "certificate_authorities change is applied even when Fleet hosts are unchanged",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetNomTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.host":                        fleetNomTLSServer.URL,
+					"fleet.ssl.enabled":                 true,
+					"fleet.ssl.certificate_authorities": []string{string(fleetRootPair.Cert), string(wrongRootPair.Cert)},
+				},
+				setterCalledCount: 1,
+				wantCAs:           caRotationWantCAs,
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"a CA-only policy change must update the client's trusted CAs even when Fleet hosts are unchanged")
 				},
 			},
 			{
@@ -689,6 +763,32 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assertErr: func(t *testing.T, err error) {
 					assert.NoError(t, err,
 						"unexpected error when applying fleet.ssl.certificate_authorities")
+				},
+			},
+			{
+				// A policy without TLS settings and with the same Fleet host does not
+				// change the connection, so the client is not replaced.
+				name: "certificate_authorities is kept when the policy has none and the host is unchanged",
+				originalCfg: &configuration.Configuration{
+					Fleet: &configuration.FleetAgentConfig{
+						Client: remote.Config{
+							Host: fleetNomTLSServer.URL,
+							Transport: httpcommon.HTTPTransportSettings{
+								TLS: &tlscommon.Config{CAs: []string{string(fleetRootPair.Cert)}},
+							},
+						},
+						AccessAPIKey: "ignore",
+					},
+					Settings: configuration.DefaultSettingsConfig(),
+				},
+				newCfg: map[string]interface{}{
+					"fleet.host": fleetNomTLSServer.URL,
+				},
+				setterCalledCount: 0,
+				wantCAs:           []string{string(fleetRootPair.Cert)},
+				assertErr: func(t *testing.T, err error) {
+					assert.NoError(t, err,
+						"a policy that does not change the connection must be applied")
 				},
 			},
 			{
@@ -944,7 +1044,8 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 				assert.Equal(t, tc.setterCalledCount, setterCalledCount,
 					"setter was not called")
 				if assert.NotNil(t, h.config.Fleet.Client.Transport.TLS, "TLS settings in fleet client config should not be null") {
-					assert.Equal(t,
+					// The order of the CAs is not meaningful.
+					assert.ElementsMatch(t,
 						tc.wantCAs, h.config.Fleet.Client.Transport.TLS.CAs,
 						"unexpected CAs")
 					assert.Equal(t,
@@ -954,6 +1055,83 @@ func TestPolicyChangeHandler_handlePolicyChange_FleetClientSettings(t *testing.T
 			})
 		}
 	})
+}
+
+func TestTLSClientEqual(t *testing.T) {
+	cert := tlscommon.CertificateConfig{Certificate: "cert", Key: "key"}
+	otherCert := tlscommon.CertificateConfig{Certificate: "other cert", Key: "other key"}
+
+	tcs := []struct {
+		name    string
+		current *tlscommon.Config
+		policy  *tlscommon.Config
+		want    bool
+	}{
+		{name: "both nil", want: true},
+		{
+			name:    "policy without TLS keeps the local CAs and certificate",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			want:    true,
+		},
+		{
+			name:    "policy with empty CAs and certificate keeps the local ones",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			policy:  &tlscommon.Config{},
+			want:    true,
+		},
+		{
+			name:    "policy repeats the local CAs and certificate",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			policy:  &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			want:    true,
+		},
+		{
+			name:    "policy repeats the local certificate and has no CAs",
+			current: &tlscommon.Config{CAs: []string{"ca"}, Certificate: cert},
+			policy:  &tlscommon.Config{Certificate: cert},
+			want:    true,
+		},
+		{
+			name:    "same CAs in another order",
+			current: &tlscommon.Config{CAs: []string{"ca1", "ca2"}},
+			policy:  &tlscommon.Config{CAs: []string{"ca2", "ca1"}},
+			want:    true,
+		},
+		{
+			name:   "empty policy TLS block is applied once to an agent without TLS settings",
+			policy: &tlscommon.Config{},
+			want:   false,
+		},
+		{
+			name:   "policy adds CAs to an agent without TLS settings",
+			policy: &tlscommon.Config{CAs: []string{"ca"}},
+			want:   false,
+		},
+		{
+			name:    "policy rotates the CA",
+			current: &tlscommon.Config{CAs: []string{"ca"}},
+			policy:  &tlscommon.Config{CAs: []string{"new ca"}},
+			want:    false,
+		},
+		{
+			name:    "policy adds a CA",
+			current: &tlscommon.Config{CAs: []string{"ca"}},
+			policy:  &tlscommon.Config{CAs: []string{"ca", "new ca"}},
+			want:    false,
+		},
+		{
+			name:    "policy changes the certificate",
+			current: &tlscommon.Config{Certificate: cert},
+			policy:  &tlscommon.Config{Certificate: otherCert},
+			want:    false,
+		},
+	}
+
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tlsClientEqual(tc.current, tc.policy))
+		})
+	}
 }
 
 type testAcker struct {
