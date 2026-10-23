@@ -193,7 +193,7 @@ helm repo update
 helm install [RELEASE_NAME] prometheus-community/kube-state-metrics --namespace <namespace>
 ```
 
-In some cases you need to wait the auto-scheduler to scale up your cluster in order kube-state metrics to install successfully
+In some cases, you need to wait for the auto-scheduler to scale up your cluster in order for kube-state-metrics to install successfully
 
 ```bash=
  >kubectl describe -n elastic-agent pod/kube-state-metrics-7f6f7d4d99-lq965
