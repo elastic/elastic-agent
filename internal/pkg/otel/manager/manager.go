@@ -499,7 +499,12 @@ func (m *OTelManager) buildMergedConfig(
 	// the service::extensions lists so that component-generated extensions (e.g.
 	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
+		// Beat receivers set the agent metadata themselves, so only pipelines from the collector config need it.
+		collectorCfg, err := injectAgentMetadataProcessor(cfgUpdate.collectorCfg, agentInfo, logger)
+		if err != nil {
+			return nil, fmt.Errorf("failed to inject agent metadata processor: %w", err)
+		}
+		if err := mergeWithExtensions(mergedOtelCfg, collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
