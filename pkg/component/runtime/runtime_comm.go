@@ -154,18 +154,6 @@ func (c *runtimeComm) CheckinExpected(
 	expected *proto.CheckinExpected,
 	observed *proto.CheckinObserved,
 ) {
-	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
-		expected.AgentInfo = &proto.AgentInfo{
-			Id:           c.agentInfo.AgentID(),
-			Version:      c.agentInfo.Version(),
-			Snapshot:     c.agentInfo.Snapshot(),
-			Mode:         ProtoAgentMode(c.agentInfo),
-			Unprivileged: c.agentInfo.Unprivileged(),
-		}
-	} else {
-		expected.AgentInfo = nil
-	}
-
 	// we need to determine if the communicator is currently waiting to complete the initial checkin process
 	// and if the given observed message is the same as the one the communicator is waiting for
 	c.initCheckinObservedMx.Lock()
