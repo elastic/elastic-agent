@@ -26,11 +26,9 @@ import (
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -90,7 +88,6 @@ var (
 // Unsupported components are quietly ignored.
 func GetOtelConfig(
 	model *component.Model,
-	info info.Agent,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	components := getSupportedComponents(logger, model)
@@ -101,7 +98,7 @@ func GetOtelConfig(
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -179,7 +176,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger())
+	_, compErr := getCollectorConfigForComponent(comp, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -272,7 +269,6 @@ func GetProcessorID(name string) otelcomponent.ID {
 // Note: Lists are not merged and should be handled by the caller of the method
 func getCollectorConfigForComponent(
 	comp *component.Component,
-	info info.Agent,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -294,7 +290,7 @@ func getCollectorConfigForComponent(
 	}
 	effectiveDefaultProcessors := filterDefaultProcessors(GetDefaultProcessors(comp.BeatName()), effectiveFlags)
 
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, effectiveDefaultProcessors)
+	receiversConfig, err := getReceiversConfigForComponent(comp, outputQueueConfig, effectiveDefaultProcessors)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +390,6 @@ func getCollectorConfigForComponent(
 // pipeline; it is used to strip duplicate per-input processor entries.
 func getReceiversConfigForComponent(
 	comp *component.Component,
-	info info.Agent,
 	outputQueueConfig map[string]any,
 	effectiveDefaultProcessors []map[string]any,
 ) (map[string]any, error) {
@@ -412,7 +407,7 @@ func getReceiversConfigForComponent(
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput && unit.Config != nil {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp, effectiveDefaultProcessors)
+			unitInputs, err := getInputsForUnit(unit, defaultDataStreamType, comp, effectiveDefaultProcessors)
 			if err != nil {
 				return nil, err
 			}
@@ -462,6 +457,11 @@ func getReceiversConfigForComponent(
 
 	if comp.OutputType == "kafka" || comp.OutputType == "logstash" {
 		sharedConfig["include_metadata"] = true
+	}
+	if beatName == "heartbeat" && comp.OutputType == "elasticsearch" {
+		sharedConfig["monitor_state"] = map[string]any{
+			"elasticsearch": getBeatsAuthExtensionID(comp.OutputName).String(),
+		}
 	}
 	if beatName == "filebeat" && fbfeatures.IsElasticsearchStateStoreEnabled() {
 		sharedConfig["storage"] = elasticsearchStateStoreExtensionName
@@ -632,7 +632,18 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 	if !ok {
 		return nil, nil, nil, nil, nil
 	}
-	return unitToExporterConfig(outputUnit, comp.OutputName, exporterType, logger)
+
+	exporterCfg, queueCfg, extensionCfg, processors, err = unitToExporterConfig(
+		outputUnit,
+		comp.OutputName,
+		exporterType,
+		logger,
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	return exporterCfg, queueCfg, extensionCfg, processors, nil
 }
 
 // getSignalForComponent returns the otel signal for the given component. Currently, this is always logs, even for
@@ -784,14 +795,8 @@ func resolveStreamID(streamID string, streamSource map[string]any, unitID string
 	return fmt.Sprintf("%s-%d", unitID, index)
 }
 
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component, effectiveDefaultProcessors []map[string]any) ([]receiverInput, error) {
-	agentInfo := &client.AgentInfo{
-		ID:           info.AgentID(),
-		Version:      info.Version(),
-		Snapshot:     info.Snapshot(),
-		ManagedMode:  runtime.ProtoAgentMode(info),
-		Unprivileged: info.Unprivileged(),
-	}
+func getInputsForUnit(unit component.Unit, defaultDataStreamType string, comp *component.Component, effectiveDefaultProcessors []map[string]any) ([]receiverInput, error) {
+	agentInfo := client.AgentInfoFromProto(comp.AgentInfo)
 	inputs, err := management.CreateInputsFromStreamsForReceiver(unit.Config, defaultDataStreamType, agentInfo)
 	if err != nil {
 		return nil, err
