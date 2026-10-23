@@ -24,6 +24,11 @@ jobs:
         #with:
         #  submodules: true
 
+      - name: Install changelog tool
+        run: |
+          GOBIN=$PWD/bin go install github.com/elastic/elastic-agent-changelog-tool@latest
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
           command: apply --config .ci/updatecli/updatecli-bump-golang.yml --values .ci/updatecli/values.d/scm.yml
