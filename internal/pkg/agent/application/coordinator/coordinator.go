@@ -33,6 +33,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
@@ -2397,8 +2398,7 @@ func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionM
 
 // generateComponentModel regenerates the configuration tree and
 // components from the current AST and vars and returns the result.
-// Called from both the main Coordinator goroutine and from external
-// goroutines via diagnostics hooks.
+// Called only on the main Coordinator goroutine.
 func (c *Coordinator) generateComponentModel() (err error) {
 	ast := c.ast.ShallowClone()
 
@@ -2476,6 +2476,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 		existingCompState,
 		dynamicInputs,
 		component.WithExpectedConfigCache(c.expectedConfigCache),
+		component.WithAgentInfo(c.componentAgentInfo()),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to render components: %w", err)
@@ -2494,6 +2495,22 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	c.checkAndLogUpdate(lastComponentModel)
 
 	return nil
+}
+
+// componentAgentInfo returns the agent info for every component.
+func (c *Coordinator) componentAgentInfo() *proto.AgentInfo {
+	var tags []string
+	if features.IncludeTagsInEvents() {
+		tags = c.agentInfo.GetTags()
+	}
+	return &proto.AgentInfo{
+		Id:           c.agentInfo.AgentID(),
+		Version:      c.agentInfo.Version(),
+		Snapshot:     c.agentInfo.Snapshot(),
+		Mode:         runtime.ProtoAgentMode(c.agentInfo),
+		Unprivileged: c.agentInfo.Unprivileged(),
+		Tags:         tags,
+	}
 }
 
 // compares the last component model with an updated model,
