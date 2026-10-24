@@ -1047,7 +1047,7 @@ func TestCompareStatuses_NilEvent(t *testing.T) {
 		})
 	})
 
-	t.Run("both s1 and s2 have nil Event with empty components", func(t *testing.T) {
+	t.Run("both s1 and s2 have nil Event", func(t *testing.T) {
 		s1 := &status.AggregateStatus{
 			Event:              nil,
 			ComponentStatusMap: make(map[string]*status.AggregateStatus),
@@ -1059,7 +1059,7 @@ func TestCompareStatuses_NilEvent(t *testing.T) {
 
 		assert.NotPanics(t, func() {
 			equal := CompareStatuses(s1, s2)
-			assert.True(t, equal)
+			assert.False(t, equal)
 		})
 	})
 
