@@ -16,8 +16,11 @@ provides a high level overview of the testing framework.
 Go version should be at least the same than the one in [.go-version](https://github.com/elastic/elastic-agent/blob/main/.go-version) file at the root of this repository.
 
 #### GCloud CLI
-The integration testing framework spins up resources in GCP.  To achieve this, it needs the
+The default `gcloud` instance provisioner spins up VMs in GCP. To achieve this, it needs the
 [GCloud CLI](https://cloud.google.com/sdk/gcloud) to be installed on the system where the tests are initiated from.
+
+This is not needed when you select a local instance provisioner (`docker`, `multipass`, `kind`
+or `microshift`) with `INSTANCE_PROVISIONER`.
 
 #### Beats
 The Elastic Agent package that is used for integration tests packages Beats from the beats submodule in this repository. The submodule must be explicitly intialized with `git submodule update --init` on first checkout. The commit of beats packaged and tested in this repository is the commit of
@@ -39,8 +42,11 @@ found.
 
 ### Configuration
 
-ESS (production) API Key to create on <https://cloud.elastic.co/account/keys>
+The `stateful` and `serverless` stack provisioners need an ESS (production) API Key, to create
+on <https://cloud.elastic.co/account/keys>.
 Warning: if you never created a deployment on it, you won't have permission to get this key, so you will need to create one first.
+
+`STACK_PROVISIONER=local` and `STACK_PROVISIONER=external` do not use this key.
 
 #### Setup Serverless deployment
 
@@ -65,11 +71,22 @@ the test Fixture**. If `AGENT_VERSION` isn't set, it'll default to the current
 version without SNAPSHOT.
 
 ### Setup
-One-time setup is required to run any integration and E2E tests. Run
-`mage integration:auth` to perform this setup.
+What you have to set up once depends on where the tests run.
 
-You'll also need to separately authenticate to [Elastic's docker registry][elastic_docker_registry].
-Go to https://docker-auth.elastic.co/ and authenticate with Okta to receive your credentials.
+**Cloud paths.** Run `mage integration:auth`. It authenticates you to GCP, for the VMs the
+`gcloud` instance provisioner creates, and to ESS, for the stack the default `stateful` and the
+`serverless` provisioners create.
+
+**Fully local path.** `mage integration:auth` is not required. The `local` stack provisioner runs
+elastic-package on your machine and `external` reads a stack you are already running, so neither
+needs ESS credentials; the local instance provisioners need no GCP account. See
+[Running the tests](#running-the-tests) for the `STACK_PROVISIONER` and `INSTANCE_PROVISIONER`
+values, and the example under `local` that runs with no cloud account.
+
+Authenticating to [Elastic's docker registry][elastic_docker_registry] is separate from
+`integration:auth`, and applies to any workflow that pulls Elastic images — the `local` stack
+included, because elastic-package pulls the package-registry image. Go to
+https://docker-auth.elastic.co/ and authenticate with Okta to receive your credentials.
 
 [elastic_docker_registry]: docker.elastic.co
 
@@ -377,12 +394,12 @@ This variable takes a comma-separated list of versions and is passed to the remo
 - `TEST_UPGRADE_VERSIONS="9.3.1,9.2.6" mage integration:single TestStandaloneUpgrade` to test upgrading from `9.3.1` and `9.2.6`.
 
 ##### Run Serverless tests
-The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:TestServerless` mage target.
+The test framework includes a smoke test suite to check elastic-agent in a serverless environment. The suite can be run via the `integration:testServerless` mage target.
 
 ##### Run Extended Runtime Leak Test
 The test framework includes a "long running" test to check for resource leaks and stability.
 The runtime of the test can be set via the `LONG_TEST_RUNTIME` environment variable.
-The test itself can be run via the `integration:TestForResourceLeaks` mage target.
+The test itself can be run via the `integration:testForResourceLeaks` mage target.
 
 ##### Limitations
 Due to the way the parameters are passed to `devtools.GoTest` the value of the environment variable
