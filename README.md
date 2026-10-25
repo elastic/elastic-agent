@@ -10,10 +10,17 @@
 
 ## Official Documentation
 
-See https://www.elastic.co/guide/en/fleet/current/index.html.
+See https://www.elastic.co/docs/reference/fleet.
 
-The source files for the official Elastic Agent documentation are currently stored
-in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
+Those source files are not in this repository. Since Elastic Stack 9.0 they live in
+[docs-content](https://github.com/elastic/docs-content/tree/main/reference/fleet); the 8.x and
+earlier content stays in [ingest-docs](https://github.com/elastic/ingest-docs) on its version
+branches.
+
+What this repository does publish is the EDOT Collector reference under
+`docs/reference/edot-collector/` and the release notes under `docs/release-notes/`. Read
+[docs/contributing-docs.md](docs/contributing-docs.md) before changing either; it covers the
+docset layout, the style rules and the branch to target.
 
 ## Contributing
 
