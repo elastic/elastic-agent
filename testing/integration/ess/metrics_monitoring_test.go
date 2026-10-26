@@ -126,6 +126,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 	if err != nil {
 		runner.T().Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		// On error dump the whole request response so we can easily spot
 		// what went wrong.
