@@ -27,10 +27,13 @@ const (
 	healthCheckIncludePermanentErrors   = true
 	healthCheckIncludeRecoverableErrors = true
 	healthCheckRecoveryDuration         = "5m"
-	healthCheckHealthStatusPath         = "/health/status"
-	healthCheckHealthStatusEnabled      = true
-	healthCheckHealthConfigPath         = "/health/config"
-	healthCheckHealthConfigEnabled      = false
+	// healthCheckHost is used both for the extension endpoint and for polling it, so they never diverge.
+	// It is an IP rather than localhost, as localhost is not guaranteed to resolve to the loopback address.
+	healthCheckHost                = "127.0.0.1"
+	healthCheckHealthStatusPath    = "/health/status"
+	healthCheckHealthStatusEnabled = true
+	healthCheckHealthConfigPath    = "/health/config"
+	healthCheckHealthConfigEnabled = false
 )
 
 // AllComponentsStatuses retrieves the status of all components from the health check endpoint.
@@ -40,7 +43,7 @@ func AllComponentsStatuses(ctx context.Context, client http.Client, httpHealthCh
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d%s?verbose",
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://%s:%d%s?verbose", healthCheckHost,
 		httpHealthCheckPort, healthCheckHealthStatusPath), http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http request: %w", err)
@@ -82,7 +85,7 @@ func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID str
 					"recovery_duration":          healthCheckRecoveryDuration,
 				},
 				"http": map[string]interface{}{
-					"endpoint":            fmt.Sprintf("localhost:%d", httpHealthCheckPort),
+					"endpoint":            fmt.Sprintf("%s:%d", healthCheckHost, httpHealthCheckPort),
 					"keep_alives_enabled": true,
 					"status": map[string]interface{}{
 						"enabled":            healthCheckHealthStatusEnabled,
