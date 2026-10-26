@@ -26,6 +26,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.77.0
 	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.77.0
+	github.com/elastic/opentelemetry-collector-components/receiver/prometheusscrapereceiver v0.77.0
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.163.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.163.0
