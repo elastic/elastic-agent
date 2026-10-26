@@ -20,6 +20,7 @@ import (
 
 	api "github.com/elastic/fleet-server/pkg/api"
 
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
@@ -57,6 +58,10 @@ func (s *testSender) Send(
 
 func (s *testSender) URI() string {
 	return "http://localhost"
+}
+
+func (s *testSender) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{}
 }
 
 func wrapStrToResp(code int, body string) *http.Response {
