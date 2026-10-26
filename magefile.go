@@ -1303,6 +1303,13 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 		return fmt.Errorf("creating flat dir %q: %w", flatPath, err)
 	}
 	defer os.RemoveAll(flatPath)
+	// the versioned drop dirs are rebuilt from the archives on every run (see flattenDependencies),
+	// so they are not kept with KEEP_ARCHIVE either
+	defer func() {
+		for _, pltf := range platforms {
+			os.RemoveAll(filepath.Join(dropPath, manifest.PlatformPackages[pltf]))
+		}
+	}()
 
 	// extract all dependencies from their archives into flat dir
 	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
