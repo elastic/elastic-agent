@@ -105,7 +105,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -442,8 +442,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 8
-  queue_size: 25600
+  num_consumers: 5
+  queue_size: 16000
   wait_for_result: true
 suppress_conflict_errors: true
 timeout: 1m30s
@@ -615,7 +615,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -681,7 +681,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -760,7 +760,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
+  num_consumers: 3
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -856,8 +856,8 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:      4,
 			batchSize:     1600,
 			floor:         12800,
-			wantQueueSize: 25600, // 2*1600*8=25600 > floor 12800
-			wantConsumers: 8,
+			wantQueueSize: 16000, // 2*1600*5=16000 > floor 12800
+			wantConsumers: 5,
 		},
 		{
 			name:      "latency preset floor kicks in without cap",
@@ -874,7 +874,7 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:      30,
 			batchSize:     1600,
 			floor:         3200,
-			wantQueueSize: maxQueueEvents,                  // 2*1600*60=192000 > 64000
+			wantQueueSize: maxQueueEvents,                  // 2*1600*31=99200 > 64000
 			wantConsumers: max(1, maxQueueEvents/(2*1600)), // 20
 		},
 		{
@@ -882,7 +882,7 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:  30,
 			batchSize: 1600,
 			floor:     maxQueueEvents + 10000, // hypothetical: preset floor above memory ceiling
-			// formula 192000 > 64000: cap to 64000, numConsumers=20;
+			// formula 99200 > 64000: cap to 64000, numConsumers=20;
 			// then floor 74000 > 64000: apply floor and recalculate
 			wantQueueSize: maxQueueEvents + 10000,
 			wantConsumers: max(1, (maxQueueEvents+10000)/(2*1600)),
