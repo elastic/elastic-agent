@@ -14,7 +14,7 @@
 * OSQuery - Add list capabilities to directories for interactive users. [#12189](https://github.com/elastic/elastic-agent/pull/12189) 
 
   Fixing file permission issues for osquery extensions on Windows.
-  It approches the problem by adding List Content permission to Logged in users so Directory permissions are not altered by UAC when traversing Agent directory structure.
+  It approaches the problem by adding List Content permission to Logged in users so Directory permissions are not altered by UAC when traversing Agent directory structure.
   After this user won&#39;t be prompted with UAC and when opening e.g log files, instead user will run into access denied in editor of choice. 
   Elevated editor must be used to open files that require elevated permissions.
   
