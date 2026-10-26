@@ -39,7 +39,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.22.1
 	github.com/google/go-github/v68 v68.0.0
-	github.com/google/pprof v0.0.0-20261016150608-1facf8f91b50
+	github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88
 	github.com/gorilla/mux v1.8.1
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/josephspurrier/goversioninfo v1.7.0
