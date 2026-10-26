@@ -44,6 +44,16 @@ type UpgradeRollbackConfig struct {
 	CleanupInterval time.Duration `yaml:"cleanup_interval" config:"cleanup_interval" json:"cleanup_interval"`
 }
 
+// LogsRetention returns for how long the logs of a failed and rolled back upgrade are retained.
+// It follows the rollback window; if rollbacks are disabled (window <= 0) the default window is used so the
+// logs needed to troubleshoot the failure are still kept.
+func (c *UpgradeRollbackConfig) LogsRetention() time.Duration {
+	if c == nil || c.Window <= 0 {
+		return defaultRollbackWindowDuration
+	}
+	return c.Window
+}
+
 func DefaultUpgradeConfig() *UpgradeConfig {
 	return &UpgradeConfig{
 		Watcher: &UpgradeWatcherConfig{

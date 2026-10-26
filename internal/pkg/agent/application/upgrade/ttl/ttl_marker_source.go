@@ -15,9 +15,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const ttlMarkerName = ".ttl"
+// MarkerFileName is the name of the TTL marker file inside a versioned home.
+const MarkerFileName = ".ttl"
 
-var defaultMarkerGlobPattern = filepath.Join("data", "elastic-agent-*", ttlMarkerName)
+var defaultMarkerGlobPattern = filepath.Join("data", "elastic-agent-*", MarkerFileName)
 
 type TTLMarkerRegistry struct {
 	baseDir               string
@@ -51,7 +52,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 			continue
 		}
 		T.log.Infof("Removing TTL marker for %s: not in new desired state", versionedHome)
-		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, MarkerFileName))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
@@ -65,7 +66,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		}
 		T.log.Infow("Sweeping malformed TTL marker: not in new desired state",
 			"versionedHome", versionedHome, "error.message", parseErr.Error())
-		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, MarkerFileName))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
@@ -74,8 +75,18 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 	return T.addOrReplace(m)
 }
 
+// Add writes the TTL marker of a single versioned home, creating or overwriting it.
+// Unlike Set it leaves every other marker untouched.
+func (T TTLMarkerRegistry) Add(versionedHome string, marker TTLMarker) error {
+	dstFilePath := filepath.Join(T.baseDir, versionedHome, MarkerFileName)
+	if err := writeTTLMarker(dstFilePath, marker); err != nil {
+		return fmt.Errorf("writing marker %q: %w", dstFilePath, err)
+	}
+	return nil
+}
+
 func (T TTLMarkerRegistry) Remove(versionedHome string) error {
-	err := os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+	err := os.Remove(filepath.Join(T.baseDir, versionedHome, MarkerFileName))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 	}
@@ -129,9 +140,24 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	return ttlMarkers, malformed, nil
 }
 
+// GetAvailableRollbacks returns the markers of GetAll that are rollback targets, meaning the ones not flagged
+// RetentionOnly. Unparseable markers are not rollback targets either.
+func (T TTLMarkerRegistry) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+	markers, _, err := T.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	for versionedHome, marker := range markers {
+		if marker.RetentionOnly {
+			delete(markers, versionedHome)
+		}
+	}
+	return markers, nil
+}
+
 func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
 	for versionedHome, marker := range m {
-		dstFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
+		dstFilePath := filepath.Join(T.baseDir, versionedHome, MarkerFileName)
 		err := writeTTLMarker(dstFilePath, marker)
 		if err != nil {
 			return fmt.Errorf("writing marker %q: %w", dstFilePath, err)

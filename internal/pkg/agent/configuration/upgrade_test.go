@@ -118,3 +118,11 @@ func TestParseUpgradeConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestUpgradeRollbackConfigLogsRetention(t *testing.T) {
+	var nilConfig *UpgradeRollbackConfig
+	require.Equal(t, defaultRollbackWindowDuration, nilConfig.LogsRetention(), "nil config falls back to the default window")
+	require.Equal(t, defaultRollbackWindowDuration, (&UpgradeRollbackConfig{Window: 0}).LogsRetention(), "disabled rollbacks still retain logs")
+	require.Equal(t, defaultRollbackWindowDuration, (&UpgradeRollbackConfig{Window: -time.Hour}).LogsRetention())
+	require.Equal(t, 3*time.Hour, (&UpgradeRollbackConfig{Window: 3 * time.Hour}).LogsRetention(), "retention follows the configured window")
+}

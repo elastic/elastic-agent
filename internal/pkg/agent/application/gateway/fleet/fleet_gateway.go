@@ -420,7 +420,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, _, err := f.rollbackSource.GetAll()
+	rollbacks, err := f.rollbackSource.GetAvailableRollbacks()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
 		rollbacks = nil

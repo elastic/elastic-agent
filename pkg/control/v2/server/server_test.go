@@ -7,6 +7,8 @@ package server
 import (
 	"context"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -22,10 +24,12 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
@@ -293,4 +297,31 @@ func TestStateMapping(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestAvailableRollbacks_SkipsRetentionOnly checks that installs kept only for retention are not listed as
+// available rollbacks.
+func TestAvailableRollbacks_SkipsRetentionOnly(t *testing.T) {
+	topDir := t.TempDir()
+	regular := filepath.Join("data", "elastic-agent-1.2.3-regular")
+	failed := filepath.Join("data", "elastic-agent-4.5.6-failed")
+	for _, home := range []string{regular, failed} {
+		require.NoError(t, os.MkdirAll(filepath.Join(topDir, home), 0o750))
+	}
+	log, _ := loggertest.New(t.Name())
+	source := ttl.NewTTLMarkerRegistry(log, topDir)
+	validUntil := time.Now().Add(time.Hour)
+	require.NoError(t, source.Set(map[string]ttl.TTLMarker{
+		regular: {Version: "1.2.3", Hash: "regular", ValidUntil: validUntil},
+		failed:  {Version: "4.5.6", Hash: "failed", ValidUntil: validUntil, RetentionOnly: true},
+	}))
+
+	s := &Server{logger: log, rollbackSource: source}
+
+	resp, err := s.AvailableRollbacks(t.Context(), &cproto.Empty{})
+	require.NoError(t, err)
+	require.Empty(t, resp.Error)
+	require.Len(t, resp.Rollbacks, 1)
+	assert.Equal(t, "1.2.3", resp.Rollbacks[0].Version)
+	assert.Equal(t, regular, resp.Rollbacks[0].VersionedHome)
 }

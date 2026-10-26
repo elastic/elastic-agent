@@ -37,8 +37,8 @@ func TestTTLMarkerRegistry_GetAll_PartialReturnsMalformedAlongsideParsed(t *test
 		"version: 1.2.3\nvalid_until: %s",
 		validUntil.Format(time.RFC3339),
 	))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, goodHome, ttlMarkerName), []byte(goodMarker), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, badHome, ttlMarkerName), []byte("this is not yaml"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, goodHome, MarkerFileName), []byte(goodMarker), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, badHome, MarkerFileName), []byte("this is not yaml"), 0644))
 
 	testLogger, _ := loggertest.New(t.Name())
 	T := NewTTLMarkerRegistry(testLogger, tmpDir)
@@ -110,9 +110,9 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 			},
 			wantErr: assert.NoError,
 			postAssertions: func(t *testing.T, tmpDir string) {
-				notExistingTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHomes[1], ttlMarkerName)
+				notExistingTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHomes[1], MarkerFileName)
 				assert.NoFileExists(t, notExistingTTLMarkerFilePath)
-				expectedTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHomes[0], ttlMarkerName)
+				expectedTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHomes[0], MarkerFileName)
 				if assert.FileExists(t, expectedTTLMarkerFilePath, "new TTL marker should have been created") {
 
 					b := new(strings.Builder)
@@ -133,7 +133,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 					b := new(strings.Builder)
 					err = expectedMarkerContentTemplate.Execute(b, map[string]string{"Version": versions[i], "ValidUntil": ttls[i], "Hash": hashes[i]})
 					require.NoError(t, err, "error setting up ttl marker")
-					err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHomes[i], ttlMarkerName), []byte(b.String()), 0644)
+					err = os.WriteFile(filepath.Join(tmpDir, "data", versionedHomes[i], MarkerFileName), []byte(b.String()), 0644)
 				}
 			},
 			args: args{
@@ -142,7 +142,7 @@ func TestTTLMarkerRegistry_Set(t *testing.T) {
 			wantErr: assert.NoError,
 			postAssertions: func(t *testing.T, tmpDir string) {
 				for _, versionedHome := range versionedHomes {
-					notExistingTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHome, ttlMarkerName)
+					notExistingTTLMarkerFilePath := filepath.Join(tmpDir, "data", versionedHome, MarkerFileName)
 					assert.NoFileExists(t, notExistingTTLMarkerFilePath)
 				}
 			},
@@ -204,9 +204,9 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, home), 0755))
 		}
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, ttlMarkerName), []byte(corruptPayload), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, MarkerFileName), []byte(corruptPayload), 0644))
 		require.NoError(t, os.WriteFile(
-			filepath.Join(tmpDir, homeB, ttlMarkerName),
+			filepath.Join(tmpDir, homeB, MarkerFileName),
 			[]byte(renderMarker(t, "4.5.6", "bbbbbb", tomorrowString)),
 			0644,
 		))
@@ -220,7 +220,7 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 		T := NewTTLMarkerRegistry(testLogger, tmpDir)
 		require.NoError(t, T.Set(desired))
 
-		aPath := filepath.Join(tmpDir, homeA, ttlMarkerName)
+		aPath := filepath.Join(tmpDir, homeA, MarkerFileName)
 		if assert.FileExists(t, aPath, "corrupt marker should have been overwritten with valid YAML") {
 			got, readErr := readTTLMarker(aPath)
 			require.NoError(t, readErr, "rewritten marker must parse")
@@ -229,9 +229,9 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 			assert.True(t, got.ValidUntil.Equal(tomorrow), "ValidUntil mismatch")
 		}
 
-		assert.NoFileExists(t, filepath.Join(tmpDir, homeB, ttlMarkerName), "B was not in desired state and should have been swept")
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeB, MarkerFileName), "B was not in desired state and should have been swept")
 
-		cPath := filepath.Join(tmpDir, homeC, ttlMarkerName)
+		cPath := filepath.Join(tmpDir, homeC, MarkerFileName)
 		if assert.FileExists(t, cPath) {
 			got, readErr := readTTLMarker(cPath)
 			require.NoError(t, readErr)
@@ -250,9 +250,9 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, home), 0755))
 		}
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, ttlMarkerName), []byte(corruptPayload), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, MarkerFileName), []byte(corruptPayload), 0644))
 		require.NoError(t, os.WriteFile(
-			filepath.Join(tmpDir, homeB, ttlMarkerName),
+			filepath.Join(tmpDir, homeB, MarkerFileName),
 			[]byte(renderMarker(t, "4.5.6", "bbbbbb", tomorrowString)),
 			0644,
 		))
@@ -261,8 +261,8 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 		T := NewTTLMarkerRegistry(testLogger, tmpDir)
 		require.NoError(t, T.Set(nil))
 
-		assert.NoFileExists(t, filepath.Join(tmpDir, homeA, ttlMarkerName))
-		assert.NoFileExists(t, filepath.Join(tmpDir, homeB, ttlMarkerName))
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeA, MarkerFileName))
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeB, MarkerFileName))
 	})
 
 	t.Run("malformed existing is reaped when desired targets a different home", func(t *testing.T) {
@@ -271,7 +271,7 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 			require.NoError(t, os.MkdirAll(filepath.Join(tmpDir, home), 0755))
 		}
 
-		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, ttlMarkerName), []byte(corruptPayload), 0644))
+		require.NoError(t, os.WriteFile(filepath.Join(tmpDir, homeA, MarkerFileName), []byte(corruptPayload), 0644))
 
 		desired := map[string]TTLMarker{
 			homeC: {Version: "7.8.9", Hash: "cccccc", ValidUntil: tomorrow},
@@ -281,13 +281,80 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 		T := NewTTLMarkerRegistry(testLogger, tmpDir)
 		require.NoError(t, T.Set(desired))
 
-		assert.NoFileExists(t, filepath.Join(tmpDir, homeA, ttlMarkerName), "malformed marker outside desired set must be removed")
+		assert.NoFileExists(t, filepath.Join(tmpDir, homeA, MarkerFileName), "malformed marker outside desired set must be removed")
 
-		cPath := filepath.Join(tmpDir, homeC, ttlMarkerName)
+		cPath := filepath.Join(tmpDir, homeC, MarkerFileName)
 		if assert.FileExists(t, cPath) {
 			got, readErr := readTTLMarker(cPath)
 			require.NoError(t, readErr)
 			assert.Equal(t, "7.8.9", got.Version)
 		}
 	})
+}
+
+func TestTTLMarkerRegistry_RetentionOnlyRoundTripAndCompatibility(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	baseDir := t.TempDir()
+	registry := NewTTLMarkerRegistry(log, baseDir)
+	regularHome := filepath.Join("data", "elastic-agent-1.2.3-regular")
+	retentionHome := filepath.Join("data", "elastic-agent-4.5.6-logs")
+	legacyHome := filepath.Join("data", "elastic-agent-7.8.9-legacy")
+	validUntil := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
+
+	for _, home := range []string{regularHome, retentionHome, legacyHome} {
+		require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home), 0o750))
+	}
+	// marker written by an agent that does not know the retention_only field
+	require.NoError(t, os.WriteFile(filepath.Join(baseDir, legacyHome, MarkerFileName),
+		[]byte("version: 7.8.9\nhash: legacy\nvalid_until: "+validUntil.Format(time.RFC3339)+"\n"), 0o640))
+
+	// Add leaves the legacy marker as it was written, Set would rewrite it
+	require.NoError(t, registry.Add(regularHome, TTLMarker{Version: "1.2.3", Hash: "regular", ValidUntil: validUntil}))
+	require.NoError(t, registry.Add(retentionHome, TTLMarker{Version: "4.5.6", Hash: "logs", ValidUntil: validUntil, RetentionOnly: true}))
+
+	// the flag is not written when false so older agents see exactly the markers they always saw
+	regularContent, err := os.ReadFile(filepath.Join(baseDir, regularHome, MarkerFileName))
+	require.NoError(t, err)
+	assert.NotContains(t, string(regularContent), "retention_only")
+	retentionContent, err := os.ReadFile(filepath.Join(baseDir, retentionHome, MarkerFileName))
+	require.NoError(t, err)
+	assert.Contains(t, string(retentionContent), "retention_only: true")
+
+	got, malformed, err := registry.GetAll()
+	require.NoError(t, err)
+	assert.Empty(t, malformed)
+	assert.False(t, got[regularHome].RetentionOnly)
+	assert.True(t, got[retentionHome].RetentionOnly)
+	assert.False(t, got[legacyHome].RetentionOnly, "markers without the field are regular rollback targets")
+}
+
+func TestTTLMarkerRegistry_GetAvailableRollbacks(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	baseDir := t.TempDir()
+	registry := NewTTLMarkerRegistry(log, baseDir)
+	validUntil := time.Now().Add(time.Hour)
+
+	regularHome := filepath.Join("data", "elastic-agent-1.2.3-regular")
+	expiredHome := filepath.Join("data", "elastic-agent-2.3.4-expired")
+	retentionHome := filepath.Join("data", "elastic-agent-4.5.6-retention")
+	for _, home := range []string{regularHome, expiredHome, retentionHome} {
+		require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home), 0o750))
+	}
+
+	require.NoError(t, registry.Set(map[string]TTLMarker{
+		regularHome:   {Version: "1.2.3", Hash: "regular", ValidUntil: validUntil},
+		expiredHome:   {Version: "2.3.4", Hash: "expired", ValidUntil: time.Now().Add(-time.Hour)},
+		retentionHome: {Version: "4.5.6", Hash: "retention", ValidUntil: validUntil, RetentionOnly: true},
+	}))
+
+	got, err := registry.GetAvailableRollbacks()
+	require.NoError(t, err)
+	assert.Len(t, got, 2)
+	assert.Contains(t, got, regularHome)
+	assert.Contains(t, got, expiredHome, "expiry is checked by the callers, not here")
+	assert.NotContains(t, got, retentionHome, "an install kept only for retention is not a rollback target")
+
+	all, _, err := registry.GetAll()
+	require.NoError(t, err)
+	assert.Len(t, all, 3, "GetAll still returns every TTL marker, the cleanup needs them")
 }

@@ -46,6 +46,11 @@ type RollbackSettings struct {
 	SkipRestart    bool
 	PreRestartHook RollbackHook
 	RemoveMarker   bool
+	// FailedUpgrade is the upgrade marker of the upgrade we are rolling back from. When set, the logs of the
+	// version we roll back from are retained for LogsRetention: its home is protected from cleanups before the
+	// restart and stripped down to its logs after it.
+	FailedUpgrade *UpdateMarker
+	LogsRetention time.Duration
 }
 
 func NewRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
@@ -74,9 +79,15 @@ func (r *RollbackSettings) SetRemoveMarker(removeMarker bool) {
 	r.RemoveMarker = removeMarker
 }
 
+func (r *RollbackSettings) SetLogsRetention(failedUpgrade *UpdateMarker, retention time.Duration) {
+	r.FailedUpgrade = failedUpgrade
+	r.LogsRetention = retention
+}
+
 func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
 
 	settings := NewRollbackSettings(opts...)
+	failedHome := retainedHome(settings.FailedUpgrade)
 
 	symlinkPath := filepath.Join(topDirPath, AgentName)
 
@@ -116,6 +127,14 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
+	// The agent we roll back to runs a cleanup when it starts: mark the home before it does.
+	if failedHome != "" {
+		if err := retainFailedUpgradeLogs(log, topDirPath, failedHome, settings.FailedUpgrade, settings.LogsRetention); err != nil {
+			// retaining logs must never block the rollback
+			log.Warnf("failed to retain the logs of the failed upgrade: %v", err)
+		}
+	}
+
 	// Restart
 	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx, log, c); err != nil {
@@ -127,9 +146,27 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// keepLogs preserves forensic logs immediately after rollback; the next startup
-	// or periodic cleanup (keepLogs=false) sweeps log-only dirs, so they do not accumulate.
-	return Cleanup(log, topDirPath, settings.RemoveMarker, true /* keepLogs */, prevVersionedHome)
+	// keepLogs preserves the logs immediately after rollback. The failed home itself is kept by its retention
+	// TTL marker until it expires, then the periodic cleanup removes it.
+	err := Cleanup(log, topDirPath, settings.RemoveMarker, true /* keepLogs */, prevVersionedHome)
+
+	// Cleanup keeps homes with an unexpired TTL marker whole, so the retained home is stripped explicitly.
+	// This runs after the restart and the restart delay in Cleanup: the failed version may still run from its home before.
+	if failedHome != "" {
+		stripToLogs(log, topDirPath, failedHome)
+	}
+
+	return err
+}
+
+// stripToLogs removes everything but the logs and the TTL marker from the versioned home retainedHome.
+// It is best effort: failures are logged because retaining logs must never fail a rollback, and an unstripped
+// home is removed as a whole once its TTL expires.
+func stripToLogs(log *logger.Logger, topDirPath, retainedHome string) {
+	homePath := filepath.Join(topDirPath, retainedHome)
+	if err := install.RemoveBut(log, homePath, true, "logs", ttl.MarkerFileName); err != nil && !goerrors.Is(err, os.ErrNotExist) {
+		log.Warnw("failed to strip retained home down to its logs", "file.path", homePath, "error.message", err.Error())
+	}
 }
 
 // Cleanup removes all artifacts and files related to a specified version.

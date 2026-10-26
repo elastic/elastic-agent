@@ -94,7 +94,7 @@ func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, versi
 
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
-	availableRollbacks, _, err := source.GetAll()
+	availableRollbacks, err := source.GetAvailableRollbacks()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
@@ -172,7 +172,7 @@ func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcher
 	var selectedRollbackVersionedHome string
 
 	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
-		rollbacks, _, err := source.GetAll()
+		rollbacks, err := source.GetAvailableRollbacks()
 		if err != nil {
 			return fmt.Errorf("reading TTL markers: %w", err)
 		}

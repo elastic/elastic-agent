@@ -185,7 +185,13 @@ func Test_watchCmd(t *testing.T) {
 						opt(settings)
 
 						return !settings.RemoveMarker
-					}), mock.Anything).
+					}), mock.Anything, mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+						// the logs of the failed version must be retained
+						settings := upgrade.NewRollbackSettings()
+						opt(settings)
+
+						return settings.FailedUpgrade != nil && settings.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-9.3.0-newver")
+					})).
 					Return(nil)
 			},
 			args: args{
@@ -234,7 +240,12 @@ func Test_watchCmd(t *testing.T) {
 							opt(settings)
 
 							return settings.RemoveMarker
-						}), mock.Anything).Return(nil)
+						}), mock.Anything, mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+							settings := upgrade.NewRollbackSettings()
+							opt(settings)
+
+							return settings.FailedUpgrade != nil && settings.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-4.5.6-newver")
+						})).Return(nil)
 			},
 			args: args{
 				cfg: configuration.DefaultUpgradeConfig().Watcher,
@@ -370,7 +381,7 @@ func Test_watchCmd(t *testing.T) {
 			mockWatcher := newMockAgentWatcher(t)
 			mockInstallModifier := newMockInstallationModifier(t)
 			tt.setupUpgradeMarker(t, tmpDir, mockWatcher, mockInstallModifier)
-			tt.wantErr(t, watchCmd(log, tmpDir, tt.args.cfg, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
+			tt.wantErr(t, watchCmd(log, tmpDir, tt.args.cfg, time.Hour, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
 			t.Log("watchCmd logs:\n")
 			for _, osbLog := range obs.All() {
 				t.Logf("\t%s - %s - %v\n", osbLog.Level, osbLog.Message, osbLog.Context)
@@ -435,7 +446,7 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 
 	cfg := configuration.DefaultUpgradeConfig().Watcher
 
-	err := watchCmd(log, topDir, cfg, mockWatcher, realModifier)
+	err := watchCmd(log, topDir, cfg, time.Hour, mockWatcher, realModifier)
 
 	if t.Failed() || err != nil {
 		for _, l := range obs.All() {
