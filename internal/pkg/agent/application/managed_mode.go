@@ -107,10 +107,15 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return errors.New("coord must be set before calling Run")
 	}
 
-	// Un-enrolled so we will not do anything.
+	// A persisted UNENROLL means the agent was unenrolled as the first step of a
+	// remote uninstall (Endpoint removed) and is awaiting the follow-up UNINSTALL.
+	// Keep Fleet communication open so it can still receive the UNINSTALL action
+	// (and its grace-period CANCEL) across restarts. The policy is deliberately
+	// not restored (see the wasUnenrolled() guard below), so the agent stays
+	// component-less until it is uninstalled. An agent-detected unenroll (invalid
+	// API key) persists no action, so it is unaffected.
 	if m.wasUnenrolled() {
-		m.log.Warnf("Elastic Agent was previously unenrolled. To reactivate please reconfigure or enroll again.")
-		return nil
+		m.log.Info("Elastic Agent was unenrolled and is awaiting a Fleet UNINSTALL action; keeping Fleet communication open without restoring the policy")
 	}
 
 	// Reload ID because of win7 sync issue

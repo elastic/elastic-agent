@@ -232,3 +232,50 @@ func TestActionUnenrollHandler(t *testing.T) {
 		})
 	}
 }
+
+// TestActionUnenrollHandlerGateway verifies that a Fleet-delivered UNENROLL keeps
+// the fleet gateway open (so the agent can still receive the follow-up UNINSTALL
+// and CANCEL), while an agent-detected unenroll closes it.
+func TestActionUnenrollHandlerGateway(t *testing.T) {
+	ctx, cn := context.WithCancel(context.Background())
+	defer cn()
+
+	log, _ := logger.New("", false)
+	coord := &MockActionCoordinator{}
+	acker := &MockAcker{}
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case cc := <-ch:
+				_ = cc.Ack()
+			}
+		}
+	}()
+
+	s, err := storage.NewDiskStore(filepath.Join(t.TempDir(), "state.json"))
+	require.NoError(t, err)
+	st, err := store.NewStateStore(log, s)
+	require.NoError(t, err)
+
+	var closed atomic.Bool
+	handler := NewUnenroll(log, coord, ch, []context.CancelFunc{func() { closed.Store(true) }}, st)
+	handler.tamperProtectionFn = func() bool { return false }
+
+	t.Run("fleet unenroll keeps the gateway open", func(t *testing.T) {
+		closed.Store(false)
+		a := &fleetapi.ActionUnenroll{ActionID: "u1", ActionType: "UNENROLL"}
+		require.NoError(t, handler.handle(ctx, a, acker, 100*time.Millisecond))
+		require.False(t, closed.Load(), "a Fleet-delivered UNENROLL must keep the gateway open for the follow-up UNINSTALL")
+	})
+
+	t.Run("agent-detected unenroll closes the gateway", func(t *testing.T) {
+		closed.Store(false)
+		a := &fleetapi.ActionUnenroll{ActionID: "u2", ActionType: "UNENROLL", IsDetected: true}
+		require.NoError(t, handler.handle(ctx, a, acker, 100*time.Millisecond))
+		require.True(t, closed.Load(), "an agent-detected unenroll must close the gateway")
+	})
+}

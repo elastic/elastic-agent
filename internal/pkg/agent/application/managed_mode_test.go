@@ -201,6 +201,35 @@ func TestManagedConfigManager_restartActionExpired(t *testing.T) {
 		"malformed expiration should be treated as expired so it is discarded")
 }
 
+func TestManagedConfigManager_wasUnenrolled(t *testing.T) {
+	log, _ := loggertest.New("managed")
+
+	t.Run("no persisted action", func(t *testing.T) {
+		m := &managedConfigManager{log: log, stateStore: newTestStateStore(t)}
+		assert.False(t, m.wasUnenrolled())
+	})
+
+	t.Run("persisted UNENROLL marks the agent as awaiting uninstall", func(t *testing.T) {
+		ss := newTestStateStore(t)
+		ss.SetAction(&fleetapi.ActionUnenroll{ActionID: "u1", ActionType: fleetapi.ActionTypeUnenroll})
+		require.NoError(t, ss.Save())
+		m := &managedConfigManager{log: log, stateStore: ss}
+		// A persisted UNENROLL means the agent was unenrolled as the first step of
+		// a remote uninstall; Run keeps Fleet communication open (rather than
+		// returning early) so a follow-up UNINSTALL/CANCEL can still be received,
+		// while this same condition prevents the old policy from being restored.
+		assert.True(t, m.wasUnenrolled())
+	})
+
+	t.Run("persisted non-unenroll action", func(t *testing.T) {
+		ss := newTestStateStore(t)
+		ss.SetAction(&fleetapi.ActionUpgrade{ActionID: "p1", ActionType: fleetapi.ActionTypeUpgrade})
+		require.NoError(t, ss.Save())
+		m := &managedConfigManager{log: log, stateStore: ss}
+		assert.False(t, m.wasUnenrolled())
+	})
+}
+
 func TestManagedConfigManager_ackPendingRestart(t *testing.T) {
 	log, _ := loggertest.New("managed")
 
