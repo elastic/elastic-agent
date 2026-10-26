@@ -194,8 +194,8 @@ github.com/ebitengine/purego v0.11.1 h1:2zpWRSQNVKN4eKsKO9eM1ILDgWfYMY9GwqRmK6Xe
 github.com/ebitengine/purego v0.11.1/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
 github.com/elastic/cloud-on-k8s/v3 v3.5.0 h1:sR4oj+gNnwI9hgsKhBwjUlx+5F2T/kND40hrzaogtek=
 github.com/elastic/cloud-on-k8s/v3 v3.5.0/go.mod h1:/pQxRSjo46xTqEVVsbcc3FCAyA5jTiBC0it1lD2Q8QY=
-github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
-github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
+github.com/elastic/elastic-agent-client/v7 v7.19.0 h1:ZZAut7GgtyRKjDpiaYRGqRbOZIQlVZxiK8x1UF/gUOE=
+github.com/elastic/elastic-agent-client/v7 v7.19.0/go.mod h1:dRGR6EAk5QnFvI5U1SDjwhKO1uva9BEqdDyJbput9Hk=
 github.com/elastic/elastic-agent-libs v0.47.0 h1:fltOh0mETIlW3LYExX62iacL63sHXSTfDB/8Qi+wXso=
 github.com/elastic/elastic-agent-libs v0.47.0/go.mod h1:UdVxZVDx8WH3nFi1vELRbxeeZ2cMP0tt74SJK2O49g8=
 github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=

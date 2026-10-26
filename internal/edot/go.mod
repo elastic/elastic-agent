@@ -1,6 +1,6 @@
 module github.com/elastic/elastic-agent/internal/edot
 
-go 1.26.8
+go 1.26.10
 
 // use in-repo directory
 replace github.com/elastic/elastic-agent => ../../
@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261020215420-d7018a21baa8
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261023172648-0d4277595c1c
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
@@ -31,6 +31,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.163.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.163.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.163.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.163.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/azureauthextension v0.163.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension v0.163.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/encoding/awslogsencodingextension v0.163.0
@@ -117,7 +118,7 @@ require (
 	github.com/coder/websocket v1.8.14 // indirect
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f // indirect
-	github.com/elastic/ebpfevents v0.10.0 // indirect
+	github.com/elastic/ebpfevents v0.12.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20260916061436-646037f10512 // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
@@ -168,8 +169,10 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/expohisto v0.163.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl/contexts/xprofile v0.163.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl/xottl v0.163.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/resourcetotelemetry v0.163.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/sampling v0.163.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/azurelogs v0.163.0 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/prometheusremotewrite v0.163.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/xstreamencoding v0.163.0 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/scraper/zookeeperscraper v0.163.0 // indirect
 	github.com/oracle/oci-go-sdk/v65 v65.124.1 // indirect
@@ -195,6 +198,8 @@ require (
 	github.com/sijms/go-ora/v2 v2.9.0 // indirect
 	github.com/sony/gobreaker/v2 v2.4.0 // indirect
 	github.com/teambition/rrule-go v1.8.2 // indirect
+	github.com/tidwall/tinylru v1.1.0 // indirect
+	github.com/tidwall/wal v1.2.1 // indirect
 	github.com/twpayne/go-geom v1.6.1 // indirect
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/vultr/govultr/v3 v3.33.0 // indirect
@@ -425,7 +430,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.22.2 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
+	github.com/elastic/elastic-agent-client/v7 v7.19.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect

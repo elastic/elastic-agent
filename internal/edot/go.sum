@@ -485,10 +485,10 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/ebpfevents v0.10.0 h1:BnkRxdQX6/OlMp3YKh8daTSTgrFFdFICwqT+FsqoZ1o=
-github.com/elastic/ebpfevents v0.10.0/go.mod h1:qR5AsvbH3Bnldc2EmBnsP5PxsuctUqSuEz6CXwvTMYU=
-github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
-github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
+github.com/elastic/ebpfevents v0.12.0 h1:RpnBWXNOib9AixRl6Gs0/3wLtZ5/rsnpf7KOZ3wV5nY=
+github.com/elastic/ebpfevents v0.12.0/go.mod h1:qR5AsvbH3Bnldc2EmBnsP5PxsuctUqSuEz6CXwvTMYU=
+github.com/elastic/elastic-agent-client/v7 v7.19.0 h1:ZZAut7GgtyRKjDpiaYRGqRbOZIQlVZxiK8x1UF/gUOE=
+github.com/elastic/elastic-agent-client/v7 v7.19.0/go.mod h1:dRGR6EAk5QnFvI5U1SDjwhKO1uva9BEqdDyJbput9Hk=
 github.com/elastic/elastic-agent-libs v0.47.0 h1:fltOh0mETIlW3LYExX62iacL63sHXSTfDB/8Qi+wXso=
 github.com/elastic/elastic-agent-libs v0.47.0/go.mod h1:UdVxZVDx8WH3nFi1vELRbxeeZ2cMP0tt74SJK2O49g8=
 github.com/elastic/elastic-transport-go/v8 v8.11.0 h1:taYmqC2M6+fZt/+W+ENYh/W5L9+KrlJGOSbEJs8egWc=
@@ -1624,10 +1624,12 @@ github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRV
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
 github.com/testcontainers/testcontainers-go v0.44.0 h1:/Fwh6HY1mIikhnm9e7HwoxGycx0lzRAE0f5VQpjFxzI=
 github.com/testcontainers/testcontainers-go v0.44.0/go.mod h1:IcnwQrYTO86xHXu5bvMaBH7ATlbS3Qn1M1QWW3c66rE=
+github.com/tidwall/gjson v1.10.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.19.0 h1:xwxm7n691Uf3u5OFjzngavjGTh55KX5q/9w9xHW88JU=
 github.com/tidwall/gjson v1.19.0/go.mod h1:V37/opeE/JbLUOfH0QTXiNez2l0RUjYUhpT4szFQAfc=
 github.com/tidwall/match v1.1.1 h1:+Ho715JplO36QYgwN9PGYNhgZvoUSc9X2c80KVTi+GA=
 github.com/tidwall/match v1.1.1/go.mod h1:eRSPERbgtNPcGhD8UCthc6PmLEQXEWd3PRB5JTxsfmM=
+github.com/tidwall/pretty v1.2.0/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
 github.com/tidwall/pretty v1.2.1 h1:qjsOFOWWQl+N3RsoF5/ssm1pHmJJwhjlSbZ51I6wMl4=
 github.com/tidwall/pretty v1.2.1/go.mod h1:ITEVvHYasfjBbM0u2Pg8T2nJnzm8xPwvNhhsoaGGjNU=
 github.com/tidwall/tinylru v1.1.0 h1:XY6IUfzVTU9rpwdhKUF6nQdChgCdGjkMfLzbWyiau6I=
