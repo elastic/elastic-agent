@@ -14,6 +14,7 @@ import (
 
 const (
 	compressionFormatNone uint16 = 0
+	openNoFollow                 = windows.O_FILE_FLAG_OPEN_REPARSE_POINT
 )
 
 func disableCompression(file *os.File) {

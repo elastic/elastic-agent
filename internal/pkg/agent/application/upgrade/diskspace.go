@@ -152,7 +152,7 @@ func getRunSize() uint64 {
 }
 
 func reserveDiskSpace(ctx context.Context, path string, size int64) error {
-	info, statErr := os.Stat(path)
+	info, statErr := os.Lstat(path)
 	fresh := goerrors.Is(statErr, os.ErrNotExist)
 
 	var reservedSize int64
@@ -170,9 +170,16 @@ func reserveDiskSpace(ctx context.Context, path string, size int64) error {
 		}
 	}
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o660)
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|openNoFollow, 0o660)
 	if err != nil {
 		return err
+	}
+	if info, err := file.Stat(); err != nil || !info.Mode().IsRegular() {
+		_ = file.Close()
+		if err != nil {
+			return fmt.Errorf("could not stat upgrade reservation file %s: %w", path, err)
+		}
+		return fmt.Errorf("upgrade reservation file %s is not a regular file", path)
 	}
 
 	if err := fillReservation(ctx, file, size); err != nil {
@@ -238,18 +245,27 @@ func CleanupDiskSpaceReservations(archiveDir string) error {
 }
 
 func shrinkDiskSpaceReservation(path string, delta int64) error {
-	info, err := os.Stat(path)
+	file, err := os.OpenFile(path, os.O_WRONLY|openNoFollow, 0)
 	if goerrors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
+		return fmt.Errorf("could not open upgrade reservation file %s: %w", path, err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
 		return fmt.Errorf("could not stat upgrade reservation file %s: %w", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("upgrade reservation file %s is not a regular file", path)
 	}
 	size := max(info.Size()-delta, 0)
 	if size >= info.Size() {
 		return nil
 	}
-	if err := os.Truncate(path, size); err != nil {
+	if err := file.Truncate(size); err != nil {
 		return fmt.Errorf("could not shrink upgrade reservation file %s: %w", path, err)
 	}
 	return nil

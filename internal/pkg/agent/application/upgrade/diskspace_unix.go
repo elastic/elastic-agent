@@ -12,6 +12,8 @@ import (
 	"syscall"
 )
 
+const openNoFollow = syscall.O_NOFOLLOW
+
 func getVolumeNameAt(dir string) (string, error) {
 	info, err := os.Stat(dir)
 	if err != nil {
