@@ -574,17 +574,6 @@ shared:
         source: '{{ repo.RootDir }}/NOTICE-fips.txt'
         mode: 0644
 
-<<<<<<< HEAD
-=======
-  - &agent_darwin_binary_fips_spec
-    <<: [*elastic_agent_fips_components, *common_fips]
-    files:
-      <<: [*metricbeat_lightweight_module, *agent_otel_collector_binary_spec, *agent_unpacked_components_files, *agent_darwin_binary_files]
-      NOTICE.txt:
-        source: '{{ repo.RootDir }}/NOTICE-fips.txt'
-        mode: 0644
-
->>>>>>> c097cf9 (fix(mage): upgrade pkgspecs.go from yaml.v2 to yaml.v3 (#16353))
   - &agent_darwin_binary_spec
     <<: [*elastic_agent_components, *common]
     files:
@@ -1080,22 +1069,6 @@ specs:
             symlink: true
             mode: 0755
 
-<<<<<<< HEAD
-=======
-    - os: darwin
-      types: [tgz]
-      spec:
-        <<: [*elastic_license_for_binaries, *agent_darwin_binary_fips_spec]
-        files:
-          'data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent':
-            template: '{{ elastic_beats_dir }}/dev-tools/packaging/templates/darwin/elastic-agent.tmpl'
-            mode: 0755
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: data/{{.BeatName}}-{{ core_commit_short }}/elastic-agent.app/Contents/MacOS/{{.BeatName}}{{.BinaryExt}}
-            symlink: true
-            mode: 0755
-
->>>>>>> c097cf9 (fix(mage): upgrade pkgspecs.go from yaml.v2 to yaml.v3 (#16353))
     - os: windows
       types: [zip]
       spec:
@@ -1237,21 +1210,6 @@ specs:
             source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
           <<: [*metricbeat_lightweight_module_core, *agent_otel_collector_binary_spec_core]
 
-<<<<<<< HEAD
-=======
-    - os: darwin
-      types: [tgz]
-      spec:
-        <<: [*elastic_license_for_binaries, *common_fips]
-        name: '{{.BeatName}}'
-        version: '{{ agent_core_version }}'
-        qualifier: 'core-fips'
-        files:
-          '{{.BeatName}}{{.BinaryExt}}':
-            source: ./build/golang-crossbuild/{{.BeatName}}-{{.GOOS}}-{{.Platform.Arch}}{{.BinaryExt}}
-          <<: [*metricbeat_lightweight_module_core, *agent_otel_collector_binary_spec_core]
-
->>>>>>> c097cf9 (fix(mage): upgrade pkgspecs.go from yaml.v2 to yaml.v3 (#16353))
     - os: windows
       types: [ zip ]
       spec:
