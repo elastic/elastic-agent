@@ -37,7 +37,7 @@ helm install elastic-agent ../../ \
         enabled: true
         url: $FLEET_URL # replace with Fleet URL
         token: $FLEET_TOKEN # replace with Fleet Enrollment token
-        preset: changeme # replace with the custom used-defined preset name
+        preset: changeme # replace with the custom user-defined preset name
     ```
 
 2. If you want to disable kube-state-metrics installation with the elastic-agent Helm chart, you can set `kube-state-metrics.enabled=false` in the Helm chart.
