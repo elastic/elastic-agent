@@ -484,7 +484,7 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 	defer cancel()
 
 	var mu sync.Mutex
-	var states []client.UnitState
+	var states []ComponentState
 	go func() {
 		for {
 			select {
@@ -492,7 +492,7 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 				return
 			case st := <-service.ch:
 				mu.Lock()
-				states = append(states, st.State)
+				states = append(states, st)
 				mu.Unlock()
 			}
 		}
@@ -501,20 +501,29 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
 	service.actionCh <- actionModeSigned{actionMode: actionStart}
 
-	// Wait for at least two failed attempts, i.e. one retry happened.
+	// Wait for FAILED to be reported and for a retry to happen after it. The log
+	// is written before the state is sent, so both conditions are needed.
 	require.Eventually(t, func() bool {
-		return logObs.FilterLevelExact(zapcore.ErrorLevel).
+		mu.Lock()
+		defer mu.Unlock()
+		failed := slices.ContainsFunc(states, func(st ComponentState) bool { return st.State == client.UnitStateFailed })
+		return failed && logObs.FilterLevelExact(zapcore.ErrorLevel).
 			FilterMessageSnippet("failed to start endpoint service").Len() >= 2
 	}, 30*time.Second, 100*time.Millisecond)
+	// Let the retry run its start attempt, which would reset the state if it was broken.
+	time.Sleep(service.serviceRestartDelay)
 
 	mu.Lock()
 	defer mu.Unlock()
-	require.Equal(t, client.UnitStateStarting, states[0])
-	require.Contains(t, states, client.UnitStateFailed)
-	failedAt := slices.Index(states, client.UnitStateFailed)
+	require.Equal(t, client.UnitStateStarting, states[0].State)
+	failedAt := slices.IndexFunc(states, func(st ComponentState) bool { return st.State == client.UnitStateFailed })
 	for _, st := range states[failedAt:] {
-		require.Equal(t, client.UnitStateFailed, st, "retry must not reset the state from FAILED")
+		require.Equal(t, client.UnitStateFailed, st.State, "retry must not reset the state from FAILED")
 	}
+	msg := states[failedAt].Message
+	require.Contains(t, msg, "failed to start")
+	require.Contains(t, msg, "Elastic Agent logs")
+	require.NotContains(t, msg, "exit status", "the state message must not embed the command error")
 }
 
 // startServiceRuntime runs service.Run in the background and registers a cleanup

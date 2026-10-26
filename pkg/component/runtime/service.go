@@ -269,8 +269,9 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						delay := s.serviceRestartDelay
 						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
 						s.startFailed = true
+						// The error is logged above, it can be long and multi-line so keep the state message generic.
 						s.forceCompState(client.UnitStateFailed,
-							fmt.Sprintf("Failed: %s service failed to start: %v, retrying in %v", s.name(), err, delay))
+							fmt.Sprintf("Failed: %s service failed to start, retrying in %v. See the Elastic Agent logs for details", s.name(), delay))
 						time.AfterFunc(delay, func() {
 							s.actionCh <- as
 						})
