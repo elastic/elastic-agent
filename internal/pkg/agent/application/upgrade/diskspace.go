@@ -31,9 +31,11 @@ import (
 )
 
 const (
-	ChecksumSize     = uint64(1024)            // 1KB
-	ExtraInstallSize = uint64(5 * 1024 * 1024) // 5MB
-	MarkerSize       = uint64(1024 * 1024)     // 1MB
+	ChecksumSize        = uint64(1024)            // 1KB
+	ExtraInstallSize    = uint64(5 * 1024 * 1024) // 5MB
+	MarkerSize          = uint64(1024 * 1024)     // 1MB
+	MaxArchiveSize      = uint64(2 * 1024 * 1024 * 1024)
+	MaxDecompressedSize = uint64(4 * 1024 * 1024 * 1024)
 
 	InstallReservationName = ".elastic-agent-install.reserved.tmp"
 	ArchiveReservationName = ".elastic-agent-artifact.reserved.tmp"
@@ -265,7 +267,7 @@ func getUpgradeSize(ctx context.Context, config *artifact.Config, uri string) (u
 	if err != nil {
 		return archiveSize, decompressedSize, goerrors.Join(upgradeErrors.ErrFetchUpgradeSize, err)
 	}
-	return archiveSize, decompressedSize, nil
+	return min(archiveSize, MaxArchiveSize), min(decompressedSize, MaxDecompressedSize), nil
 }
 
 func GetLocalUpgradeSize(uri string) (uint64, uint64, error) {
