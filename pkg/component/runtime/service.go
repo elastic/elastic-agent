@@ -68,6 +68,11 @@ type serviceRuntime struct {
 	// serviceRestartDelay is the time duration the service runtime will wait before
 	// attempting to restart a service that failed to start.
 	serviceRestartDelay time.Duration
+
+	// startFailed is true while the last attempt to start the service failed and
+	// a retry is pending. It keeps start() from overwriting the reported FAILED
+	// state with STARTING between retries.
+	startFailed bool
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
@@ -162,6 +167,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		// the flag is set once and never reset since the serviceRuntime object
 		// is not supposed to be reused once it's stopping
 		stopping = true
+		s.startFailed = false
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
 		checkinTimer.Stop()
@@ -243,6 +249,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 							slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
 							s.log.Warnf("exit code %d is non-fatal, continuing to run...", exitCode)
 							err = nil // fall through to open CIS and reset check-in timer
+							s.clearStartFailure()
 						}
 					}
 					if err != nil {
@@ -261,6 +268,9 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						// the start action on the action channel.
 						delay := s.serviceRestartDelay
 						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
+						s.startFailed = true
+						s.forceCompState(client.UnitStateFailed,
+							fmt.Sprintf("Failed: %s service failed to start: %v, retrying in %v", s.name(), err, delay))
 						time.AfterFunc(delay, func() {
 							s.actionCh <- as
 						})
@@ -405,8 +415,11 @@ func injectSigned(comp component.Component, signed *component.Signed) (component
 func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	name := s.name()
 
-	// Set state to starting
-	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
+	// Set state to starting, unless the previous attempt failed: keep reporting
+	// that failure until this attempt succeeds.
+	if !s.startFailed {
+		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
+	}
 
 	// Call the check command of the service
 	s.log.Infof("check if %s service is installed", name)
@@ -422,7 +435,17 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	}
 
 	// The service should start on it's own, expecting check-ins
+	s.clearStartFailure()
 	return nil
+}
+
+// clearStartFailure resets the state to STARTING after a previously failed start
+// attempt, as the service is now expected to check in.
+func (s *serviceRuntime) clearStartFailure() {
+	if s.startFailed {
+		s.startFailed = false
+		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", s.name()))
+	}
 }
 
 func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {

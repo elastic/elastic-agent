@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -456,6 +457,64 @@ func TestServiceStartRetry(t *testing.T) {
 		}
 		return false
 	}, service.serviceRestartDelay+1*time.Second, 500*time.Millisecond)
+}
+
+// TestServiceStartFailureReportedAcrossRetries tests that a failed service start
+// is reported as FAILED and that the retries do not reset the state to STARTING.
+func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
+	log, logObs := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".sfrteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var mu sync.Mutex
+	var states []client.UnitState
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case st := <-service.ch:
+				mu.Lock()
+				states = append(states, st.State)
+				mu.Unlock()
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	// Wait for at least two failed attempts, i.e. one retry happened.
+	require.Eventually(t, func() bool {
+		return logObs.FilterLevelExact(zapcore.ErrorLevel).
+			FilterMessageSnippet("failed to start endpoint service").Len() >= 2
+	}, 30*time.Second, 100*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, client.UnitStateStarting, states[0])
+	require.Contains(t, states, client.UnitStateFailed)
+	failedAt := slices.Index(states, client.UnitStateFailed)
+	for _, st := range states[failedAt:] {
+		require.Equal(t, client.UnitStateFailed, st, "retry must not reset the state from FAILED")
+	}
 }
 
 // startServiceRuntime runs service.Run in the background and registers a cleanup
