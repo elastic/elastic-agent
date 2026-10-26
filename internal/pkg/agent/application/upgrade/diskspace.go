@@ -433,6 +433,9 @@ func getZipPayloadSize(uri string, archiveSize uint64, readRange readRangeFunc) 
 
 	var total uint64
 	for _, f := range zr.File {
+		if f.UncompressedSize64 > math.MaxUint64-total {
+			return math.MaxUint64, nil
+		}
 		total += f.UncompressedSize64
 	}
 	return total, nil
