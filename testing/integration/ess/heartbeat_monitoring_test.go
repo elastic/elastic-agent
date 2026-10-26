@@ -97,7 +97,19 @@ func (runner *HeartbeatRunner) SetupSuite() {
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Minute)
 	defer cancel()
 
-	require.NoError(t, fleettools.UpdateESOutputPreset(ctx, runner.info.KibanaClient, fleettools.DefaultFleetOutputID, fleettools.OutputPresetLatency))
+	// Exporter requests retain output parameters, but the Beatsauth endpoint used
+	// by Heartbeat's monitor-state client must not include them.
+	require.NoError(t, fleettools.UpdateESOutput(
+		ctx,
+		runner.info.KibanaClient,
+		fleettools.DefaultFleetOutputID,
+		fleettools.ElasticsearchOutputUpdate{
+			Preset: fleettools.OutputPresetLatency,
+			ConfigYAML: `parameters:
+  pretty: "true"
+`,
+		},
+	), "configuring the Fleet Elasticsearch output with query parameters")
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, t, installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
 	require.NoError(t, err)
 

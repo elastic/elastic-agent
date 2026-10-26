@@ -485,6 +485,63 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	// required to make the extension not cause the collector to fail and exit on startup
 	newMap["continue_on_error"] = true
 
+<<<<<<< HEAD
+=======
+	esConfig := elasticsearch.DefaultConfig()
+	if err := outputCfg.Unpack(&esConfig); err != nil {
+		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
+	}
+	if err := esConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
+	}
+
+	if outputCfg.HasField("hosts") || outputCfg.HasField("cloud_id") || outputCfg.HasField("cloud.id") {
+		endpoints, err := getURL(esConfig, outputCfg)
+		if err != nil {
+			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)
+		}
+		// Beatsauth consumers use endpoints as base URLs and do not support
+		// Elasticsearch output parameters. Keep query parameters on the exporter
+		// endpoints, but remove them from the shared authenticator endpoints.
+		for i, endpoint := range endpoints {
+			endpointURL, err := url.Parse(endpoint)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse beatsauth endpoint %q: %w", endpoint, err)
+			}
+			endpointURL.RawQuery = ""
+			endpointURL.ForceQuery = false
+			endpoints[i] = endpointURL.String()
+		}
+		newMap["endpoints"] = endpoints
+	}
+
+	auth := map[string]any{}
+	if esConfig.Username != "" || esConfig.Password != "" {
+		if esConfig.Username == "" || esConfig.Password == "" {
+			return nil, errors.New("username and password must be configured together for the beatsauth extension")
+		}
+		auth["username"] = esConfig.Username
+		auth["password"] = esConfig.Password
+	}
+	if esConfig.APIKey != "" {
+		auth["api_key"] = base64.StdEncoding.EncodeToString([]byte(esConfig.APIKey))
+	}
+	if len(esConfig.Headers) > 0 {
+		headerNames := slices.Sorted(maps.Keys(esConfig.Headers))
+		headers := make([]map[string]string, 0, len(headerNames))
+		for _, name := range headerNames {
+			headers = append(headers, map[string]string{
+				"key":   name,
+				"value": esConfig.Headers[name],
+			})
+		}
+		auth["headers"] = headers
+	}
+	if len(auth) > 0 {
+		newMap["auth"] = auth
+	}
+
+>>>>>>> c99e85d (Drop query string parameters for Beatsauth endpoints (#17497))
 	return newMap, nil
 }
 
