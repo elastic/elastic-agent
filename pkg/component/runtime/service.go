@@ -70,8 +70,7 @@ type serviceRuntime struct {
 	serviceRestartDelay time.Duration
 
 	// startFailed is true while the last attempt to start the service failed and
-	// a retry is pending. It keeps start() from overwriting the reported FAILED
-	// state with STARTING between retries.
+	// a retry is pending. The FAILED state is kept until a start attempt succeeds.
 	startFailed bool
 }
 
@@ -269,7 +268,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						delay := s.serviceRestartDelay
 						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
 						s.startFailed = true
-						// The error is logged above, it can be long and multi-line so keep the state message generic.
+						// The error is logged above, the state message only points to the logs.
 						s.forceCompState(client.UnitStateFailed,
 							fmt.Sprintf("Failed: %s service failed to start, retrying in %v. See the Elastic Agent logs for details", s.name(), delay))
 						time.AfterFunc(delay, func() {
@@ -416,8 +415,7 @@ func injectSigned(comp component.Component, signed *component.Signed) (component
 func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	name := s.name()
 
-	// Set state to starting, unless the previous attempt failed: keep reporting
-	// that failure until this attempt succeeds.
+	// Keep reporting FAILED while retrying a failed start.
 	if !s.startFailed {
 		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
 	}
@@ -440,8 +438,8 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	return nil
 }
 
-// clearStartFailure resets the state to STARTING after a previously failed start
-// attempt, as the service is now expected to check in.
+// clearStartFailure moves the state from FAILED back to STARTING once a start
+// attempt no longer fails.
 func (s *serviceRuntime) clearStartFailure() {
 	if s.startFailed {
 		s.startFailed = false
