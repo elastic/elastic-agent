@@ -144,6 +144,11 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		return nil, nil, nil, err
 	}
 
+	persistentQueue, storageName, err := extractPersistentQueueConfig(output)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	// Preset must be applied before unpacking the config because it can override output fields.
 	//
 	// isNamedPreset distinguishes the four performance presets (balanced/throughput/scale/latency)
@@ -179,13 +184,51 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		}
 	}
 
+	persistentDefaults := persistentQueue != nil && !isNamedPreset
+	var userBulk, userMinEvents, userEvents bool
+	appliedLabel := fmt.Sprintf("performance preset '%v'", storedPreset)
+	if persistentDefaults {
+		userBulk, _ = output.Has("bulk_max_size", -1)
+		userMinEvents, _ = output.Has("queue.mem.flush.min_events", -1)
+		userEvents, _ = output.Has("queue.mem.events", -1)
+		defaults := config.MustNewConfigFrom(map[string]any{})
+		_, storedPresetConfig, err = elasticsearch.ApplyPreset("balanced", defaults)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		if err := defaults.Merge(output); err != nil {
+			return nil, nil, nil, fmt.Errorf("failed applying persistent queue defaults: %w", err)
+		}
+		output = defaults
+		storedPreset = "balanced"
+		appliedLabel = "persistent queue defaults (balanced)"
+	}
+
+	if persistentQueue != nil && usesPersistentSizing(storedPreset) {
+		bulkMaxSize := persistentSizingBulkMaxSize
+		if storedPreset == "latency" {
+			bulkMaxSize = persistentSizingLatencyBulkMaxSize
+		}
+		if !userBulk {
+			if err := output.SetInt("bulk_max_size", -1, int64(bulkMaxSize)); err != nil {
+				return nil, nil, nil, fmt.Errorf("failed setting bulk_max_size: %w", err)
+			}
+		}
+		if !userMinEvents {
+			if err := output.SetInt("queue.mem.flush.min_events", -1, int64(bulkMaxSize)); err != nil {
+				return nil, nil, nil, fmt.Errorf("failed setting queue.mem.flush.min_events: %w", err)
+			}
+		}
+		presetFloor = 0
+	}
+
 	// maxConns and batchSize are computed once here, after ApplyPreset has written
 	// the preset's worker count and queue parameters into output.
 	maxConns := getTotalNumConnections(output)
 	batchSize := min(getFlushMinEvents(logger, output), getBulkMaxSize(output))
 
 	var queueSize, numConsumers int
-	if isNamedPreset {
+	if isNamedPreset || (persistentDefaults && !userEvents) {
 		queueSize, numConsumers = calcNamedPresetSizing(maxConns, batchSize, presetFloor)
 
 		// Write the OTel-adjusted queue size back into output so the subsequent
@@ -199,10 +242,10 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		logCopy := config.MustNewConfigFrom(map[string]any{})
 		_ = logCopy.Merge(storedPresetConfig)
 		_ = logCopy.SetInt("queue.mem.events", -1, int64(queueSize))
-		logger.Infof("Applying performance preset '%v': %v", storedPreset, config.DebugString(logCopy, false))
+		logger.Infof("Applying %v: %v", appliedLabel, config.DebugString(logCopy, false))
 	} else {
 		if storedPresetConfig != nil {
-			logger.Infof("Applying performance preset '%v': %v", storedPreset, config.DebugString(storedPresetConfig, false))
+			logger.Infof("Applying %v: %v", appliedLabel, config.DebugString(storedPresetConfig, false))
 		}
 		// num_consumers has no beats equivalent (users never set it) so apply the
 		// same one-spare-consumer staging model regardless of preset.
@@ -327,6 +370,13 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 	// sets extensionCfg
 	extensionCfg = map[string]any{
 		extensionID.String(): extensionConfig,
+	}
+
+	if storageName == "" {
+		storageName = outputName
+	}
+	if err := applyPersistentQueue(persistentQueue, storedPreset, storageName, otelYAMLCfg, extensionCfg); err != nil {
+		return nil, nil, nil, fmt.Errorf("error configuring persistent queue for output: %s, error: %w", outputName, err)
 	}
 
 	// add authenticator to ES config

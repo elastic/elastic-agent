@@ -1,0 +1,5 @@
+kind: feature
+
+summary: Support queue.persistent on Elasticsearch outputs run by the OTel runtime, backed by the file_storage extension
+
+component: "elastic-agent"

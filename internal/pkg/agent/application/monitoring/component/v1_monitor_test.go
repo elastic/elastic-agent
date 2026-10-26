@@ -28,6 +28,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -1253,4 +1254,47 @@ func TestLoggingPath(t *testing.T) {
 			assert.True(t, strings.HasSuffix(logsPath, "unit-1"), "%q must end with the sanitized unit id", logsPath)
 		})
 	}
+}
+
+func TestInjectMonitoringOutputSharesQueueStorage(t *testing.T) {
+	persistent := func() map[string]any {
+		return map[string]any{"file_storage": map[string]any{"max_size": 10485760}}
+	}
+	source := map[string]any{
+		"outputs": map[string]any{
+			"default": map[string]any{
+				"type":  "elasticsearch",
+				"queue": map[string]any{"persistent": persistent()},
+			},
+			"other": map[string]any{
+				"type":  "elasticsearch",
+				"queue": map[string]any{"persistent": persistent()},
+			},
+			"plain": map[string]any{"type": "elasticsearch"},
+		},
+	}
+
+	for _, useOutput := range []string{"default", "other"} {
+		t.Run("shares_"+useOutput, func(t *testing.T) {
+			b := &BeatsMonitor{config: &monitoringConfig{C: &monitoringcfg.MonitoringConfig{UseOutput: useOutput}}}
+			dest := map[string]any{}
+			_, err := b.injectMonitoringOutput(source, dest)
+			require.NoError(t, err)
+			out := dest["outputs"].(map[string]any)[MonitoringOutput].(map[string]any)
+			got := out["queue"].(map[string]any)["persistent"].(map[string]any)
+			require.Equal(t, useOutput, got[translate.PersistentQueueStorageKey])
+
+			orig := source["outputs"].(map[string]any)[useOutput].(map[string]any)
+			require.NotContains(t, orig["queue"].(map[string]any)["persistent"], translate.PersistentQueueStorageKey)
+		})
+	}
+
+	t.Run("no_persistent_queue_untouched", func(t *testing.T) {
+		b := &BeatsMonitor{config: &monitoringConfig{C: &monitoringcfg.MonitoringConfig{UseOutput: "plain"}}}
+		dest := map[string]any{}
+		_, err := b.injectMonitoringOutput(source, dest)
+		require.NoError(t, err)
+		out := dest["outputs"].(map[string]any)[MonitoringOutput].(map[string]any)
+		require.NotContains(t, out, "queue")
+	})
 }
