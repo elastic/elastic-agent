@@ -130,6 +130,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
+	if m.cfg.Fleet.Server == nil {
+		for _, cs := range m.initialClientSetters {
+			cs.SetClient(m.client)
+		}
+	}
+
 	action := m.stateStore.Action()
 	stateRestored := false
 	if action != nil && !m.wasUnenrolled() {
