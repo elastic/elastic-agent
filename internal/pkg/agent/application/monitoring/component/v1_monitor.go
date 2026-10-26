@@ -367,7 +367,7 @@ func (b *BeatsMonitor) injectMonitoringOutput(source, dest map[string]any) (map[
 	}
 
 	monitoringOutputs := map[string]any{
-		MonitoringOutput: outputNode,
+		MonitoringOutput: translate.ShareOutputStorage(outputMap, monitoringOutputName),
 	}
 
 	dest[outputsKey] = monitoringOutputs

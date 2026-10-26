@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/protobuf/types/known/structpb"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -3194,5 +3196,39 @@ func TestCoordinator_Restart(t *testing.T) {
 		err := coord.Restart(ctx, action)
 		require.ErrorIs(t, err, ErrContainerNotSupported)
 		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
+	})
+}
+
+func TestStripPersistentQueueForProcess(t *testing.T) {
+	newComp := func(runtime pkgcomponent.RuntimeManager, queue map[string]any) pkgcomponent.Component {
+		src, err := structpb.NewStruct(map[string]any{"type": "elasticsearch", "queue": queue})
+		require.NoError(t, err)
+		return pkgcomponent.Component{
+			RuntimeManager: runtime,
+			Units:          []pkgcomponent.Unit{{Type: client.UnitTypeOutput, Config: &proto.UnitExpectedConfig{Source: src}}},
+		}
+	}
+	persistent := map[string]any{"persistent": map[string]any{"file_storage": map[string]any{}}}
+
+	t.Run("process_removed_and_original_untouched", func(t *testing.T) {
+		comp := newComp(pkgcomponent.ProcessRuntimeManager, persistent)
+		orig := comp.Units[0].Config
+		stripPersistentQueueForProcess(&comp)
+		require.NotContains(t, comp.Units[0].Config.Source.Fields, "queue")
+		require.Contains(t, orig.Source.Fields, "queue")
+	})
+
+	t.Run("process_keeps_other_queue_settings", func(t *testing.T) {
+		comp := newComp(pkgcomponent.ProcessRuntimeManager, map[string]any{"mem": map[string]any{"events": 100}, "persistent": persistent["persistent"]})
+		stripPersistentQueueForProcess(&comp)
+		queue := comp.Units[0].Config.Source.Fields["queue"].GetStructValue()
+		require.Contains(t, queue.Fields, "mem")
+		require.NotContains(t, queue.Fields, "persistent")
+	})
+
+	t.Run("otel_untouched", func(t *testing.T) {
+		comp := newComp(pkgcomponent.OtelRuntimeManager, persistent)
+		stripPersistentQueueForProcess(&comp)
+		require.Contains(t, comp.Units[0].Config.Source.Fields, "queue")
 	})
 }
