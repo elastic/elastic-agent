@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -149,6 +150,7 @@ func TestUpgradeReserveDiskSpace(t *testing.T) {
 				upgradetest.WithCustomWatcherConfig(watcherConfig))
 
 			tt.run(t, err, targetDir, installDir)
+			require.NoError(t, upgradetest.CheckDiskSpaceReservationsRemoved(paths.InstallPath(installDir), targetDir))
 		})
 	}
 }

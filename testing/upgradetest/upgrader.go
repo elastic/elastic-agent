@@ -22,6 +22,7 @@ import (
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/acl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -341,6 +342,16 @@ func PerformUpgrade(
 		}
 	}
 
+	reservationTopPath := installtest.DefaultTopPath()
+	if installOpts.BasePath != "" {
+		reservationTopPath = paths.InstallPath(installOpts.BasePath)
+	}
+	startInspect, err := startFixture.ExecInspect(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to inspect start agent: %w", err)
+	}
+	startDownloadsDir := filepath.Join(startInspect.Path.Home, "downloads")
+
 	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 
 	upgradeCmdArgs := []string{"upgrade", endVersionInfo.Binary.String()}
@@ -466,6 +477,10 @@ func PerformUpgrade(
 		return err
 	}
 
+	if err := CheckDiskSpaceReservationsRemoved(reservationTopPath, startDownloadsDir); err != nil {
+		return err
+	}
+
 	// validate again that the installation is correct, upgrade should not have changed installation validation
 	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
 		var topPath string
@@ -485,6 +500,24 @@ func PerformUpgrade(
 	}
 
 	return nil
+}
+
+func CheckDiskSpaceReservationsRemoved(topPath, archiveDir string) error {
+	installReservation := filepath.Join(paths.DataFrom(topPath), upgrade.InstallReservationName)
+	archiveReservation := filepath.Join(archiveDir, upgrade.ArchiveReservationName)
+
+	var errs []error
+	if _, err := os.Lstat(installReservation); err == nil {
+		errs = append(errs, fmt.Errorf("disk space reservation file %s was not removed", installReservation))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("failed to check disk space reservation file %s: %w", installReservation, err))
+	}
+	if _, err := os.Lstat(archiveReservation); err == nil {
+		errs = append(errs, fmt.Errorf("disk space reservation file %s was not removed", archiveReservation))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("failed to check disk space reservation file %s: %w", archiveReservation, err))
+	}
+	return errors.Join(errs...)
 }
 
 var ErrVerMismatch = errors.New("versions don't match")

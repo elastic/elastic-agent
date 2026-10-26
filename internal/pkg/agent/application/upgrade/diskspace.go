@@ -35,6 +35,9 @@ const (
 	ExtraInstallSize = uint64(5 * 1024 * 1024) // 5MB
 	MarkerSize       = uint64(1024 * 1024)     // 1MB
 
+	InstallReservationName = ".elastic-agent-install.reserved.tmp"
+	ArchiveReservationName = ".elastic-agent-artifact.reserved.tmp"
+
 	reservationFillByte  = 0xFF
 	reservationFillChunk = 1024 * 1024
 
@@ -45,11 +48,11 @@ const (
 )
 
 func getArchiveReservation(archiveDir string) string {
-	return filepath.Join(archiveDir, ".elastic-agent-artifact.reserved.tmp")
+	return filepath.Join(archiveDir, ArchiveReservationName)
 }
 
 func getInstallReservation() string {
-	return filepath.Join(paths.Data(), ".elastic-agent-install.reserved.tmp")
+	return filepath.Join(paths.Data(), InstallReservationName)
 }
 
 func checkSameVolume(pathA, pathB string) bool {
