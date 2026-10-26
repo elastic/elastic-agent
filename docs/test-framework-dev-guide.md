@@ -559,14 +559,14 @@ package for helper utilities.
 
 ### Test group
 
-Every `define.Require` must define a `Group` that it belongs too. Each group is executed on a separate instance with all tests with in the same group executed
-on the same instance. Placing similar tests in the same group allows those tests to run on its own instance
+Every `define.Require` must define a `Group` that it belongs to. Each group is executed on a separate instance with all tests within the same group executed
+on the same instance. Placing similar tests in the same group allows those tests to run on their own instance
 as well as provides a way for a developer to select a specific group of tests with `TEST_GROUP="{group-name}"`.
 
 Grouping tests is another way of spreading out the testing load across multiple instances. The more groups that
 are defined the more instances will be provisioned to complete all tests. A balance between a small good set of
 groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
-out weight the benefits of creating another group.
+outweigh the benefits of creating another group.
 
 #### Creating a new test group and Buildkite integration tests
 
