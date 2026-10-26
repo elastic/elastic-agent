@@ -678,7 +678,11 @@ instrumentation:
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.11.0
   dotnet:
+<<<<<<< HEAD
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.4.0
+=======
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.1
+>>>>>>> 711c0b3 (chore: Update Elastic OTEL .NET image in values.yaml (#17496))
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.12.0
   go:
