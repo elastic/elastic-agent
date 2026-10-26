@@ -2760,6 +2760,13 @@ service:
 		return true
 	}, 1*time.Minute, 1*time.Second)
 
+	// The monitoring connector emits bodymap logs, so the agent adds its identity to them.
+	agentStatus, err := fixture.ExecStatus(ctx)
+	require.NoError(t, err, "failed to get agent status")
+	require.NotEmpty(t, agentStatus.Info.ID, "agent status should include the agent ID")
+	hostname, err := os.Hostname()
+	require.NoError(t, err, "couldn't get local hostname")
+
 	// Wait for monitoring events to be indexed in Elasticsearch
 	var docs estools.Documents
 	require.EventuallyWithT(
@@ -2794,11 +2801,7 @@ service:
 	reportedHostname, err := ev.GetValue("host.name")
 	assert.NoError(t, err, "monitoring events should include host.name")
 	if err == nil {
-		hostname, err := os.Hostname()
-		assert.NoError(t, err, "couldn't get local hostname")
-		if err == nil {
-			assert.Equal(t, reportedHostname, hostname, "monitoring event host.name should match hostname")
-		}
+		assert.Equal(t, reportedHostname, hostname, "monitoring event host.name should match hostname")
 	}
 	_ = ev.Delete("host")
 
@@ -2818,7 +2821,14 @@ service:
 		"beat.stats.libbeat.output.events.acked":          float64(1),
 		"beat.stats.libbeat.output.events.dropped":        float64(0),
 		"beat.stats.libbeat.output.events.batches":        float64(1),
-		"component.id": "elasticsearch/1",
+		"component.id":           "elasticsearch/1",
+		"agent.id":               agentStatus.Info.ID,
+		"agent.name":             hostname,
+		"agent.type":             "otelcol",
+		"agent.version":          agentStatus.Info.Version,
+		"elastic_agent.id":       agentStatus.Info.ID,
+		"elastic_agent.snapshot": agentStatus.Info.Snapshot,
+		"elastic_agent.version":  agentStatus.Info.Version,
 	}
 
 	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
