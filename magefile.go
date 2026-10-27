@@ -1247,6 +1247,13 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	}
 	os.MkdirAll(flatPath, 0o755)
 	defer os.RemoveAll(flatPath)
+	// the versioned drop dirs are rebuilt from the archives on every run (see flattenDependencies),
+	// so they are not kept with KEEP_ARCHIVE either
+	defer func() {
+		for _, pltf := range platforms.Names() {
+			os.RemoveAll(filepath.Join(dropPath, manifest.PlatformPackages[pltf]))
+		}
+	}()
 
 	// extract all dependencies from their archives into flat dir
 	flattenDependencies(cfg, platforms.Names(), dependenciesVersion, archivePath, dropPath, flatPath, manifestResponse, dependencies)
@@ -1492,9 +1499,21 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
-		os.MkdirAll(targetPath, 0o755)
-		os.MkdirAll(versionedFlatPath, 0o755)
-		os.MkdirAll(versionedDropPath, 0o755)
+
+		if err := os.MkdirAll(targetPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating target dir %q: %w", targetPath, err))
+		}
+		if err := os.MkdirAll(versionedFlatPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating versioned flat dir %q: %w", versionedFlatPath, err))
+		}
+		// KEEP_ARCHIVE only caches the downloaded archives: the versioned drop dir is rebuilt from them on
+		// every run, so remove what a previous build left there instead of merging into it
+		if err := os.RemoveAll(versionedDropPath); err != nil {
+			panic(fmt.Errorf("cleaning versioned drop dir %q: %w", versionedDropPath, err))
+		}
+		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
+		}
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
