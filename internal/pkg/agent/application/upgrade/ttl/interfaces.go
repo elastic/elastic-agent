@@ -4,8 +4,6 @@
 
 package ttl
 
-import "time"
-
 // ReadOnlySource is the read-only view of the TTL rollback registry.
 type ReadOnlySource interface {
 	// GetAll reads all on-disk TTL markers and returns three values:
@@ -15,9 +13,9 @@ type ReadOnlySource interface {
 	//   - err: non-nil only on structural failures (e.g. glob error) where no scan could be
 	//     performed; in that case both maps are nil.
 	GetAll() (map[string]TTLMarker, map[string]error, error)
-	// GetAvailableRollbacks returns the entries of GetAll that are rollback targets valid at now, keyed by versioned
+	// GetAvailableRollbacks returns the entries of GetAll that are rollback targets valid now, keyed by versioned
 	// home path. Entries kept only for retention (TTLMarker.RetentionOnly) and expired entries are left out.
-	GetAvailableRollbacks(now time.Time) (map[string]TTLMarker, error)
+	GetAvailableRollbacks() (map[string]TTLMarker, error)
 }
 
 // Source is the persistence layer for TTL-based rollback markers.

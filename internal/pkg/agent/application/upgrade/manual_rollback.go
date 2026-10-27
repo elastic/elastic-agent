@@ -50,7 +50,7 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
 		// the TTL registry and then proceed with rollback
 		updateMarkerExistsBeforeRollback = true
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackWithExistingMarker(ctx, u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, action)
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackWithExistingMarker(ctx, u.log, u.watcherHelper, u.availableRollbacksSource, topDir, version, action)
 	}
 
 	if err != nil {
@@ -94,7 +94,7 @@ func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, version string) (str
 
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
-	availableRollbacks, err := source.GetAvailableRollbacks(now)
+	availableRollbacks, err := source.GetAvailableRollbacks()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
@@ -151,7 +151,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	return watcherExecutable, targetInstall, nil
 }
 
-func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
+func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
@@ -172,7 +172,7 @@ func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcher
 	var selectedRollbackVersionedHome string
 
 	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
-		rollbacks, err := source.GetAvailableRollbacks(now)
+		rollbacks, err := source.GetAvailableRollbacks()
 		if err != nil {
 			return fmt.Errorf("reading TTL markers: %w", err)
 		}

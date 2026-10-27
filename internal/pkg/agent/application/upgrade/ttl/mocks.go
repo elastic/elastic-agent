@@ -9,8 +9,6 @@
 package ttl
 
 import (
-	"time"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -114,8 +112,8 @@ func (_c *MockReadOnlySource_GetAll_Call) RunAndReturn(run func() (map[string]TT
 }
 
 // GetAvailableRollbacks provides a mock function for the type MockReadOnlySource
-func (_mock *MockReadOnlySource) GetAvailableRollbacks(now time.Time) (map[string]TTLMarker, error) {
-	ret := _mock.Called(now)
+func (_mock *MockReadOnlySource) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAvailableRollbacks")
@@ -123,18 +121,18 @@ func (_mock *MockReadOnlySource) GetAvailableRollbacks(now time.Time) (map[strin
 
 	var r0 map[string]TTLMarker
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(time.Time) (map[string]TTLMarker, error)); ok {
-		return returnFunc(now)
+	if returnFunc, ok := ret.Get(0).(func() (map[string]TTLMarker, error)); ok {
+		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func(time.Time) map[string]TTLMarker); ok {
-		r0 = returnFunc(now)
+	if returnFunc, ok := ret.Get(0).(func() map[string]TTLMarker); ok {
+		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]TTLMarker)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(time.Time) error); ok {
-		r1 = returnFunc(now)
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -147,20 +145,13 @@ type MockReadOnlySource_GetAvailableRollbacks_Call struct {
 }
 
 // GetAvailableRollbacks is a helper method to define mock.On call
-//   - now time.Time
-func (_e *MockReadOnlySource_Expecter) GetAvailableRollbacks(now any) *MockReadOnlySource_GetAvailableRollbacks_Call {
-	return &MockReadOnlySource_GetAvailableRollbacks_Call{Call: _e.mock.On("GetAvailableRollbacks", now)}
+func (_e *MockReadOnlySource_Expecter) GetAvailableRollbacks() *MockReadOnlySource_GetAvailableRollbacks_Call {
+	return &MockReadOnlySource_GetAvailableRollbacks_Call{Call: _e.mock.On("GetAvailableRollbacks")}
 }
 
-func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) Run(run func(now time.Time)) *MockReadOnlySource_GetAvailableRollbacks_Call {
+func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) Run(run func()) *MockReadOnlySource_GetAvailableRollbacks_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 time.Time
-		if args[0] != nil {
-			arg0 = args[0].(time.Time)
-		}
-		run(
-			arg0,
-		)
+		run()
 	})
 	return _c
 }
@@ -170,7 +161,7 @@ func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) Return(stringToTTLMarke
 	return _c
 }
 
-func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) RunAndReturn(run func(now time.Time) (map[string]TTLMarker, error)) *MockReadOnlySource_GetAvailableRollbacks_Call {
+func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) RunAndReturn(run func() (map[string]TTLMarker, error)) *MockReadOnlySource_GetAvailableRollbacks_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -275,8 +266,8 @@ func (_c *MockSource_GetAll_Call) RunAndReturn(run func() (map[string]TTLMarker,
 }
 
 // GetAvailableRollbacks provides a mock function for the type MockSource
-func (_mock *MockSource) GetAvailableRollbacks(now time.Time) (map[string]TTLMarker, error) {
-	ret := _mock.Called(now)
+func (_mock *MockSource) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+	ret := _mock.Called()
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAvailableRollbacks")
@@ -284,18 +275,18 @@ func (_mock *MockSource) GetAvailableRollbacks(now time.Time) (map[string]TTLMar
 
 	var r0 map[string]TTLMarker
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(time.Time) (map[string]TTLMarker, error)); ok {
-		return returnFunc(now)
+	if returnFunc, ok := ret.Get(0).(func() (map[string]TTLMarker, error)); ok {
+		return returnFunc()
 	}
-	if returnFunc, ok := ret.Get(0).(func(time.Time) map[string]TTLMarker); ok {
-		r0 = returnFunc(now)
+	if returnFunc, ok := ret.Get(0).(func() map[string]TTLMarker); ok {
+		r0 = returnFunc()
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]TTLMarker)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(time.Time) error); ok {
-		r1 = returnFunc(now)
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -308,20 +299,13 @@ type MockSource_GetAvailableRollbacks_Call struct {
 }
 
 // GetAvailableRollbacks is a helper method to define mock.On call
-//   - now time.Time
-func (_e *MockSource_Expecter) GetAvailableRollbacks(now any) *MockSource_GetAvailableRollbacks_Call {
-	return &MockSource_GetAvailableRollbacks_Call{Call: _e.mock.On("GetAvailableRollbacks", now)}
+func (_e *MockSource_Expecter) GetAvailableRollbacks() *MockSource_GetAvailableRollbacks_Call {
+	return &MockSource_GetAvailableRollbacks_Call{Call: _e.mock.On("GetAvailableRollbacks")}
 }
 
-func (_c *MockSource_GetAvailableRollbacks_Call) Run(run func(now time.Time)) *MockSource_GetAvailableRollbacks_Call {
+func (_c *MockSource_GetAvailableRollbacks_Call) Run(run func()) *MockSource_GetAvailableRollbacks_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 time.Time
-		if args[0] != nil {
-			arg0 = args[0].(time.Time)
-		}
-		run(
-			arg0,
-		)
+		run()
 	})
 	return _c
 }
@@ -331,7 +315,7 @@ func (_c *MockSource_GetAvailableRollbacks_Call) Return(stringToTTLMarker map[st
 	return _c
 }
 
-func (_c *MockSource_GetAvailableRollbacks_Call) RunAndReturn(run func(now time.Time) (map[string]TTLMarker, error)) *MockSource_GetAvailableRollbacks_Call {
+func (_c *MockSource_GetAvailableRollbacks_Call) RunAndReturn(run func() (map[string]TTLMarker, error)) *MockSource_GetAvailableRollbacks_Call {
 	_c.Call.Return(run)
 	return _c
 }

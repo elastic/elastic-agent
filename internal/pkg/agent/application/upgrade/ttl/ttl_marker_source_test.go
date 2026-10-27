@@ -347,7 +347,7 @@ func TestTTLMarkerRegistry_GetAvailableRollbacks(t *testing.T) {
 		retentionHome: {Version: "4.5.6", Hash: "retention", ValidUntil: validUntil, RetentionOnly: true},
 	}))
 
-	got, err := registry.GetAvailableRollbacks(time.Now())
+	got, err := registry.GetAvailableRollbacks()
 	require.NoError(t, err)
 	assert.Len(t, got, 1)
 	assert.Contains(t, got, regularHome)
