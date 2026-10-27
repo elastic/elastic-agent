@@ -245,8 +245,8 @@ RUN cd {{$beatHome}}/.node \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
 # fix .node .npm and .synthetics
   && chown -R {{ .user }}:{{ .user }} $NODE_PATH \
-# TODO: Remove this step when Node.js is bumped to a version that bundles npm >= 12.0.2
-# Bootstrap npm 12.0.2 from a downloaded copy to avoid npm 10.x self-replacement failures
+# TODO: Remove this step when Node.js is bumped to a version that bundles npm >= 12.2.1
+# Bootstrap npm 12.2.1 from a downloaded copy to avoid npm 10.x self-replacement failures
   && curl -fsSL -o /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-12.2.1.tgz \
   && echo "6ca0a6151553fc107e60f1186d9c10d57508dcde6de31292a54d4cc4e8e8ef3de25b3281274657442d7115d10df930bb3794ddcb0681cdfd9d317189abf7b63d  /tmp/npm.tgz" | sha512sum -c - \
   && tar xz -C /tmp -f /tmp/npm.tgz \
