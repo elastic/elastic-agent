@@ -56,6 +56,10 @@ jobs:
       uses: actions/setup-go@v7
       with:
         go-version-file: 'go.mod'
+        cache-dependency-path: |
+          go.mod
+          beats/go.mod
+          internal/edot/go.mod
 
     - name: Install mage
       uses: magefile/mage-action@a662bd8c29d8106879588cfff83b2faf6e6f59db # v4.0.0
