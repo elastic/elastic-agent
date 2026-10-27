@@ -1250,7 +1250,7 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	// the versioned drop dirs are rebuilt from the archives on every run (see flattenDependencies),
 	// so they are not kept with KEEP_ARCHIVE either
 	defer func() {
-		for _, pltf := range platforms {
+		for _, pltf := range platforms.Names() {
 			os.RemoveAll(filepath.Join(dropPath, manifest.PlatformPackages[pltf]))
 		}
 	}()
