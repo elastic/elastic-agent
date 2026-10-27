@@ -76,6 +76,27 @@ func TestManualRollback(t *testing.T) {
        version: 1.2.3
        valid_until: 2025-07-18T10:11:12.131415Z
    `
+	const updatemarkerwatching456MarkerValidFarFuture = `
+   version: 4.5.6
+   hash: newver
+   versioned_home: data/elastic-agent-4.5.6-newver
+   updated_on: 2025-07-11T10:11:12.131415Z
+   prev_version: 1.2.3
+   prev_hash: oldver
+   prev_versioned_home: data/elastic-agent-1.2.3-oldver
+   acked: false
+   action: null
+   details:
+       target_version: 4.5.6
+       state: UPG_WATCHING
+       metadata:
+           retry_until: null
+   desired_outcome: UPGRADE
+   rollbacks_available:
+     "data/elastic-agent-1.2.3-oldver":
+       version: 1.2.3
+       valid_until: 2099-01-01T00:00:00Z
+   `
 	const updatemarkerwatching456MarkerExpired = `
    version: 4.5.6
    hash: newver
@@ -160,6 +181,68 @@ func TestManualRollback(t *testing.T) {
 				return assert.ErrorIs(t, err, ErrEmptyRollbackVersion)
 			},
 			additionalAsserts: nil,
+		},
+		{
+			name: "update marker ok but rollback is expired - error",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+				// the TTL source does not report the expired entry
+				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			now:              nowBeforeTTL,
+			version:          "1.2.3",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				// marker should be untouched
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+
+				assert.YAMLEq(t, updatemarkerwatching456, string(markerFileBytes), "update marker should be untouched")
+			},
+		},
+		{
+			name: "marker says rollback valid but TTL says expired - error (TTL is the source of truth)",
+			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
+				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456MarkerValidFarFuture), 0600)
+				require.NoError(t, err, "error setting up update marker")
+				locker := filelock.NewAppLocker(topDir, "watcher.lock")
+				err = locker.TryLock()
+				require.NoError(t, err, "error locking initial watcher AppLocker")
+				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
+				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
+				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
+				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
+				// the TTL source does not report the expired entry
+				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{}, nil)
+			},
+			artifactSettings: artifact.DefaultConfig(),
+			upgradeSettings:  configuration.DefaultUpgradeConfig(),
+			now:              nowBeforeTTL,
+			version:          "1.2.3",
+			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
+			},
+			additionalAsserts: func(t *testing.T, topDir string) {
+				filePath := markerFilePath(paths.DataFrom(topDir))
+				require.FileExists(t, filePath)
+				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
+				require.NoError(t, readMarkerErr)
+				assert.YAMLEq(t, updatemarkerwatching456MarkerValidFarFuture, string(markerFileBytes), "update marker should be untouched")
+			},
 		},
 		{
 			name: "no update marker - rollback fails",
