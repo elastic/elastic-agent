@@ -115,6 +115,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -183,6 +185,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -252,6 +256,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -355,6 +361,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -415,6 +423,8 @@ logs_index: some-index
 password: changeme
 user: elastic
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -514,6 +524,8 @@ sending_queue:
 suppress_conflict_errors: true
 timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -643,6 +655,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -709,6 +723,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -784,6 +800,8 @@ sending_queue:
 suppress_conflict_errors: true
 timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
