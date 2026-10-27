@@ -159,10 +159,8 @@ func (T TTLMarkerRegistry) GetAvailableRollbacks() (map[string]TTLMarker, error)
 
 func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
 	for versionedHome, marker := range m {
-		dstFilePath := filepath.Join(T.baseDir, versionedHome, MarkerFileName)
-		err := writeTTLMarker(dstFilePath, marker)
-		if err != nil {
-			return fmt.Errorf("writing marker %q: %w", dstFilePath, err)
+		if err := T.Add(versionedHome, marker); err != nil {
+			return err
 		}
 	}
 
