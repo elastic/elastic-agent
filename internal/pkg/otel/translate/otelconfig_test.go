@@ -3181,10 +3181,10 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-b-same-stream")
 
 	// status must be attributed to the right unit even though the stream IDs match
-	statuses := map[string]*status.AggregateStatus{
+	statuses := newReceiverStatuses(map[string]*status.AggregateStatus{
 		receiverStreamSuffix(comp.ID, comp.Units[0].ID, "same-stream"): {Event: componentstatus.NewEvent(componentstatus.StatusOK)},
 		receiverStreamSuffix(comp.ID, comp.Units[1].ID, "same-stream"): {Event: componentstatus.NewEvent(componentstatus.StatusPermanentError)},
-	}
+	})
 	for i, unit := range comp.Units {
 		got := receiversForUnit(statuses, unit, comp)
 		require.Len(t, got, 1)
