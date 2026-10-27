@@ -32,11 +32,6 @@ receivers:
             - cat_template
             - component_template
             - index_template
-    processors:
-      - add_fields:
-          target: autoops_es
-          fields:
-            token: ${env:AUTOOPS_TOKEN}
     output:
       otelconsumer:
     telemetry_types: ["logs"]
@@ -71,12 +66,6 @@ service:
 {{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName) -}}
 extraEnvs:
   # Always present
-  - name: AUTOOPS_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: {{ $agentName }}-autoops
-        key: autoops-token
-
   - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
     valueFrom:
       secretKeyRef:

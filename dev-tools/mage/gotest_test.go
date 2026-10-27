@@ -6,21 +6,15 @@ package mage
 
 import (
 	"context"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/magefile/mage/mg"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const envGoTestHelper = "GOTEST_WANT_HELPER"
-
-var gotestHelperMode = os.Getenv(envGoTestHelper) == "1"
 
 // TestGoTest_CaptureOutput runs different `go test` scenarios via `GoTest` and
 // captures the stderr and stdout output of the test run. The output is then
@@ -28,8 +22,13 @@ var gotestHelperMode = os.Getenv(envGoTestHelper) == "1"
 //
 // For each scenario a GoTest helper test is defined and a regular expression
 // that the test output must match. The naming convention for scenario X is:
-//   - TestGoTest_Helper_<X>: the test function to be executed
+//   - TestGoTest_Helper_<X>: the test function to be executed, defined in
+//     testdata/gotesthelper/helper_test.go
 //   - wantTest<X>: regular expression the output must match.
+//
+// The helpers live in a minimal package under testdata so each `go test` run
+// builds only the standard library and testify instead of linking the whole
+// dev-tools/mage test binary, which is very slow on Windows CI runners.
 //
 // TestGoTest_CaptureOutput sets the `GOTEST_WANT_HELPER` environment variable when it executes the tests.
 // each test helper must check if it is driven by this function or not:
@@ -46,7 +45,7 @@ func TestGoTest_CaptureOutput(t *testing.T) {
 	makeArgs := func(test string) GoTestArgs {
 		return GoTestArgs{
 			LogName:    "asserts",
-			Packages:   []string{"."},
+			Packages:   []string{"./testdata/gotesthelper"},
 			Env:        map[string]string{envGoTestHelper: "1"},
 			ExtraFlags: []string{"-test.run", test},
 		}
@@ -123,110 +122,53 @@ func TestGoTest_CaptureOutput(t *testing.T) {
 	}
 }
 
-func TestGoTest_Helper_OK(t *testing.T) {
-	if !gotestHelperMode {
-		return
-	}
-
-	// Succeeding test without any additional output or test logs.
-}
-
 var wantTestOK = `--- PASS: TestGoTest_Helper_OK.*`
-
-func TestGoTest_Helper_AssertOutput(t *testing.T) {
-	if !gotestHelperMode {
-		return
-	}
-
-	t.Run("assert fails", func(t *testing.T) {
-		assert.True(t, false)
-	})
-
-	t.Run("assert with message", func(t *testing.T) {
-		assert.True(t, false, "My message")
-	})
-
-	t.Run("assert with messagef", func(t *testing.T) {
-		assert.True(t, false, "My message with arguments: %v", 42)
-	})
-
-	t.Run("require fails", func(t *testing.T) {
-		require.True(t, false)
-	})
-
-	t.Run("require with message", func(t *testing.T) {
-		require.True(t, false, "My message")
-	})
-
-	t.Run("require with messagef", func(t *testing.T) {
-		require.True(t, false, "My message with arguments: %v", 42)
-	})
-
-	t.Run("equals map", func(t *testing.T) {
-		want := map[string]interface{}{
-			"a": 1,
-			"b": true,
-			"c": "test",
-			"e": map[string]interface{}{
-				"x": "y",
-			},
-		}
-
-		got := map[string]interface{}{
-			"a": 42,
-			"b": false,
-			"c": "test",
-		}
-
-		assert.Equal(t, want, got)
-	})
-}
 
 var wantTestAssertOutput = `(?sm:
 === Failed
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/assert_fails.*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/assert_fails.*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/assert_fails.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/assert_with_message .*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/assert_with_message .*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/assert_with_message.*
         	Messages:   	My message.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/assert_with_messagef .*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/assert_with_messagef .*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/assert_with_messagef.*
         	Messages:   	My message with arguments: 42.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/require_fails .*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/require_fails .*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/require_fails.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/require_with_message .*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/require_with_message .*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/require_with_message.*
         	Messages:   	My message.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/require_with_messagef .*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/require_with_messagef .*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Should be true.*
         	Test:       	TestGoTest_Helper_AssertOutput/require_with_messagef.*
         	Messages:   	My message with arguments: 42.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_AssertOutput/equals_map .*
-    .*gotest_test.go:\d+:.*
-        	Error Trace:	.*gotest_test.go:\d+.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_AssertOutput/equals_map .*
+    .*helper_test.go:\d+:.*
+        	Error Trace:	.*helper_test.go:\d+.*
         	Error:      	Not equal:.*
 \s+expected: map\[string\]interface \{\}\{"a":1, "b":true, "c":"test", "e":map\[string\]interface \{\}\{"x":"y"\}\}.*
 \s+actual  : map\[string\]interface \{\}\{"a":42, "b":false, "c":"test"\}.*
@@ -247,67 +189,36 @@ var wantTestAssertOutput = `(?sm:
 \s+\}.*
 )`
 
-func TestGoTest_Helper_LogOutput(t *testing.T) {
-	if !gotestHelperMode {
-		return
-	}
-
-	t.Run("on error", func(t *testing.T) {
-		t.Log("Log message should be printed")
-		t.Logf("printf style log message: %v", 42)
-		t.Error("Log should fail")
-		t.Errorf("Log should fail with printf style log: %v", 23)
-	})
-
-	t.Run("on fatal", func(t *testing.T) {
-		t.Log("Log message should be printed")
-		t.Logf("printf style log message: %v", 42)
-		t.Fatal("Log should fail")
-	})
-
-	t.Run("on fatalf", func(t *testing.T) {
-		t.Log("Log message should be printed")
-		t.Logf("printf style log message: %v", 42)
-		t.Fatalf("Log should fail with printf style log: %v", 42)
-	})
-
-	t.Run("with newlines", func(t *testing.T) {
-		t.Log("Log\nmessage\nshould\nbe\nprinted")
-		t.Logf("printf\nstyle\nlog\nmessage:\n%v", 42)
-		t.Fatalf("Log\nshould\nfail\nwith\nprintf\nstyle\nlog:\n%v", 42)
-	})
-}
-
 var wantTestLogOutput = `(?sm:
 === Failed.*
-=== FAIL: dev-tools/mage TestGoTest_Helper_LogOutput/on_error.*
-    gotest_test.go:\d+: Log message should be printed.*
-    gotest_test.go:\d+: printf style log message: 42.*
-    gotest_test.go:\d+: Log should fail.*
-    gotest_test.go:\d+: Log should fail with printf style log: 23.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_LogOutput/on_error.*
+    helper_test.go:\d+: Log message should be printed.*
+    helper_test.go:\d+: printf style log message: 42.*
+    helper_test.go:\d+: Log should fail.*
+    helper_test.go:\d+: Log should fail with printf style log: 23.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_LogOutput/on_fatal.*
-    gotest_test.go:\d+: Log message should be printed.*
-    gotest_test.go:\d+: printf style log message: 42.*
-    gotest_test.go:\d+: Log should fail.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_LogOutput/on_fatal.*
+    helper_test.go:\d+: Log message should be printed.*
+    helper_test.go:\d+: printf style log message: 42.*
+    helper_test.go:\d+: Log should fail.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_LogOutput/on_fatalf.*
-    gotest_test.go:\d+: Log message should be printed.*
-    gotest_test.go:\d+: printf style log message: 42.*
-    gotest_test.go:\d+: Log should fail with printf style log: 42.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_LogOutput/on_fatalf.*
+    helper_test.go:\d+: Log message should be printed.*
+    helper_test.go:\d+: printf style log message: 42.*
+    helper_test.go:\d+: Log should fail with printf style log: 42.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_LogOutput/with_newlines.*
-    gotest_test.go:\d+: Log.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_LogOutput/with_newlines.*
+    helper_test.go:\d+: Log.*
         message.*
         should.*
         be.*
         printed.*
-    gotest_test.go:\d+: printf.*
+    helper_test.go:\d+: printf.*
         style.*
         log.*
         message:.*
         42.*
-    gotest_test.go:\d+: Log.*
+    helper_test.go:\d+: Log.*
         should.*
         fail.*
         with.*
@@ -316,44 +227,19 @@ var wantTestLogOutput = `(?sm:
         log:.*
         42.*
 
-=== FAIL: dev-tools/mage TestGoTest_Helper_LogOutput.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_LogOutput.*
 
 DONE 5 tests, 5 failures in.*
 )`
 
-func TestGoTest_Helper_WithPanic(t *testing.T) {
-	if !gotestHelperMode {
-		return
-	}
-
-	panic("Kaputt.")
-}
-
 var wantTestWithPanic = `(?sm:
-=== FAIL: dev-tools/mage TestGoTest_Helper_WithPanic.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_WithPanic.*
 panic: Kaputt. \[recovered, repanicked\].*)`
-
-func TestGoTest_Helper_WithWrongPanic(t *testing.T) {
-	if !gotestHelperMode {
-		return
-	}
-
-	t.Run("setup failing go-routine", func(t *testing.T) {
-		go func() {
-			time.Sleep(1 * time.Second)
-			t.Error("oops")
-		}()
-	})
-
-	t.Run("false positive failure", func(t *testing.T) {
-		time.Sleep(10 * time.Second)
-	})
-}
 
 // The regular expression must very forgiving. Unfortunately the order of the
 // tests and log lines can differ per run.
 var wantTestWithWrongPanic = `(?sm:
-=== FAIL: dev-tools/mage TestGoTest_Helper_WithWrongPanic.*
+=== FAIL: dev-tools/mage/testdata/gotesthelper TestGoTest_Helper_WithWrongPanic.*
 .*
 panic: Fail in goroutine after TestGoTest_Helper_WithWrongPanic/setup_failing_go-routine has completed.*
 )`

@@ -98,7 +98,7 @@ spec:
       description: Buildkite pipeline for the Elastic Agent extended testing
     spec:
       repository: elastic/elastic-agent
-      pipeline_file: ".buildkite/integration.pipeline.yml"
+      pipeline_file: ".buildkite/integration.pipeline.yml .buildkite/bk.integration.pipeline.yml"
       provider_settings:
         trigger_mode: none # don't trigger jobs from github activity
       cancel_intermediate_builds: true
