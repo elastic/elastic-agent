@@ -515,6 +515,51 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 	}
 }
 
+// TestServiceStartRetryDiscardedAfterStop tests that a stopped service is not started
+// by a retry of a failed start that was scheduled before the stop.
+func TestServiceStartRetryDiscardedAfterStop(t *testing.T) {
+	log, logObs := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".ssrcteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	failedStarts := func() int {
+		return logObs.FilterMessageSnippet("failed to start endpoint service").Len()
+	}
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+	require.Eventually(t, func() bool { return failedStarts() == 1 }, 30*time.Second, 50*time.Millisecond)
+
+	require.NoError(t, service.Stop())
+	require.Never(t, func() bool { return failedStarts() > 1 }, 3*service.serviceRestartDelay, 50*time.Millisecond,
+		"the service was started again after it was stopped")
+}
+
 // startServiceRuntime runs service.Run in the background and registers a cleanup
 // that cancels ctx and waits for Run to return. Cancelling the context alone does not
 // wait for the connection-info server to close, and tests share socket names across

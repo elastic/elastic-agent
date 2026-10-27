@@ -27,6 +27,9 @@ import (
 type actionModeSigned struct {
 	actionMode
 	signed *component.Signed
+
+	// retryGen is set on the retry of a failed start, see serviceRuntime.startRetryGen.
+	retryGen uint64
 }
 
 const (
@@ -72,6 +75,12 @@ type serviceRuntime struct {
 	// startFailed is true while the last attempt to start the service failed and
 	// a retry is pending. The FAILED state is kept until a start attempt succeeds.
 	startFailed bool
+
+	// startRetryGen identifies the current retry of a failed start. It changes whenever
+	// a retry is scheduled or discarded, so that a retry that fires after the service
+	// was stopped, or after a new start action, is recognized as stale by Run.
+	// Only accessed by Run.
+	startRetryGen uint64
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
@@ -167,6 +176,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		// is not supposed to be reused once it's stopping
 		stopping = true
 		s.startFailed = false
+		s.invalidateStartRetry()
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
 		checkinTimer.Stop()
@@ -203,6 +213,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	onTeardown := func(as actionModeSigned) {
 		tamperProtection := features.TamperProtection()
 		s.log.Debugf("got teardown for %s service, tearingDown: %v, tamperProtection: %v", s.name(), tearingDown, tamperProtection)
+		s.invalidateStartRetry()
 
 		// If tamper protection is disabled do the old behavior
 		if !tamperProtection {
@@ -223,11 +234,16 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			s.log.Debug("context is done. exiting.")
 			return ctx.Err()
 		case as := <-s.actionCh:
+			if as.retryGen != 0 && as.retryGen != s.startRetryGen {
+				s.log.Debugf("discarding stale start retry for %s service", s.name())
+				continue
+			}
 			s.log.Debugf("got action %v for %s service", as.actionMode, s.name())
 			s.actionState = as
 			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
+				s.invalidateStartRetry()
 				lastCheckin = time.Time{}
 				ignoreCheckins = false
 				missedCheckins = 0
@@ -271,8 +287,14 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						// The error is logged above, the state message only points to the logs.
 						s.forceCompState(client.UnitStateFailed,
 							fmt.Sprintf("Failed: %s service failed to start, retrying in %v. See the Elastic Agent logs for details", s.name(), delay))
+						s.startRetryGen++
+						retry := as
+						retry.retryGen = s.startRetryGen
 						time.AfterFunc(delay, func() {
-							s.actionCh <- as
+							select {
+							case s.actionCh <- retry:
+							case <-ctx.Done():
+							}
 						})
 						continue
 					}
@@ -436,6 +458,12 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	// The service should start on it's own, expecting check-ins
 	s.clearStartFailure()
 	return nil
+}
+
+// invalidateStartRetry discards the pending retry of a failed start, so that it does not
+// start the service after it was stopped or when a new start action supersedes it.
+func (s *serviceRuntime) invalidateStartRetry() {
+	s.startRetryGen++
 }
 
 // clearStartFailure moves the state from FAILED back to STARTING once a start
@@ -666,7 +694,7 @@ func (s *serviceRuntime) Start() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionModeSigned{actionStart, nil}
+	s.actionCh <- actionModeSigned{actionMode: actionStart}
 	return nil
 }
 
@@ -692,7 +720,7 @@ func (s *serviceRuntime) Stop() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionModeSigned{actionStop, nil}
+	s.actionCh <- actionModeSigned{actionMode: actionStop}
 	return nil
 }
 
@@ -705,7 +733,7 @@ func (s *serviceRuntime) Teardown(signed *component.Signed) error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionModeSigned{actionTeardown, signed}
+	s.actionCh <- actionModeSigned{actionMode: actionTeardown, signed: signed}
 	return nil
 }
 
