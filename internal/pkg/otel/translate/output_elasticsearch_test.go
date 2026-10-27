@@ -108,7 +108,12 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -168,7 +173,12 @@ sending_queue:
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -227,7 +237,12 @@ sending_queue:
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -289,7 +304,12 @@ sending_queue:
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -343,7 +363,12 @@ logs_index: some-index
 password: changeme
 user: elastic
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -430,7 +455,12 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -547,7 +577,12 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -605,7 +640,12 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 compression: gzip
 compression_params:
   level: 1
@@ -672,7 +712,12 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+<<<<<<< HEAD
 timeout: 1m30s
+=======
+version_detection:
+  enabled: false
+>>>>>>> 49b96ba (Work around (#17598))
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
