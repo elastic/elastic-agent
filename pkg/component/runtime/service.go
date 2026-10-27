@@ -33,6 +33,7 @@ type actionModeSigned struct {
 }
 
 const (
+	defaultStartFailedAfter           = 5 * time.Minute
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 )
 
@@ -72,9 +73,10 @@ type serviceRuntime struct {
 	// attempting to restart a service that failed to start.
 	serviceRestartDelay time.Duration
 
-	// startFailed is true while the last attempt to start the service failed and
-	// a retry is pending. The FAILED state is kept until a start attempt succeeds.
-	startFailed bool
+	// startFailingSince is when the current run of failed start attempts began. It is
+	// zero unless the last attempt to start the service failed. The failure is kept
+	// reported until a start attempt succeeds.
+	startFailingSince time.Time
 
 	// startRetryGen identifies the current retry of a failed start. It changes whenever
 	// a retry is scheduled or discarded, so that a retry that fires after the service
@@ -175,7 +177,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		// the flag is set once and never reset since the serviceRuntime object
 		// is not supposed to be reused once it's stopping
 		stopping = true
-		s.startFailed = false
+		s.startFailingSince = time.Time{}
 		s.invalidateStartRetry()
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
@@ -283,10 +285,16 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						// the start action on the action channel.
 						delay := s.serviceRestartDelay
 						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
-						s.startFailed = true
-						s.forceCompState(client.UnitStateFailed,
-							fmt.Sprintf("Failed: %s service failed to start: %s, retrying in %v. See the Elastic Agent logs for details",
-								s.name(), describeStartFailure(err), delay))
+						if s.startFailingSince.IsZero() {
+							s.startFailingSince = time.Now()
+						}
+						failureState, failureLabel := client.UnitStateDegraded, "Degraded"
+						if time.Since(s.startFailingSince) >= s.startFailedAfter() {
+							failureState, failureLabel = client.UnitStateFailed, "Failed"
+						}
+						s.forceCompState(failureState,
+							fmt.Sprintf("%s: %s service failed to start: %s, retrying in %v. See the Elastic Agent logs for details",
+								failureLabel, s.name(), describeStartFailure(err), delay))
 						s.startRetryGen++
 						retry := as
 						retry.retryGen = s.startRetryGen
@@ -437,8 +445,8 @@ func injectSigned(comp component.Component, signed *component.Signed) (component
 func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	name := s.name()
 
-	// Keep reporting FAILED while retrying a failed start.
-	if !s.startFailed {
+	// Keep reporting the failure while retrying a failed start.
+	if s.startFailingSince.IsZero() {
 		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
 	}
 
@@ -497,11 +505,11 @@ func describeStartFailure(err error) string {
 	return reason
 }
 
-// clearStartFailure moves the state from FAILED back to STARTING once a start
-// attempt no longer fails.
+// clearStartFailure moves the state from the reported failure back to STARTING once a
+// start attempt no longer fails.
 func (s *serviceRuntime) clearStartFailure() {
-	if s.startFailed {
-		s.startFailed = false
+	if !s.startFailingSince.IsZero() {
+		s.startFailingSince = time.Time{}
 		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", s.name()))
 	}
 }
@@ -699,6 +707,15 @@ func (s *serviceRuntime) maxCheckinMisses(checkinPeriod time.Duration) int {
 		}
 	}
 	return misses
+}
+
+// startFailedAfter returns how long failed start attempts are reported as degraded
+// before they are reported as failed.
+func (s *serviceRuntime) startFailedAfter() time.Duration {
+	if d := s.comp.InputSpec.Spec.Service.Timeouts.StartFailedAfter; d > 0 {
+		return d
+	}
+	return defaultStartFailedAfter
 }
 
 func (s *serviceRuntime) checkinPeriod() time.Duration {
