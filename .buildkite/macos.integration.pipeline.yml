@@ -6,8 +6,8 @@
 # not honored there, so the default checkout is a full ~500 MiB clone that takes minutes. Skip it and fetch
 # only the commit under test.
 env:
-  # Same values as integration.pipeline.yml
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1789434098"
+  # Same values as bk.integration.pipeline.yml
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1791307568"
 
 common:
   - google_oidc_plugin: &google_oidc_plugin
@@ -79,7 +79,7 @@ steps:
           # the darwin/arm64 golang-crossbuild image only runs on arm64 hosts
           provider: "aws"
           instanceType: "c6g.2xlarge"
-          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+          image: "${IMAGE_UBUNTU_2404_ARM_64}"
         plugins:
           - *google_oidc_plugin
 
