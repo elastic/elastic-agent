@@ -45,9 +45,12 @@ func TestStartCollector(t *testing.T) {
 			wg := startCollector(context.Background(), t, collector, tc.expectedErrorMessage)
 
 			if tc.expectedErrorMessage == "" {
+				// Starting all components can take well over 10s on slow CI runners: e.g. every
+				// Prometheus scrape manager resolves the host FQDN on start, which blocks for
+				// several seconds where hostname DNS lookups time out (macOS GitHub runners).
 				assert.Eventually(t, func() bool {
 					return otelcol.StateRunning == collector.GetState()
-				}, 10*time.Second, 200*time.Millisecond)
+				}, 30*time.Second, 200*time.Millisecond)
 				collector.Shutdown()
 			}
 			wg.Wait()
