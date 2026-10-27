@@ -14,7 +14,6 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/require"
-
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
@@ -408,7 +407,12 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
+			"auth": map[string]any{
+				"password": "password",
+				"username": "elastic",
+			},
 			"continue_on_error":       true,
+			"endpoints":               []string{"http://localhost:9200"},
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
 			"proxy_url":               "https://example.com",
@@ -593,6 +597,9 @@ func TestGetOtelConfig(t *testing.T) {
 	// expects component id
 	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
+		cfg["monitor_state"] = map[string]any{
+			"elasticsearch": "beatsauth/_agent-component/default",
+		}
 		cfg["heartbeat"] = map[string]any{
 			"monitors": []map[string]any{
 				{
@@ -2081,7 +2088,9 @@ func TestGetOtelConfig(t *testing.T) {
 					"heartbeatreceiver/_agent-component/heartbeat-default/heartbeat-unit-test-1": expectedHeartbeatReceiverConfig("heartbeat-default"),
 				},
 				"service": map[string]any{
-					"extensions": []any{"beatsauth/_agent-component/default"},
+					"extensions": []any{
+						"beatsauth/_agent-component/default",
+					},
 					"pipelines": map[string]any{
 						"logs/_agent-component/heartbeat-default": map[string][]string{
 							"exporters": {"elasticsearch/_agent-component/default"},
@@ -3659,6 +3668,130 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 	}
 }
 
+func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) {
+	newHeartbeatComponent := func(outputType string, singleReceiver bool) *component.Component {
+		return &component.Component{
+			ID:         "heartbeat-auth-test-id",
+			InputType:  "synthetics/http",
+			OutputType: outputType,
+			OutputName: "default",
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "elastic-otel-collector",
+				Spec: component.InputSpec{
+					Name: "synthetics/http",
+					Command: &component.CommandSpec{
+						Args: []string{"heartbeat"},
+					},
+					SingleReceiver: singleReceiver,
+				},
+			},
+			Units: []component.Unit{
+				{
+					ID:   "heartbeat-auth-test-id-unit",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]any{
+						"id":         "test",
+						"use_output": "default",
+						"type":       "synthetics/http",
+						"streams": []any{
+							map[string]any{
+								"id": "http-1",
+								"data_stream": map[string]any{
+									"dataset": "synthetics.http",
+								},
+								"urls":     []any{"https://example.com/one"},
+								"schedule": "@every 5s",
+							},
+							map[string]any{
+								"id": "http-2",
+								"data_stream": map[string]any{
+									"dataset": "synthetics.http",
+								},
+								"urls":     []any{"https://example.com/two"},
+								"schedule": "@every 10s",
+							},
+						},
+					}),
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                string
+		outputType          string
+		singleReceiver      bool
+		expectedReceiverIDs []string
+		expectedAuth        string
+	}{
+		{
+			name:           "elasticsearch per-stream receivers",
+			outputType:     "elasticsearch",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+			expectedAuth: "beatsauth/_agent-component/default",
+		},
+		{
+			name:           "elasticsearch single receiver",
+			outputType:     "elasticsearch",
+			singleReceiver: true,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/single",
+			},
+			expectedAuth: "beatsauth/_agent-component/default",
+		},
+		{
+			name:           "logstash",
+			outputType:     "logstash",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+		},
+		{
+			name:           "kafka",
+			outputType:     "kafka",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(
+				newHeartbeatComponent(tt.outputType, tt.singleReceiver),
+				nil,
+				nil,
+			)
+			require.NoError(t, err, "heartbeat receiver translation must succeed")
+			require.Len(t, result, len(tt.expectedReceiverIDs), "translation must generate the expected receiver count")
+
+			for _, receiverID := range tt.expectedReceiverIDs {
+				require.Contains(t, result, receiverID, "translation must generate receiver %q", receiverID)
+			}
+
+			for receiverID, rawConfig := range result {
+				receiverConfig, ok := rawConfig.(map[string]any)
+				require.True(t, ok, "receiver %q config must be a map", receiverID)
+				if tt.expectedAuth == "" {
+					assert.NotContains(t, receiverConfig, "monitor_state", "receiver %q must omit monitor state for %s output", receiverID, tt.outputType)
+					continue
+				}
+				monitorState, ok := receiverConfig["monitor_state"].(map[string]any)
+				require.True(t, ok, "receiver %q monitor state config must be a map", receiverID)
+				assert.Equal(t, tt.expectedAuth, monitorState["elasticsearch"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
+			}
+		})
+	}
+}
+
 // TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
 // monitor, which compiles into a single synthetics/browser input with a scheduled
 // "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
@@ -4303,6 +4436,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -4375,6 +4509,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -4406,6 +4541,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -4441,6 +4577,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "5m",
