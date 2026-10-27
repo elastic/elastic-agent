@@ -1948,7 +1948,43 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 // propagated into the generated beat receiver config.
 func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 	comp := &component.Component{
+<<<<<<< HEAD
 		ID:        "filestream-fqdn",
+=======
+		ID:        "metricbeat-default",
+		InputType: "elasticsearch/metrics",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name:    "elasticsearch/metrics",
+				Command: &component.CommandSpec{Args: []string{"metricbeat"}},
+			},
+		},
+		Units: []component.Unit{newUnit("pod-a", "https://10.0.0.1:9200"), newUnit("pod-b", "https://10.0.0.2:9200")},
+	}
+
+	receivers, err := getReceiversConfigForComponent(comp, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, receivers, 2)
+	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-a-same-stream")
+	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-b-same-stream")
+
+	// status must be attributed to the right unit even though the stream IDs match
+	statuses := newReceiverStatuses(map[string]*status.AggregateStatus{
+		receiverStreamSuffix(comp.ID, comp.Units[0].ID, "same-stream"): {Event: componentstatus.NewEvent(componentstatus.StatusOK)},
+		receiverStreamSuffix(comp.ID, comp.Units[1].ID, "same-stream"): {Event: componentstatus.NewEvent(componentstatus.StatusPermanentError)},
+	})
+	for i, unit := range comp.Units {
+		got := receiversForUnit(statuses, unit, comp)
+		require.Len(t, got, 1)
+		assert.Same(t, statuses[receiverStreamSuffix(comp.ID, comp.Units[i].ID, "same-stream")], got["same-stream"])
+	}
+}
+
+func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-features",
+>>>>>>> f17f9fe (Decode receiver input statuses once per component status update (#17576))
 		InputType: "filestream",
 		InputSpec: &component.InputRuntimeSpec{
 			BinaryName: "elastic-otel-collector",
