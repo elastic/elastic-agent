@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-archive_pattern='build/distributions/elastic-agent-complete-[0-9]*-linux-amd64.docker.tar.gz'
+source .buildkite/scripts/common.sh
+
+archive_pattern='build/distributions/elastic-agent-complete-*-linux-amd64.docker.tar.gz'
 buildkite-agent artifact download "$archive_pattern" . --step 'packaging-containers-amd64'
 
 shopt -s nullglob
