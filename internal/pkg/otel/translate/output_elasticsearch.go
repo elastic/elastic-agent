@@ -590,6 +590,18 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)
 		}
+		// Beatsauth consumers use endpoints as base URLs and do not support
+		// Elasticsearch output parameters. Keep query parameters on the exporter
+		// endpoints, but remove them from the shared authenticator endpoints.
+		for i, endpoint := range endpoints {
+			endpointURL, err := url.Parse(endpoint)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse beatsauth endpoint %q: %w", endpoint, err)
+			}
+			endpointURL.RawQuery = ""
+			endpointURL.ForceQuery = false
+			endpoints[i] = endpointURL.String()
+		}
 		newMap["endpoints"] = endpoints
 	}
 

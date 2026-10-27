@@ -416,10 +416,10 @@ func receiversForUnit(receiverBySuffix map[string]*status.AggregateStatus, unit 
 	return result
 }
 
-// getStreamStatusFromReceiver extracts a stream's status from a receiver's "inputs" attributes.
-func getStreamStatusFromReceiver(rs *status.AggregateStatus, streamID string) *serializablestatus.SerializableEvent {
-	attrs := rs.Attributes().AsRaw()
-	inputStatuses, ok := attrs["inputs"]
+// receiverInputStatuses decodes a receiver's "inputs" attribute, the per-stream
+// statuses reported by the beat.
+func receiverInputStatuses(rs *status.AggregateStatus) map[string]*serializablestatus.SerializableEvent {
+	inputStatuses, ok := rs.Attributes().Get("inputs")
 	if !ok {
 		return nil
 	}
@@ -428,10 +428,10 @@ func getStreamStatusFromReceiver(rs *status.AggregateStatus, streamID string) *s
 	// per-stream status isn't available, so we return nil and the caller falls
 	// back to the receiver's top-level status.
 	var inputStatusMap map[string]*serializablestatus.SerializableEvent
-	if err := mapstructure.Decode(inputStatuses, &inputStatusMap); err != nil {
+	if err := mapstructure.Decode(inputStatuses.AsRaw(), &inputStatusMap); err != nil {
 		return nil
 	}
-	return inputStatusMap[streamID]
+	return inputStatusMap
 }
 
 // getComponentStartingState returns a ComponentComponentState with all units in the starting state,
@@ -517,6 +517,18 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 	// unitStreamStatuses tracks per-stream statuses from receiver attributes (detailed status from beat)
 	unitStreamStatuses := make(map[string]*serializablestatus.SerializableEvent, len(unit.Config.Streams))
 	streamStatuses := make(map[string]map[string]string, len(unit.Config.Streams))
+
+	// A receiver can run every stream of the unit (single_receiver), so decode
+	// its statuses once instead of once per stream.
+	decoded := make(map[*status.AggregateStatus]map[string]*serializablestatus.SerializableEvent)
+	getStreamStatusFromReceiver := func(rs *status.AggregateStatus, streamID string) *serializablestatus.SerializableEvent {
+		inputStatuses, ok := decoded[rs]
+		if !ok {
+			inputStatuses = receiverInputStatuses(rs)
+			decoded[rs] = inputStatuses
+		}
+		return inputStatuses[streamID]
+	}
 
 	// worstReceiverState tracks the worst top-level receiver state for streams without per-stream attributes
 	var worstReceiverState client.UnitState
