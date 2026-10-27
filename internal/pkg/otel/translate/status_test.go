@@ -15,6 +15,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -772,7 +773,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp)
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateHealthy, result.State)
 		assert.Equal(t, map[string]any{
 			"streams": map[string]map[string]string{
@@ -813,7 +814,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp)
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateDegraded, result.State)
 		assert.Equal(t, "Recoverable: stream error", result.Message)
 		assert.Equal(t, map[string]any{
@@ -842,7 +843,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				map[string]any{"inputs": map[string]any{}},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp)
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		// No streams matched any receiver, empty state
 		assert.Equal(t, client.UnitState(0), result.State)
 	})
@@ -864,7 +865,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 			},
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp)
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateHealthy, result.State)
 		assert.Equal(t, map[string]any{
 			"streams": map[string]map[string]string{
@@ -907,7 +908,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp)
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateDegraded, result.State)
 		assert.Equal(t, "Recoverable: unit level error", result.Message)
 	})
@@ -1345,7 +1346,7 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(nil, tt.receivers, unit, comp)
+			result := getComponentUnitState(nil, newReceiverStatuses(tt.receivers), unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -1404,7 +1405,7 @@ func TestGetComponentUnitStateWithUnitInputStatus(t *testing.T) {
 		Payload: nil,
 	}
 
-	result := getComponentUnitState(nil, receivers, unit, comp)
+	result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 	assert.Equal(t, expectedState.State, result.State)
 	assert.Equal(t, expectedState.Message, result.Message)
 	assert.Equal(t, expectedState.Payload, result.Payload)
@@ -1861,10 +1862,10 @@ func TestOutputStatus(t *testing.T) {
 
 // singleReceiverUnit returns a unit with n streams that all run in one receiver,
 // which reports the status of every stream in its "inputs" attribute.
-func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*status.AggregateStatus) {
+func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*receiverStatus) {
 	streams := make([]*proto.Stream, n)
 	inputs := make(map[string]any, n)
-	receivers := make(map[string]*status.AggregateStatus, n)
+	receivers := make(map[string]*receiverStatus, n)
 	for i := range streams {
 		id := fmt.Sprintf("stream-%d", i)
 		streams[i] = &proto.Stream{Id: id}
@@ -1873,7 +1874,7 @@ func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*sta
 	if degraded != "" {
 		inputs[degraded] = map[string]any{"status": "StatusRecoverableError", "error": "slow"}
 	}
-	rs := aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{"inputs": inputs})
+	rs := newReceiverStatus(aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{"inputs": inputs}))
 	for _, s := range streams {
 		receivers[s.Id] = rs
 	}
@@ -1883,6 +1884,16 @@ func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*sta
 		Config: &proto.UnitExpectedConfig{Streams: streams},
 	}
 	return unit, receivers
+}
+
+// newReceiverStatuses decodes the per-stream statuses of each receiver, like
+// getComponentState does before computing unit states.
+func newReceiverStatuses(receivers map[string]*status.AggregateStatus) map[string]*receiverStatus {
+	result := make(map[string]*receiverStatus, len(receivers))
+	for id, rs := range receivers {
+		result[id] = newReceiverStatus(rs)
+	}
+	return result
 }
 
 func TestGetComponentUnitStateSingleReceiverStreams(t *testing.T) {
@@ -1912,5 +1923,47 @@ func BenchmarkGetComponentUnitStateSingleReceiver(b *testing.B) {
 				getComponentUnitState(nil, receivers, unit, comp)
 			}
 		})
+	}
+}
+
+// BenchmarkGetComponentStateSingleReceiver measures one status update for a
+// component whose single receiver runs 1000 streams, each in its own unit, like
+// Synthetics monitors.
+func BenchmarkGetComponentStateSingleReceiver(b *testing.B) {
+	const streams = 1000
+	comp := component.Component{
+		ID:             "synthetics-default",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			Spec: component.InputSpec{SingleReceiver: true},
+		},
+	}
+	attrs := pcommon.NewMap()
+	inputs := attrs.PutEmptyMap("inputs")
+	for i := range streams {
+		streamID := fmt.Sprintf("monitor-%04d", i)
+		comp.Units = append(comp.Units, component.Unit{
+			ID:   "synthetics/tcp-" + streamID,
+			Type: client.UnitTypeInput,
+			Config: &proto.UnitExpectedConfig{
+				Streams: []*proto.Stream{{Id: streamID}},
+			},
+		})
+		stream := inputs.PutEmptyMap(streamID)
+		stream.PutStr("status", componentstatus.StatusOK.String())
+		stream.PutStr("error", "")
+	}
+	receiverKey := fmt.Sprintf("receiver:heartbeatreceiver/%ssynthetics-default/single", OtelNamePrefix)
+	pipelineStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			receiverKey: {Event: componentstatus.NewEvent(componentstatus.StatusOK, componentstatus.WithAttributes(attrs))},
+		},
+	}
+
+	for b.Loop() {
+		result, err := getComponentState(pipelineStatus, comp)
+		require.NoError(b, err)
+		require.Len(b, result.State.Units, streams)
 	}
 }
