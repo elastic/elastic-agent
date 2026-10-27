@@ -1499,11 +1499,7 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
-<<<<<<< HEAD
-		os.MkdirAll(targetPath, 0o755)
-		os.MkdirAll(versionedFlatPath, 0o755)
-		os.MkdirAll(versionedDropPath, 0o755)
-=======
+
 		if err := os.MkdirAll(targetPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating target dir %q: %w", targetPath, err))
 		}
@@ -1518,7 +1514,6 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
 		}
->>>>>>> e10b4fc (Clean versioned drop dirs before downloading artifacts (#17530))
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))
