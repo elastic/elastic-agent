@@ -14,12 +14,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestGetRetryConfig(t *testing.T) {
@@ -102,7 +105,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -265,18 +268,36 @@ logs_dynamic_pipeline:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
-	t.Run("parameters are added to every host", func(t *testing.T) {
+	t.Run("output parameters are retained on exporter endpoints and excluded from beatsauth endpoints", func(t *testing.T) {
 		cfg := config.MustNewConfigFrom(map[string]any{
 			"hosts":      []any{"es-1:9200", "es-2:9200", "es-3:9200"},
 			"parameters": map[string]any{"somekey": "somevalue"},
 		})
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+
+		esExporterCfg, _, extensions, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
-		assert.Equal(t, []string{
-			"http://es-1:9200?somekey=somevalue",
-			"http://es-2:9200?somekey=somevalue",
-			"http://es-3:9200?somekey=somevalue",
-		}, got["endpoints"])
+		assert.Equal(
+			t,
+			[]string{
+				"http://es-1:9200?somekey=somevalue",
+				"http://es-2:9200?somekey=somevalue",
+				"http://es-3:9200?somekey=somevalue",
+			},
+			esExporterCfg["endpoints"],
+			"exporter endpoints must retain output parameters",
+		)
+
+		beatsAuthConfig := extensions["beatsauth/_agent-component/"].(map[string]any)
+		assert.Equal(
+			t,
+			[]string{
+				"http://es-1:9200",
+				"http://es-2:9200",
+				"http://es-3:9200",
+			},
+			beatsAuthConfig["endpoints"],
+			"beatsauth endpoints must exclude unsupported output parameters",
+		)
 	})
 
 	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
@@ -439,8 +460,8 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 8
-  queue_size: 25600
+  num_consumers: 5
+  queue_size: 16000
   wait_for_result: true
 suppress_conflict_errors: true
 timeout: 1m30s
@@ -612,7 +633,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -678,7 +699,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -757,7 +778,7 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
+  num_consumers: 3
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
@@ -816,6 +837,21 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 	}
 }
 
+func TestESToOTelConfigRejectsHostURLCredentials(t *testing.T) {
+	cfg := config.MustNewConfigFrom(map[string]any{
+		"hosts": []any{"https://user:secret@es.example:9200"},
+	})
+
+	_, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+	require.ErrorContains(
+		t,
+		err,
+		"credentials in Elasticsearch host URLs are unsupported; configure username and password separately",
+		"URL-embedded credentials must be rejected during translation",
+	)
+	assert.NotContains(t, err.Error(), "secret", "translation error must not expose the URL password")
+}
+
 func TestCalcNamedPresetSizing(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -838,8 +874,8 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:      4,
 			batchSize:     1600,
 			floor:         12800,
-			wantQueueSize: 25600, // 2*1600*8=25600 > floor 12800
-			wantConsumers: 8,
+			wantQueueSize: 16000, // 2*1600*5=16000 > floor 12800
+			wantConsumers: 5,
 		},
 		{
 			name:      "latency preset floor kicks in without cap",
@@ -856,7 +892,7 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:      30,
 			batchSize:     1600,
 			floor:         3200,
-			wantQueueSize: maxQueueEvents,                  // 2*1600*60=192000 > 64000
+			wantQueueSize: maxQueueEvents,                  // 2*1600*31=99200 > 64000
 			wantConsumers: max(1, maxQueueEvents/(2*1600)), // 20
 		},
 		{
@@ -864,7 +900,7 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:  30,
 			batchSize: 1600,
 			floor:     maxQueueEvents + 10000, // hypothetical: preset floor above memory ceiling
-			// formula 192000 > 64000: cap to 64000, numConsumers=20;
+			// formula 99200 > 64000: cap to 64000, numConsumers=20;
 			// then floor 74000 > 64000: apply floor and recalculate
 			wantQueueSize: maxQueueEvents + 10000,
 			wantConsumers: max(1, (maxQueueEvents+10000)/(2*1600)),
@@ -918,6 +954,174 @@ func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *con
 	assert.Equal(t, string(want), string(got))
 }
 
+func TestGetBeatsAuthExtensionConfigIncludesEndpointsAndAuthentication(t *testing.T) {
+	t.Setenv("ELASTICSEARCH_AUTH_HOST", "es.example")
+
+	source := map[string]any{
+		"hosts": []any{
+			"${ELASTICSEARCH_AUTH_HOST}:9200",
+			"es-secondary.example:9201",
+		},
+		"protocol":                    "https",
+		"path":                        "/elastic",
+		"parameters":                  map[string]any{"routing": "state loader"},
+		"username":                    "heartbeat",
+		"password":                    "secret",
+		"headers":                     map[string]any{"X-State-Loader": "true"},
+		"proxy_url":                   "http://proxy.example:8080",
+		"idle_connection_timeout":     "17s",
+		"ssl.certificate_authorities": "testdata/certs/rootCA.crt",
+		"ssl.certificate":             "testdata/certs/client.crt",
+		"ssl.key":                     "testdata/certs/client-unencrypted.key",
+		"ssl.verification_mode":       "strict",
+		"bulk_max_size":               123,
+		"compression_level":           9,
+		"index":                       "exporter-only",
+		"pipeline":                    "exporter-only",
+		"timeout":                     "42s",
+	}
+
+	cfg, err := config.NewConfigFrom(source)
+	require.NoError(t, err, "source output config must be valid")
+
+	got, err := getBeatsAuthExtensionConfig(cfg)
+	require.NoError(t, err, "beatsauth config must translate")
+
+	assert.Equal(
+		t,
+		[]string{
+			"https://es.example:9200/elastic",
+			"https://es-secondary.example:9201/elastic",
+		},
+		got["endpoints"],
+		"beatsauth must contain resolved endpoints without unsupported output parameters",
+	)
+
+	assert.Equal(
+		t,
+		map[string]any{
+			"headers": []map[string]string{{
+				"key":   "X-State-Loader",
+				"value": "true",
+			}},
+			"password": "secret",
+			"username": "heartbeat",
+		},
+		got["auth"],
+		"beatsauth must own output authentication and headers",
+	)
+}
+
+func TestESToOTelConfigCloudID(t *testing.T) {
+	// Decoded Base64: example.test$elasticsearch$kibana
+	const encodedCloudID = "cloudidtest:ZXhhbXBsZS50ZXN0JGVsYXN0aWNzZWFyY2gka2liYW5h"
+	t.Setenv("ELASTICSEARCH_AUTH_CLOUD_ID", encodedCloudID)
+
+	tests := []struct {
+		name   string
+		output map[string]any
+	}{
+		{
+			name: "Cloud ID only",
+			output: map[string]any{
+				"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
+				"cloud_auth": "cloud-user:cloud-password",
+			},
+		},
+		{
+			name: "Cloud ID overrides hosts and credentials",
+			output: map[string]any{
+				"hosts":      []any{"https://other.example:9200"},
+				"username":   "other-user",
+				"password":   "other-password",
+				"cloud_id":   "${ELASTICSEARCH_AUTH_CLOUD_ID}",
+				"cloud_auth": "cloud-user:cloud-password",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			exporter, _, extensions, err := ESToOTelConfig(
+				config.MustNewConfigFrom(test.output),
+				"default",
+				logp.NewNopLogger(),
+			)
+			require.NoError(t, err, "Cloud ID output config must translate")
+
+			expectedEndpoints := []string{"https://elasticsearch.example.test:443"}
+			assert.Equal(t, expectedEndpoints, exporter["endpoints"], "exporter must use the Cloud ID endpoint")
+			assert.Equal(t, "cloud-user", exporter["user"], "exporter must use the Cloud auth username")
+			assert.Equal(t, "cloud-password", exporter["password"], "exporter must use the Cloud auth password")
+
+			beatsAuthID := getBeatsAuthExtensionID("default").String()
+			beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
+			require.True(t, ok, "translation must generate the output-scoped beatsauth extension")
+			assert.Equal(t, expectedEndpoints, beatsAuth["endpoints"], "beatsauth must use the same Cloud ID endpoint as the exporter")
+
+			auth, ok := beatsAuth["auth"].(map[string]any)
+			require.True(t, ok, "beatsauth authentication config must be a map")
+			assert.Equal(t, "cloud-user", auth["username"], "beatsauth must use the Cloud auth username")
+			assert.Equal(t, "cloud-password", auth["password"], "beatsauth must use the Cloud auth password")
+		})
+	}
+}
+
+func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
+	const (
+		outputName         = "default"
+		trustedFingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		caSHA256           = "GkPh2Lqh6eDoIatcr5AlZTAIKcIz/AWC61lrWgRwwe8="
+	)
+	output := map[string]any{
+		"hosts":                      []any{"localhost:9200"},
+		"preset":                     "throughput",
+		"proxy_disable":              true,
+		"proxy_headers":              map[string]any{"X-Proxy": "value"},
+		"ssl.ca_sha256":              []any{caSHA256},
+		"ssl.ca_trusted_fingerprint": trustedFingerprint,
+		"ssl.verification_mode":      "certificate",
+	}
+	comp := &component.Component{
+		ID:         "heartbeat-default",
+		InputType:  "synthetics/http",
+		OutputType: "elasticsearch",
+		OutputName: outputName,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{Args: []string{"heartbeat"}},
+			},
+		},
+		Units: []component.Unit{{
+			ID:     "heartbeat-default",
+			Type:   client.UnitTypeOutput,
+			Config: component.MustExpectedConfig(output),
+		}},
+	}
+
+	_, _, extensions, _, err := getExporterConfigForComponent(
+		comp,
+		otelcomponent.MustNewType("elasticsearch"),
+		logp.NewNopLogger(),
+	)
+	require.NoError(t, err, "Heartbeat translation must accept transport and TLS settings")
+
+	beatsAuthID := getBeatsAuthExtensionID(outputName).String()
+	beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
+	require.True(t, ok, "Heartbeat translation must generate the output-scoped beatsauth extension")
+	assert.Equal(t, []string{"http://localhost:9200"}, beatsAuth["endpoints"], "beatsauth must contain output endpoints")
+	assert.Equal(t, "15s", beatsAuth["idle_connection_timeout"], "beatsauth must retain the effective throughput-preset idle timeout")
+	assert.Equal(t, true, beatsAuth["proxy_disable"], "beatsauth must retain proxy_disable")
+	assert.Equal(t, map[string]any{"X-Proxy": "value"}, beatsAuth["proxy_headers"], "beatsauth must retain proxy_headers")
+
+	tlsConfig, ok := beatsAuth["ssl"].(map[string]any)
+	require.True(t, ok, "beatsauth must retain TLS settings")
+	assert.Equal(t, trustedFingerprint, tlsConfig["ca_trusted_fingerprint"], "beatsauth must retain the trusted CA fingerprint")
+	assert.Equal(t, []any{caSHA256}, tlsConfig["ca_sha256"], "beatsauth must retain CA SHA-256 pins")
+	assert.Equal(t, uint64(2), tlsConfig["verification_mode"], "beatsauth must retain certificate verification mode")
+}
+
 func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -947,6 +1151,21 @@ func TestGetBeatsAuthExtensionConfig(t *testing.T) {
 				"proxy_disable":           false,
 				"proxy_url":               "http://proxy.example.com:8080",
 				"timeout":                 "2m0s",
+			},
+		},
+		{
+			name: "with API key",
+			outputCfg: map[string]any{
+				"api_key": "id:key",
+			},
+			expected: map[string]any{
+				"auth": map[string]any{
+					"api_key": "aWQ6a2V5",
+				},
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"timeout":                 "1m30s",
 			},
 		},
 		{

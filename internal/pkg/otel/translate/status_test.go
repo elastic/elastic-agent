@@ -7,6 +7,7 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -516,6 +517,89 @@ func TestGetComponentStatus(t *testing.T) {
 				assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
 			}
 		})
+	}
+}
+
+// TestGetComponentStatusNoEnabledStreams verifies that a component whose input units have no
+// enabled streams (see getReceiversConfigForComponent's no-op receiver fallback) gets both a
+// component-level diagnostic message and a real status on every input unit, rather than
+// units being silently absent from State.Units or stuck in Starting.
+func TestGetComponentStatusNoEnabledStreams(t *testing.T) {
+	comp := component.Component{
+		ID:         "linux-metrics-default",
+		InputType:  "linux/metrics",
+		OutputType: "elasticsearch",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{
+					Args: []string{"metricbeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "linux-metrics-default-linux-metrics-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":      "linux/metrics-linux-metrics-default",
+					"type":    "linux/metrics",
+					"streams": []any{}, // all streams disabled
+				}),
+			},
+			{
+				// A second integration using the same input type lands in the same component.
+				ID:   "linux-metrics-default-other-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":      "linux/metrics-other",
+					"type":    "linux/metrics",
+					"streams": []any{},
+				}),
+			},
+			{
+				ID:   "output-1",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"type":  "elasticsearch",
+					"hosts": []any{"localhost:9200"},
+				}),
+			},
+		},
+	}
+
+	// Derive the receiver key from the config translation so the test covers it end to end.
+	receiversConfig, err := getReceiversConfigForComponent(&comp, nil, nil)
+	require.NoError(t, err)
+	require.Len(t, receiversConfig, 1, "expected exactly one fallback receiver")
+	var nopReceiverKey string
+	for k := range receiversConfig {
+		nopReceiverKey = k
+	}
+
+	otelStatus := &status.AggregateStatus{
+		Event: componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			fmt.Sprintf("receiver:%s", nopReceiverKey): {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+			fmt.Sprintf("exporter:elasticsearch/%soutput-1", OtelNamePrefix): {
+				Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			},
+		},
+	}
+
+	result, err := getComponentState(otelStatus, comp)
+	require.NoError(t, err)
+	assert.Equal(t, client.UnitStateDegraded, result.State.State)
+	assert.Equal(t, noEnabledStreamsMessage, result.State.Message)
+
+	for _, unit := range comp.Units[:2] {
+		unitKey := runtime.ComponentUnitKey{UnitID: unit.ID, UnitType: client.UnitTypeInput}
+		unitState, found := result.State.Units[unitKey]
+		require.True(t, found, "input unit %s must have a status entry, not be silently absent", unit.ID)
+		assert.Equal(t, client.UnitStateDegraded, unitState.State)
+		assert.Equal(t, noEnabledStreamsMessage, unitState.Message)
 	}
 }
 
@@ -1771,6 +1855,62 @@ func TestOutputStatus(t *testing.T) {
 			assert.Equal(t, tt.expected.State.State, result.State.State)
 			assert.Equal(t, len(tt.expected.State.Units), len(result.State.Units))
 			assert.Equal(t, tt.expected.State.Units, result.State.Units)
+		})
+	}
+}
+
+// singleReceiverUnit returns a unit with n streams that all run in one receiver,
+// which reports the status of every stream in its "inputs" attribute.
+func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*status.AggregateStatus) {
+	streams := make([]*proto.Stream, n)
+	inputs := make(map[string]any, n)
+	receivers := make(map[string]*status.AggregateStatus, n)
+	for i := range streams {
+		id := fmt.Sprintf("stream-%d", i)
+		streams[i] = &proto.Stream{Id: id}
+		inputs[id] = map[string]any{"status": "StatusOK", "error": ""}
+	}
+	if degraded != "" {
+		inputs[degraded] = map[string]any{"status": "StatusRecoverableError", "error": "slow"}
+	}
+	rs := aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{"inputs": inputs})
+	for _, s := range streams {
+		receivers[s.Id] = rs
+	}
+	unit := component.Unit{
+		ID:     "heartbeat-unit",
+		Type:   client.UnitTypeInput,
+		Config: &proto.UnitExpectedConfig{Streams: streams},
+	}
+	return unit, receivers
+}
+
+func TestGetComponentUnitStateSingleReceiverStreams(t *testing.T) {
+	unit, receivers := singleReceiverUnit(3, "stream-1")
+	comp := &component.Component{ID: "test-component", RuntimeManager: component.OtelRuntimeManager, Units: []component.Unit{unit}}
+
+	result := getComponentUnitState(nil, receivers, unit, comp)
+
+	assert.Equal(t, client.UnitStateDegraded, result.State, "a degraded stream must degrade the unit")
+	streams, ok := result.Payload["streams"].(map[string]map[string]string)
+	require.True(t, ok, "payload must carry the per-stream statuses")
+	require.Len(t, streams, 3, "every stream must get its own status from the shared receiver")
+	assert.Equal(t, client.UnitStateHealthy.String(), streams["stream-0"]["status"], "stream-0 status")
+	assert.Equal(t, client.UnitStateDegraded.String(), streams["stream-1"]["status"], "stream-1 status")
+}
+
+// BenchmarkGetComponentUnitStateSingleReceiver measures one status update for a
+// unit whose streams all run in one receiver. The cost must grow linearly with
+// the number of streams.
+func BenchmarkGetComponentUnitStateSingleReceiver(b *testing.B) {
+	for _, n := range []int{1000, 5000} {
+		b.Run(strconv.Itoa(n), func(b *testing.B) {
+			unit, receivers := singleReceiverUnit(n, "")
+			comp := &component.Component{ID: "test-component", RuntimeManager: component.OtelRuntimeManager, Units: []component.Unit{unit}}
+			b.ResetTimer()
+			for range b.N {
+				getComponentUnitState(nil, receivers, unit, comp)
+			}
 		})
 	}
 }
