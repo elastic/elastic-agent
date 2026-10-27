@@ -1045,68 +1045,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			expectedBeatName:           "metricbeat",
 		},
 		{
-			name: "component with no input units",
-			component: &component.Component{
-				ID:        "no-inputs-test-id",
-				InputType: "filestream",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
-					Spec: component.InputSpec{
-						Name: "filestream",
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:   "output-unit",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-			outputQueueConfig:          nil,
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-			expectedReceiverType:       "filebeatreceiver",
-			expectedBeatName:           "filebeat",
-		},
-		{
-			name: "input unit with nil config is skipped without panic",
-			component: &component.Component{
-				ID:        "nil-config-test-id",
-				InputType: "filestream",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "agentbeat",
-					Spec: component.InputSpec{
-						Name: "filestream",
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:     "input-unit",
-						Type:   client.UnitTypeInput,
-						Config: nil,
-					},
-					{
-						ID:   "output-unit",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-			outputQueueConfig:          nil,
-			beatMonitoringConfigGetter: mockBeatMonitoringConfigGetter,
-			// No expectedReceiverType - nil config input is skipped
-		},
-		{
 			name: "unsupported component type",
 			component: &component.Component{
 				ID:        "unsupported-test-id",
@@ -1745,6 +1683,85 @@ func TestUnitToExporterConfig(t *testing.T) {
 			assert.Equal(t, tt.expectedExportersCfg, exportersCfg)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
 			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
+		})
+	}
+}
+
+// TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
+// enabled streams (either no input units, or input units with nil config) falls back to
+// a no-op receiver instead of an error, so the pipeline stays valid and the component
+// remains OTel-managed and healthy. The receiver is named after the component.
+func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
+	nopType := otelcomponent.MustNewType(NoEnabledStreamsReceiverType)
+	tests := []struct {
+		name               string
+		component          *component.Component
+		expectedReceiverID otelcomponent.ID
+	}{
+		{
+			name: "component with no input units",
+			component: &component.Component{
+				ID:        "no-inputs-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			expectedReceiverID: GetReceiverID(nopType, "no-inputs-test-id"),
+		},
+		{
+			name: "input unit with nil config",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "agentbeat",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "nil-config-test-id-input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			expectedReceiverID: GetReceiverID(nopType, "nil-config-test-id"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(tt.component, &info.AgentInfo{}, nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
 		})
 	}
 }
