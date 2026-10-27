@@ -11,6 +11,8 @@ import (
 
 	prometheusreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/prometheusreceiver"
 
+	prometheusscrapereceiver "github.com/elastic/opentelemetry-collector-components/receiver/prometheusscrapereceiver"
+
 	osqreceiver "github.com/elastic/beats/v7/x-pack/osquerybeat/osqreceiver"
 	pbreceiver "github.com/elastic/beats/v7/x-pack/packetbeat/pbreceiver"
 
@@ -21,6 +23,7 @@ import (
 func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	receivers = append(receivers,
 		prometheusreceiver.NewFactory(),
+		prometheusscrapereceiver.NewFactory(),
 		osqreceiver.NewFactoryWithSettings(osqreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 		pbreceiver.NewFactoryWithSettings(pbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 	)
