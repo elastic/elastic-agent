@@ -97,83 +97,18 @@ func TestOtelKubeStackHelm(t *testing.T) {
 			},
 		},
 		{
-<<<<<<< HEAD
-=======
-			name: "managed helm kube-stack operator standalone agent openshift rootless",
-			steps: []k8sTestStep{
-				k8sStepRequireOpenShift(),
-				k8sStepCreateNamespace(),
-				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
-						values.Options{
-							ValueFiles: []string{
-								"../../../deploy/helm/edot-collector/kube-stack/values.yaml",
-								"../../../deploy/helm/edot-collector/kube-stack/openshift/values.yaml",
-								"../../../deploy/helm/edot-collector/kube-stack/openshift/rootless-values.yaml",
-							},
-							Values: []string{
-								fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
-								fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
-								// avoid cluster collector OOMs at the default 128Mi limit
-								"collectors.cluster.resources.limits.memory=192Mi",
-								"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
-								// store the filelog checkpoints of each run in a new directory
-								// of the hostPath, so earlier runs do not leave offsets in them
-								fmt.Sprintf("collectors.daemon.config.extensions.file_storage.directory=/var/lib/otelcol/%s", namespace),
-								"collectors.daemon.config.extensions.file_storage.create_directory=true",
-							},
-							JSONValues: []string{
-								fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_ENDPOINT","value":"%s"}`, kCtx.esHost),
-								fmt.Sprintf(`collectors.gateway.env[2]={"name":"ELASTIC_API_KEY","value":"%s"}`, kCtx.esEncodedAPIKey),
-							},
-						},
-					)(t, ctx, kCtx, namespace)
-				},
-				// - An OpenTelemetry Operator Deployment (1 pod per
-				// cluster)
-				k8sStepCheckRunningPods("app.kubernetes.io/name=opentelemetry-operator", 1, "manager"),
-				// - A Daemonset to collect K8s node's metrics and logs
-				// (1 EDOT collector pod per node)
-				// - A Cluster wide Deployment to collect K8s metrics and
-				// events (1 EDOT collector pod per cluster)
-				// - Two Gateway pods to collect, aggregate and forward
-				// telemetry.
-				k8sStepCheckRunningPods("app.kubernetes.io/managed-by=opentelemetry-operator", 4, "otc-container"),
-				// validate the daemon collector runs as non-root
-				k8sStepCheckPodsRunAs("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container", 1000, 0),
-				// validate k8s metrics are being pushed
-				k8sStepCheckNamespaceDatastreamHits(info, "metrics", "kubeletstatsreceiver.otel", "default"),
-				// validates pod logs are being pushed
-				func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-					k8sStepDeployJavaApp()(t, ctx, kCtx, namespace)
-					k8sStepCheckNamespaceFilelogDatastreamHits(info, "logs", "filelogreceiver.otel", "default")(t, ctx, kCtx, namespace)
-				},
-				// validate filelog checkpoints are persisted across restarts
-				k8sStepRestartPods("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container"),
-				k8sStepCheckPodsLogContains("app.kubernetes.io/name=opentelemetry-kube-stack-daemon-collector", "otc-container",
-					"Resuming from previously known offset(s)"),
-			},
-		},
-		{
->>>>>>> e69007e (increase collector memory limit to 256Mi (#17548))
 			name: "mOTel helm kube-stack operator standalone agent kubernetes privileged",
 			steps: []k8sTestStep{
 				k8sStepCreateNamespace(),
 				k8sStepHelmDeployWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-<<<<<<< HEAD
 						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
-=======
-						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
-							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"),
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
 							// avoid cluster collector OOMs at the default 128Mi limit
 							"collectors.cluster.resources.limits.memory=192Mi",
 						},
->>>>>>> e69007e (increase collector memory limit to 256Mi (#17548))
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -231,19 +166,13 @@ func TestOtelKubeStackHelm(t *testing.T) {
 				k8sStepCreateNamespace(),
 				k8sStepHelmTemplateApplyWithValueOptions(KubeStackChartPath, "kube-stack-otel",
 					values.Options{
-<<<<<<< HEAD
 						ValueFiles: []string{"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"},
-						Values:     []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
-=======
-						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
-							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/values.yaml"),
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
 							// avoid cluster collector OOMs at the default 128Mi limit
 							"collectors.cluster.resources.limits.memory=192Mi",
 						},
->>>>>>> e69007e (increase collector memory limit to 256Mi (#17548))
 
 						JSONValues: []string{
 							fmt.Sprintf(`collectors.gateway.env[1]={"name":"ELASTIC_OTLP_ENDPOINT","value":"%s"}`, "https://otlp.ingest:433"),
