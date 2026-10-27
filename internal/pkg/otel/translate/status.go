@@ -320,15 +320,16 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 	}
 
 	// Build a map from input ID to receiver status.
-	receiverByInputID := make(map[string]*status.AggregateStatus)
+	receiverByInputID := make(map[string]*receiverStatus)
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		// single_receiver: true means all streams share one receiver named after the
 		// component ID with a placeholder stream suffix. Map every stream's resolved ID to it.
 		singleReceiverName := OtelNamePrefix + comp.ID + "/" + SingleReceiverStreamID
-		for receiverOtelID, rs := range receiverStatuses {
+		for receiverOtelID, aggStatus := range receiverStatuses {
 			if receiverOtelID.Name() != singleReceiverName {
 				continue
 			}
+			rs := newReceiverStatus(aggStatus)
 			for _, u := range comp.Units {
 				if u.Type != client.UnitTypeInput || u.Config == nil {
 					continue
@@ -343,9 +344,9 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 	} else {
 		// Default: each receiver is named compID/streamID.
 		receiverPrefix := OtelNamePrefix + comp.ID + "/"
-		for receiverOtelID, rs := range receiverStatuses {
+		for receiverOtelID, aggStatus := range receiverStatuses {
 			if inputID, found := strings.CutPrefix(receiverOtelID.Name(), receiverPrefix); found {
-				receiverByInputID[inputID] = rs
+				receiverByInputID[inputID] = newReceiverStatus(aggStatus)
 			}
 		}
 	}
@@ -357,8 +358,6 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		exporterStatus = slices.Collect(maps.Values(exporterStatuses))[0]
 	}
 
-	// Units can share a receiver, so decode its statuses once for all of them.
-	decoded := decodedInputStatuses{}
 	for _, unit := range comp.Units {
 		unitKey := runtime.ComponentUnitKey{
 			UnitID:   unit.ID,
@@ -375,11 +374,11 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 					Message: noEnabledStreamsMessage,
 				}
 			} else if len(receiverByInputID) > 0 {
-				compState.Units[unitKey] = getComponentUnitState(nil, receiversForUnit(receiverByInputID, unit, &comp), unit, &comp, decoded)
+				compState.Units[unitKey] = getComponentUnitState(nil, receiversForUnit(receiverByInputID, unit, &comp), unit, &comp)
 			}
 		case client.UnitTypeOutput:
 			if exporterStatus != nil {
-				compState.Units[unitKey] = getComponentUnitState(exporterStatus, nil, unit, &comp, decoded)
+				compState.Units[unitKey] = getComponentUnitState(exporterStatus, nil, unit, &comp)
 			}
 		}
 	}
@@ -393,8 +392,8 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 
 // receiversForUnit narrows a map of receiver statuses keyed by receiver stream suffix down to the
 // receivers of a single input unit, keyed by stream ID (or beat input ID for units without streams).
-func receiversForUnit(receiverBySuffix map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component) map[string]*status.AggregateStatus {
-	result := make(map[string]*status.AggregateStatus)
+func receiversForUnit(receiverBySuffix map[string]*receiverStatus, unit component.Unit, comp *component.Component) map[string]*receiverStatus {
+	result := make(map[string]*receiverStatus)
 	if unit.Config == nil {
 		return result
 	}
@@ -416,6 +415,21 @@ func receiversForUnit(receiverBySuffix map[string]*status.AggregateStatus, unit 
 		}
 	}
 	return result
+}
+
+// receiverStatus is a receiver's status together with the per-stream statuses
+// reported in its "inputs" attribute. A receiver can run many streams
+// (single_receiver), in one unit or in many, so the attribute is decoded once
+// per status update when the receiver is matched to its streams.
+type receiverStatus struct {
+	*status.AggregateStatus
+	// streams holds the status of each stream by stream ID. It is nil if the
+	// receiver doesn't report per-stream statuses.
+	streams map[string]*serializablestatus.SerializableEvent
+}
+
+func newReceiverStatus(rs *status.AggregateStatus) *receiverStatus {
+	return &receiverStatus{AggregateStatus: rs, streams: receiverInputStatuses(rs)}
 }
 
 // receiverInputStatuses decodes a receiver's "inputs" attribute, the per-stream
@@ -460,7 +474,7 @@ func getComponentStartingState(comp component.Component) runtime.ComponentCompon
 		compState.Units[unitKey] = getComponentUnitState(&status.AggregateStatus{
 			Event:              componentstatus.NewEvent(componentstatus.StatusStarting),
 			ComponentStatusMap: map[string]*status.AggregateStatus{},
-		}, nil, unit, &comp, decodedInputStatuses{})
+		}, nil, unit, &comp)
 	}
 	return runtime.ComponentComponentState{
 		Component: comp,
@@ -498,27 +512,10 @@ func getUnitOtelStatuses(pipelineStatus *status.AggregateStatus, comp component.
 	return
 }
 
-// decodedInputStatuses holds the decoded "inputs" attribute of each receiver.
-// A receiver can run many streams (single_receiver), either in one unit or in
-// many units, like Synthetics monitors, so decode its statuses once instead of
-// once per stream.
-type decodedInputStatuses map[*status.AggregateStatus]map[string]*serializablestatus.SerializableEvent
-
-// streamStatus returns the status of a stream from its receiver's "inputs" attribute.
-func (d decodedInputStatuses) streamStatus(rs *status.AggregateStatus, streamID string) *serializablestatus.SerializableEvent {
-	inputStatuses, ok := d[rs]
-	if !ok {
-		inputStatuses = receiverInputStatuses(rs)
-		d[rs] = inputStatuses
-	}
-	return inputStatuses[streamID]
-}
-
 // getComponentUnitState extracts component unit state from otel status.
 // For input units with streams, receiverByInputID maps each stream/input ID to its dedicated receiver status.
 // For output units or starting state, outputUnitStatus provides a single fallback status and receiverByInputID is nil.
-// decoded holds the receiver statuses decoded so far, shared across the units of a component.
-func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByInputID map[string]*status.AggregateStatus, unit component.Unit, comp *component.Component, decoded decodedInputStatuses) runtime.ComponentUnitState {
+func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByInputID map[string]*receiverStatus, unit component.Unit, comp *component.Component) runtime.ComponentUnitState {
 	if unit.Type == client.UnitTypeOutput {
 		topLevelState, topLevelMessage := StateWithMessage(outputUnitStatus)
 		return runtime.ComponentUnitState{
@@ -551,14 +548,14 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 		}
 		streamID := resolveStreamID(stream.Id, streamSource, unit.ID, i)
 
-		var rs *status.AggregateStatus
+		var rs *receiverStatus
 		if receiverByInputID != nil {
 			rs = receiverByInputID[streamID]
 		}
 
 		if rs != nil {
 			// Extract the stream's status from its receiver's attributes
-			streamStatus := decoded.streamStatus(rs, streamID)
+			streamStatus := rs.streams[streamID]
 			if streamStatus != nil {
 				unitStreamStatuses[streamID] = streamStatus
 				streamStatusEvent := streamStatusToStatusEvent(streamStatus)
@@ -617,7 +614,7 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 		beatInputID := comp.GetBeatInputIDForUnit(unit.ID)
 		if beatInputID != "" {
 			if rs, ok := receiverByInputID[beatInputID]; ok {
-				streamStatus := decoded.streamStatus(rs, beatInputID)
+				streamStatus := rs.streams[beatInputID]
 				if streamStatus != nil {
 					unitState, unitMessage := StateWithMessage(streamStatusToStatusEvent(streamStatus))
 					return runtime.ComponentUnitState{

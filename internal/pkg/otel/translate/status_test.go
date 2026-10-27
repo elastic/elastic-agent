@@ -773,7 +773,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateHealthy, result.State)
 		assert.Equal(t, map[string]any{
 			"streams": map[string]map[string]string{
@@ -814,7 +814,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateDegraded, result.State)
 		assert.Equal(t, "Recoverable: stream error", result.Message)
 		assert.Equal(t, map[string]any{
@@ -843,7 +843,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				map[string]any{"inputs": map[string]any{}},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		// No streams matched any receiver, empty state
 		assert.Equal(t, client.UnitState(0), result.State)
 	})
@@ -865,7 +865,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 			},
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateHealthy, result.State)
 		assert.Equal(t, map[string]any{
 			"streams": map[string]map[string]string{
@@ -908,7 +908,7 @@ func TestGetComponentUnitStateWithPerStreamReceivers(t *testing.T) {
 				},
 			),
 		}
-		result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+		result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 		assert.Equal(t, client.UnitStateDegraded, result.State)
 		assert.Equal(t, "Recoverable: unit level error", result.Message)
 	})
@@ -990,7 +990,7 @@ func TestGetComponentUnitState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(tt.status, nil, unit, comp, decodedInputStatuses{})
+			result := getComponentUnitState(tt.status, nil, unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -1003,7 +1003,7 @@ func TestGetComponentUnitState(t *testing.T) {
 			Type:   client.UnitTypeInput,
 			Config: nil,
 		}
-		result := getComponentUnitState(nil, nil, nilConfigUnit, comp, decodedInputStatuses{})
+		result := getComponentUnitState(nil, nil, nilConfigUnit, comp)
 		assert.Equal(t, client.UnitStateDegraded, result.State)
 		assert.Equal(t, "unit configuration is nil", result.Message)
 	})
@@ -1346,7 +1346,7 @@ func TestGetComponentUnitStateWithStreamAttributes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := getComponentUnitState(nil, tt.receivers, unit, comp, decodedInputStatuses{})
+			result := getComponentUnitState(nil, newReceiverStatuses(tt.receivers), unit, comp)
 			assert.Equal(t, tt.expected.State, result.State)
 			assert.Equal(t, tt.expected.Message, result.Message)
 			assert.Equal(t, tt.expected.Payload, result.Payload)
@@ -1405,7 +1405,7 @@ func TestGetComponentUnitStateWithUnitInputStatus(t *testing.T) {
 		Payload: nil,
 	}
 
-	result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+	result := getComponentUnitState(nil, newReceiverStatuses(receivers), unit, comp)
 	assert.Equal(t, expectedState.State, result.State)
 	assert.Equal(t, expectedState.Message, result.Message)
 	assert.Equal(t, expectedState.Payload, result.Payload)
@@ -1862,10 +1862,10 @@ func TestOutputStatus(t *testing.T) {
 
 // singleReceiverUnit returns a unit with n streams that all run in one receiver,
 // which reports the status of every stream in its "inputs" attribute.
-func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*status.AggregateStatus) {
+func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*receiverStatus) {
 	streams := make([]*proto.Stream, n)
 	inputs := make(map[string]any, n)
-	receivers := make(map[string]*status.AggregateStatus, n)
+	receivers := make(map[string]*receiverStatus, n)
 	for i := range streams {
 		id := fmt.Sprintf("stream-%d", i)
 		streams[i] = &proto.Stream{Id: id}
@@ -1874,7 +1874,7 @@ func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*sta
 	if degraded != "" {
 		inputs[degraded] = map[string]any{"status": "StatusRecoverableError", "error": "slow"}
 	}
-	rs := aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{"inputs": inputs})
+	rs := newReceiverStatus(aggregateStatusWithAttributes(componentstatus.StatusOK, nil, map[string]any{"inputs": inputs}))
 	for _, s := range streams {
 		receivers[s.Id] = rs
 	}
@@ -1886,11 +1886,21 @@ func singleReceiverUnit(n int, degraded string) (component.Unit, map[string]*sta
 	return unit, receivers
 }
 
+// newReceiverStatuses decodes the per-stream statuses of each receiver, like
+// getComponentState does before computing unit states.
+func newReceiverStatuses(receivers map[string]*status.AggregateStatus) map[string]*receiverStatus {
+	result := make(map[string]*receiverStatus, len(receivers))
+	for id, rs := range receivers {
+		result[id] = newReceiverStatus(rs)
+	}
+	return result
+}
+
 func TestGetComponentUnitStateSingleReceiverStreams(t *testing.T) {
 	unit, receivers := singleReceiverUnit(3, "stream-1")
 	comp := &component.Component{ID: "test-component", RuntimeManager: component.OtelRuntimeManager, Units: []component.Unit{unit}}
 
-	result := getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+	result := getComponentUnitState(nil, receivers, unit, comp)
 
 	assert.Equal(t, client.UnitStateDegraded, result.State, "a degraded stream must degrade the unit")
 	streams, ok := result.Payload["streams"].(map[string]map[string]string)
@@ -1910,7 +1920,7 @@ func BenchmarkGetComponentUnitStateSingleReceiver(b *testing.B) {
 			comp := &component.Component{ID: "test-component", RuntimeManager: component.OtelRuntimeManager, Units: []component.Unit{unit}}
 			b.ResetTimer()
 			for range b.N {
-				getComponentUnitState(nil, receivers, unit, comp, decodedInputStatuses{})
+				getComponentUnitState(nil, receivers, unit, comp)
 			}
 		})
 	}
