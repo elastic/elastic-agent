@@ -22,10 +22,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 
@@ -37,10 +37,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 
@@ -52,10 +52,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -291,10 +291,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 stringData:
@@ -324,41 +324,31 @@ stringData:
         - data_stream:
             dataset: kubernetes.container_logs
             type: logs
-          id: kubernetes-container-logs-${kubernetes.pod.name}-${kubernetes.container.id}
+          id: kubernetes-container-logs
           parsers:
           - container:
               format: auto
               stream: all
           paths:
-          - /var/log/containers/*${kubernetes.container.id}.log
+          - /var/log/containers/*.log
           processors:
-          - add_fields:
-              fields:
-                annotations.elastic_co/dataset: ${kubernetes.annotations.elastic.co/dataset|""}
-                annotations.elastic_co/namespace: ${kubernetes.annotations.elastic.co/namespace|""}
-                annotations.elastic_co/preserve_original_event: ${kubernetes.annotations.elastic.co/preserve_original_event|""}
-              target: kubernetes
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/dataset
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/dataset: ""
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/namespace
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/namespace: ""
-          - drop_fields:
-              fields:
-              - kubernetes.annotations.elastic_co/preserve_original_event
-              ignore_missing: true
-              when:
-                equals:
-                  kubernetes.annotations.elastic_co/preserve_original_event: ""
+          - add_kubernetes_metadata:
+              append_fields: true
+              default_indexers:
+                enabled: false
+              default_matchers:
+                enabled: false
+              include_annotations:
+              - elastic.co/dataset
+              - elastic.co/namespace
+              - elastic.co/preserve_original_event
+              indexers:
+              - container: null
+              matchers:
+              - logs_path:
+                  logs_path: /var/log/containers/
+                  resource_type: container
+              wait_for_metadata: true
           - add_tags:
               tags:
               - preserve_original_event
@@ -369,6 +359,9 @@ stringData:
                 - regexp:
                     kubernetes.annotations.elastic_co/preserve_original_event: ^(?i)true$
           prospector.scanner.symlinks: true
+          take_over:
+            enabled: true
+            from_any_id: true
         type: filestream
         use_output: default
       - data_stream:
@@ -626,10 +619,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -709,10 +702,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 rules:
@@ -814,10 +807,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -836,10 +829,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 subjects:
@@ -975,14 +968,14 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
-  version: 9.6.0
+  version: 9.7.0
   configRef:
     secretName: agent-pernode-example
   elasticsearchRefs:
@@ -1006,7 +999,7 @@ spec:
             value: /usr/share/elastic-agent/state
           - name: ELASTIC_NETINFO
             value: "false"
-          image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0-SNAPSHOT
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.7.0-SNAPSHOT
           imagePullPolicy: IfNotPresent
           name: agent
           resources:
@@ -1059,14 +1052,14 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     eck.k8s.elastic.co/license: basic
 spec:
-  version: 9.6.0
+  version: 9.7.0
   configRef:
     secretName: agent-clusterwide-example
   elasticsearchRefs:
@@ -1090,7 +1083,7 @@ spec:
             value: /usr/share/elastic-agent/state
           - name: ELASTIC_NETINFO
             value: "false"
-          image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0-SNAPSHOT
+          image: docker.elastic.co/elastic-agent/elastic-agent:9.7.0-SNAPSHOT
           imagePullPolicy: IfNotPresent
           name: agent
           resources:

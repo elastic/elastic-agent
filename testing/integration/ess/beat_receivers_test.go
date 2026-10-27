@@ -764,7 +764,9 @@ func TestBeatsReceiverLogs(t *testing.T) {
 
 	type configOptions struct {
 		RuntimeExperimental string
+		OutputURL           string
 	}
+	mockESURL := integration.StartMockES(t, 0, 0, 0, 0)
 	configTemplate := `agent.logging.level: info
 agent.logging.to_stderr: true
 agent.logging.to_files: false
@@ -781,7 +783,7 @@ outputs:
   default:
     type: elasticsearch
     preset: latency
-    hosts: [http://localhost:9200]
+    hosts: ["{{.OutputURL}}"]
     api_key: placeholder
 agent.monitoring.enabled: false
 `
@@ -791,19 +793,21 @@ agent.monitoring.enabled: false
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
 				RuntimeExperimental: string(component.ProcessRuntimeManager),
+				OutputURL:           mockESURL.String(),
 			}))
 	processConfig := configBuffer.Bytes()
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
 				RuntimeExperimental: string(component.OtelRuntimeManager),
+				OutputURL:           mockESURL.String(),
 			}))
 	receiverConfig := configBuffer.Bytes()
 	// this is the context for the whole test, with a global timeout defined
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 
-	// since we set the output to a nonexistent ES endpoint, we expect it to be degraded, but the input to be healthy
+	// Wait for the component and both of its units to be healthy.
 	assertBeatsReady := func(t *assert.CollectT, status *atesting.AgentStatusOutput, runtime component.RuntimeManager) {
 		t.Helper()
 
@@ -818,17 +822,31 @@ agent.monitoring.enabled: false
 		// we don't actually care about anything here other than the receiver itself
 		assert.Equal(t, 1, len(status.Components))
 
-		// all the components should be degraded, their output units should be degraded, the input units should be healthy,
-		// and should identify themselves appropriately via their version info
+		// The component and its input and output units should be healthy, and the component
+		// should identify itself appropriately via its version info.
 		for _, comp := range status.Components {
+			assert.Equal(t, int(cproto.State_HEALTHY), comp.State)
 			assert.Equal(t, componentVersionInfoName, comp.VersionInfo.Name)
+			var inputUnits, outputUnits int
 			for _, unit := range comp.Units {
-				if unit.UnitType == int(cproto.UnitType_INPUT) {
-					assert.Equal(t, int(cproto.State_HEALTHY), unit.State,
-						"expected state of unit %s to be %s, got %s",
-						unit.UnitID, cproto.State_HEALTHY.String(), cproto.State(unit.State).String()) //nolint:gosec // G115 always under 32-bit
+				switch unit.UnitType {
+				case int(cproto.UnitType_INPUT):
+					inputUnits++
+				case int(cproto.UnitType_OUTPUT):
+					outputUnits++
 				}
+				assert.Equal(
+					t,
+					int(cproto.State_HEALTHY),
+					unit.State,
+					"expected state of unit %s to be %s, got %d",
+					unit.UnitID,
+					cproto.State_HEALTHY.String(),
+					unit.State,
+				)
 			}
+			assert.Equal(t, 1, inputUnits, "expected exactly one input unit")
+			assert.Equal(t, 1, outputUnits, "expected exactly one output unit")
 		}
 	}
 
@@ -862,12 +880,14 @@ agent.monitoring.enabled: false
 		assertBeatsReady(collect, &status, component.OtelRuntimeManager)
 	}, 2*time.Minute, 5*time.Second)
 
-	logsBytes, err := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
-	require.NoError(t, err, "failed to read logs: %v", err)
+	var beatStartLogs []map[string]any
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		logsBytes, logsErr := fixture.Exec(ctx, []string{"logs", "-n", "1000", "--exclude-events"})
+		require.NoError(collect, logsErr, "failed to read logs: %v", logsErr)
+		beatStartLogs = getBeatStartLogRecords(string(logsBytes))
+		assert.Len(collect, beatStartLogs, 2, "expected to find one log line for each configuration")
+	}, 30*time.Second, time.Second)
 
-	beatStartLogs := getBeatStartLogRecords(string(logsBytes))
-
-	require.Len(t, beatStartLogs, 2, "expected to find one log line for each configuration")
 	processLog, receiverLog := beatStartLogs[0], beatStartLogs[1]
 
 	// Check that the process log is a subset of the receiver log.
