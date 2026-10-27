@@ -417,12 +417,6 @@ func receiversForUnit(receiverBySuffix map[string]*receiverStatus, unit componen
 	return result
 }
 
-<<<<<<< HEAD
-// getStreamStatusFromReceiver extracts a stream's status from a receiver's "inputs" attributes.
-func getStreamStatusFromReceiver(rs *status.AggregateStatus, streamID string) *serializablestatus.SerializableEvent {
-	attrs := rs.Attributes().AsRaw()
-	inputStatuses, ok := attrs["inputs"]
-=======
 // receiverStatus is a receiver's status together with the per-stream statuses
 // reported in its "inputs" attribute. A receiver can run many streams
 // (single_receiver), in one unit or in many, so the attribute is decoded once
@@ -441,8 +435,7 @@ func newReceiverStatus(rs *status.AggregateStatus) *receiverStatus {
 // receiverInputStatuses decodes a receiver's "inputs" attribute, the per-stream
 // statuses reported by the beat.
 func receiverInputStatuses(rs *status.AggregateStatus) map[string]*serializablestatus.SerializableEvent {
-	inputStatuses, ok := rs.Attributes().Get("inputs")
->>>>>>> f17f9fe (Decode receiver input statuses once per component status update (#17576))
+	inputStatuses, ok := rs.Attributes().AsRaw()["inputs"]
 	if !ok {
 		return nil
 	}
@@ -454,7 +447,7 @@ func receiverInputStatuses(rs *status.AggregateStatus) map[string]*serializables
 	if err := mapstructure.Decode(inputStatuses, &inputStatusMap); err != nil {
 		return nil
 	}
-	return inputStatusMap[streamID]
+	return inputStatusMap
 }
 
 // getComponentStartingState returns a ComponentComponentState with all units in the starting state,

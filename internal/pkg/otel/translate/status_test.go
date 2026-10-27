@@ -7,6 +7,7 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1859,8 +1860,6 @@ func TestOutputStatus(t *testing.T) {
 		})
 	}
 }
-<<<<<<< HEAD
-=======
 
 // singleReceiverUnit returns a unit with n streams that all run in one receiver,
 // which reports the status of every stream in its "inputs" attribute.
@@ -1969,4 +1968,3 @@ func BenchmarkGetComponentStateSingleReceiver(b *testing.B) {
 		require.Len(b, result.State.Units, streams)
 	}
 }
->>>>>>> f17f9fe (Decode receiver input statuses once per component status update (#17576))
