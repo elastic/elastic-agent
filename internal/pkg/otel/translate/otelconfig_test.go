@@ -3551,7 +3551,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 // TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
 // enabled streams (either no input units, or input units with nil config) falls back to
 // a no-op receiver instead of an error, so the pipeline stays valid and the component
@@ -3619,7 +3618,18 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 				},
 			},
 			expectedReceiverID: GetReceiverID(nopType, "nil-config-test-id"),
-=======
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(tt.component, nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
+		})
+	}
+}
+
 func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) {
 	newHeartbeatComponent := func(outputType string, singleReceiver bool) *component.Component {
 		return &component.Component{
@@ -3712,20 +3722,13 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
 				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
 			},
->>>>>>> fe0cdc3 (Restore Heartbeat monitor state in OTel mode (#16902))
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-<<<<<<< HEAD
-			result, err := getReceiversConfigForComponent(tt.component, nil, nil)
-			require.NoError(t, err)
-			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
-=======
 			result, err := getReceiversConfigForComponent(
 				newHeartbeatComponent(tt.outputType, tt.singleReceiver),
-				&info.AgentInfo{},
 				nil,
 				nil,
 			)
@@ -3747,7 +3750,6 @@ func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) 
 				require.True(t, ok, "receiver %q monitor state config must be a map", receiverID)
 				assert.Equal(t, tt.expectedAuth, monitorState["elasticsearch"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
 			}
->>>>>>> fe0cdc3 (Restore Heartbeat monitor state in OTel mode (#16902))
 		})
 	}
 }
