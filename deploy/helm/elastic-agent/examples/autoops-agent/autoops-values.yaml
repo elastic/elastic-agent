@@ -6,7 +6,6 @@ kube-state-metrics:
 
 autoOps:
   enabled: true
-  autoops_token: "REPLACE_ME_TOKEN"
   autoops_otel_url: "https://otel.example.com:4318"
   es_api_key: "REPLACE_ME_API_KEY"
   elastic_cloud_connected_mode_api_key: "CCM-API-KEY"
