@@ -770,26 +770,7 @@ steps:
           - packaging-containers-amd64
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
-        command: |
-          buildkite-agent artifact download "build/distributions/elastic-agent-complete-*-linux-amd64.docker.tar.gz" . --step 'packaging-containers-amd64'
-          shopt -s nullglob
-          archives=(build/distributions/elastic-agent-complete-*-linux-amd64.docker.tar.gz)
-          if [ "$${#archives[@]}" -ne 1 ]; then
-            echo "Error: expected exactly 1 complete docker archive, found $${#archives[@]}" >&2
-            exit 1
-          fi
-          load_output="$(BUILDKIT_PROGRESS=plain docker load -i "$${archives[0]}")"
-          printf '%s\n' "$${load_output}"
-          ELASTIC_AGENT_COMPLETE_IMAGE="$(printf '%s\n' "$${load_output}" | sed -n 's/^Loaded image: //p' | tail -n1)"
-          if [ -z "$${ELASTIC_AGENT_COMPLETE_IMAGE}" ]; then
-            ELASTIC_AGENT_COMPLETE_IMAGE="$(tar -xOf "$${archives[0]}" manifest.json | jq -r '.[0].RepoTags[0] // empty')"
-          fi
-          if [ -z "$${ELASTIC_AGENT_COMPLETE_IMAGE}" ]; then
-            echo "Error: failed to determine loaded image reference from $${archives[0]}" >&2
-            exit 1
-          fi
-          export ELASTIC_AGENT_COMPLETE_IMAGE
-          .buildkite/scripts/steps/integration_tests_oblt-cli.sh heartbeat-complete true
+        command: bash .buildkite/scripts/steps/heartbeat-complete.sh
         artifact_paths:
           - build/*
           - build/diagnostics/**
