@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"gopkg.in/yaml.v2"
 
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -42,13 +43,24 @@ func TestCoordinator_generateComponentModel_reusesUnchangedWork(t *testing.T) {
 		}
 	}
 
-	// the keys consumed while generating the components are still in the rendered policy
-	inputs, ok := coord.derivedConfig["inputs"].([]interface{})
+	// the keys consumed while generating the components are still in the cached rendered inputs
+	cfg, _, err := renderConfig(coord.ast, coord.vars, coord.renderCache)
+	require.NoError(t, err)
+	inputs, ok := cfg["inputs"].([]interface{})
 	require.True(t, ok)
 	require.NotEmpty(t, inputs)
 	for _, input := range inputs {
 		assert.Contains(t, input.(map[string]interface{}), "use_output")
 	}
+
+	// the computed-config diagnostic renders the same policy without touching the render cache
+	cacheLen := coord.renderCache.Len()
+	hook, ok := diagnosticHooksMap(coord)["computed-config"]
+	require.True(t, ok, "diagnostic hooks should have an entry for computed-config")
+	expected, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+	assert.YAMLEq(t, string(expected), string(hook.Hook(ctx)), "computed-config should match the rendered policy")
+	assert.Equal(t, cacheLen, coord.renderCache.Len(), "computed-config must not modify the render cache")
 
 	// cold caches produce the same model
 	coord.renderCache.Reset()

@@ -440,8 +440,9 @@ type Coordinator struct {
 	// The current variables
 	vars []*transpiler.Vars
 
-	// The policy after spec and variable substitution
-	derivedConfig map[string]interface{}
+	// The "signed" section of the policy after variable substitution. The full
+	// derived policy duplicates every input, so diagnostics re-render it instead.
+	derivedSigned map[string]interface{}
 
 	// renderCache reuses the rendered inputs of the previous refresh for the (input, vars)
 	// pairs that did not change. It is reset whenever ast changes.
@@ -1393,7 +1394,12 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current computed configuration of the running Elastic Agent after variable substitution",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				cfg := c.derivedConfig
+				// rendered on demand, without the render cache, as this runs outside the
+				// main Coordinator goroutine
+				cfg, _, err := renderConfig(c.ast, c.vars, nil)
+				if err != nil {
+					return []byte(fmt.Sprintf("error: %q", err))
+				}
 				o, err := yaml.Marshal(cfg)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
@@ -1816,8 +1822,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		c.otelCfg = cfg.OTel
 	}
 
-	// perform and verify ast translation
-	m, err := cfg.ToMapStr()
+	// perform and verify ast translation; nothing reads the inputs from cfg after this
+	m, err := cfg.ToMapStrReleasing("inputs")
 	if err != nil {
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
@@ -1845,6 +1851,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	if err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
+	// Only Settings is read later; holding UCfg would retain a full copy of the policy tree.
+	currentCfg.UCfg = nil
 	c.currentCfg = currentCfg
 
 	// Standalone mode has no dedicated notification channel unlike managed mode,
@@ -2098,7 +2106,7 @@ func (c *Coordinator) refreshComponentModel(ctx context.Context) (err error) {
 		return fmt.Errorf("ensuring component work dirs exists: %w", err)
 	}
 
-	signed, err := component.SignedFromPolicy(c.derivedConfig)
+	signed, err := component.SignedFromPolicy(c.derivedSigned)
 	if err != nil {
 		if !errors.Is(err, component.ErrNotFound) {
 			c.logger.Errorf("Failed to parse \"signed\" properties: %v", err)
@@ -2400,46 +2408,9 @@ func (c *Coordinator) ackMigration(ctx context.Context, action *fleetapi.ActionM
 // components from the current AST and vars and returns the result.
 // Called only on the main Coordinator goroutine.
 func (c *Coordinator) generateComponentModel() (err error) {
-	ast := c.ast.ShallowClone()
-
-	// perform variable substitution for inputs
-	inputs, ok := transpiler.Lookup(ast, "inputs")
-	var renderedInputInfo map[string]transpiler.RenderedInputInfo
-	var renderedInputs *transpiler.RenderedInputs
-	if ok {
-		renderedInputs, err = transpiler.RenderInputsCached(inputs, c.vars, c.renderCache)
-		if err != nil {
-			return fmt.Errorf("rendering inputs failed: %w", err)
-		}
-		renderedInputInfo = renderedInputs.Info
-		// the rendered inputs are added to the map form of the policy below, straight from
-		// the render cache, instead of being converted from the tree on every refresh
-		err = transpiler.Insert(ast, transpiler.NewList(nil), "inputs")
-		if err != nil {
-			return fmt.Errorf("inserting rendered inputs failed: %w", err)
-		}
-	}
-
-	// perform variable substitution for outputs
-	// outputs only support the context variables (dynamic provides are not provide to the outputs)
-	outputs, ok := transpiler.Lookup(ast, "outputs")
-	if ok {
-		renderedOutputs, err := transpiler.RenderOutputs(outputs, c.vars)
-		if err != nil {
-			return fmt.Errorf("rendering outputs failed: %w", err)
-		}
-		err = transpiler.Insert(ast, renderedOutputs, "outputs")
-		if err != nil {
-			return fmt.Errorf("inserting rendered outputs failed: %w", err)
-		}
-	}
-
-	cfg, err := ast.Map()
+	cfg, renderedInputInfo, err := renderConfig(c.ast, c.vars, c.renderCache)
 	if err != nil {
-		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
-	}
-	if renderedInputs != nil {
-		cfg["inputs"] = renderedInputs.Maps()
+		return err
 	}
 	var configInjector component.GenerateMonitoringCfgFn
 	if c.monitorMgr != nil && c.monitorMgr.Enabled() {
@@ -2487,7 +2458,10 @@ func (c *Coordinator) generateComponentModel() (err error) {
 
 	// If we made it this far, update our internal derived values and
 	// return with no error
-	c.derivedConfig = cfg
+	c.derivedSigned = nil
+	if signed, ok := cfg["signed"]; ok {
+		c.derivedSigned = map[string]interface{}{"signed": signed}
+	}
 
 	lastComponentModel := c.componentModel
 	c.componentModel = comps
@@ -2511,6 +2485,58 @@ func (c *Coordinator) componentAgentInfo() *proto.AgentInfo {
 		Unprivileged: c.agentInfo.Unprivileged(),
 		Tags:         tags,
 	}
+}
+
+// renderConfig substitutes vars into the inputs and outputs of ast and returns the resulting
+// policy. The rendered inputs are shared with cache (when non-nil) and must be treated as
+// read-only. Callers outside the main Coordinator goroutine must pass a nil cache, as a render
+// drops every cache entry it doesn't use.
+func renderConfig(ast *transpiler.AST, vars []*transpiler.Vars, cache *transpiler.RenderCache) (map[string]interface{}, map[string]transpiler.RenderedInputInfo, error) {
+	if ast == nil {
+		return nil, nil, nil
+	}
+	ast = ast.ShallowClone()
+
+	// perform variable substitution for inputs
+	inputs, ok := transpiler.Lookup(ast, "inputs")
+	var renderedInputs *transpiler.RenderedInputs
+	if ok {
+		var err error
+		renderedInputs, err = transpiler.RenderInputsCached(inputs, vars, cache)
+		if err != nil {
+			return nil, nil, fmt.Errorf("rendering inputs failed: %w", err)
+		}
+		// the rendered inputs are added to the map form of the policy below, straight from
+		// the render cache, instead of being converted from the tree on every refresh
+		err = transpiler.Insert(ast, transpiler.NewList(nil), "inputs")
+		if err != nil {
+			return nil, nil, fmt.Errorf("inserting rendered inputs failed: %w", err)
+		}
+	}
+
+	// perform variable substitution for outputs
+	// outputs only support the context variables (dynamic provides are not provide to the outputs)
+	outputs, ok := transpiler.Lookup(ast, "outputs")
+	if ok {
+		renderedOutputs, err := transpiler.RenderOutputs(outputs, vars)
+		if err != nil {
+			return nil, nil, fmt.Errorf("rendering outputs failed: %w", err)
+		}
+		err = transpiler.Insert(ast, renderedOutputs, "outputs")
+		if err != nil {
+			return nil, nil, fmt.Errorf("inserting rendered outputs failed: %w", err)
+		}
+	}
+
+	cfg, err := ast.Map()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
+	}
+	if renderedInputs == nil {
+		return cfg, nil, nil
+	}
+	cfg["inputs"] = renderedInputs.Maps()
+	return cfg, renderedInputs.Info, nil
 }
 
 // compares the last component model with an updated model,
