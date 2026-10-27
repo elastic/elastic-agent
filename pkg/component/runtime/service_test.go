@@ -485,6 +485,7 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 
 	var mu sync.Mutex
 	var states []client.UnitState
+	var failedMsg string
 	go func() {
 		for {
 			select {
@@ -493,6 +494,9 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 			case st := <-service.ch:
 				mu.Lock()
 				states = append(states, st.State)
+				if st.State == client.UnitStateFailed && failedMsg == "" {
+					failedMsg = st.Message
+				}
 				mu.Unlock()
 			}
 		}
@@ -512,6 +516,36 @@ func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
 	require.GreaterOrEqual(t, failedAt, 0, "FAILED was not reported")
 	for _, st := range states[failedAt:] {
 		require.Equal(t, client.UnitStateFailed, st, "the retry must not reset the state from FAILED")
+	}
+	require.Contains(t, failedMsg, "install exited with code 99")
+}
+
+func TestDescribeStartFailure(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "timeout with output",
+			err:  &commandError{line: "2026-01-02 03:04:05: error: A.cpp:1 something broke", err: context.DeadlineExceeded},
+			want: "install timed out: A.cpp:1 something broke",
+		},
+		{
+			name: "no output",
+			err:  errors.New("boom"),
+			want: "install failed",
+		},
+		{
+			name: "long line is shortened",
+			err:  &commandError{line: strings.Repeat("x", 300), err: errors.New("boom")},
+			want: "install failed: " + strings.Repeat("x", maxStartFailureLineLength) + "...",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, describeStartFailure(tc.err))
+		})
 	}
 }
 

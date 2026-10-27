@@ -284,9 +284,9 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						delay := s.serviceRestartDelay
 						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
 						s.startFailed = true
-						// The error is logged above, the state message only points to the logs.
 						s.forceCompState(client.UnitStateFailed,
-							fmt.Sprintf("Failed: %s service failed to start, retrying in %v. See the Elastic Agent logs for details", s.name(), delay))
+							fmt.Sprintf("Failed: %s service failed to start: %s, retrying in %v. See the Elastic Agent logs for details",
+								s.name(), describeStartFailure(err), delay))
 						s.startRetryGen++
 						retry := as
 						retry.retryGen = s.startRetryGen
@@ -464,6 +464,37 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 // start the service after it was stopped or when a new start action supersedes it.
 func (s *serviceRuntime) invalidateStartRetry() {
 	s.startRetryGen++
+}
+
+// maxStartFailureLineLength limits the line of command output shown in a state message.
+const maxStartFailureLineLength = 200
+
+// describeStartFailure returns a short description of a failed start: what failed and
+// how, followed by the most relevant line of the command output when there is one.
+// start only returns the error of the install step, so the failure is described as one.
+func describeStartFailure(err error) string {
+	var reason string
+	var exitErr *exec.ExitError
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		reason = "install timed out"
+	case errors.As(err, &exitErr):
+		reason = fmt.Sprintf("install exited with code %d", exitErr.ExitCode())
+	default:
+		reason = "install failed"
+	}
+
+	var cmdErr *commandError
+	if errors.As(err, &cmdErr) {
+		line := logLinePrefix.ReplaceAllString(cmdErr.summary(), "")
+		if runes := []rune(line); len(runes) > maxStartFailureLineLength {
+			line = string(runes[:maxStartFailureLineLength]) + "..."
+		}
+		if line != "" {
+			reason += ": " + line
+		}
+	}
+	return reason
 }
 
 // clearStartFailure moves the state from FAILED back to STARTING once a start
