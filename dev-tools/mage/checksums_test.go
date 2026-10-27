@@ -133,7 +133,7 @@ func TestComponentCopyOptions_FailsOnOverwrite(t *testing.T) {
 func TestComponentCopyOptions_FailsOnFileLeftInDropPath(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, filepath.Join(root, "comp-a"), map[string]string{"NOTICE.txt": "notice a"})
-	// the drop path is not cleaned between builds, e.g. with KEEP_ARCHIVE
+	// a file is already in the drop path before the component is copied
 	dropPath := filepath.Join(root, "drop")
 	writeFiles(t, dropPath, map[string]string{"NOTICE.comp-a.txt": "left from a previous build"})
 
