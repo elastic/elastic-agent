@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
@@ -41,7 +42,7 @@ func setupRolledBackAgentDirs(t *testing.T, topDir string) (prev, failed, failed
 	return prev, failed, failedLog
 }
 
-// startupCleanup runs what application.normalizeAgentInstalls runs when the agent starts.
+// startupCleanup runs the CleanAvailableRollbacks part of what application.normalizeAgentInstalls runs when the agent starts.
 func startupCleanup(t *testing.T, topDir, currentHome string) error {
 	t.Helper()
 	log, _ := loggertest.New(t.Name())
@@ -52,13 +53,13 @@ func startupCleanup(t *testing.T, topDir, currentHome string) error {
 	return err
 }
 
-// The startup cleanup of the agent we rolled back to must keep the home of the failed upgrade and its logs
-// when the failed home carries the retention marker (#17234).
 // failedUpgradeMarker is the upgrade marker of an upgrade from prev to failed.
 func failedUpgradeMarker(prev, failed string) *UpdateMarker {
 	return &UpdateMarker{Version: "9.5.4", Hash: "b18dae", VersionedHome: failed, PrevVersion: "9.5.3", PrevHash: "0e70ce", PrevVersionedHome: prev}
 }
 
+// The startup cleanup of the agent we rolled back to must keep the home of the failed upgrade and its logs
+// when the failed home carries the retention marker (#17234).
 func TestRetainFailedUpgradeLogs_SurvivesStartupCleanup(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
@@ -129,12 +130,18 @@ func TestRetainedHome(t *testing.T) {
 		retainedHome(&UpdateMarker{Hash: "b18dae2c72", PrevVersionedHome: prevHome}), "marker of older agents has no versioned home")
 	assert.Equal(t, "", retainedHome(&UpdateMarker{Hash: "b1", PrevVersionedHome: prevHome}), "no failed home in the marker")
 	assert.Equal(t, "", retainedHome(&UpdateMarker{VersionedHome: prevHome, PrevVersionedHome: prevHome}), "the home we roll back to is never retained")
+
+	// the retained home gets stripped, so it must be a data/elastic-agent-* directory
+	for _, invalid := range []string{".", "data", "..", filepath.Join("data", "..", "etc"), filepath.Join("data", "other"), filepath.Join("data", "elastic-agent-1", "nested"), string(filepath.Separator)} {
+		assert.Equal(t, "", retainedHome(&UpdateMarker{VersionedHome: invalid, PrevVersionedHome: prevHome}), "%q is not a versioned home", invalid)
+	}
 }
 
 func TestRollbackWithOpts_RetainsLogsOfFailedUpgrade(t *testing.T) {
+	var logs *observer.ObservedLogs
 	setup := func(t *testing.T, onRestart func()) (log *logger.Logger, topDir string, mockClient *client.MockClient) {
 		t.Helper()
-		log, _ = loggertest.New(t.Name())
+		log, logs = loggertest.New(t.Name())
 		topDir = t.TempDir()
 		setupAgents(t, log, topDir, setupAgentInstallations{
 			installedAgents: []testAgentInstall{
@@ -197,6 +204,66 @@ func TestRollbackWithOpts_RetainsLogsOfFailedUpgrade(t *testing.T) {
 		marker := &UpdateMarker{Version: "9.9.9", Hash: "nonexistent", VersionedHome: "data/elastic-agent-9.9.9-nonexi", PrevVersionedHome: prevHome}
 		require.NoError(t, RollbackWithOpts(t.Context(), log, mockClient, topDir, prevHome, "abcdef", withLogsRetention(marker)))
 
+		assert.NotEmpty(t, logs.FilterMessageSnippet("failed to retain the logs").All(), "the failure must be logged")
 		assertAgentInstallExists(t, filepath.Join(topDir, prevHome), paths.BinaryName)
 	})
+}
+
+// The home we roll back to can be derived from the previous hash when the marker does not record it:
+// it must not be mistaken for the failed home.
+func TestRollbackWithOpts_NeverStripsThePreviousHomeDerivedFromItsHash(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+	setupAgents(t, log, topDir, setupAgentInstallations{
+		installedAgents: []testAgentInstall{
+			{version: version123Snapshot, useVersionInPath: false},
+			{version: version456Snapshot, useVersionInPath: true},
+		},
+		upgradeFrom:  version123Snapshot,
+		upgradeTo:    version456Snapshot,
+		currentAgent: version456Snapshot,
+	}, true)
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	prevHome := filepath.Join("data", "elastic-agent-abcdef")
+	marker := &UpdateMarker{Version: "1.2.3-SNAPSHOT", Hash: "abcdef", VersionedHome: prevHome}
+	retention := func(rs *RollbackSettings) { rs.SetLogsRetention(marker, time.Hour) }
+
+	require.NoError(t, RollbackWithOpts(t.Context(), log, mockClient, topDir, "", "abcdef", retention))
+
+	assertAgentInstallExists(t, filepath.Join(topDir, prevHome), paths.BinaryName)
+	assert.NoFileExists(t, filepath.Join(topDir, prevHome, ttl.MarkerFileName))
+}
+
+// A supervisor can start the agent we roll back to as soon as the symlink changes, and that agent's startup
+// cleanup removes homes without a TTL marker: the failed home must be marked before the symlink changes.
+// A symlink change that fails makes the rollback stop right there, so a marker that exists then was written before it.
+func TestRollbackWithOpts_MarksTheFailedHomeBeforeChangingTheSymlink(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+	setupAgents(t, log, topDir, setupAgentInstallations{
+		installedAgents: []testAgentInstall{
+			{version: version123Snapshot, useVersionInPath: true},
+			{version: version456Snapshot, useVersionInPath: true},
+		},
+		upgradeFrom:  version123Snapshot,
+		upgradeTo:    version456Snapshot,
+		currentAgent: version456Snapshot,
+	}, true)
+	prevHome := "data/elastic-agent-1.2.3-SNAPSHOT-abcdef"
+	failedHome := filepath.Join("data", "elastic-agent-4.5.6-SNAPSHOT-ghijkl")
+	// the symlink cannot point to an install without a binary
+	require.NoError(t, os.Remove(paths.BinaryPath(filepath.Join(topDir, prevHome), paths.BinaryName)))
+	marker := &UpdateMarker{Version: "4.5.6-SNAPSHOT", Hash: "ghijkl", VersionedHome: failedHome, PrevVersionedHome: prevHome}
+
+	// the agent must not be restarted, the mock fails the test if it is contacted
+	err := RollbackWithOpts(t.Context(), log, client.NewMockClient(t), topDir, prevHome, "abcdef", func(rs *RollbackSettings) {
+		rs.SetLogsRetention(marker, time.Hour)
+	})
+
+	require.Error(t, err, "the rollback must stop at the symlink change")
+	assert.FileExists(t, filepath.Join(topDir, failedHome, ttl.MarkerFileName), "the failed home must be marked before the symlink changes")
 }

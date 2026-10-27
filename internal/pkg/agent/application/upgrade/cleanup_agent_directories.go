@@ -281,10 +281,6 @@ func cleanupAgentDirectories(
 	}
 }
 
-// hasOnlyLogs returns true when dir contains exactly one visible (non-hidden) entry
-// and that entry is a directory named "logs".
-// Hidden entries (names starting with ".") are ignored so that OS artefacts like
-// .DS_Store or a leftover .ttl file do not cause a false negative.
 // snapshotAgentDirs returns absolute paths of all elastic-agent-* dirs in the data directory.
 // Take the snapshot before reading markers or TTL entries: directories created by a concurrent
 // upgrade afterward won't appear and therefore can't be swept by this cleanup run.
@@ -305,6 +301,10 @@ func snapshotAgentDirs(topDir string) ([]string, error) {
 	return dirs, nil
 }
 
+// hasOnlyLogs returns true when dir contains exactly one visible (non-hidden) entry
+// and that entry is a directory named "logs".
+// Hidden entries (names starting with ".") are ignored so that OS artefacts like
+// .DS_Store or a .ttl marker do not cause a false negative.
 func hasOnlyLogs(log *logger.Logger, dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {

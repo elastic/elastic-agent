@@ -81,11 +81,11 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
-// findRollbackTarget returns the versionedHome and TTLMarker for the first unexpired entry
-// matching version, or ("", zero, false) if none is found.
-func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, version string) (string, ttl.TTLMarker, bool) {
+// findRollbackTarget returns the versionedHome and TTLMarker for the first entry matching version,
+// or ("", zero, false) if none is found. rollbacks must be the available rollbacks (see ttl.ReadOnlySource).
+func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, version string) (string, ttl.TTLMarker, bool) {
 	for versionedHome, marker := range rollbacks {
-		if marker.Version == version && now.Before(marker.ValidUntil) {
+		if marker.Version == version {
 			return versionedHome, marker, true
 		}
 	}
@@ -94,12 +94,12 @@ func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, versi
 
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
-	availableRollbacks, err := source.GetAvailableRollbacks()
+	availableRollbacks, err := source.GetAvailableRollbacks(now)
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
 
-	targetInstall, targetTTLMarker, found := findRollbackTarget(availableRollbacks, now, rollbackVersion)
+	targetInstall, targetTTLMarker, found := findRollbackTarget(availableRollbacks, rollbackVersion)
 	if !found {
 		return "", "", fmt.Errorf("version %q not listed among the available rollbacks: %w", rollbackVersion, ErrNoRollbacksAvailable)
 	}
@@ -172,12 +172,12 @@ func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcher
 	var selectedRollbackVersionedHome string
 
 	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
-		rollbacks, err := source.GetAvailableRollbacks()
+		rollbacks, err := source.GetAvailableRollbacks(now)
 		if err != nil {
 			return fmt.Errorf("reading TTL markers: %w", err)
 		}
 		var found bool
-		selectedRollbackVersionedHome, _, found = findRollbackTarget(rollbacks, now, version)
+		selectedRollbackVersionedHome, _, found = findRollbackTarget(rollbacks, version)
 		if !found {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}

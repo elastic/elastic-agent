@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -140,15 +141,15 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	return ttlMarkers, malformed, nil
 }
 
-// GetAvailableRollbacks returns the markers of GetAll that are rollback targets, meaning the ones not flagged
-// RetentionOnly. Unparseable markers are not rollback targets either.
-func (T TTLMarkerRegistry) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+// GetAvailableRollbacks returns the markers of GetAll that are rollback targets valid at now: not flagged
+// RetentionOnly and not expired. Unparseable markers are not rollback targets either.
+func (T TTLMarkerRegistry) GetAvailableRollbacks(now time.Time) (map[string]TTLMarker, error) {
 	markers, _, err := T.GetAll()
 	if err != nil {
 		return nil, err
 	}
 	for versionedHome, marker := range markers {
-		if marker.RetentionOnly {
+		if marker.RetentionOnly || !now.Before(marker.ValidUntil) {
 			delete(markers, versionedHome)
 		}
 	}
@@ -184,18 +185,46 @@ func readTTLMarker(filePath string) (TTLMarker, error) {
 	return ttlMarker, nil
 }
 
-func writeTTLMarker(filePath string, marker TTLMarker) error {
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
-	if err != nil {
-		return fmt.Errorf("failed to open %q: %w", filePath, err)
+// renameReplacing renames oldPath over newPath. On Windows the rename fails while another goroutine has newPath
+// open, for example to read the markers, so it is retried a few times.
+func renameReplacing(oldPath, newPath string) (err error) {
+	const attempts = 5
+	for i := 0; i < attempts; i++ {
+		if err = os.Rename(oldPath, newPath); err == nil {
+			return nil
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(file)
+	return err
+}
 
-	err = yaml.NewEncoder(file).Encode(marker)
+// writeTTLMarker writes the marker through a temporary file and renames it over filePath, so a crash never leaves
+// a truncated marker behind: a corrupt marker makes its install look like an orphan to the cleanup.
+// The temporary file does not match the marker glob pattern.
+func writeTTLMarker(filePath string, marker TTLMarker) (err error) {
+	tmpPath := filePath + ".tmp"
+	file, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
 	if err != nil {
-		return fmt.Errorf("failed to encode %q: %w", filePath, err)
+		return fmt.Errorf("failed to open %q: %w", tmpPath, err)
+	}
+	defer func() {
+		if err != nil {
+			_ = file.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err = yaml.NewEncoder(file).Encode(marker); err != nil {
+		return fmt.Errorf("failed to encode %q: %w", tmpPath, err)
+	}
+	if err = file.Sync(); err != nil {
+		return fmt.Errorf("failed to sync %q: %w", tmpPath, err)
+	}
+	if err = file.Close(); err != nil {
+		return fmt.Errorf("failed to close %q: %w", tmpPath, err)
+	}
+	if err = renameReplacing(tmpPath, filePath); err != nil {
+		return fmt.Errorf("failed to rename %q to %q: %w", tmpPath, filePath, err)
 	}
 
 	return nil

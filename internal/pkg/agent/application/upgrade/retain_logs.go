@@ -7,6 +7,7 @@ package upgrade
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
@@ -15,7 +16,8 @@ import (
 
 // retainedHome returns the versioned home, relative to the top path, of the version a failed upgrade was
 // upgrading to, as recorded in the upgrade marker. Its logs are retained after the rollback.
-// It returns "" if there is nothing to retain: the marker has no failed home, or it is the home we roll back to.
+// It returns "" if there is nothing to retain: the marker has no failed home, it is the home we roll back to, or
+// it is not a data/elastic-agent-* directory (the home gets stripped, so it must be one).
 func retainedHome(marker *UpdateMarker) string {
 	if marker == nil {
 		return ""
@@ -29,6 +31,9 @@ func retainedHome(marker *UpdateMarker) string {
 		return ""
 	}
 	home = filepath.Clean(home)
+	if filepath.Dir(home) != "data" || !strings.HasPrefix(filepath.Base(home), AgentName+"-") {
+		return ""
+	}
 	if home == filepath.Clean(marker.PrevVersionedHome) {
 		return ""
 	}
@@ -38,7 +43,7 @@ func retainedHome(marker *UpdateMarker) string {
 // retainFailedUpgradeLogs writes a TTL marker flagged RetentionOnly, valid for the given retention, into the
 // failed home (see retainedHome). Cleanups keep homes with an unexpired TTL marker, so the home survives the cleanup
 // that the agent we roll back to runs when it starts. It must be called before that agent is restarted.
-// Existing TTL markers are not touched.
+// The markers of other homes are not touched.
 func retainFailedUpgradeLogs(log *logger.Logger, topDir, failedHome string, failedUpgrade *UpdateMarker, retention time.Duration) error {
 	err := ttl.NewTTLMarkerRegistry(log, topDir).Add(failedHome, ttl.TTLMarker{
 		Version:       failedUpgrade.Version,

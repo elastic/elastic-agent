@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -269,4 +270,40 @@ func TestSkipFleetAuditUnenroll(t *testing.T) {
 		)
 	}
 
+}
+
+func TestRemoveBut(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	t.Run("removes everything but the exceptions", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "logs"), 0o750))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "components"), 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "elastic-agent"), []byte("agent"), 0o750))
+
+		require.NoError(t, RemoveBut(log, dir, true, "logs"))
+
+		assert.DirExists(t, filepath.Join(dir, "logs"))
+		assert.NoDirExists(t, filepath.Join(dir, "components"))
+		assert.NoFileExists(t, filepath.Join(dir, "elastic-agent"))
+	})
+
+	t.Run("best effort reports a failure even if the last entry is removed", func(t *testing.T) {
+		if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+			t.Skip("needs a path that cannot be removed, which permissions do not give on Windows or as root")
+		}
+		dir := t.TempDir()
+		// "a" cannot be removed: its subdirectory is not writable. "z" is removed last.
+		locked := filepath.Join(dir, "a", "locked")
+		require.NoError(t, os.MkdirAll(locked, 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(locked, "file"), []byte("x"), 0o640))
+		require.NoError(t, os.Chmod(locked, 0o500))
+		t.Cleanup(func() { _ = os.Chmod(locked, 0o750) })
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "z"), []byte("x"), 0o640))
+
+		err := RemoveBut(log, dir, true, "logs")
+
+		require.Error(t, err)
+		assert.NoFileExists(t, filepath.Join(dir, "z"), "best effort keeps removing after a failure")
+	})
 }

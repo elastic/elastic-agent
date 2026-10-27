@@ -377,7 +377,7 @@ func (s *Server) Configure(ctx context.Context, req *cproto.ConfigureRequest) (*
 }
 
 func (s *Server) AvailableRollbacks(context.Context, *cproto.Empty) (*cproto.AvailableRollbacksResponse, error) {
-	rollbacks, err := s.rollbackSource.GetAvailableRollbacks()
+	rollbacks, err := s.rollbackSource.GetAvailableRollbacks(time.Now())
 	if err != nil {
 		return &cproto.AvailableRollbacksResponse{
 			Error: fmt.Sprintf("error fetching rollbacks: %s", err.Error()),

@@ -76,27 +76,6 @@ func TestManualRollback(t *testing.T) {
        version: 1.2.3
        valid_until: 2025-07-18T10:11:12.131415Z
    `
-	const updatemarkerwatching456MarkerValidFarFuture = `
-   version: 4.5.6
-   hash: newver
-   versioned_home: data/elastic-agent-4.5.6-newver
-   updated_on: 2025-07-11T10:11:12.131415Z
-   prev_version: 1.2.3
-   prev_hash: oldver
-   prev_versioned_home: data/elastic-agent-1.2.3-oldver
-   acked: false
-   action: null
-   details:
-       target_version: 4.5.6
-       state: UPG_WATCHING
-       metadata:
-           retry_until: null
-   desired_outcome: UPGRADE
-   rollbacks_available:
-     "data/elastic-agent-1.2.3-oldver":
-       version: 1.2.3
-       valid_until: 2099-01-01T00:00:00Z
-   `
 	const updatemarkerwatching456MarkerExpired = `
    version: 4.5.6
    hash: newver
@@ -151,13 +130,9 @@ func TestManualRollback(t *testing.T) {
 	nowBeforeTTL, err := time.Parse(time.RFC3339, `2025-07-11T10:11:12Z`)
 	require.NoError(t, err, "error parsing nowBeforeTTL")
 
-	// the update marker yaml assume 7d TLL for rollbacks, let's make an extra day pass
-	nowAfterTTL := nowBeforeTTL.Add(8 * 24 * time.Hour)
-
 	// save the current timestamp, useful for TTL-based testing
 	aMomentInTime := time.Now()
 	aMomentTomorrow := aMomentInTime.Add(24 * time.Hour)
-	aMomentAgo := aMomentInTime.Add(-1 * time.Second)
 
 	type setupF func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource)
 	type postRollbackAssertionsF func(t *testing.T, topDir string)
@@ -190,7 +165,7 @@ func TestManualRollback(t *testing.T) {
 			name: "no update marker - rollback fails",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
 				//do not setup anything here, let the rollback fail
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(nil, nil)
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(nil, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -232,7 +207,7 @@ func TestManualRollback(t *testing.T) {
 				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(nil, nil)
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(nil, nil)
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -262,7 +237,7 @@ func TestManualRollback(t *testing.T) {
 				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(nil, errors.New("disk error"))
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(nil, errors.New("disk error"))
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings:  configuration.DefaultUpgradeConfig(),
@@ -288,7 +263,7 @@ func TestManualRollback(t *testing.T) {
 				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
 				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil)
 			},
@@ -310,70 +285,6 @@ func TestManualRollback(t *testing.T) {
 			},
 		},
 		{
-			name: "update marker ok but rollback is expired - error",
-			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456), 0600)
-				require.NoError(t, err, "error setting up update marker")
-				locker := filelock.NewAppLocker(topDir, "watcher.lock")
-				err = locker.TryLock()
-				require.NoError(t, err, "error locking initial watcher AppLocker")
-				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
-				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
-				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
-				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
-					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowAfterTTL.Add(-24 * time.Hour)},
-				}, nil)
-			},
-			artifactSettings: artifact.DefaultConfig(),
-			upgradeSettings:  configuration.DefaultUpgradeConfig(),
-			now:              nowAfterTTL,
-			version:          "1.2.3",
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
-			},
-			additionalAsserts: func(t *testing.T, topDir string) {
-				// marker should be untouched
-				filePath := markerFilePath(paths.DataFrom(topDir))
-				require.FileExists(t, filePath)
-				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
-				require.NoError(t, readMarkerErr)
-
-				assert.YAMLEq(t, updatemarkerwatching456, string(markerFileBytes), "update marker should be untouched")
-			},
-		},
-		{
-			name: "marker says rollback valid but TTL says expired - error (TTL is the source of truth)",
-			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456MarkerValidFarFuture), 0600)
-				require.NoError(t, err, "error setting up update marker")
-				locker := filelock.NewAppLocker(topDir, "watcher.lock")
-				err = locker.TryLock()
-				require.NoError(t, err, "error locking initial watcher AppLocker")
-				watcherHelper.EXPECT().TakeOverWatcher(t.Context(), mock.Anything, topDir).Return(locker, nil)
-				newerWatcherExecutable := filepath.Join(topDir, "data", "elastic-agent-4.5.6-newver", "elastic-agent")
-				watcherHelper.EXPECT().SelectWatcherExecutable(topDir, agentInstall123, agentInstall456).Return(newerWatcherExecutable)
-				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
-					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowAfterTTL.Add(-24 * time.Hour)},
-				}, nil)
-			},
-			artifactSettings: artifact.DefaultConfig(),
-			upgradeSettings:  configuration.DefaultUpgradeConfig(),
-			now:              nowAfterTTL,
-			version:          "1.2.3",
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable)
-			},
-			additionalAsserts: func(t *testing.T, topDir string) {
-				filePath := markerFilePath(paths.DataFrom(topDir))
-				require.FileExists(t, filePath)
-				markerFileBytes, readMarkerErr := os.ReadFile(filePath)
-				require.NoError(t, readMarkerErr)
-				assert.YAMLEq(t, updatemarkerwatching456MarkerValidFarFuture, string(markerFileBytes), "update marker should be untouched")
-			},
-		},
-		{
 			name: "marker says rollback expired but TTL says valid - success (TTL is the source of truth)",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
 				err := os.WriteFile(markerFilePath(paths.DataFrom(topDir)), []byte(updatemarkerwatching456MarkerExpired), 0600)
@@ -387,7 +298,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().
 					InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
 					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil)
 			},
@@ -419,7 +330,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).Return(nil, errors.New("error invoking watcher"))
 				// Expect watch to be resumed
 				watcherHelper.EXPECT().InvokeWatcher(mock.Anything, newerWatcherExecutable).Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for realsies"}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil)
 			},
@@ -452,7 +363,7 @@ func TestManualRollback(t *testing.T) {
 				watcherHelper.EXPECT().
 					InvokeWatcher(mock.Anything, newerWatcherExecutable, "--rollback", filepath.Join("data", "elastic-agent-1.2.3-oldver")).
 					Return(&exec.Cmd{Path: newerWatcherExecutable, Args: []string{"watch", "for rollbacksies"}, Process: &os.Process{Pid: 123}}, nil)
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {Version: "1.2.3", ValidUntil: nowBeforeTTL.Add(24 * time.Hour)},
 				}, nil)
 			},
@@ -472,7 +383,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, available install for rollback with valid TTL - rollback",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(map[string]ttl.TTLMarker{
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(map[string]ttl.TTLMarker{
 					filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
 						Version:    "1.2.3",
 						Hash:       "oldver",
@@ -519,38 +430,9 @@ func TestManualRollback(t *testing.T) {
 			},
 		},
 		{
-			name: "no update marker, available install for rollback with expired TTL - error",
-			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(
-					map[string]ttl.TTLMarker{
-						filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
-							Version:    "1.2.3",
-							Hash:       "oldver",
-							ValidUntil: aMomentAgo,
-						},
-					}, nil)
-			},
-			artifactSettings: artifact.DefaultConfig(),
-			upgradeSettings: &configuration.UpgradeConfig{
-				Rollback: &configuration.UpgradeRollbackConfig{
-					Window: 24 * time.Hour,
-				},
-			},
-			now:     aMomentInTime,
-			version: "1.2.3",
-			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
-				return assert.ErrorIs(t, err, ErrNoRollbacksAvailable, i...)
-			},
-			additionalAsserts: func(t *testing.T, topDir string) {
-				actualMarkerFilePath := filepath.Join(topDir, "data", markerFilename)
-				require.NoFileExists(t, actualMarkerFilePath, "marker file must not be created")
-
-			},
-		},
-		{
 			name: "no update marker, no available install for the version - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(
 					map[string]ttl.TTLMarker{
 						filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
 							Version:    "1.2.3",
@@ -579,7 +461,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, error retrieving agent installs",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(nil, errors.New("error retrieving agent rollbacks"))
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(nil, errors.New("error retrieving agent rollbacks"))
 			},
 			artifactSettings: artifact.DefaultConfig(),
 			upgradeSettings: &configuration.UpgradeConfig{
@@ -594,7 +476,7 @@ func TestManualRollback(t *testing.T) {
 		{
 			name: "no update marker, invoking watcher fails - error",
 			setup: func(t *testing.T, topDir string, agent *info.MockAgent, watcherHelper *MockWatcherHelper, rollbacksSource *ttl.MockSource) {
-				rollbacksSource.EXPECT().GetAvailableRollbacks().Return(
+				rollbacksSource.EXPECT().GetAvailableRollbacks(mock.Anything).Return(
 					map[string]ttl.TTLMarker{
 						filepath.Join("data", "elastic-agent-1.2.3-oldver"): {
 							Version:    "1.2.3",
@@ -641,6 +523,11 @@ func TestManualRollback(t *testing.T) {
 			require.NoError(t, err, "error instantiating upgrader")
 			_, err = upgrader.rollbackToPreviousVersion(t.Context(), topDir, tc.now, tc.version, nil)
 			tc.wantErr(t, err, "unexpected error returned by rollbackToPreviousVersion()")
+			for _, call := range mockRollbacksSource.Calls {
+				if call.Method == "GetAvailableRollbacks" {
+					assert.Equal(t, tc.now, call.Arguments.Get(0), "the available rollbacks must be read for the injected time")
+				}
+			}
 			if tc.additionalAsserts != nil {
 				tc.additionalAsserts(t, topDir)
 			}
@@ -1154,5 +1041,25 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 			tt.handleGoroutine(t, cancel, appDone)
 			wg.Wait()
 		})
+	}
+}
+
+// Expired entries and installs kept only for retention are not rollback targets.
+func TestRollbackUsingAgentInstalls_IgnoresExpiredAndRetentionOnlyEntries(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	topDir := t.TempDir()
+	now := time.Now()
+	expiredHome := filepath.Join("data", "elastic-agent-1.2.3-expired")
+	retentionHome := filepath.Join("data", "elastic-agent-4.5.6-retention")
+	for _, home := range []string{expiredHome, retentionHome} {
+		require.NoError(t, os.MkdirAll(filepath.Join(topDir, home), 0o750))
+	}
+	registry := ttl.NewTTLMarkerRegistry(log, topDir)
+	require.NoError(t, registry.Add(expiredHome, ttl.TTLMarker{Version: "1.2.3", Hash: "expired", ValidUntil: now.Add(-time.Hour)}))
+	require.NoError(t, registry.Add(retentionHome, ttl.TTLMarker{Version: "4.5.6", Hash: "retention", ValidUntil: now.Add(time.Hour), RetentionOnly: true}))
+
+	for _, version := range []string{"1.2.3", "4.5.6"} {
+		_, _, err := rollbackUsingAgentInstalls(log, nil, registry, topDir, now, version, nil, nil)
+		assert.ErrorIs(t, err, ErrNoRollbacksAvailable, "version %s must not be a rollback target", version)
 	}
 }

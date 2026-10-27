@@ -190,7 +190,7 @@ func Test_watchCmd(t *testing.T) {
 						settings := upgrade.NewRollbackSettings()
 						opt(settings)
 
-						return settings.FailedUpgrade != nil && settings.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-9.3.0-newver")
+						return settings.LogsRetention != nil && settings.LogsRetention.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-9.3.0-newver") && settings.LogsRetention.Duration == time.Hour
 					})).
 					Return(nil)
 			},
@@ -244,7 +244,7 @@ func Test_watchCmd(t *testing.T) {
 							settings := upgrade.NewRollbackSettings()
 							opt(settings)
 
-							return settings.FailedUpgrade != nil && settings.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-4.5.6-newver")
+							return settings.LogsRetention != nil && settings.LogsRetention.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-4.5.6-newver") && settings.LogsRetention.Duration == time.Hour
 						})).Return(nil)
 			},
 			args: args{

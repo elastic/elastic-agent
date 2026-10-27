@@ -46,11 +46,17 @@ type RollbackSettings struct {
 	SkipRestart    bool
 	PreRestartHook RollbackHook
 	RemoveMarker   bool
-	// FailedUpgrade is the upgrade marker of the upgrade we are rolling back from. When set, the logs of the
-	// version we roll back from are retained for LogsRetention: its home is protected from cleanups before the
-	// restart and stripped down to its logs after it.
+	// LogsRetention, when set, retains the logs of the version we roll back from: its home is protected from
+	// cleanups before the restart and stripped down to its logs after it.
+	LogsRetention *LogsRetention
+}
+
+// LogsRetention describes the logs of a failed upgrade to retain after a rollback.
+type LogsRetention struct {
+	// FailedUpgrade is the upgrade marker of the upgrade we are rolling back from.
 	FailedUpgrade *UpdateMarker
-	LogsRetention time.Duration
+	// Duration is for how long the logs are retained.
+	Duration time.Duration
 }
 
 func NewRollbackSettings(opts ...RollbackOpt) *RollbackSettings {
@@ -80,14 +86,16 @@ func (r *RollbackSettings) SetRemoveMarker(removeMarker bool) {
 }
 
 func (r *RollbackSettings) SetLogsRetention(failedUpgrade *UpdateMarker, retention time.Duration) {
-	r.FailedUpgrade = failedUpgrade
-	r.LogsRetention = retention
+	r.LogsRetention = &LogsRetention{FailedUpgrade: failedUpgrade, Duration: retention}
 }
 
 func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, topDirPath string, prevVersionedHome string, prevHash string, opts ...RollbackOpt) error {
 
 	settings := NewRollbackSettings(opts...)
-	failedHome := retainedHome(settings.FailedUpgrade)
+	var failedHome string
+	if settings.LogsRetention != nil {
+		failedHome = retainedHome(settings.LogsRetention.FailedUpgrade)
+	}
 
 	symlinkPath := filepath.Join(topDirPath, AgentName)
 
@@ -95,6 +103,20 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		// fallback for upgrades that didn't use the manifest and path remapping
 		hashedDir := fmt.Sprintf("%s-%s", AgentName, prevHash)
 		prevVersionedHome = filepath.Join("data", hashedDir)
+	}
+
+	// never retain, and later strip, the home we roll back to
+	if failedHome == filepath.Clean(prevVersionedHome) {
+		failedHome = ""
+	}
+
+	// The agent we roll back to runs a cleanup when it starts, and a supervisor can start it as soon as the symlink
+	// changes: mark the failed home before that.
+	if failedHome != "" && !settings.SkipRestart {
+		if err := retainFailedUpgradeLogs(log, topDirPath, failedHome, settings.LogsRetention.FailedUpgrade, settings.LogsRetention.Duration); err != nil {
+			// retaining logs must never block the rollback
+			log.Warnf("failed to retain the logs of the failed upgrade: %v", err)
+		}
 	}
 
 	// paths.BinaryPath properly derives the binary directory depending on the platform. The path to the binary for macOS is inside of the app bundle.
@@ -127,14 +149,6 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// The agent we roll back to runs a cleanup when it starts: mark the home before it does.
-	if failedHome != "" {
-		if err := retainFailedUpgradeLogs(log, topDirPath, failedHome, settings.FailedUpgrade, settings.LogsRetention); err != nil {
-			// retaining logs must never block the rollback
-			log.Warnf("failed to retain the logs of the failed upgrade: %v", err)
-		}
-	}
-
 	// Restart
 	log.Info("Restarting the agent after rollback")
 	if err := restartAgent(ctx, log, c); err != nil {
@@ -148,7 +162,10 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 
 	// keepLogs preserves the logs immediately after rollback. The failed home itself is kept by its retention
 	// TTL marker until it expires, then the periodic cleanup removes it.
-	err := Cleanup(log, topDirPath, settings.RemoveMarker, true /* keepLogs */, prevVersionedHome)
+	if err := Cleanup(log, topDirPath, settings.RemoveMarker, true /* keepLogs */, prevVersionedHome); err != nil {
+		// the agent has been rolled back and restarted, a cleanup failure must not make the rollback fail
+		log.Warnf("cleanup after rollback failed: %v", err)
+	}
 
 	// Cleanup keeps homes with an unexpired TTL marker whole, so the retained home is stripped explicitly.
 	// This runs after the restart and the restart delay in Cleanup: the failed version may still run from its home before.
@@ -156,15 +173,21 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		stripToLogs(log, topDirPath, failedHome)
 	}
 
-	return err
+	return nil
 }
 
 // stripToLogs removes everything but the logs and the TTL marker from the versioned home retainedHome.
-// It is best effort: failures are logged because retaining logs must never fail a rollback, and an unstripped
-// home is removed as a whole once its TTL expires.
+// It is best effort: failures are logged because retaining logs must never fail a rollback, and an
+// unstripped home is removed as a whole when its TTL expires or at the next upgrade.
 func stripToLogs(log *logger.Logger, topDirPath, retainedHome string) {
 	homePath := filepath.Join(topDirPath, retainedHome)
-	if err := install.RemoveBut(log, homePath, true, "logs", ttl.MarkerFileName); err != nil && !goerrors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(homePath); err != nil {
+		if !goerrors.Is(err, os.ErrNotExist) {
+			log.Warnw("failed to access the retained home to strip it down to its logs", "file.path", homePath, "error.message", err.Error())
+		}
+		return
+	}
+	if err := install.RemoveBut(log, homePath, true, "logs", ttl.MarkerFileName); err != nil {
 		log.Warnw("failed to strip retained home down to its logs", "file.path", homePath, "error.message", err.Error())
 	}
 }

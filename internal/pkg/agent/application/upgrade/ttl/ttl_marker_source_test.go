@@ -347,14 +347,38 @@ func TestTTLMarkerRegistry_GetAvailableRollbacks(t *testing.T) {
 		retentionHome: {Version: "4.5.6", Hash: "retention", ValidUntil: validUntil, RetentionOnly: true},
 	}))
 
-	got, err := registry.GetAvailableRollbacks()
+	got, err := registry.GetAvailableRollbacks(time.Now())
 	require.NoError(t, err)
-	assert.Len(t, got, 2)
+	assert.Len(t, got, 1)
 	assert.Contains(t, got, regularHome)
-	assert.Contains(t, got, expiredHome, "expiry is checked by the callers, not here")
+	assert.NotContains(t, got, expiredHome, "an expired entry is not available")
 	assert.NotContains(t, got, retentionHome, "an install kept only for retention is not a rollback target")
 
 	all, _, err := registry.GetAll()
 	require.NoError(t, err)
 	assert.Len(t, all, 3, "GetAll still returns every TTL marker, the cleanup needs them")
+}
+
+func TestTTLMarkerRegistry_AddReplacesTheMarkerWithoutLeftovers(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+	baseDir := t.TempDir()
+	registry := NewTTLMarkerRegistry(log, baseDir)
+	home := filepath.Join("data", "elastic-agent-1.2.3-abcdef")
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home), 0o750))
+
+	require.NoError(t, registry.Add(home, TTLMarker{Version: "1.2.3", Hash: "abcdef", ValidUntil: time.Now().Add(time.Hour)}))
+	replacement := TTLMarker{Version: "1.2.4", Hash: "abcdef", ValidUntil: time.Now().Add(2 * time.Hour), RetentionOnly: true}
+	require.NoError(t, registry.Add(home, replacement))
+
+	got, malformed, err := registry.GetAll()
+	require.NoError(t, err)
+	assert.Empty(t, malformed)
+	require.Contains(t, got, home)
+	assert.Equal(t, "1.2.4", got[home].Version)
+	assert.True(t, got[home].RetentionOnly)
+
+	entries, err := os.ReadDir(filepath.Join(baseDir, home))
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "the temporary file used to write the marker must not be left behind")
+	assert.Equal(t, MarkerFileName, entries[0].Name())
 }
