@@ -21,18 +21,14 @@ import (
 )
 
 const (
-	// stsAudience is the audience requested from the workload-identity-issuer. The
-	// customer's role trust policy pins it: "<issuer>:aud" = "sts.amazonaws.com".
+	// stsAudience is the audience the customer's role trust policy pins ("<issuer>:aud").
 	stsAudience = "sts.amazonaws.com"
-	// defaultSTSRegion mirrors the fallback of the Beats AWS inputs when neither the
-	// configuration nor the SDK resolves a region.
+	// defaultSTSRegion mirrors the fallback of the Beats AWS inputs.
 	defaultSTSRegion = "us-east-1"
 )
 
-// Provider is the interface that AWS-SDK-based components use to obtain credentials
-// from this extension. Components look the extension up via host.GetExtensions()
-// using the component ID they were configured with and type-assert to this interface
-// (or to a structurally identical local interface, like the awscloudwatch receiver).
+// Provider is the interface AWS-SDK-based components use to obtain credentials from
+// this extension; the awscloudwatch receiver declares a structurally identical one.
 type Provider interface {
 	// GetCredentialsProvider returns the credentials provider resolved by the
 	// extension. It is only valid after the extension has been started.
@@ -54,10 +50,9 @@ func newExtension(cfg *Config, logger *zap.Logger) *awsIdentityFederationExtensi
 	return &awsIdentityFederationExtension{cfg: cfg, logger: logger}
 }
 
-// Start wires the credential chain: workload-identity-issuer JWT (over mTLS) →
-// sts:AssumeRoleWithWebIdentity on the customer role → cached session credentials.
-// Nothing is fetched here; the first credential retrieval performs the exchange, so a
-// misconfigured role surfaces on the consuming component rather than blocking startup.
+// Start wires the credential chain (issuer JWT over mTLS → AssumeRoleWithWebIdentity →
+// cached session). Nothing is fetched here: the first credential retrieval performs the
+// exchange, so a misconfigured role surfaces on the consuming component.
 func (e *awsIdentityFederationExtension) Start(ctx context.Context, _ component.Host) error {
 	issuer, err := e.cfg.resolveIssuerSettings()
 	if err != nil {

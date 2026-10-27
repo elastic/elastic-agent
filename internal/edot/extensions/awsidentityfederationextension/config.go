@@ -18,23 +18,19 @@ import (
 // minAssumeRoleDuration is the smallest session duration STS accepts.
 const minAssumeRoleDuration = 15 * time.Minute
 
-// Config stores the configuration for the AWS Identity Federation extension.
-//
-// Only role_arn is required. The workload-identity-issuer settings default to the
-// environment variables the agentless controller injects into the pod, so a managed
-// integration only needs to render the role to assume.
+// Config stores the configuration for the AWS Identity Federation extension. Only
+// role_arn is required; the issuer settings default to the environment variables the
+// agentless controller injects into the pod.
 type Config struct {
-	// RoleARN is the customer IAM role assumed with sts:AssumeRoleWithWebIdentity.
-	// The role trusts the Elastic workload-identity-issuer OIDC provider. Required.
+	// RoleARN is the customer IAM role assumed with sts:AssumeRoleWithWebIdentity. Required.
 	RoleARN string `mapstructure:"role_arn"`
 	// SessionName is the role session name passed to STS. Optional.
 	SessionName string `mapstructure:"session_name"`
 	// Duration is the requested session duration. Optional; STS applies its default
 	// (one hour) when unset. STS rejects values below 15 minutes.
 	Duration time.Duration `mapstructure:"duration"`
-	// STSRegion is the region of the STS endpoint used for the exchange. When empty,
-	// the SDK's default region resolution applies (for example AWS_REGION), falling
-	// back to us-east-1 like the Beats inputs do.
+	// STSRegion is the region of the STS endpoint. When empty, the SDK's default region
+	// resolution applies, falling back to us-east-1 like the Beats inputs.
 	STSRegion string `mapstructure:"sts_region"`
 
 	// IssuerURL is the base URL of the workload-identity-issuer (without /token).
@@ -58,8 +54,7 @@ var (
 	errMissingClientCerts = fmt.Errorf("the workload-identity client certificate and key must be set with cert_file and key_file or the %s and %s environment variables", identityfederation.WIISSLCertFileEnvVar, identityfederation.WIISSLKeyFileEnvVar)
 )
 
-// Validate checks the static configuration. Environment-provided settings are
-// resolved at Start, so they are not validated here.
+// Validate checks the static configuration; issuer settings are resolved at Start.
 func (cfg *Config) Validate() error {
 	if cfg.RoleARN == "" {
 		return errMissingRoleARN
@@ -80,8 +75,8 @@ type issuerSettings struct {
 	keyFile   string
 }
 
-// resolveIssuerSettings merges the explicit configuration with the environment
-// variables set by the agentless controller. Explicit configuration wins.
+// resolveIssuerSettings merges the configuration with the controller-set environment;
+// explicit configuration wins.
 func (cfg *Config) resolveIssuerSettings() (issuerSettings, error) {
 	s := issuerSettings{
 		issuerURL: firstNonEmpty(cfg.IssuerURL, os.Getenv(identityfederation.WIIIssuerURLEnvVar)),

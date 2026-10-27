@@ -27,7 +27,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/extension"
 	"go.uber.org/zap"
 
 	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
@@ -92,6 +94,28 @@ func TestResolveIssuerSettings(t *testing.T) {
 		_, err := (&Config{RoleARN: testRoleARN, IssuerURL: "https://wii.example.com", CertFile: "/cfg/client.crt"}).resolveIssuerSettings()
 		require.ErrorIs(t, err, errMissingClientCerts)
 	})
+}
+
+func TestFactoryLifecycle(t *testing.T) {
+	t.Setenv(identityfederation.WIIIssuerURLEnvVar, "https://wii.example.com")
+	t.Setenv(identityfederation.WIISSLCertFileEnvVar, "/env/client.crt")
+	t.Setenv(identityfederation.WIISSLKeyFileEnvVar, "/env/client.key")
+
+	factory := NewFactory()
+	cfg := factory.CreateDefaultConfig().(*Config)
+	cfg.RoleARN = testRoleARN
+	require.NoError(t, cfg.Validate())
+	settings := extension.Settings{
+		ID:                component.NewID(factory.Type()),
+		TelemetrySettings: componenttest.NewNopTelemetrySettings(),
+		BuildInfo:         component.NewDefaultBuildInfo(),
+	}
+
+	ext, err := factory.Create(context.Background(), settings, cfg)
+	require.NoError(t, err)
+	require.NoError(t, ext.Start(context.Background(), componenttest.NewNopHost()))
+	assert.NotNil(t, ext.(Provider).GetCredentialsProvider())
+	require.NoError(t, ext.Shutdown(context.Background()))
 }
 
 func TestStartFailsWithoutIssuer(t *testing.T) {

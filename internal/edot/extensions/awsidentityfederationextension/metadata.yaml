@@ -18,9 +18,7 @@ status:
     active: [jeniawhite]
 
 tests:
-  config:
-    role_arn: arn:aws:iam::123456789012:role/ElasticWorkloadIdentity-test
-    sts_region: us-east-1
-    issuer_url: https://workload-identity-issuer-internal.us-east-1.aws.svc.elastic.cloud
-    cert_file: /nonexistent/wii-client.crt
-    key_file: /nonexistent/wii-client.key
+  # The generated lifecycle tests would make extensiontest a direct dependency, which the
+  # README generator lists as a component. TestFactoryLifecycle covers the same ground.
+  skip_lifecycle: true
+  skip_shutdown: true

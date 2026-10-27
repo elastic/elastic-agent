@@ -733,7 +733,7 @@ require (
 	go.opentelemetry.io/collector/extension/extensionauth v1.69.0 // indirect
 	go.opentelemetry.io/collector/extension/extensioncapabilities v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension/extensionmiddleware v0.163.0 // indirect
-	go.opentelemetry.io/collector/extension/extensiontest v0.163.0
+	go.opentelemetry.io/collector/extension/extensiontest v0.163.0 // indirect
 	go.opentelemetry.io/collector/extension/xextension v0.163.0 // indirect
 	go.opentelemetry.io/collector/filter v0.163.0 // indirect
 	go.opentelemetry.io/collector/internal/fanoutconsumer v0.163.0 // indirect
