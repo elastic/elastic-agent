@@ -13,6 +13,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -184,46 +185,35 @@ func readTTLMarker(filePath string) (TTLMarker, error) {
 	return ttlMarker, nil
 }
 
-// renameReplacing renames oldPath over newPath. On Windows the rename fails while another goroutine has newPath
-// open, for example to read the markers, so it is retried a few times.
-func renameReplacing(oldPath, newPath string) (err error) {
-	const attempts = 5
-	for i := 0; i < attempts; i++ {
-		if err = os.Rename(oldPath, newPath); err == nil {
-			return nil
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	return err
-}
-
-// writeTTLMarker writes the marker through a temporary file and renames it over filePath, so a crash never leaves
-// a truncated marker behind: a corrupt marker makes its install look like an orphan to the cleanup.
-// The temporary file does not match the marker glob pattern.
+// writeTTLMarker writes the marker to a temporary file that is rotated over filePath, so a crash never leaves a
+// truncated marker behind: a corrupt marker makes its install look like an orphan to the cleanup.
+// The temporary file does not match the marker glob pattern. Like the upgrade marker, the file is only accessible to
+// the user running the agent.
 func writeTTLMarker(filePath string, marker TTLMarker) (err error) {
-	tmpPath := filePath + ".tmp"
-	file, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+	tmp, err := os.CreateTemp(filepath.Dir(filePath), MarkerFileName+"-*.tmp")
 	if err != nil {
-		return fmt.Errorf("failed to open %q: %w", tmpPath, err)
+		return fmt.Errorf("failed to create a temporary file for %q: %w", filePath, err)
 	}
+	tmpPath := tmp.Name()
 	defer func() {
 		if err != nil {
-			_ = file.Close()
+			_ = tmp.Close()
 			_ = os.Remove(tmpPath)
 		}
 	}()
 
-	if err = yaml.NewEncoder(file).Encode(marker); err != nil {
+	if err = yaml.NewEncoder(tmp).Encode(marker); err != nil {
 		return fmt.Errorf("failed to encode %q: %w", tmpPath, err)
 	}
-	if err = file.Sync(); err != nil {
+	if err = tmp.Sync(); err != nil {
 		return fmt.Errorf("failed to sync %q: %w", tmpPath, err)
 	}
-	if err = file.Close(); err != nil {
+	// close before rotating: on Windows an open file cannot be renamed
+	if err = tmp.Close(); err != nil {
 		return fmt.Errorf("failed to close %q: %w", tmpPath, err)
 	}
-	if err = renameReplacing(tmpPath, filePath); err != nil {
-		return fmt.Errorf("failed to rename %q to %q: %w", tmpPath, filePath, err)
+	if err = file.SafeFileRotate(filePath, tmpPath); err != nil {
+		return fmt.Errorf("failed to safe rotate %q over %q: %w", tmpPath, filePath, err)
 	}
 
 	return nil

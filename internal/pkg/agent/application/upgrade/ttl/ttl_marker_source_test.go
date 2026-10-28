@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"text/template"
@@ -388,5 +389,25 @@ func TestTTLMarkerRegistry_AddReplacesTheMarkerWithoutLeftovers(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(baseDir, home))
 	require.NoError(t, err)
 	require.Len(t, entries, 1, "the temporary file used to write the marker must not be left behind")
+	assert.Equal(t, MarkerFileName, entries[0].Name())
+}
+
+func TestTTLMarkerRegistry_AddFailureLeavesNoTemporaryFile(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("the rotation over a directory does not fail the same way on Windows")
+	}
+	log, _ := loggertest.New(t.Name())
+	baseDir := t.TempDir()
+	registry := NewTTLMarkerRegistry(log, baseDir)
+	home := filepath.Join("data", "elastic-agent-1.2.3-abcdef")
+	// a directory where the marker goes makes the rotation fail after the temporary file was written
+	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home, MarkerFileName), 0o750))
+
+	err := registry.Add(home, TTLMarker{Version: "1.2.3", Hash: "abcdef", ValidUntil: time.Now().Add(time.Hour)})
+
+	require.Error(t, err)
+	entries, readErr := os.ReadDir(filepath.Join(baseDir, home))
+	require.NoError(t, readErr)
+	require.Len(t, entries, 1, "the temporary file must be removed when the write fails")
 	assert.Equal(t, MarkerFileName, entries[0].Name())
 }
