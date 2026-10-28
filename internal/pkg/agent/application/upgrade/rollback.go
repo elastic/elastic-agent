@@ -160,36 +160,24 @@ func RollbackWithOpts(ctx context.Context, log *logger.Logger, c client.Client, 
 		return nil
 	}
 
-	// keepLogs preserves the logs immediately after rollback. The failed home itself is kept by its retention
-	// TTL marker until it expires, then the periodic cleanup removes it.
+	// keepLogs preserves the logs immediately after rollback. When the logs are retained, the failed home itself is
+	// kept by its diagnostics TTL marker until it expires.
 	if err := Cleanup(log, topDirPath, settings.RemoveMarker, true /* keepLogs */, prevVersionedHome); err != nil {
 		// the agent has been rolled back and restarted, a cleanup failure must not make the rollback fail
 		log.Warnf("cleanup after rollback failed: %v", err)
 	}
 
-	// Cleanup keeps homes with an unexpired TTL marker whole, so the retained home is stripped explicitly.
-	// This runs after the restart and the restart delay in Cleanup: the failed version may still run from its home before.
+	// The cleanup keeps the home whole because of its TTL marker. Strip it by path, after the restart and the restart
+	// delay in Cleanup (the failed version may still run from its home before): the agent we rolled back to may have
+	// rewritten the marker without its kind. The periodic cleanup retries what could not be stripped, as long as the marker
+	// keeps its kind.
 	if failedHome != "" {
-		stripToLogs(log, topDirPath, failedHome)
+		if err := stripToLogs(log, topDirPath, failedHome); err != nil {
+			log.Warnf("failed to strip the retained home down to its logs: %v", err)
+		}
 	}
 
 	return nil
-}
-
-// stripToLogs removes everything but the logs and the TTL marker from the versioned home retainedHome.
-// It is best effort: failures are logged because retaining logs must never fail a rollback, and an
-// unstripped home is removed as a whole when its TTL expires or at the next upgrade.
-func stripToLogs(log *logger.Logger, topDirPath, retainedHome string) {
-	homePath := filepath.Join(topDirPath, retainedHome)
-	if _, err := os.Stat(homePath); err != nil {
-		if !goerrors.Is(err, os.ErrNotExist) {
-			log.Warnw("failed to access the retained home to strip it down to its logs", "file.path", homePath, "error.message", err.Error())
-		}
-		return
-	}
-	if err := install.RemoveBut(log, homePath, true, "logs", ttl.MarkerFileName); err != nil {
-		log.Warnw("failed to strip retained home down to its logs", "file.path", homePath, "error.message", err.Error())
-	}
 }
 
 // Cleanup removes all artifacts and files related to a specified version.

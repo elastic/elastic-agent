@@ -302,10 +302,16 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // Directories referenced by an active upgrade marker are preserved even if the marker has no Details set — Details can be nil for a marker written by an older agent or a pre-unpack marker written before an upgrade begins, both of which may indicate an upgrade in progress.
 // The remaining TTL entries are returned so the caller can schedule the next cleanup.
 func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
-	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
-	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, cleanupOpts{
+	return cleanAvailableRollbacksWithOpts(log, source, topDir, currentHomeRelPath, now, filter, cleanupOpts{
 		requireMarkerDetails: false, // lenient: nil-Details markers may indicate an upgrade in progress and still protect directories
 	})
+}
+
+// cleanAvailableRollbacksWithOpts is CleanAvailableRollbacks with the cleanup options of the caller, for example to
+// strip the homes kept for diagnostics.
+func cleanAvailableRollbacksWithOpts(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter, opts cleanupOpts) (map[string]ttl.TTLMarker, error) {
+	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
+	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, opts)
 }
 
 func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, minInterval time.Duration) {
@@ -334,8 +340,16 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 }
 
 func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, now time.Time, minInterval time.Duration) time.Time {
-	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
+	rollbacksAfterCleanup, err := cleanAvailableRollbacksWithOpts(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks, cleanupOpts{
+		requireMarkerDetails: false,
+		stripDiagnostics:     true,
+	})
 	if err != nil {
+		if isOnly(err, errStripIncomplete) {
+			// not critical, the next run retries
+			log.Warnf("could not strip every retained diagnostics home: %s, rescheduling cleanup in %s", err.Error(), minInterval)
+			return now.Add(minInterval)
+		}
 		if !errors.Is(err, errCleanupDegraded) {
 			log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)
 			return now.Add(minInterval)

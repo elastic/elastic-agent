@@ -8,6 +8,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -59,7 +60,7 @@ func failedUpgradeMarker(prev, failed string) *UpdateMarker {
 }
 
 // The startup cleanup of the agent we rolled back to must keep the home of the failed upgrade and its logs
-// when the failed home carries the retention marker (#17234).
+// when the failed home carries the retention marker.
 func TestRetainFailedUpgradeLogs_SurvivesStartupCleanup(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
@@ -178,13 +179,35 @@ func TestRollbackWithOpts_RetainsLogsOfFailedUpgrade(t *testing.T) {
 		var log *logger.Logger
 		var mockClient *client.MockClient
 		log, topDir, mockClient = setup(t, onRestart)
+		failedLog := filepath.Join(topDir, failedHome, "logs", "elastic-agent-watcher.ndjson")
+		require.NoError(t, os.WriteFile(failedLog, []byte("Error detected, proceeding to rollback"), 0o640))
 
 		require.NoError(t, RollbackWithOpts(t.Context(), log, mockClient, topDir, prevHome, "abcdef", withLogsRetention(failedMarker)))
 
-		assert.DirExists(t, filepath.Join(topDir, failedHome, "logs"))
+		assert.FileExists(t, failedLog, "the logs of the failed upgrade must survive the strip")
 		assert.FileExists(t, filepath.Join(topDir, failedHome, ttl.MarkerFileName))
 		assert.True(t, hasOnlyLogs(log, filepath.Join(topDir, failedHome)), "the failed home must be stripped down to its logs")
 		assertAgentInstallExists(t, filepath.Join(topDir, prevHome), paths.BinaryName)
+	})
+
+	t.Run("the failed home is stripped even if the agent we rolled back to rewrote its marker without the kind", func(t *testing.T) {
+		var topDir string
+		onRestart := func() {
+			// what an agent that does not know kinds does when it starts: it rewrites the markers it reads
+			legacyMarker := "version: 4.5.6-SNAPSHOT\nhash: ghijkl\nvalid_until: " + time.Now().Add(time.Hour).UTC().Format(time.RFC3339) + "\n"
+			require.NoError(t, os.WriteFile(filepath.Join(topDir, failedHome, ttl.MarkerFileName), []byte(legacyMarker), 0o660))
+		}
+		var log *logger.Logger
+		var mockClient *client.MockClient
+		log, topDir, mockClient = setup(t, onRestart)
+		failedLog := filepath.Join(topDir, failedHome, "logs", "elastic-agent-watcher.ndjson")
+		require.NoError(t, os.WriteFile(failedLog, []byte("Error detected, proceeding to rollback"), 0o640))
+
+		require.NoError(t, RollbackWithOpts(t.Context(), log, mockClient, topDir, prevHome, "abcdef", withLogsRetention(failedMarker)))
+
+		assert.True(t, hasOnlyLogs(log, filepath.Join(topDir, failedHome)), "the failed home must be stripped down to its logs")
+		assert.FileExists(t, failedLog, "the logs must survive the strip")
+		assert.FileExists(t, filepath.Join(topDir, failedHome, ttl.MarkerFileName))
 	})
 
 	t.Run("the home rolled back to is never marked nor stripped", func(t *testing.T) {
@@ -266,4 +289,38 @@ func TestRollbackWithOpts_MarksTheFailedHomeBeforeChangingTheSymlink(t *testing.
 
 	require.Error(t, err, "the rollback must stop at the symlink change")
 	assert.FileExists(t, filepath.Join(topDir, failedHome, ttl.MarkerFileName), "the failed home must be marked before the symlink changes")
+}
+
+// The agent has been rolled back and restarted when the cleanup runs: its failure must not fail the rollback.
+func TestRollbackWithOpts_CleanupFailureDoesNotFailTheRollback(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("needs something that cannot be removed, which permissions do not give on Windows or as root")
+	}
+	log, logs := loggertest.New(t.Name())
+	topDir := t.TempDir()
+	setupAgents(t, log, topDir, setupAgentInstallations{
+		installedAgents: []testAgentInstall{
+			{version: version123Snapshot, useVersionInPath: true},
+			{version: version456Snapshot, useVersionInPath: true},
+		},
+		upgradeFrom:  version123Snapshot,
+		upgradeTo:    version456Snapshot,
+		currentAgent: version456Snapshot,
+	}, true)
+	// an orphan that the cleanup cannot remove
+	orphan := createFakeAgentInstall(t, topDir, "0.0.1", "aaaaaa", true)
+	locked := filepath.Join(topDir, orphan, "components", "locked")
+	require.NoError(t, os.MkdirAll(locked, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(locked, "file"), []byte("x"), 0o640))
+	require.NoError(t, os.Chmod(locked, 0o500))
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o750) })
+	mockClient := client.NewMockClient(t)
+	mockClient.EXPECT().Connect(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	mockClient.EXPECT().Disconnect().Return()
+	mockClient.EXPECT().Restart(mock.Anything).Return(nil).Once()
+
+	err := RollbackWithOpts(t.Context(), log, mockClient, topDir, "data/elastic-agent-1.2.3-SNAPSHOT-abcdef", "abcdef")
+
+	require.NoError(t, err)
+	assert.NotEmpty(t, logs.FilterMessageSnippet("cleanup after rollback failed").All(), "the cleanup failure must be logged")
 }
