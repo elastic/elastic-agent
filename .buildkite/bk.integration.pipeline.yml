@@ -765,6 +765,27 @@ steps:
           setup:
             variant: *linux_deb_variants
 
+      - label: "linux:amd64:tier1:sudo:heartbeat-complete"
+        depends_on:
+          - packaging-containers-amd64
+        env:
+          TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
+        command: bash .buildkite/scripts/steps/heartbeat-complete.sh
+        artifact_paths:
+          - build/*
+          - build/diagnostics/**
+        retry:
+          automatic:
+            limit: 1
+        agents:
+          provider: "gcp"
+          machineType: "n2-standard-8"
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        plugins:
+          - *google_oidc_observability_plugin
+          - *oblt_cli_plugin
+          - *vault_github_token
+
   - group: "Stateful: Linux (tier 2)"
     if_changed:
       include:
