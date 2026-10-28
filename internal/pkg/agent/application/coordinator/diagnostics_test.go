@@ -275,8 +275,8 @@ variables:
 }
 
 func TestDiagnosticComputedConfig(t *testing.T) {
-	// Create a Coordinator with a test AST and make sure its rendered
-	// form is reported by the computed-config diagnostic.
+	// Create a Coordinator with a test value in derivedConfig and make sure
+	// it's reported by the computed-config diagnostic.
 
 	expected := `
 test:
@@ -286,49 +286,14 @@ something:
   - id: thing one
   - id: thing two
 `
-	cfgAST, err := transpiler.NewAST(mapFromRawYAML(t, expected))
-	require.NoError(t, err)
-	coord := &Coordinator{ast: cfgAST}
+	derivedCfg := mapFromRawYAML(t, expected)
+	coord := &Coordinator{derivedConfig: derivedCfg}
 
 	hook, ok := diagnosticHooksMap(coord)["computed-config"]
 	require.True(t, ok, "diagnostic hooks should have an entry for computed-config")
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expected, string(result), "computed-config diagnostic returned unexpected value")
-
-	t.Run("substitutes vars into inputs and outputs", func(t *testing.T) {
-		cfgAST, err := transpiler.NewAST(mapFromRawYAML(t, `
-outputs:
-  default:
-    type: elasticsearch
-    hosts: ["${host.name}:9200"]
-inputs:
-  - id: test-input
-    type: filestream
-    use_output: default
-    paths: ["/var/log/${host.name}.log"]
-`))
-		require.NoError(t, err)
-		vars, err := transpiler.NewVars("id", map[string]interface{}{
-			"host": map[string]interface{}{"name": "myhost"},
-		}, nil, "")
-		require.NoError(t, err)
-		coord := &Coordinator{ast: cfgAST, vars: []*transpiler.Vars{vars}}
-
-		result := diagnosticHooksMap(coord)["computed-config"].Hook(context.Background())
-		assert.YAMLEq(t, `
-outputs:
-  default:
-    type: elasticsearch
-    hosts: ["myhost:9200"]
-inputs:
-  - id: test-input-id
-    original_id: test-input
-    type: filestream
-    use_output: default
-    paths: ["/var/log/myhost.log"]
-`, string(result), "computed-config diagnostic should render the current vars")
-	})
 }
 
 func TestDiagnosticComponentsExpected(t *testing.T) {

@@ -119,9 +119,7 @@ func benchmarkK8sVars(b *testing.B, vars []*transpiler.Vars, beforeRender func(*
 	for _, c := range coord.componentModel {
 		units += len(c.Units)
 	}
-	cfg, _, err := renderConfig(coord.ast, coord.vars, nil)
-	require.NoError(b, err)
-	b.Logf("vars=%d components=%d units=%d rendered_inputs=%d", len(vars), len(coord.componentModel), units, len(cfg["inputs"].([]any)))
+	b.Logf("vars=%d components=%d units=%d rendered_inputs=%d", len(vars), len(coord.componentModel), units, len(coord.derivedConfig["inputs"].([]any)))
 
 	b.ReportAllocs()
 	b.ResetTimer()
