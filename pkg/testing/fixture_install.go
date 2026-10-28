@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	agentsystemprocess "github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
