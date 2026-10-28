@@ -65,8 +65,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
-							// avoid cluster collector OOMs at the default 128Mi limit
-							"collectors.cluster.resources.limits.memory=192Mi",
 							// override cluster wide
 							// endpoint for tests
 							"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
@@ -118,8 +116,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 							Values: []string{
 								fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 								fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
-								// avoid cluster collector OOMs at the default 128Mi limit
-								"collectors.cluster.resources.limits.memory=192Mi",
 								"instrumentation.exporter.endpoint=http://opentelemetry-kube-stack-daemon-collector:4318",
 								// store the filelog checkpoints of each run in a new directory
 								// of the hostPath, so earlier runs do not leave offsets in them
@@ -169,8 +165,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
-							// avoid cluster collector OOMs at the default 128Mi limit
-							"collectors.cluster.resources.limits.memory=192Mi",
 						},
 
 						// override secrets reference with env variables
@@ -201,7 +195,10 @@ func TestOtelKubeStackHelm(t *testing.T) {
 					values.Options{
 						ValueFiles: helmValuesWithOpenShiftOverlay(kCtx,
 							"../../../deploy/helm/edot-collector/kube-stack/managed_otlp/logs-values.yaml"),
-						Values: []string{fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo), fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag)},
+						Values: []string{
+							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
+							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
+						},
 
 						// override secrets reference with env variables
 						JSONValues: []string{
@@ -235,8 +232,6 @@ func TestOtelKubeStackHelm(t *testing.T) {
 						Values: []string{
 							fmt.Sprintf("defaultCRConfig.image.repository=%s", kCtx.agentImageRepo),
 							fmt.Sprintf("defaultCRConfig.image.tag=%s", kCtx.agentImageTag),
-							// avoid cluster collector OOMs at the default 128Mi limit
-							"collectors.cluster.resources.limits.memory=192Mi",
 						},
 
 						JSONValues: []string{
