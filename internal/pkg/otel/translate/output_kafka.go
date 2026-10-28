@@ -226,7 +226,7 @@ func getLogBody(field string) string {
 
 // getTransformProcessorID returns the id for transform processor
 func getTransformProcessorID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
 }
 
