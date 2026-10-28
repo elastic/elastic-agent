@@ -110,7 +110,7 @@ func (c *monitoringConnector) appendMonitoringEvent(scopeLogs plog.ScopeLogs, rm
 	}
 
 	if compID, ok := scopeAttrs.Get(internaltelemetry.ComponentIDAttr); ok {
-		template[monitoringFieldComponentID] = compID.Str()
+		_, _ = template.Put(monitoringFieldComponentID, compID.Str())
 	}
 
 	eventType := eventTypeVal.Str()

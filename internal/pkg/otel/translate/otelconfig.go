@@ -26,11 +26,9 @@ import (
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -47,6 +45,14 @@ const (
 	// components with single_receiver: true, so that all receiver names uniformly have
 	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
 	SingleReceiverStreamID = "single"
+	// NoEnabledStreamsReceiverType is the receiver type used in place of a component's
+	// normal receivers when it has no enabled streams. The OTel collector rejects a
+	// pipeline with zero receivers, so a no-op receiver keeps the pipeline valid
+	// (and the component healthy, collecting no data) instead of crashing the collector.
+	NoEnabledStreamsReceiverType = "nop"
+	// noEnabledStreamsMessage is the status message reported for a component, and its input
+	// units, whose policy has no enabled streams.
+	noEnabledStreamsMessage = "Component has no enabled streams, no data will be collected"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -90,7 +96,6 @@ var (
 // Unsupported components are quietly ignored.
 func GetOtelConfig(
 	model *component.Model,
-	info info.Agent,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	components := getSupportedComponents(logger, model)
@@ -101,7 +106,7 @@ func GetOtelConfig(
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, info, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -179,7 +184,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 
 	// check if the actual configuration is supported. We need to actually generate the config and look for
 	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, &info.AgentInfo{}, logp.NewNopLogger())
+	_, compErr := getCollectorConfigForComponent(comp, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -272,7 +277,6 @@ func GetProcessorID(name string) otelcomponent.ID {
 // Note: Lists are not merged and should be handled by the caller of the method
 func getCollectorConfigForComponent(
 	comp *component.Component,
-	info info.Agent,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -294,7 +298,7 @@ func getCollectorConfigForComponent(
 	}
 	effectiveDefaultProcessors := filterDefaultProcessors(GetDefaultProcessors(comp.BeatName()), effectiveFlags)
 
-	receiversConfig, err := getReceiversConfigForComponent(comp, info, outputQueueConfig, effectiveDefaultProcessors)
+	receiversConfig, err := getReceiversConfigForComponent(comp, outputQueueConfig, effectiveDefaultProcessors)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +398,6 @@ func getCollectorConfigForComponent(
 // pipeline; it is used to strip duplicate per-input processor entries.
 func getReceiversConfigForComponent(
 	comp *component.Component,
-	info info.Agent,
 	outputQueueConfig map[string]any,
 	effectiveDefaultProcessors []map[string]any,
 ) (map[string]any, error) {
@@ -412,12 +415,22 @@ func getReceiversConfigForComponent(
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
 		if unit.Type == client.UnitTypeInput && unit.Config != nil {
-			unitInputs, err := getInputsForUnit(unit, info, defaultDataStreamType, comp, effectiveDefaultProcessors)
+			unitInputs, err := getInputsForUnit(unit, defaultDataStreamType, comp, effectiveDefaultProcessors)
 			if err != nil {
 				return nil, err
 			}
 			inputs = append(inputs, unitInputs...)
 		}
+	}
+
+	// A component whose policy has all streams disabled produces zero inputs. An empty
+	// receivers list would cause the OTel collector to reject the pipeline and crash, so
+	// fall back to a no-op receiver: the component stays OTel-managed and healthy, just
+	// collecting no data. The receiver is named after the component so it is unique, and
+	// getComponentState reports the status of every input unit itself.
+	if len(inputs) == 0 {
+		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), comp.ID)
+		return map[string]any{receiverID.String(): map[string]any{}}, nil
 	}
 
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
@@ -763,10 +776,13 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		}
 
 		if fbfeatures.IsElasticsearchStateStoreEnabled() {
-			// Add elasticsearch state store extension for agentless mode
-			// We paste the config as is, without any translation.
-			// The state store extension will pick up relevant settings from it and ignore the rest.
-			extensionConfig[elasticsearchStateStoreExtensionName] = unitConfigMap
+			// Add the Elasticsearch state store extension for agentless mode and
+			// reuse the output's Beats authenticator for endpoints and transport.
+			extensionConfig[elasticsearchStateStoreExtensionName] = map[string]any{
+				"auth": map[string]any{
+					"authenticator": getBeatsAuthExtensionID(outputName).String(),
+				},
+			}
 		}
 	}
 
@@ -800,14 +816,8 @@ func resolveStreamID(streamID string, streamSource map[string]any, unitID string
 	return fmt.Sprintf("%s-%d", unitID, index)
 }
 
-func getInputsForUnit(unit component.Unit, info info.Agent, defaultDataStreamType string, comp *component.Component, effectiveDefaultProcessors []map[string]any) ([]receiverInput, error) {
-	agentInfo := &client.AgentInfo{
-		ID:           info.AgentID(),
-		Version:      info.Version(),
-		Snapshot:     info.Snapshot(),
-		ManagedMode:  runtime.ProtoAgentMode(info),
-		Unprivileged: info.Unprivileged(),
-	}
+func getInputsForUnit(unit component.Unit, defaultDataStreamType string, comp *component.Component, effectiveDefaultProcessors []map[string]any) ([]receiverInput, error) {
+	agentInfo := client.AgentInfoFromProto(comp.AgentInfo)
 	inputs, err := management.CreateInputsFromStreamsForReceiver(unit.Config, defaultDataStreamType, agentInfo)
 	if err != nil {
 		return nil, err

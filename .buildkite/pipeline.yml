@@ -382,32 +382,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-  # Skipping due to Orka provider slowness
-  # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
-  - group: "macOS tests"
-    skip: true
-    key: "macos-unit-tests"
-    steps:
-      # Runs only on main and release branches
-      - label: "Unit tests - macOS 13"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: "main 8.* 9.*"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-x64
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
   - group: "Desktop Windows tests"
     key: "extended-windows"
     steps:
@@ -528,8 +502,6 @@ steps:
       - step: "unit-tests-win2022"
         allow_failure: true
       - step: "unit-tests-win2016"
-        allow_failure: true
-      - step: "macos-unit-tests"
         allow_failure: true
       - step: "unit-tests-win10"
         allow_failure: true
@@ -691,9 +663,7 @@ steps:
   # NOTE: Tests the unified-release staging packaging workflow against the latest
   # staging manifest, to catch regressions before they reach the release pipeline.
   # See https://buildkite.com/elastic/unified-release-staging
-  # Temporarily skipping until new artifacts available in staging. See https://github.com/elastic/elastic-agent/pull/17099#issuecomment-6213275037
   - label: "Trigger Elastic Agent Package (unified-release staging)"
-    skip: true
     if: build.pull_request.id != null
     commands:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh
