@@ -1671,12 +1671,13 @@ service:
 
 	doc1 := docs.Hits.Hits[0].Source
 	doc2 := docs.Hits.Hits[1].Source
-	// Unlike in RuntimeComparisonIgnoredFields, agent.id and elastic_agent.* are compared: the agent sets them on
-	// both documents, on the fbreceiver one through the processor it adds to the logs pipelines from the otel
-	// configuration.
+	// Unlike in RuntimeComparisonIgnoredFields, elastic_agent.* is compared: the agent sets it on both documents, on
+	// the fbreceiver one through the processor it adds to the logs pipelines from the otel configuration.
 	ignoredFields := []string{
 		"@timestamp",
 		"agent.ephemeral_id",
+		// The fbreceiver sets the agent section itself, with its own ID, so the agent doesn't add one.
+		"agent.id",
 		// Beat receivers managed by the agent report the version of libbeat instead of the agent's version, so
 		// this differs whenever the beats version doesn't match the agent's.
 		"agent.version",
@@ -1687,7 +1688,7 @@ service:
 	}
 
 	AssertMapsEqual(t, doc1, doc2, ignoredFields, "expected documents to be equal")
-	assert.NotEmpty(t, mapstr.M(doc1).Flatten()["agent.id"], "expected agent.id to be set")
+	assert.NotEmpty(t, mapstr.M(doc1).Flatten()["elastic_agent.id"], "expected elastic_agent.id to be set")
 	cancel()
 	_ = cmd.Wait()
 }
