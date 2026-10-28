@@ -28,6 +28,11 @@ type InputSpec struct {
 	// (e.g. osqueryd) cannot tolerate multiple independently-launched receiver instances sharing
 	// the same working directory.
 	SingleReceiver bool `config:"single_receiver,omitempty" yaml:"single_receiver,omitempty"`
+	// ControlProtocolUnits makes the OTel runtime send this input's units to its receiver over
+	// the control protocol, as for a process, instead of through the collector config. Changing
+	// the units then doesn't recreate the receiver. Requires SingleReceiver and a receiver that
+	// supports it.
+	ControlProtocolUnits bool `config:"control_protocol_units,omitempty" yaml:"control_protocol_units,omitempty"`
 }
 
 // Validate ensures correctness of input specification.

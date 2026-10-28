@@ -264,6 +264,16 @@ func getPipelineID(comp *component.Component) (pipeline.ID, error) {
 	return pipeline.NewIDWithName(signal, pipelineName), nil
 }
 
+// GetControlProtocolReceiverID returns the ID of the single receiver of a component
+// whose units are delivered over the control protocol.
+func GetControlProtocolReceiverID(comp *component.Component) (otelcomponent.ID, error) {
+	receiverType, err := getReceiverTypeForComponent(comp)
+	if err != nil {
+		return otelcomponent.ID{}, err
+	}
+	return GetReceiverID(receiverType, EncodeNameSegment(comp.ID)+"/"+SingleReceiverStreamID), nil
+}
+
 // GetReceiverID returns the receiver id for the given unit and exporter type.
 func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent.ID {
 	receiverName := fmt.Sprintf("%s%s", OtelNamePrefix, unitID)
@@ -467,6 +477,10 @@ func getReceiversConfigForComponent(
 	// get inputs for all the units
 	var inputs []receiverInput
 	for _, unit := range comp.Units {
+		if comp.UsesControlProtocolUnits() {
+			// the receiver gets its inputs over the control protocol
+			break
+		}
 		if unit.Type == client.UnitTypeInput && unit.Config != nil {
 			unitInputs, err := getInputsForUnit(unit, defaultDataStreamType, comp, effectiveDefaultProcessors)
 			if err != nil {
@@ -481,7 +495,9 @@ func getReceiversConfigForComponent(
 	// fall back to a no-op receiver: the component stays OTel-managed and healthy, just
 	// collecting no data. The receiver is named after the component so it is unique, and
 	// getComponentState reports the status of every input unit itself.
-	if len(inputs) == 0 {
+	// A component with control protocol units has no inputs here, but its receiver
+	// gets them over the control protocol, so it doesn't need the fallback.
+	if len(inputs) == 0 && !comp.UsesControlProtocolUnits() {
 		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), EncodeNameSegment(comp.ID))
 		return map[string]any{receiverID.String(): map[string]any{}}, nil
 	}
