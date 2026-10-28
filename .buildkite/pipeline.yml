@@ -203,7 +203,189 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+  # Skipping due to Orka provider slowness
+  # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
+  # Unit tests of the EDOT Collector module, selected by GO_MODULE_DIR.
+  # internal/edot is a separate Go module, so its unit tests are not reached by
+  # `mage test:unit`. They run here on their own agents: running them alongside
+  # the root-module tests on one agent starves the timing-sensitive root-module
+  # tests of CPU and makes them flaky.
+  - group: "EDOT unit tests"
+    key: "edot-unit-tests"
+    steps:
+      - label: "EDOT unit tests - Ubuntu 22.04"
+        key: "edot-unit-tests-2204"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - fips140=only Ubuntu 22.04"
+        key: "edot-unit-tests-2204-fips140-only"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_UBUNTU_2204_X86_64}"
+          machineType: "n2-standard-8"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Ubuntu 22.04 ARM64"
+        key: "edot-unit-tests-2204-arm64"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "aws"
+          image: "${IMAGE_UBUNTU_2204_ARM_64}"
+          diskSizeGb: 200
+          instanceType: "m6g.xlarge"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Windows 2022"
+        key: "edot-unit-tests-win2022"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - fips140=only Windows 2022"
+        key: "edot-unit-tests-win2022-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      # Runs only on main and release branches, like "Unit tests - macOS 13".
+      # Skipped like "Unit tests - macOS 13" due to Orka provider slowness,
+      # see https://github.com/elastic/elastic-agent/pull/17290
+      - label: "EDOT unit tests - macOS 13"
+        key: "edot-unit-tests-macos13"
+        skip: "Orka slowness, see github.com/elastic/elastic-agent/pull/17290"
+        command: ".buildkite/scripts/steps/unit-tests.sh"
+        branches: "main 8.* 9.*"
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: orka
+          imagePrefix: generic-13-ventura-x64
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      # The EDOT module does not compile on the Windows arm64 Buildkite agents.
+      # Remove `skip` once https://github.com/elastic/elastic-agent/issues/17227 is resolved.
+      - label: "EDOT unit tests - Windows 11 arm64"
+        key: "edot-unit-tests-win11-arm64"
+        # Buildkite limits the skip reason to 70 characters.
+        skip: "Doesn't compile, see github.com/elastic/elastic-agent/issues/17227"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
   - group: "macOS tests"
+    skip: true
     key: "macos-unit-tests"
     steps:
       # Runs only on main and release branches
@@ -358,6 +540,8 @@ steps:
       - step: "unit-tests-win2022-fips140-only"
         allow_failure: true
       - step: "unit-tests-win11-arm64-fips140-only"
+        allow_failure: true
+      - step: "edot-unit-tests"
         allow_failure: true
 
   - group: "K8s tests"
