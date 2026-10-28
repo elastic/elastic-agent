@@ -16,7 +16,7 @@ summary: Add Elastic Agent identity fields to bodymap logs from OTel-native pipe
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 # NOTE: This field will be rendered only for breaking-change and known-issue kinds at the moment.
-description: Elastic Agent now adds the `agent` and `elastic_agent` sections to the body of logs in the bodymap mapping mode from the OTel pipelines in its policy, by adding a transform processor to every logs pipeline. Each section is only added if the log does not have it already. Logs in other mapping modes are not modified.
+description: Elastic Agent now adds the `agent` and `elastic_agent` sections and its tags to the body of logs in the bodymap mapping mode from the OTel pipelines in its policy, by adding a transform processor to every logs pipeline. Each section is only added if the log does not have it already. Logs in other mapping modes are not modified.
 
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
 component: elastic-agent

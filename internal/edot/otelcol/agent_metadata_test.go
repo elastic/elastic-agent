@@ -18,17 +18,22 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/processor/processortest"
 
+	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 )
 
 var testAgentMetadata = manager.AgentMetadata{
-	ID:       "8f3a2c1e-5b7d-4e9a-a6c2-1d4f0b9e7a35",
-	Version:  "9.6.0",
-	Snapshot: false,
-	Name:     "web-01",
+	AgentInfo: agentclient.AgentInfo{
+		ID:       "8f3a2c1e-5b7d-4e9a-a6c2-1d4f0b9e7a35",
+		Version:  "9.6.0",
+		Snapshot: false,
+		Tags:     []string{"tag1", "tag2"},
+	},
+	Hostname: "web-01",
 }
 
 // newAgentMetadataProcessor creates the transform processor with the configuration the OTel manager injects.
@@ -128,7 +133,7 @@ func TestAgentMetadataProcessor(t *testing.T) {
 			p := newAgentMetadataProcessor(t, sink)
 
 			input := tc.logs(3)
-			// Sections that already exist are kept as they are.
+			// Sections that already exist are kept as they are. Tags are only added with the elastic_agent section.
 			if tc.mapBody {
 				records := input.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
 				records.At(0).Body().Map().PutEmptyMap("agent").PutStr("id", "other-agent-id")
@@ -149,10 +154,19 @@ func TestAgentMetadataProcessor(t *testing.T) {
 						agent := body.PutEmptyMap("agent")
 						agent.PutStr("id", testAgentMetadata.ID)
 						agent.PutStr("version", testAgentMetadata.Version)
-						agent.PutStr("name", testAgentMetadata.Name)
+						agent.PutStr("name", testAgentMetadata.Hostname)
 						agent.PutStr("type", "otelcol")
 					}
 					if _, ok := body.Get("elastic_agent"); !ok {
+						var tags pcommon.Slice
+						if existing, ok := body.Get("tags"); ok {
+							tags = existing.Slice()
+						} else {
+							tags = body.PutEmptySlice("tags")
+						}
+						for _, tag := range testAgentMetadata.Tags {
+							tags.AppendEmpty().SetStr(tag)
+						}
 						elasticAgent := body.PutEmptyMap("elastic_agent")
 						elasticAgent.PutStr("id", testAgentMetadata.ID)
 						elasticAgent.PutStr("version", testAgentMetadata.Version)

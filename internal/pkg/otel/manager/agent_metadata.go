@@ -11,8 +11,11 @@ import (
 
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 // agentMetadataProcessorID is the ID of the transform processor injected into the logs pipelines of the
@@ -21,15 +24,33 @@ const agentMetadataProcessorID = "transform/_agent-metadata"
 
 // AgentMetadata is the Elastic Agent identity added to bodymap logs by the agent metadata processor.
 type AgentMetadata struct {
-	ID       string
-	Version  string
-	Snapshot bool
-	// Name is the value of agent.name. Skipped if empty.
-	Name string
+	client.AgentInfo
+	// Hostname is the value of agent.name. Skipped if empty.
+	Hostname string
+}
+
+// newAgentMetadata returns the identity of the agent described by agentInfo, with the tags included under the same
+// condition as for components.
+func newAgentMetadata(agentInfo info.Agent, hostname string) AgentMetadata {
+	var tags []string
+	if features.IncludeTagsInEvents() {
+		tags = agentInfo.GetTags()
+	}
+	return AgentMetadata{
+		AgentInfo: client.AgentInfo{
+			ID:           agentInfo.AgentID(),
+			Version:      agentInfo.Version(),
+			Snapshot:     agentInfo.Snapshot(),
+			ManagedMode:  runtime.ProtoAgentMode(agentInfo),
+			Unprivileged: agentInfo.Unprivileged(),
+			Tags:         tags,
+		},
+		Hostname: hostname,
+	}
 }
 
 // AgentMetadataProcessorConfig returns the configuration of a transform processor adding the agent and elastic_agent
-// sections to logs in the bodymap mapping mode, like libbeat does for Beats inputs.
+// sections and the agent tags to logs in the bodymap mapping mode, like libbeat does for Beats inputs.
 //
 // In the bodymap mapping mode the Elasticsearch exporter writes only the log body, so the fields are set in the
 // body. Logs in other mapping modes aren't modified. The mapping mode is resolved the way the exporter does it: the
@@ -37,14 +58,15 @@ type AgentMetadata struct {
 // case-insensitively.
 //
 // Each section is added as a whole, and only if the body doesn't have it yet, so identity set earlier, for example
-// by another Elastic Agent before forwarding the logs, is kept.
+// by another Elastic Agent before forwarding the logs, is kept. Tags are added together with the elastic_agent
+// section, so logs already handled by an Elastic Agent don't get tags from another one.
 func AgentMetadataProcessorConfig(meta AgentMetadata) map[string]any {
 	agent := []string{
 		fmt.Sprintf(`"id": %s`, ottlString(meta.ID)),
 		fmt.Sprintf(`"version": %s`, ottlString(meta.Version)),
 	}
-	if meta.Name != "" {
-		agent = append(agent, fmt.Sprintf(`"name": %s`, ottlString(meta.Name)))
+	if meta.Hostname != "" {
+		agent = append(agent, fmt.Sprintf(`"name": %s`, ottlString(meta.Hostname)))
 	}
 	agent = append(agent, `"type": "otelcol"`)
 	elasticAgent := []string{
@@ -55,8 +77,18 @@ func AgentMetadataProcessorConfig(meta AgentMetadata) map[string]any {
 
 	statements := []any{
 		fmt.Sprintf(`set(log.body["agent"], {%s}) where log.body["agent"] == nil`, strings.Join(agent, ", ")),
-		fmt.Sprintf(`set(log.body["elastic_agent"], {%s}) where log.body["elastic_agent"] == nil`, strings.Join(elasticAgent, ", ")),
 	}
+	if len(meta.Tags) > 0 {
+		tags := make([]string, 0, len(meta.Tags))
+		for _, tag := range meta.Tags {
+			tags = append(tags, ottlString(tag))
+		}
+		// Must run before the elastic_agent section is added.
+		statements = append(statements, fmt.Sprintf(`append(log.body["tags"], values = [%s]) where log.body["elastic_agent"] == nil`,
+			strings.Join(tags, ", ")))
+	}
+	statements = append(statements,
+		fmt.Sprintf(`set(log.body["elastic_agent"], {%s}) where log.body["elastic_agent"] == nil`, strings.Join(elasticAgent, ", ")))
 
 	// The mapping mode check comes before IsMap on purpose: most logs aren't in bodymap mode, and IsMap formats an
 	// error for every non-map body, which makes it several times more expensive than the mode check.
@@ -139,17 +171,13 @@ func injectAgentMetadataProcessor(cfg *confmap.Conf, agentInfo info.Agent, logge
 		processorsCfg = map[string]any{}
 		raw["processors"] = processorsCfg
 	}
-	meta := AgentMetadata{
-		ID:       agentInfo.AgentID(),
-		Version:  agentInfo.Version(),
-		Snapshot: agentInfo.Snapshot(),
-	}
 	// The hostname the agent reports to Fleet, which honours ELASTIC_AGENT_HOSTNAME and the FQDN feature.
+	var hostname string
 	if ecsMeta, err := agentInfo.ECSMetadata(logger); err == nil {
-		meta.Name = ecsMeta.Host.Hostname
+		hostname = ecsMeta.Host.Hostname
 	} else {
 		logger.Warnf("Failed to get the agent hostname, agent.name won't be set on bodymap logs: %v", err)
 	}
-	processorsCfg[agentMetadataProcessorID] = AgentMetadataProcessorConfig(meta)
+	processorsCfg[agentMetadataProcessorID] = AgentMetadataProcessorConfig(newAgentMetadata(agentInfo, hostname))
 	return confmap.NewFromStringMap(raw), nil
 }

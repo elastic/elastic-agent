@@ -14,18 +14,35 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
+	"github.com/elastic/elastic-agent/pkg/features"
 )
+
+var testAgentMetadata = AgentMetadata{
+	AgentInfo: client.AgentInfo{
+		ID:       "test-agent-id",
+		Version:  "9.6.0",
+		Snapshot: true,
+		Tags:     []string{"tag1", "tag2"},
+	},
+	Hostname: "Test-Host",
+}
 
 func testAgentInfo(t *testing.T) *info.MockAgent {
 	agentInfo := info.NewMockAgent(t)
 	agentInfo.EXPECT().AgentID().Return("test-agent-id").Maybe()
 	agentInfo.EXPECT().Version().Return("9.6.0").Maybe()
 	agentInfo.EXPECT().Snapshot().Return(true).Maybe()
+	agentInfo.EXPECT().IsStandalone().Return(false).Maybe()
+	agentInfo.EXPECT().Unprivileged().Return(false).Maybe()
+	agentInfo.EXPECT().GetTags().Return([]string{"tag1"}).Maybe()
 	agentInfo.EXPECT().ECSMetadata(mock.Anything).Return(&ecsmeta.ECSMeta{
 		Host: &ecsmeta.HostECSMeta{Hostname: "Test-Host", Name: "test-host"},
 	}, nil).Maybe()
@@ -83,12 +100,7 @@ func TestInjectAgentMetadataProcessor(t *testing.T) {
 	assert.False(t, result.IsSet("service::pipelines::traces/foo::processors"))
 
 	assert.True(t, result.IsSet("processors::batch"), "existing processors must be kept")
-	expected := AgentMetadataProcessorConfig(AgentMetadata{
-		ID:       "test-agent-id",
-		Version:  "9.6.0",
-		Snapshot: true,
-		Name:     "Test-Host",
-	})
+	expected := AgentMetadataProcessorConfig(newAgentMetadata(testAgentInfo(t), "Test-Host"))
 	assert.Equal(t, confmap.NewFromStringMap(expected).ToStringMap(),
 		result.Get("processors::"+agentMetadataProcessorID))
 
@@ -104,6 +116,9 @@ func TestInjectAgentMetadataProcessorNoHostname(t *testing.T) {
 	agentInfo.EXPECT().AgentID().Return("test-agent-id")
 	agentInfo.EXPECT().Version().Return("9.6.0")
 	agentInfo.EXPECT().Snapshot().Return(false)
+	agentInfo.EXPECT().IsStandalone().Return(false).Maybe()
+	agentInfo.EXPECT().Unprivileged().Return(false).Maybe()
+	agentInfo.EXPECT().GetTags().Return(nil).Maybe()
 	agentInfo.EXPECT().ECSMetadata(mock.Anything).Return(nil, errors.New("no host info"))
 	cfg := confmap.NewFromStringMap(map[string]any{
 		"service": map[string]any{
@@ -118,7 +133,7 @@ func TestInjectAgentMetadataProcessorNoHostname(t *testing.T) {
 
 	result, err := injectAgentMetadataProcessor(cfg, agentInfo, logp.NewNopLogger())
 	require.NoError(t, err)
-	expected := AgentMetadataProcessorConfig(AgentMetadata{ID: "test-agent-id", Version: "9.6.0"})
+	expected := AgentMetadataProcessorConfig(newAgentMetadata(agentInfo, ""))
 	assert.Equal(t, confmap.NewFromStringMap(expected).ToStringMap(), result.Get("processors::"+agentMetadataProcessorID),
 		"agent.name must be skipped when the hostname is unknown")
 }
@@ -145,34 +160,75 @@ func TestInjectAgentMetadataProcessorNoLogsPipelines(t *testing.T) {
 
 func TestAgentMetadataProcessorConfig(t *testing.T) {
 	t.Run("all fields", func(t *testing.T) {
+		meta := testAgentMetadata
+		meta.ID = `id-with-"quotes"`
 		assert.Equal(t, []string{
 			`set(log.body["agent"], {"id": "id-with-\"quotes\"", "version": "9.6.0", "name": "Test-Host", "type": "otelcol"}) where log.body["agent"] == nil`,
+			`append(log.body["tags"], values = ["tag1", "tag2"]) where log.body["elastic_agent"] == nil`,
 			`set(log.body["elastic_agent"], {"id": "id-with-\"quotes\"", "version": "9.6.0", "snapshot": true}) where log.body["elastic_agent"] == nil`,
-		}, toStrings(t, AgentMetadataProcessorConfig(AgentMetadata{
-			ID:       `id-with-"quotes"`,
-			Version:  "9.6.0",
-			Snapshot: true,
-			Name:     "Test-Host",
-		})))
+		}, statements(t, AgentMetadataProcessorConfig(meta)))
 	})
 
-	t.Run("no name", func(t *testing.T) {
+	t.Run("no hostname or tags", func(t *testing.T) {
+		meta := testAgentMetadata
+		meta.Hostname = ""
+		meta.Tags = nil
 		assert.Equal(t, []string{
 			`set(log.body["agent"], {"id": "test-agent-id", "version": "9.6.0", "type": "otelcol"}) where log.body["agent"] == nil`,
-			`set(log.body["elastic_agent"], {"id": "test-agent-id", "version": "9.6.0", "snapshot": false}) where log.body["elastic_agent"] == nil`,
-		}, toStrings(t, AgentMetadataProcessorConfig(AgentMetadata{ID: "test-agent-id", Version: "9.6.0"})))
+			`set(log.body["elastic_agent"], {"id": "test-agent-id", "version": "9.6.0", "snapshot": true}) where log.body["elastic_agent"] == nil`,
+		}, statements(t, AgentMetadataProcessorConfig(meta)))
 	})
 }
 
-func toStrings(t *testing.T, cfg map[string]any) []string {
+func statements(t *testing.T, cfg map[string]any) []string {
 	t.Helper()
+	groups, ok := cfg["log_statements"].([]any)
+	require.True(t, ok)
+	require.Len(t, groups, 1, "only log bodies may be modified")
 	var out []string
-	for _, group := range cfg["log_statements"].([]any) {
-		for _, s := range group.(map[string]any)["statements"].([]any) {
-			out = append(out, s.(string))
-		}
+	for _, s := range groups[0].(map[string]any)["statements"].([]any) {
+		out = append(out, s.(string))
 	}
 	return out
+}
+
+func TestNewAgentMetadata(t *testing.T) {
+	originalValue := features.IncludeTagsInEvents()
+	t.Cleanup(func() {
+		require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]any{
+			"agent.features.include_tags_in_events.enabled": originalValue,
+		})))
+	})
+	agentInfo := info.NewMockAgent(t)
+	agentInfo.EXPECT().AgentID().Return("test-agent-id")
+	agentInfo.EXPECT().Version().Return("9.6.0")
+	agentInfo.EXPECT().Snapshot().Return(true)
+	agentInfo.EXPECT().IsStandalone().Return(false)
+	agentInfo.EXPECT().Unprivileged().Return(true)
+	agentInfo.EXPECT().GetTags().Return([]string{"tag1"}).Maybe()
+
+	for _, includeTags := range []bool{false, true} {
+		t.Run(fmt.Sprintf("include tags %t", includeTags), func(t *testing.T) {
+			require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]any{
+				"agent.features.include_tags_in_events.enabled": includeTags,
+			})))
+			var tags []string
+			if includeTags {
+				tags = []string{"tag1"}
+			}
+			assert.Equal(t, AgentMetadata{
+				AgentInfo: client.AgentInfo{
+					ID:           "test-agent-id",
+					Version:      "9.6.0",
+					Snapshot:     true,
+					ManagedMode:  proto.AgentManagedMode_MANAGED,
+					Unprivileged: true,
+					Tags:         tags,
+				},
+				Hostname: "Test-Host",
+			}, newAgentMetadata(agentInfo, "Test-Host"))
+		})
+	}
 }
 
 // TestBuildMergedConfigAgentMetadataProcessor verifies that the agent metadata processor is added to logs pipelines
