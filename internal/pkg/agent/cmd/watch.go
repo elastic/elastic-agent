@@ -108,7 +108,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			}
 
 			if err = withAppLocker(log, func() error {
-				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, cfg.Settings.Upgrade.Rollback.LogsRetention(), new(upgradeAgentWatcher), new(upgradeInstallationModifier))
+				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, cfg.Settings.Upgrade.Rollback.LogsRetention, new(upgradeAgentWatcher), new(upgradeInstallationModifier))
 			}); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage)
@@ -271,7 +271,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			return nil
 		}
 
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker), WithPreRestartHook(revertRegistryHook), WithLogsRetention(marker, logsRetention))
+		rollbackOpts := []upgrade.RollbackOption{WithRemoveMarker(removeMarker), WithPreRestartHook(revertRegistryHook)}
+		if logsRetention > 0 {
+			rollbackOpts = append(rollbackOpts, WithLogsRetention(marker, logsRetention))
+		}
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, rollbackOpts...)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)

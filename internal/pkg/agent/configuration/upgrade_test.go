@@ -30,6 +30,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -49,6 +50,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -70,6 +72,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -87,6 +90,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          8 * time.Hour,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -104,6 +108,43 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: 1 * time.Minute,
+					LogsRetention:   defaultLogsRetentionDuration,
+				},
+			},
+		},
+		"logs_retention": {
+			cfg: map[string]any{
+				"rollback.logs_retention": "48h",
+			},
+			expected: UpgradeConfig{
+				Watcher: &UpgradeWatcherConfig{
+					GracePeriod: defaultGracePeriodDuration,
+					ErrorCheck: UpgradeWatcherCheckConfig{
+						Interval: defaultStatusCheckInterval,
+					},
+				},
+				Rollback: &UpgradeRollbackConfig{
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   48 * time.Hour,
+				},
+			},
+		},
+		"logs_retention_disabled": {
+			cfg: map[string]any{
+				"rollback.logs_retention": "0s",
+			},
+			expected: UpgradeConfig{
+				Watcher: &UpgradeWatcherConfig{
+					GracePeriod: defaultGracePeriodDuration,
+					ErrorCheck: UpgradeWatcherCheckConfig{
+						Interval: defaultStatusCheckInterval,
+					},
+				},
+				Rollback: &UpgradeRollbackConfig{
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   0,
 				},
 			},
 		},
@@ -117,12 +158,4 @@ func TestParseUpgradeConfig(t *testing.T) {
 			require.Equal(t, test.expected, *c)
 		})
 	}
-}
-
-func TestUpgradeRollbackConfigLogsRetention(t *testing.T) {
-	var nilConfig *UpgradeRollbackConfig
-	require.Equal(t, defaultRollbackWindowDuration, nilConfig.LogsRetention(), "nil config falls back to the default window")
-	require.Equal(t, defaultRollbackWindowDuration, (&UpgradeRollbackConfig{Window: 0}).LogsRetention(), "disabled rollbacks still retain logs")
-	require.Equal(t, defaultRollbackWindowDuration, (&UpgradeRollbackConfig{Window: -time.Hour}).LogsRetention())
-	require.Equal(t, 3*time.Hour, (&UpgradeRollbackConfig{Window: 3 * time.Hour}).LogsRetention(), "retention follows the configured window")
 }
