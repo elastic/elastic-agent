@@ -734,6 +734,17 @@ outputs:
 				StripNondeterminism(agentDoc, tt.metricset)
 				StripNondeterminism(otelDoc, tt.metricset)
 
+				// cloud.* is added by add_cloud_metadata, which queries the cloud metadata service once
+				// at startup with a 3s timeout and no retry. Whether these fields are present depends on
+				// that service answering during each of the two separate installs, not on the runtime.
+				for _, doc := range []mapstr.M{agentDoc, otelDoc} {
+					for k := range doc {
+						if strings.HasPrefix(k, "cloud.") {
+							delete(doc, k)
+						}
+					}
+				}
+
 				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)
 			})
