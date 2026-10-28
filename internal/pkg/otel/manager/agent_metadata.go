@@ -12,7 +12,6 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -121,7 +120,7 @@ func ottlString(s string) string {
 // injectAgentMetadataProcessor returns a copy of the collector configuration with the agent metadata processor
 // appended to every logs pipeline. The input configuration isn't modified. Configurations without logs pipelines
 // are returned as is.
-func injectAgentMetadataProcessor(cfg *confmap.Conf, agentInfo info.Agent, logger *logp.Logger) (*confmap.Conf, error) {
+func injectAgentMetadataProcessor(cfg *confmap.Conf, meta AgentMetadata) (*confmap.Conf, error) {
 	if cfg == nil {
 		return nil, nil
 	}
@@ -171,13 +170,6 @@ func injectAgentMetadataProcessor(cfg *confmap.Conf, agentInfo info.Agent, logge
 		processorsCfg = map[string]any{}
 		raw["processors"] = processorsCfg
 	}
-	// The hostname the agent reports to Fleet, which honours ELASTIC_AGENT_HOSTNAME and the FQDN feature.
-	var hostname string
-	if ecsMeta, err := agentInfo.ECSMetadata(logger); err == nil {
-		hostname = ecsMeta.Host.Hostname
-	} else {
-		logger.Warnf("Failed to get the agent hostname, agent.name won't be set on bodymap logs: %v", err)
-	}
-	processorsCfg[agentMetadataProcessorID] = AgentMetadataProcessorConfig(newAgentMetadata(agentInfo, hostname))
+	processorsCfg[agentMetadataProcessorID] = AgentMetadataProcessorConfig(meta)
 	return confmap.NewFromStringMap(raw), nil
 }

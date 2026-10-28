@@ -80,6 +80,8 @@ type configUpdate struct {
 	monitoringCfg *monitoringCfg.MonitoringConfig
 	components    []component.Component
 	agentLogLevel logp.Level
+	// hostname is the hostname the agent reports, added to logs from the collector config.
+	hostname string
 }
 
 // OTelManager is a manager that manages the lifecycle of the OTel collector inside of the Elastic Agent.
@@ -500,7 +502,8 @@ func (m *OTelManager) buildMergedConfig(
 	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
 		// Beat receivers set the agent metadata themselves, so only pipelines from the collector config need it.
-		collectorCfg, err := injectAgentMetadataProcessor(cfgUpdate.collectorCfg, agentInfo, logger)
+		collectorCfg, err := injectAgentMetadataProcessor(cfgUpdate.collectorCfg,
+			newAgentMetadata(agentInfo, cfgUpdate.hostname))
 		if err != nil {
 			return nil, fmt.Errorf("failed to inject agent metadata processor: %w", err)
 		}
@@ -876,13 +879,15 @@ func (m *OTelManager) applyMergedConfig(
 	return nil
 }
 
-// Update sends collector configuration and component updates to the manager's run loop.
-func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+// Update sends collector configuration and component updates to the manager's run loop. hostname is the hostname
+// the agent reports, added to logs from the collector configuration.
+func (m *OTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component, hostname string) {
 	cfgUpdate := configUpdate{
 		collectorCfg:  cfg,
 		monitoringCfg: monitoring,
 		components:    components,
 		agentLogLevel: ll,
+		hostname:      hostname,
 	}
 
 	// we care only about the latest config update

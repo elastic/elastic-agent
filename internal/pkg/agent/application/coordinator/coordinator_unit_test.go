@@ -64,6 +64,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -1150,6 +1151,181 @@ inputs:
 		agentInfo, err := applyPolicy(policy)
 		require.NoError(t, err)
 		assert.Empty(t, agentInfo.GetTags(), "the tags are not sent when include_tags_in_events is off")
+	})
+}
+
+// lookupAgentInfo is a fakeAgentInfo whose hostname lookups block until the test provides the result.
+type lookupAgentInfo struct {
+	fakeAgentInfo
+	hostnames chan string
+}
+
+func (a lookupAgentInfo) ECSMetadata(*logger.Logger) (*ecsmeta.ECSMeta, error) {
+	return &ecsmeta.ECSMeta{Host: &ecsmeta.HostECSMeta{Hostname: <-a.hostnames}}, nil
+}
+
+// failingLookupAgentInfo is a fakeAgentInfo whose hostname lookups fail.
+type failingLookupAgentInfo struct {
+	fakeAgentInfo
+}
+
+func (failingLookupAgentInfo) ECSMetadata(*logger.Logger) (*ecsmeta.ECSMeta, error) {
+	return nil, errors.New("no host information")
+}
+
+func TestCoordinatorInitialHostnameLookup(t *testing.T) {
+	newCoordinator := func(agentInfo info.Agent) *Coordinator {
+		return &Coordinator{
+			logger:             logp.NewLogger("testing"),
+			agentInfo:          agentInfo,
+			hostnameCh:         make(chan string),
+			componentPIDTicker: time.NewTicker(time.Minute),
+		}
+	}
+
+	t.Run("waits for the lookup", func(t *testing.T) {
+		lookups := make(chan string)
+		coord := newCoordinator(lookupAgentInfo{hostnames: lookups})
+		go func() { lookups <- "host" }()
+		coord.startWatchingHostname(t.Context(), time.Minute)
+		assert.Equal(t, "host", coord.hostname)
+	})
+
+	t.Run("slow lookup is applied later", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		lookups := make(chan string)
+		coord := newCoordinator(lookupAgentInfo{hostnames: lookups})
+		coord.startWatchingHostname(ctx, 10*time.Millisecond)
+		assert.Empty(t, coord.hostname, "the lookup hasn't finished yet")
+
+		lookups <- "host"
+		coord.runLoopIteration(ctx)
+		assert.Equal(t, "host", coord.hostname)
+	})
+
+	t.Run("failed lookup doesn't wait for the timeout", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+		defer cancel()
+		coord := newCoordinator(failingLookupAgentInfo{})
+		coord.startWatchingHostname(ctx, time.Minute)
+		assert.NoError(t, ctx.Err(), "should return when the lookup fails")
+		assert.Empty(t, coord.hostname)
+	})
+}
+
+// TestCoordinatorFQDNChangeUpdatesOTelHostname verifies that the Coordinator sends the OTel manager the new hostname
+// when the FQDN feature changes it, without blocking on the hostname lookup.
+func TestCoordinatorFQDNChangeUpdatesOTelHostname(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	originalFQDN := features.FQDN()
+	t.Cleanup(func() {
+		require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]any{
+			"agent.features.fqdn.enabled": originalFQDN,
+		})))
+	})
+	setFQDN := func(enabled bool) {
+		require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]any{"agent.features.fqdn.enabled": enabled})))
+	}
+	setFQDN(false)
+
+	lookups := make(chan string)
+	var hostnames []string
+	configChan := make(chan ConfigChange, 1)
+	coord := &Coordinator{
+		logger:           logp.NewLogger("testing"),
+		agentInfo:        lookupAgentInfo{hostnames: lookups},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr: &fakeRuntimeManager{},
+		otelMgr: &fakeOTelManager{
+			updateHostnameCallback: func(hostname string) { hostnames = append(hostnames, hostname) },
+		},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		hostnameCh:         make(chan string),
+	}
+
+	// The policy keeps the FQDN feature disabled, so it only changes when the test changes it.
+	applyPolicy := func() {
+		cfgChange := &configChange{cfg: config.MustNewConfigFrom(`
+agent.features.fqdn.enabled: false
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		require.True(t, cfgChange.acked, "policy change was not acked")
+		require.NoError(t, cfgChange.err)
+	}
+
+	watchCtx, stopWatching := context.WithCancel(ctx)
+	go func() { lookups <- "host" }()
+	coord.startWatchingHostname(watchCtx, 5*time.Second)
+	require.Equal(t, "host", coord.hostname)
+	applyPolicy()
+	require.Equal(t, []string{"host"}, hostnames)
+
+	// The steps run in sequence on one coordinator. Each step depends on the previous one.
+	t.Run("hostname change sends an update", func(t *testing.T) {
+		hostnames = nil
+		setFQDN(true)
+		lookups <- "host.example.com"
+		coord.runLoopIteration(ctx)
+		assert.Equal(t, []string{"host.example.com"}, hostnames)
+	})
+
+	t.Run("pending lookup doesn't block the coordinator", func(t *testing.T) {
+		hostnames = nil
+		setFQDN(false)
+		// The lookup is now waiting for its result, while the coordinator handles a policy with the old hostname.
+		applyPolicy()
+		assert.Equal(t, []string{"host.example.com"}, hostnames)
+
+		lookups <- "host"
+		coord.runLoopIteration(ctx)
+		assert.Equal(t, []string{"host.example.com", "host"}, hostnames)
+	})
+
+	t.Run("unchanged hostname sends no update", func(t *testing.T) {
+		hostnames = nil
+		setFQDN(true)
+		lookups <- "host"
+		coord.runLoopIteration(ctx)
+		assert.Empty(t, hostnames)
+	})
+
+	t.Run("policy without an FQDN change doesn't look up the hostname", func(t *testing.T) {
+		setFQDN(false)
+		lookups <- "host"
+		coord.runLoopIteration(ctx)
+		// The feature flags are applied with every policy, which calls the FQDN callback even without a change.
+		applyPolicy()
+		select {
+		case lookups <- "host":
+			t.Fatal("hostname was looked up without an FQDN change")
+		case <-time.After(100 * time.Millisecond):
+		}
+	})
+
+	t.Run("stops when the context is cancelled", func(t *testing.T) {
+		stopWatching()
+		setFQDN(true)
+		select {
+		case lookups <- "host.example.com":
+			t.Fatal("hostname was looked up after watching stopped")
+		case <-time.After(100 * time.Millisecond):
+		}
 	})
 }
 

@@ -5,12 +5,10 @@
 package manager
 
 import (
-	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
 
@@ -21,7 +19,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -33,20 +30,6 @@ var testAgentMetadata = AgentMetadata{
 		Tags:     []string{"tag1", "tag2"},
 	},
 	Hostname: "Test-Host",
-}
-
-func testAgentInfo(t *testing.T) *info.MockAgent {
-	agentInfo := info.NewMockAgent(t)
-	agentInfo.EXPECT().AgentID().Return("test-agent-id").Maybe()
-	agentInfo.EXPECT().Version().Return("9.6.0").Maybe()
-	agentInfo.EXPECT().Snapshot().Return(true).Maybe()
-	agentInfo.EXPECT().IsStandalone().Return(false).Maybe()
-	agentInfo.EXPECT().Unprivileged().Return(false).Maybe()
-	agentInfo.EXPECT().GetTags().Return([]string{"tag1"}).Maybe()
-	agentInfo.EXPECT().ECSMetadata(mock.Anything).Return(&ecsmeta.ECSMeta{
-		Host: &ecsmeta.HostECSMeta{Hostname: "Test-Host", Name: "test-host"},
-	}, nil).Maybe()
-	return agentInfo
 }
 
 func TestInjectAgentMetadataProcessor(t *testing.T) {
@@ -88,7 +71,7 @@ func TestInjectAgentMetadataProcessor(t *testing.T) {
 	}
 	input := newCfg()
 
-	result, err := injectAgentMetadataProcessor(input, testAgentInfo(t), logp.NewNopLogger())
+	result, err := injectAgentMetadataProcessor(input, testAgentMetadata)
 	require.NoError(t, err)
 
 	assert.Equal(t, newCfg().ToStringMap(), input.ToStringMap(), "input config must not be modified")
@@ -100,42 +83,14 @@ func TestInjectAgentMetadataProcessor(t *testing.T) {
 	assert.False(t, result.IsSet("service::pipelines::traces/foo::processors"))
 
 	assert.True(t, result.IsSet("processors::batch"), "existing processors must be kept")
-	expected := AgentMetadataProcessorConfig(newAgentMetadata(testAgentInfo(t), "Test-Host"))
-	assert.Equal(t, confmap.NewFromStringMap(expected).ToStringMap(),
+	assert.Equal(t, confmap.NewFromStringMap(AgentMetadataProcessorConfig(testAgentMetadata)).ToStringMap(),
 		result.Get("processors::"+agentMetadataProcessorID))
 
 	t.Run("idempotent", func(t *testing.T) {
-		again, err := injectAgentMetadataProcessor(result, testAgentInfo(t), logp.NewNopLogger())
+		again, err := injectAgentMetadataProcessor(result, testAgentMetadata)
 		require.NoError(t, err)
 		assert.Equal(t, result.ToStringMap(), again.ToStringMap())
 	})
-}
-
-func TestInjectAgentMetadataProcessorNoHostname(t *testing.T) {
-	agentInfo := info.NewMockAgent(t)
-	agentInfo.EXPECT().AgentID().Return("test-agent-id")
-	agentInfo.EXPECT().Version().Return("9.6.0")
-	agentInfo.EXPECT().Snapshot().Return(false)
-	agentInfo.EXPECT().IsStandalone().Return(false).Maybe()
-	agentInfo.EXPECT().Unprivileged().Return(false).Maybe()
-	agentInfo.EXPECT().GetTags().Return(nil).Maybe()
-	agentInfo.EXPECT().ECSMetadata(mock.Anything).Return(nil, errors.New("no host info"))
-	cfg := confmap.NewFromStringMap(map[string]any{
-		"service": map[string]any{
-			"pipelines": map[string]any{
-				"logs": map[string]any{
-					"receivers": []any{"nop"},
-					"exporters": []any{"nop"},
-				},
-			},
-		},
-	})
-
-	result, err := injectAgentMetadataProcessor(cfg, agentInfo, logp.NewNopLogger())
-	require.NoError(t, err)
-	expected := AgentMetadataProcessorConfig(newAgentMetadata(agentInfo, ""))
-	assert.Equal(t, confmap.NewFromStringMap(expected).ToStringMap(), result.Get("processors::"+agentMetadataProcessorID),
-		"agent.name must be skipped when the hostname is unknown")
 }
 
 func TestInjectAgentMetadataProcessorNoLogsPipelines(t *testing.T) {
@@ -152,7 +107,7 @@ func TestInjectAgentMetadataProcessorNoLogsPipelines(t *testing.T) {
 		},
 	})
 
-	result, err := injectAgentMetadataProcessor(cfg, testAgentInfo(t), logp.NewNopLogger())
+	result, err := injectAgentMetadataProcessor(cfg, testAgentMetadata)
 	require.NoError(t, err)
 	assert.Same(t, cfg, result)
 	assert.False(t, result.IsSet("processors"), "processor must not be defined when no pipeline uses it")
@@ -238,9 +193,7 @@ func TestBuildMergedConfigAgentMetadataProcessor(t *testing.T) {
 	paths.SetTop(t.TempDir())
 	t.Cleanup(func() { paths.SetTop(topPath) })
 
-	m := &OTelManager{
-		healthCheckExtComponentID: "healthcheckv2/test",
-	}
+	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test"}
 	cfgUpdate := configUpdate{
 		collectorCfg: confmap.NewFromStringMap(map[string]any{
 			"receivers": map[string]any{"nop": map[string]any{}},
@@ -255,6 +208,7 @@ func TestBuildMergedConfigAgentMetadataProcessor(t *testing.T) {
 			},
 		}),
 		components: []component.Component{testComponent("test-component")},
+		hostname:   "Test-Host",
 	}
 
 	result, err := m.buildMergedConfig(cfgUpdate, &info.AgentInfo{}, logp.NewNopLogger())
@@ -271,5 +225,6 @@ func TestBuildMergedConfigAgentMetadataProcessor(t *testing.T) {
 			assert.NotContains(t, processors, agentMetadataProcessorID, "pipeline %s", id)
 		}
 	}
-	assert.True(t, result.IsSet("processors::"+agentMetadataProcessorID))
+	assert.Contains(t, fmt.Sprint(result.Get("processors::"+agentMetadataProcessorID)), `"name": "Test-Host"`,
+		"agent.name must be the hostname from the update")
 }
