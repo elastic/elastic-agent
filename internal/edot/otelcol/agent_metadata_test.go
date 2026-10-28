@@ -127,12 +127,15 @@ func TestAgentMetadataProcessor(t *testing.T) {
 			sink := &consumertest.LogsSink{}
 			p := newAgentMetadataProcessor(t, sink)
 
-			input := tc.logs(2)
-			// Values set before the processor runs are kept for agent.name and agent.type only.
+			input := tc.logs(3)
+			// Sections that already exist are kept as they are.
 			if tc.mapBody {
-				agent := input.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Map().PutEmptyMap("agent")
-				agent.PutStr("name", "custom-name")
-				agent.PutStr("id", "wrong-id")
+				records := input.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
+				records.At(0).Body().Map().PutEmptyMap("agent").PutStr("id", "other-agent-id")
+				second := records.At(1).Body().Map()
+				second.PutEmptyMap("elastic_agent").PutStr("id", "other-agent-id")
+				second.PutEmptySlice("tags").AppendEmpty().SetStr("existing")
+				records.At(2).Body().Map().PutEmptySlice("tags").AppendEmpty().SetStr("existing")
 			}
 
 			// Only the bodies of bodymap logs may change.
@@ -140,17 +143,21 @@ func TestAgentMetadataProcessor(t *testing.T) {
 			input.CopyTo(expected)
 			if tc.bodymap && tc.mapBody {
 				records := expected.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
-				for i, name := range []string{"custom-name", testAgentMetadata.Name} {
+				for i := range records.Len() {
 					body := records.At(i).Body().Map()
-					agent := body.PutEmptyMap("agent")
-					agent.PutStr("id", testAgentMetadata.ID)
-					agent.PutStr("version", testAgentMetadata.Version)
-					agent.PutStr("name", name)
-					agent.PutStr("type", "otelcol")
-					elasticAgent := body.PutEmptyMap("elastic_agent")
-					elasticAgent.PutStr("id", testAgentMetadata.ID)
-					elasticAgent.PutStr("version", testAgentMetadata.Version)
-					elasticAgent.PutBool("snapshot", testAgentMetadata.Snapshot)
+					if _, ok := body.Get("agent"); !ok {
+						agent := body.PutEmptyMap("agent")
+						agent.PutStr("id", testAgentMetadata.ID)
+						agent.PutStr("version", testAgentMetadata.Version)
+						agent.PutStr("name", testAgentMetadata.Name)
+						agent.PutStr("type", "otelcol")
+					}
+					if _, ok := body.Get("elastic_agent"); !ok {
+						elasticAgent := body.PutEmptyMap("elastic_agent")
+						elasticAgent.PutStr("id", testAgentMetadata.ID)
+						elasticAgent.PutStr("version", testAgentMetadata.Version)
+						elasticAgent.PutBool("snapshot", testAgentMetadata.Snapshot)
+					}
 				}
 			}
 

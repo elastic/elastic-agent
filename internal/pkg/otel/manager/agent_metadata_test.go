@@ -7,7 +7,6 @@ package manager
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -145,15 +144,24 @@ func TestInjectAgentMetadataProcessorNoLogsPipelines(t *testing.T) {
 }
 
 func TestAgentMetadataProcessorConfig(t *testing.T) {
-	cfg := AgentMetadataProcessorConfig(AgentMetadata{
-		ID:      `id-with-"quotes"`,
-		Version: "9.6.0",
+	t.Run("all fields", func(t *testing.T) {
+		assert.Equal(t, []string{
+			`set(log.body["agent"], {"id": "id-with-\"quotes\"", "version": "9.6.0", "name": "Test-Host", "type": "otelcol"}) where log.body["agent"] == nil`,
+			`set(log.body["elastic_agent"], {"id": "id-with-\"quotes\"", "version": "9.6.0", "snapshot": true}) where log.body["elastic_agent"] == nil`,
+		}, toStrings(t, AgentMetadataProcessorConfig(AgentMetadata{
+			ID:       `id-with-"quotes"`,
+			Version:  "9.6.0",
+			Snapshot: true,
+			Name:     "Test-Host",
+		})))
 	})
-	all := strings.Join(toStrings(t, cfg), "\n")
-	assert.Contains(t, all, `set(log.body["agent"]["id"], "id-with-\"quotes\"")`)
-	assert.Contains(t, all, `set(log.body["elastic_agent"]["snapshot"], false)`)
-	assert.NotContains(t, all, `["name"]`, "agent.name must be skipped when the name is empty")
-	assert.NotContains(t, all, "resource", "only bodymap log bodies may be modified")
+
+	t.Run("no name", func(t *testing.T) {
+		assert.Equal(t, []string{
+			`set(log.body["agent"], {"id": "test-agent-id", "version": "9.6.0", "type": "otelcol"}) where log.body["agent"] == nil`,
+			`set(log.body["elastic_agent"], {"id": "test-agent-id", "version": "9.6.0", "snapshot": false}) where log.body["elastic_agent"] == nil`,
+		}, toStrings(t, AgentMetadataProcessorConfig(AgentMetadata{ID: "test-agent-id", Version: "9.6.0"})))
+	})
 }
 
 func toStrings(t *testing.T, cfg map[string]any) []string {

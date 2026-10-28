@@ -24,44 +24,38 @@ type AgentMetadata struct {
 	ID       string
 	Version  string
 	Snapshot bool
-	// Name is the value of agent.name, used only when the field isn't already set. Skipped if empty.
+	// Name is the value of agent.name. Skipped if empty.
 	Name string
 }
 
-// AgentMetadataProcessorConfig returns the configuration of a transform processor setting the agent.* and
-// elastic_agent.* fields on logs in the bodymap mapping mode, the same fields libbeat sets for Beats inputs.
+// AgentMetadataProcessorConfig returns the configuration of a transform processor adding the agent and elastic_agent
+// sections to logs in the bodymap mapping mode, like libbeat does for Beats inputs.
 //
 // In the bodymap mapping mode the Elasticsearch exporter writes only the log body, so the fields are set in the
 // body. Logs in other mapping modes aren't modified. The mapping mode is resolved the way the exporter does it: the
 // elastic.mapping.mode scope attribute if set, otherwise the X-Elastic-Mapping-Mode client metadata, compared
 // case-insensitively.
+//
+// Each section is added as a whole, and only if the body doesn't have it yet, so identity set earlier, for example
+// by another Elastic Agent before forwarding the logs, is kept.
 func AgentMetadataProcessorConfig(meta AgentMetadata) map[string]any {
-	type field struct {
-		path      string
-		value     string // OTTL literal
-		onlyIfNil bool
-	}
-	fields := []field{
-		{path: `log.body["agent"]["id"]`, value: ottlString(meta.ID)},
-		{path: `log.body["agent"]["version"]`, value: ottlString(meta.Version)},
+	agent := []string{
+		fmt.Sprintf(`"id": %s`, ottlString(meta.ID)),
+		fmt.Sprintf(`"version": %s`, ottlString(meta.Version)),
 	}
 	if meta.Name != "" {
-		fields = append(fields, field{path: `log.body["agent"]["name"]`, value: ottlString(meta.Name), onlyIfNil: true})
+		agent = append(agent, fmt.Sprintf(`"name": %s`, ottlString(meta.Name)))
 	}
-	fields = append(fields,
-		field{path: `log.body["agent"]["type"]`, value: ottlString("otelcol"), onlyIfNil: true},
-		field{path: `log.body["elastic_agent"]["id"]`, value: ottlString(meta.ID)},
-		field{path: `log.body["elastic_agent"]["version"]`, value: ottlString(meta.Version)},
-		field{path: `log.body["elastic_agent"]["snapshot"]`, value: fmt.Sprintf("%t", meta.Snapshot)},
-	)
+	agent = append(agent, `"type": "otelcol"`)
+	elasticAgent := []string{
+		fmt.Sprintf(`"id": %s`, ottlString(meta.ID)),
+		fmt.Sprintf(`"version": %s`, ottlString(meta.Version)),
+		fmt.Sprintf(`"snapshot": %t`, meta.Snapshot),
+	}
 
-	statements := make([]any, 0, len(fields))
-	for _, f := range fields {
-		statement := fmt.Sprintf("set(%s, %s)", f.path, f.value)
-		if f.onlyIfNil {
-			statement += fmt.Sprintf(" where %s == nil", f.path)
-		}
-		statements = append(statements, statement)
+	statements := []any{
+		fmt.Sprintf(`set(log.body["agent"], {%s}) where log.body["agent"] == nil`, strings.Join(agent, ", ")),
+		fmt.Sprintf(`set(log.body["elastic_agent"], {%s}) where log.body["elastic_agent"] == nil`, strings.Join(elasticAgent, ", ")),
 	}
 
 	// The mapping mode check comes before IsMap on purpose: most logs aren't in bodymap mode, and IsMap formats an
@@ -129,7 +123,7 @@ func injectAgentMetadataProcessor(cfg *confmap.Conf, agentInfo info.Agent, logge
 			continue
 		}
 		// Last, so the processor sees the same scope attributes and client metadata as the exporter, and keeps
-		// agent.name and agent.type set by the pipeline's own processors.
+		// the agent sections set by the pipeline's own processors.
 		pipeline["processors"] = append(processors, agentMetadataProcessorID)
 		injected = true
 	}
