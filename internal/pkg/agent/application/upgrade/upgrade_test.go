@@ -335,6 +335,8 @@ agent.download:
   install_path: "/sonic_screwdriver"
   drop_path: "/gallifrey"
   retry_sleep_init_duration: 10s
+  reserve_diskspace:
+    enabled: true
   timeout: 30s
   proxy_url: "http://trenzalore:1234"
   proxy_headers:
@@ -432,6 +434,7 @@ agent.download:
 		InstallPath:            "/sonic_screwdriver",
 		DropPath:               "/gallifrey",
 		RetrySleepInitDuration: 10 * time.Second,
+		ReserveDiskSpace:       artifact.ReserveDiskSpaceConfig{Enabled: true},
 
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			TLS: &tlscommon.Config{
@@ -1077,8 +1080,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	type upgraderMocker func(upgrader *Upgrader, archivePath string, versionedHome string)
 
 	type testCase struct {
-		isDiskSpaceErrorResult    bool
+		isDiskSpaceLowErrorResult bool
 		expectedError             error
+		expectDiskSpaceLowError   bool
 		upgraderMocker            upgraderMocker
 		upgradeOpts               []Option
 		checkArchiveCleanup       bool
@@ -1088,8 +1092,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 
 	testCases := map[string]testCase{
 		"should return error and cleanup downloaded archive if downloadArtifact fails after download is complete": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError:       testError,
@@ -1103,8 +1107,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error if getPackageMetadata fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1120,8 +1124,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1149,8 +1153,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1182,8 +1186,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1217,8 +1221,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
 				upgrader.artifactDownloader = &mockArtifactDownloader{
@@ -1256,8 +1260,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1300,8 +1304,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact if writeUpgradeMarker fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1331,8 +1335,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
-			isDiskSpaceErrorResult: true,
-			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
+			isDiskSpaceLowErrorResult: true,
+			expectedError:             testError,
+			expectDiskSpaceLowError:   true,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError: testError,
@@ -1463,12 +1468,14 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			err = os.WriteFile(filepath.Join(baseDir, "versionedHome"), []byte("test"), 0o600)
 			require.NoError(t, err)
 
-			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
-				return tc.isDiskSpaceErrorResult
+			upgrader.isDiskSpaceLowErrorFunc = func(err error) bool {
+				return tc.isDiskSpaceLowErrorResult
 			}
 
 			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, nil, nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
 			require.ErrorIs(t, err, tc.expectedError)
+			var diskSpaceLowErr upgradeErrors.DiskSpaceLowError
+			require.Equal(t, tc.expectDiskSpaceLowError, errors.As(err, &diskSpaceLowErr))
 
 			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
 			if tc.checkArchiveCleanup {
@@ -1981,4 +1988,16 @@ func TestSetClient(t *testing.T) {
 
 	upgrader.SetClient(&mockSender{})
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
+}
+
+func TestSetClientURISurvivesReload(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	upgrader.SetClient(&mockSender{})
+	require.NoError(t, upgrader.Reload(config.MustNewConfigFrom("")))
+	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
 }
