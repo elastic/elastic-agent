@@ -37,7 +37,7 @@ func GetAllComponentStates(otelStatus *status.AggregateStatus, components []comp
 	for _, comp := range components {
 		if comp.RuntimeManager == component.OtelRuntimeManager {
 			var compState runtime.ComponentComponentState
-			if pipelineStatus, found := otelPipelineStatus[comp.ID]; found {
+			if pipelineStatus, found := otelPipelineStatus[EncodeNameSegment(comp.ID)]; found {
 				var statusErr error
 				if compState, statusErr = getComponentState(pipelineStatus, comp); statusErr != nil {
 					return nil, statusErr
@@ -324,7 +324,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		// single_receiver: true means all streams share one receiver named after the
 		// component ID with a placeholder stream suffix. Map every stream's resolved ID to it.
-		singleReceiverName := OtelNamePrefix + comp.ID + "/" + SingleReceiverStreamID
+		singleReceiverName := OtelNamePrefix + EncodeNameSegment(comp.ID) + "/" + SingleReceiverStreamID
 		for receiverOtelID, aggStatus := range receiverStatuses {
 			if receiverOtelID.Name() != singleReceiverName {
 				continue
@@ -343,7 +343,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		}
 	} else {
 		// Default: each receiver is named compID/streamID.
-		receiverPrefix := OtelNamePrefix + comp.ID + "/"
+		receiverPrefix := OtelNamePrefix + EncodeNameSegment(comp.ID) + "/"
 		for receiverOtelID, aggStatus := range receiverStatuses {
 			if inputID, found := strings.CutPrefix(receiverOtelID.Name(), receiverPrefix); found {
 				receiverByInputID[inputID] = newReceiverStatus(aggStatus)
