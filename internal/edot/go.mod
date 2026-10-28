@@ -430,7 +430,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.22.2 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.19.0 // indirect
+	github.com/elastic/elastic-agent-client/v7 v7.20.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.15.0 // indirect
@@ -448,7 +448,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.2 // indirect
-	github.com/elastic/mito v1.28.1 // indirect
+	github.com/elastic/mito v1.28.2 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.78.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.50.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
