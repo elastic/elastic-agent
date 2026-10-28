@@ -578,7 +578,7 @@ func TestFleetGatewayCheckinAdvertisesOnlyRollbackTargets(t *testing.T) {
 	rollbacksSrc := ttl.NewTTLMarkerRegistry(log, topDir)
 	require.NoError(t, rollbacksSrc.Set(map[string]ttl.TTLMarker{
 		regular: {Version: "1.2.3", Hash: "regular", ValidUntil: validUntil},
-		failed:  {Version: "4.5.6", Hash: "failed", ValidUntil: validUntil, RetentionOnly: true},
+		failed:  {Version: "4.5.6", Hash: "failed", ValidUntil: validUntil, Kind: ttl.KindDiagnostics},
 	}))
 
 	gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), rollbacksSrc)

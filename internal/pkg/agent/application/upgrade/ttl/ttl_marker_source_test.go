@@ -292,40 +292,47 @@ func TestTTLMarkerRegistry_Set_TolerateMalformedExisting(t *testing.T) {
 	})
 }
 
-func TestTTLMarkerRegistry_RetentionOnlyRoundTripAndCompatibility(t *testing.T) {
+func TestTTLMarkerRegistry_KindRoundTripAndCompatibility(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 	baseDir := t.TempDir()
 	registry := NewTTLMarkerRegistry(log, baseDir)
 	regularHome := filepath.Join("data", "elastic-agent-1.2.3-regular")
-	retentionHome := filepath.Join("data", "elastic-agent-4.5.6-logs")
+	diagnosticsHome := filepath.Join("data", "elastic-agent-4.5.6-diagnostics")
 	legacyHome := filepath.Join("data", "elastic-agent-7.8.9-legacy")
 	validUntil := time.Now().Add(time.Hour).UTC().Truncate(time.Second)
 
-	for _, home := range []string{regularHome, retentionHome, legacyHome} {
+	for _, home := range []string{regularHome, diagnosticsHome, legacyHome} {
 		require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home), 0o750))
 	}
-	// marker written by an agent that does not know the retention_only field
+	// marker written by an agent that does not know the kind field
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, legacyHome, MarkerFileName),
 		[]byte("version: 7.8.9\nhash: legacy\nvalid_until: "+validUntil.Format(time.RFC3339)+"\n"), 0o640))
 
 	// Add leaves the legacy marker as it was written, Set would rewrite it
 	require.NoError(t, registry.Add(regularHome, TTLMarker{Version: "1.2.3", Hash: "regular", ValidUntil: validUntil}))
-	require.NoError(t, registry.Add(retentionHome, TTLMarker{Version: "4.5.6", Hash: "logs", ValidUntil: validUntil, RetentionOnly: true}))
+	require.NoError(t, registry.Add(diagnosticsHome, TTLMarker{Version: "4.5.6", Hash: "diagnostics", ValidUntil: validUntil, Kind: KindDiagnostics}))
 
-	// the flag is not written when false so older agents see exactly the markers they always saw
+	// no kind is written for a rollback so older agents see exactly the markers they always saw
 	regularContent, err := os.ReadFile(filepath.Join(baseDir, regularHome, MarkerFileName))
 	require.NoError(t, err)
-	assert.NotContains(t, string(regularContent), "retention_only")
-	retentionContent, err := os.ReadFile(filepath.Join(baseDir, retentionHome, MarkerFileName))
+	assert.NotContains(t, string(regularContent), "kind")
+	diagnosticsContent, err := os.ReadFile(filepath.Join(baseDir, diagnosticsHome, MarkerFileName))
 	require.NoError(t, err)
-	assert.Contains(t, string(retentionContent), "retention_only: true")
+	assert.Contains(t, string(diagnosticsContent), "kind: diagnostics")
 
 	got, malformed, err := registry.GetAll()
 	require.NoError(t, err)
 	assert.Empty(t, malformed)
-	assert.False(t, got[regularHome].RetentionOnly)
-	assert.True(t, got[retentionHome].RetentionOnly)
-	assert.False(t, got[legacyHome].RetentionOnly, "markers without the field are regular rollback targets")
+	assert.True(t, got[regularHome].IsRollbackTarget())
+	assert.Equal(t, KindDiagnostics, got[diagnosticsHome].Kind)
+	assert.True(t, got[legacyHome].IsRollbackTarget(), "markers without the field are regular rollback targets")
+}
+
+func TestTTLMarker_IsRollbackTarget(t *testing.T) {
+	assert.True(t, TTLMarker{}.IsRollbackTarget(), "no kind is a rollback, that is what agents that do not know kinds write")
+	assert.True(t, TTLMarker{Kind: KindRollback}.IsRollbackTarget())
+	assert.False(t, TTLMarker{Kind: KindDiagnostics}.IsRollbackTarget())
+	assert.False(t, TTLMarker{Kind: "from-the-future"}.IsRollbackTarget(), "a kind written by a newer agent is not offered as a rollback")
 }
 
 func TestTTLMarkerRegistry_GetAvailableRollbacks(t *testing.T) {
@@ -336,27 +343,28 @@ func TestTTLMarkerRegistry_GetAvailableRollbacks(t *testing.T) {
 
 	regularHome := filepath.Join("data", "elastic-agent-1.2.3-regular")
 	expiredHome := filepath.Join("data", "elastic-agent-2.3.4-expired")
-	retentionHome := filepath.Join("data", "elastic-agent-4.5.6-retention")
-	for _, home := range []string{regularHome, expiredHome, retentionHome} {
+	diagnosticsHome := filepath.Join("data", "elastic-agent-4.5.6-diagnostics")
+	unknownKindHome := filepath.Join("data", "elastic-agent-5.6.7-unknown")
+	for _, home := range []string{regularHome, expiredHome, diagnosticsHome, unknownKindHome} {
 		require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home), 0o750))
 	}
 
 	require.NoError(t, registry.Set(map[string]TTLMarker{
-		regularHome:   {Version: "1.2.3", Hash: "regular", ValidUntil: validUntil},
-		expiredHome:   {Version: "2.3.4", Hash: "expired", ValidUntil: time.Now().Add(-time.Hour)},
-		retentionHome: {Version: "4.5.6", Hash: "retention", ValidUntil: validUntil, RetentionOnly: true},
+		regularHome:     {Version: "1.2.3", Hash: "regular", ValidUntil: validUntil},
+		expiredHome:     {Version: "2.3.4", Hash: "expired", ValidUntil: time.Now().Add(-time.Hour)},
+		diagnosticsHome: {Version: "4.5.6", Hash: "diagnostics", ValidUntil: validUntil, Kind: KindDiagnostics},
+		unknownKindHome: {Version: "5.6.7", Hash: "unknown", ValidUntil: validUntil, Kind: "from-the-future"},
 	}))
 
 	got, err := registry.GetAvailableRollbacks()
 	require.NoError(t, err)
-	assert.Len(t, got, 1)
+	// not the expired entry, nor the installs kept for diagnostics or for an unknown reason
+	require.Len(t, got, 1)
 	assert.Contains(t, got, regularHome)
-	assert.NotContains(t, got, expiredHome, "an expired entry is not available")
-	assert.NotContains(t, got, retentionHome, "an install kept only for retention is not a rollback target")
 
 	all, _, err := registry.GetAll()
 	require.NoError(t, err)
-	assert.Len(t, all, 3, "GetAll still returns every TTL marker, the cleanup needs them")
+	assert.Len(t, all, 4, "GetAll still returns every TTL marker, the cleanup needs them")
 }
 
 func TestTTLMarkerRegistry_AddReplacesTheMarkerWithoutLeftovers(t *testing.T) {
@@ -367,7 +375,7 @@ func TestTTLMarkerRegistry_AddReplacesTheMarkerWithoutLeftovers(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(baseDir, home), 0o750))
 
 	require.NoError(t, registry.Add(home, TTLMarker{Version: "1.2.3", Hash: "abcdef", ValidUntil: time.Now().Add(time.Hour)}))
-	replacement := TTLMarker{Version: "1.2.4", Hash: "abcdef", ValidUntil: time.Now().Add(2 * time.Hour), RetentionOnly: true}
+	replacement := TTLMarker{Version: "1.2.4", Hash: "abcdef", ValidUntil: time.Now().Add(2 * time.Hour), Kind: KindDiagnostics}
 	require.NoError(t, registry.Add(home, replacement))
 
 	got, malformed, err := registry.GetAll()
@@ -375,7 +383,7 @@ func TestTTLMarkerRegistry_AddReplacesTheMarkerWithoutLeftovers(t *testing.T) {
 	assert.Empty(t, malformed)
 	require.Contains(t, got, home)
 	assert.Equal(t, "1.2.4", got[home].Version)
-	assert.True(t, got[home].RetentionOnly)
+	assert.Equal(t, KindDiagnostics, got[home].Kind)
 
 	entries, err := os.ReadDir(filepath.Join(baseDir, home))
 	require.NoError(t, err)

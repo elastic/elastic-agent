@@ -299,9 +299,9 @@ func TestStateMapping(t *testing.T) {
 	}
 }
 
-// TestAvailableRollbacks_SkipsRetentionOnly checks that installs kept only for retention are not listed as
+// TestAvailableRollbacks_SkipsDiagnostics checks that installs kept only for diagnostics are not listed as
 // available rollbacks.
-func TestAvailableRollbacks_SkipsRetentionOnly(t *testing.T) {
+func TestAvailableRollbacks_SkipsDiagnostics(t *testing.T) {
 	topDir := t.TempDir()
 	regular := filepath.Join("data", "elastic-agent-1.2.3-regular")
 	failed := filepath.Join("data", "elastic-agent-4.5.6-failed")
@@ -313,7 +313,7 @@ func TestAvailableRollbacks_SkipsRetentionOnly(t *testing.T) {
 	validUntil := time.Now().Add(time.Hour)
 	require.NoError(t, source.Set(map[string]ttl.TTLMarker{
 		regular: {Version: "1.2.3", Hash: "regular", ValidUntil: validUntil},
-		failed:  {Version: "4.5.6", Hash: "failed", ValidUntil: validUntil, RetentionOnly: true},
+		failed:  {Version: "4.5.6", Hash: "failed", ValidUntil: validUntil, Kind: ttl.KindDiagnostics},
 	}))
 
 	s := &Server{logger: log, rollbackSource: source}

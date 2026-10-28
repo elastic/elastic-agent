@@ -141,8 +141,8 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	return ttlMarkers, malformed, nil
 }
 
-// GetAvailableRollbacks returns the markers of GetAll that are rollback targets valid now: not flagged
-// RetentionOnly and not expired. Unparseable markers are not rollback targets either.
+// GetAvailableRollbacks returns the markers of GetAll that are rollback targets valid now: of the rollback kind
+// and not expired. Unparseable markers are not rollback targets either.
 func (T TTLMarkerRegistry) GetAvailableRollbacks() (map[string]TTLMarker, error) {
 	markers, _, err := T.GetAll()
 	if err != nil {
@@ -150,7 +150,7 @@ func (T TTLMarkerRegistry) GetAvailableRollbacks() (map[string]TTLMarker, error)
 	}
 	now := time.Now()
 	for versionedHome, marker := range markers {
-		if marker.RetentionOnly || !now.Before(marker.ValidUntil) {
+		if !marker.IsRollbackTarget() || !now.Before(marker.ValidUntil) {
 			delete(markers, versionedHome)
 		}
 	}

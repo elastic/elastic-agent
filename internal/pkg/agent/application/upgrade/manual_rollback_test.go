@@ -1122,19 +1122,19 @@ func TestPeriodicallyCleanRollbacks(t *testing.T) {
 	}
 }
 
-// Expired entries and installs kept only for retention are not rollback targets.
-func TestRollbackUsingAgentInstalls_IgnoresExpiredAndRetentionOnlyEntries(t *testing.T) {
+// Expired entries and installs kept only for diagnostics are not rollback targets.
+func TestRollbackUsingAgentInstalls_IgnoresExpiredAndDiagnosticsEntries(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 	topDir := t.TempDir()
 	now := time.Now()
 	expiredHome := filepath.Join("data", "elastic-agent-1.2.3-expired")
-	retentionHome := filepath.Join("data", "elastic-agent-4.5.6-retention")
-	for _, home := range []string{expiredHome, retentionHome} {
+	diagnosticsHome := filepath.Join("data", "elastic-agent-4.5.6-diagnostics")
+	for _, home := range []string{expiredHome, diagnosticsHome} {
 		require.NoError(t, os.MkdirAll(filepath.Join(topDir, home), 0o750))
 	}
 	registry := ttl.NewTTLMarkerRegistry(log, topDir)
 	require.NoError(t, registry.Add(expiredHome, ttl.TTLMarker{Version: "1.2.3", Hash: "expired", ValidUntil: now.Add(-time.Hour)}))
-	require.NoError(t, registry.Add(retentionHome, ttl.TTLMarker{Version: "4.5.6", Hash: "retention", ValidUntil: now.Add(time.Hour), RetentionOnly: true}))
+	require.NoError(t, registry.Add(diagnosticsHome, ttl.TTLMarker{Version: "4.5.6", Hash: "diagnostics", ValidUntil: now.Add(time.Hour), Kind: ttl.KindDiagnostics}))
 
 	for _, version := range []string{"1.2.3", "4.5.6"} {
 		_, _, err := rollbackUsingAgentInstalls(log, nil, registry, topDir, now, version, nil, nil)

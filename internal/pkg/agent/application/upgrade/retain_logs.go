@@ -40,16 +40,16 @@ func retainedHome(marker *UpdateMarker) string {
 	return home
 }
 
-// retainFailedUpgradeLogs writes a TTL marker flagged RetentionOnly, valid for the given retention, into the
+// retainFailedUpgradeLogs writes a TTL marker of the diagnostics kind, valid for the given retention, into the
 // failed home (see retainedHome). Cleanups keep homes with an unexpired TTL marker, so the home survives the cleanup
 // that the agent we roll back to runs when it starts. It must be called before that agent is restarted.
 // The markers of other homes are not touched.
 func retainFailedUpgradeLogs(log *logger.Logger, topDir, failedHome string, failedUpgrade *UpdateMarker, retention time.Duration) error {
 	err := ttl.NewTTLMarkerRegistry(log, topDir).Add(failedHome, ttl.TTLMarker{
-		Version:       failedUpgrade.Version,
-		Hash:          failedUpgrade.Hash,
-		ValidUntil:    time.Now().Add(retention),
-		RetentionOnly: true,
+		Version:    failedUpgrade.Version,
+		Hash:       failedUpgrade.Hash,
+		ValidUntil: time.Now().Add(retention),
+		Kind:       ttl.KindDiagnostics,
 	})
 	if err != nil {
 		return fmt.Errorf("writing retention TTL marker for %q: %w", failedHome, err)

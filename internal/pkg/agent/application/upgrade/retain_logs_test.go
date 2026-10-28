@@ -107,8 +107,8 @@ func TestRetainFailedUpgradeLogs_KeepsExistingMarkers(t *testing.T) {
 	assert.Empty(t, malformed)
 	require.Len(t, got, 2)
 	assert.Equal(t, prevTTL.ValidUntil.Unix(), got[prev].ValidUntil.Unix(), "the existing marker must be left untouched")
-	assert.False(t, got[prev].RetentionOnly)
-	assert.True(t, got[failed].RetentionOnly)
+	assert.True(t, got[prev].IsRollbackTarget())
+	assert.Equal(t, ttl.KindDiagnostics, got[failed].Kind)
 	assert.WithinDuration(t, validUntil, got[failed].ValidUntil, time.Second)
 }
 

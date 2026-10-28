@@ -14,7 +14,7 @@ type ReadOnlySource interface {
 	//     performed; in that case both maps are nil.
 	GetAll() (map[string]TTLMarker, map[string]error, error)
 	// GetAvailableRollbacks returns the entries of GetAll that are rollback targets valid now, keyed by versioned
-	// home path. Entries kept only for retention (TTLMarker.RetentionOnly) and expired entries are left out.
+	// home path. Entries that are not rollback targets (see TTLMarker.Kind) and expired entries are left out.
 	GetAvailableRollbacks() (map[string]TTLMarker, error)
 }
 
