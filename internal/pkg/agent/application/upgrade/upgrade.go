@@ -121,16 +121,16 @@ type Upgrader struct {
 	availableRollbacksSource ttl.Source
 
 	// The following are abstractions for testability
-	artifactDownloader   artifactDownloadHandler
-	unpacker             unpackHandler
-	isDiskSpaceErrorFunc func(err error) bool
-	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
-	copyActionStore      copyActionStoreFunc
-	copyRunDirectory     copyRunDirectoryFunc
-	writeUpgradeMarker   writeUpgradeMarkerFunc
-	markUpgrade          markUpgradeFunc
-	changeSymlink        changeSymlinkFunc
-	rollbackInstall      rollbackInstallFunc
+	artifactDownloader      artifactDownloadHandler
+	unpacker                unpackHandler
+	isDiskSpaceLowErrorFunc func(err error) bool
+	extractAgentVersion     func(metadata packageMetadata, upgradeVersion string) agentVersion
+	copyActionStore         copyActionStoreFunc
+	copyRunDirectory        copyRunDirectoryFunc
+	writeUpgradeMarker      writeUpgradeMarkerFunc
+	markUpgrade             markUpgradeFunc
+	changeSymlink           changeSymlinkFunc
+	rollbackInstall         rollbackInstallFunc
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
@@ -153,7 +153,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		availableRollbacksSource: ars,
 		artifactDownloader:       newArtifactDownloader(settings, log),
 		unpacker:                 newUnpacker(log),
-		isDiskSpaceErrorFunc:     upgradeErrors.IsDiskSpaceError,
+		isDiskSpaceLowErrorFunc:  upgradeErrors.IsDiskSpaceLowError,
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
@@ -217,6 +217,7 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	u.upgradeSettings = cfg.Settings.Upgrade
 
 	u.artifactDownloader = newArtifactDownloader(u.settings, u.log)
+	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
 
 	return nil
 }
@@ -308,10 +309,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	defer func() {
 		if err != nil {
 			// Add the disk space error to the error chain if it is a disk space error
-			// so that we can use errors.Is to check for it
-			if u.isDiskSpaceErrorFunc(err) {
-				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			// so that we can use errors.As to check for it
+			var diskSpaceLowErr upgradeErrors.DiskSpaceLowError
+			if u.isDiskSpaceLowErrorFunc(err) && !goerrors.As(err, &diskSpaceLowErr) {
+				err = goerrors.Join(err, upgradeErrors.DiskSpaceLowError{})
 			}
+
 			// If there is an error, we need to clean up downloads and any
 			// extracted agent files.
 			for _, path := range cleanupPaths {
@@ -406,6 +409,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 
 	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sources, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	cleanupPaths = append(cleanupPaths, getInstallReservation())
 
 	// If the artifactPath is not empty, then the artifact was downloaded.
 	// There may still be an error in the download process, so we need to add
@@ -470,6 +474,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
+	installReservation := getInstallReservation()
+
+	if err := shrinkDiskSpaceReservation(installReservation, int64(MarkerSize)); err != nil {
+		return nil, err
+	}
+
 	// Write the marker before unpacking so newVersionedHome is protected from cleanup during the upgrade.
 	// RollbacksAvailable is nil here: TTL entries are written after the symlink flips, and previous rollbacks were already removed at the start of Upgrade().
 	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det, nil); err != nil {
@@ -488,6 +498,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+
+	if err := os.Remove(installReservation); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("could not remove disk space reservation file %s: %w", installReservation, err)
+	}
+
 	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
 
 	// If VersionedHome is empty then unpack has not started unpacking the

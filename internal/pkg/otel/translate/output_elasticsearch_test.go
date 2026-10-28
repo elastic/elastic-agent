@@ -115,6 +115,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -183,6 +185,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -252,6 +256,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -268,18 +274,36 @@ logs_dynamic_pipeline:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
-	t.Run("parameters are added to every host", func(t *testing.T) {
+	t.Run("output parameters are retained on exporter endpoints and excluded from beatsauth endpoints", func(t *testing.T) {
 		cfg := config.MustNewConfigFrom(map[string]any{
 			"hosts":      []any{"es-1:9200", "es-2:9200", "es-3:9200"},
 			"parameters": map[string]any{"somekey": "somevalue"},
 		})
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+
+		esExporterCfg, _, extensions, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
-		assert.Equal(t, []string{
-			"http://es-1:9200?somekey=somevalue",
-			"http://es-2:9200?somekey=somevalue",
-			"http://es-3:9200?somekey=somevalue",
-		}, got["endpoints"])
+		assert.Equal(
+			t,
+			[]string{
+				"http://es-1:9200?somekey=somevalue",
+				"http://es-2:9200?somekey=somevalue",
+				"http://es-3:9200?somekey=somevalue",
+			},
+			esExporterCfg["endpoints"],
+			"exporter endpoints must retain output parameters",
+		)
+
+		beatsAuthConfig := extensions["beatsauth/_agent-component/"].(map[string]any)
+		assert.Equal(
+			t,
+			[]string{
+				"http://es-1:9200",
+				"http://es-2:9200",
+				"http://es-3:9200",
+			},
+			beatsAuthConfig["endpoints"],
+			"beatsauth endpoints must exclude unsupported output parameters",
+		)
 	})
 
 	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
@@ -337,6 +361,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -397,6 +423,8 @@ logs_index: some-index
 password: changeme
 user: elastic
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -496,6 +524,8 @@ sending_queue:
 suppress_conflict_errors: true
 timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -625,6 +655,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -691,6 +723,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -766,6 +800,8 @@ sending_queue:
 suppress_conflict_errors: true
 timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
@@ -972,11 +1008,11 @@ func TestGetBeatsAuthExtensionConfigIncludesEndpointsAndAuthentication(t *testin
 	assert.Equal(
 		t,
 		[]string{
-			"https://es.example:9200/elastic?routing=state+loader",
-			"https://es-secondary.example:9201/elastic?routing=state+loader",
+			"https://es.example:9200/elastic",
+			"https://es-secondary.example:9201/elastic",
 		},
 		got["endpoints"],
-		"beatsauth must contain resolved endpoints",
+		"beatsauth must contain resolved endpoints without unsupported output parameters",
 	)
 
 	assert.Equal(

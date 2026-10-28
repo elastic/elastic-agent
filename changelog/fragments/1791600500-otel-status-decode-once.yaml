@@ -1,0 +1,3 @@
+kind: bug-fix
+summary: Fix slow status handling of OTel receivers that run many streams, which delayed policy changes by minutes
+component: elastic-agent

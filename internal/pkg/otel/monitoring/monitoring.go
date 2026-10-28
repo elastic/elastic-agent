@@ -17,10 +17,10 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/gorilla/mux"
 
+	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
 	"github.com/elastic/elastic-agent-libs/api"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-agent/version"
