@@ -229,7 +229,47 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 				checkinTimer.Stop()
 				cisStop()
 
-				// Start connection info
+				// Run the installer before opening the connection-info server. Opening
+				// the server first lets a still-running old service (e.g. the previous
+				// Endpoint version) reconnect, be adopted as HEALTHY, and receive a
+				// policy update that interferes with the upgrade.
+				err = s.start(ctx)
+				if err != nil {
+					var exitErr *exec.ExitError
+					if errors.As(err, &exitErr) {
+						exitCode := exitErr.ExitCode()
+						s.log.Debugf("service %s start failed with exit code %d, err = %s", s.name(), exitCode, err)
+						if s.comp.InputSpec.Spec.Service.Operations.Install != nil &&
+							slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
+							s.log.Warnf("exit code %d is non-fatal, continuing to run...", exitCode)
+							err = nil // fall through to open CIS and reset check-in timer
+						}
+					}
+					if err != nil {
+						// Drain any checkins queued while the installer was running.
+						// The old service may have connected to the CIS and queued a
+						// checkin; processing it would adopt it as HEALTHY mid-install.
+						for done := false; !done; {
+							select {
+							case <-comm.CheckinObserved():
+								s.log.Debugf("discarding checkin for %s received during failed install", s.name())
+							default:
+								done = true
+							}
+						}
+						// Schedule a restart of the service after a delay by resending
+						// the start action on the action channel.
+						delay := s.serviceRestartDelay
+						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
+						time.AfterFunc(delay, func() {
+							s.actionCh <- as
+						})
+						continue
+					}
+				}
+
+				// Open the connection-info server after the installer completes so
+				// that only the newly-installed service connects, not the old one.
 				if cis == nil {
 					var address string
 					// [gRPC:8.15] Uncomment after 8.14 when Endpoint is ready for local gRPC
@@ -248,31 +288,6 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						err = fmt.Errorf("failed to start connection info service %s: %w", s.name(), err)
 						break
 					}
-				}
-
-				// Start service
-				err = s.start(ctx)
-				if err != nil {
-					// If the error is due to a non-fatal exit code, continue running the service
-					var exitErr *exec.ExitError
-					if errors.As(err, &exitErr) {
-						exitCode := exitErr.ExitCode()
-						s.log.Debugf("service %s start failed with exit code %d, err = %s", s.name(), exitCode, err)
-						if s.comp.InputSpec.Spec.Service.Operations.Install != nil &&
-							slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
-							s.log.Warnf("exit code %d is non-fatal, continuing to run...", exitCode)
-							continue
-						}
-					}
-
-					// Error is due to a fatal exit code. Schedule a restart of the service after a delay by resending
-					// the start action on the action channel
-					delay := s.serviceRestartDelay
-					s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
-					time.AfterFunc(delay, func() {
-						s.actionCh <- as
-					})
-					continue
 				}
 
 				// Start check-in timer

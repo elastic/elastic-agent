@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/otiai10/copy"
@@ -38,6 +39,56 @@ func CopyComponentSpecs(componentName, versionedDropPath string) (string, error)
 
 	// compute checksum
 	return GetSHA512Hash(targetPath)
+}
+
+// componentMetadataFiles are files that several components ship under the same name. They are renamed to
+// <stem>.<component><ext> (e.g. NOTICE.apm-server.txt) when merged into the shared drop path, so that
+// the files of every component end up in the package instead of only the last copied one.
+var componentMetadataFiles = map[string]bool{
+	"NOTICE.txt":      true,
+	"LICENSE.txt":     true,
+	".build_hash.txt": true,
+}
+
+// componentDestination returns the path a component file is copied to in the drop path: metadata files
+// get the component name added, everything else keeps its name.
+func componentDestination(dest, component string) string {
+	dir, base := filepath.Split(dest)
+	if !componentMetadataFiles[base] {
+		return dest
+	}
+	ext := filepath.Ext(base)
+	return filepath.Join(dir, strings.TrimSuffix(base, ext)+"."+component+ext)
+}
+
+// componentCopyOptions returns the copy options used to merge the root dir of a component into the
+// shared drop path. Metadata files are renamed per component (see componentMetadataFiles). When a
+// component would overwrite any other file that already exists in the drop path, the copy fails,
+// because only the last copy would end up in the package.
+func componentCopyOptions(component string) copy.Options {
+	return copy.Options{
+		OnSymlink: func(_ string) copy.SymlinkAction {
+			return copy.Shallow
+		},
+		Sync: true,
+		// Skip is called with the original destination, before RenameDestination: check the path
+		// that is actually going to be written.
+		Skip: func(info os.FileInfo, _, dest string) (bool, error) {
+			// directories are merged, only files can be overwritten
+			if info.IsDir() {
+				return false, nil
+			}
+			dest = componentDestination(dest, component)
+			// Lstat, as the destination can be a symlink copied shallowly from another component
+			if _, err := os.Lstat(dest); err == nil {
+				return false, fmt.Errorf("component %s overwrites existing file %s", component, dest)
+			}
+			return false, nil
+		},
+		RenameDestination: func(_, dest string) (string, error) {
+			return componentDestination(dest, component), nil
+		},
+	}
 }
 
 // ChecksumsWithoutManifest is a helper function for flattenDependencies that's used when not packaging from a manifest.
@@ -87,17 +138,11 @@ func ChecksumsWithoutManifest(cfg *Settings, platform string, dependenciesVersio
 			log.Printf("--- Copying into %s: %v", versionedDropPath, srcDir)
 		}
 
-		options := copy.Options{
-			OnSymlink: func(_ string) copy.SymlinkAction {
-				return copy.Shallow
-			},
-			Sync: true,
-		}
 		if mg.Verbose() {
 			log.Printf("> prepare to copy %s into %s ", srcDir, versionedDropPath)
 		}
 
-		err := copy.Copy(srcDir, versionedDropPath, options)
+		err := copy.Copy(srcDir, versionedDropPath, componentCopyOptions(dep.BinaryName))
 		if err != nil {
 			panic(fmt.Errorf("copying dependency %s files from %q to %q: %w", dep.BinaryName, srcDir, versionedDropPath, err))
 		}
@@ -163,19 +208,12 @@ func ChecksumsWithManifest(platform string, dependenciesVersion string, versione
 			log.Printf(">>>>>>> Calculated directory to copy: [%s]", fullPath)
 		}
 
-		// Set copy options
-		options := copy.Options{
-			OnSymlink: func(_ string) copy.SymlinkAction {
-				return copy.Shallow
-			},
-			Sync: true,
-		}
 		if mg.Verbose() {
 			log.Printf("> prepare to copy %s into %s ", fullPath, versionedDropPath)
 		}
 
 		// Do the copy
-		err = copy.Copy(fullPath, versionedDropPath, options)
+		err = copy.Copy(fullPath, versionedDropPath, componentCopyOptions(spec.BinaryName))
 		if err != nil {
 			panic(err)
 		}
