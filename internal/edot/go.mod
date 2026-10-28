@@ -414,8 +414,12 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.22.2 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
+<<<<<<< HEAD
 	github.com/elastic/elastic-agent-client/v7 v7.18.1 // indirect
 	github.com/elastic/elastic-agent-system-metrics v0.14.5 // indirect
+=======
+	github.com/elastic/elastic-agent-client/v7 v7.19.0 // indirect
+>>>>>>> fe28d25 (Replace elastic-agent-system-metrics with Beats pkg/systemmetrics (#17362))
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.14.1 // indirect
