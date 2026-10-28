@@ -826,7 +826,7 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 		if d.IsDir() {
 			return nil
 		}
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path is rooted under the walk root; TOCTOU risk is acceptable in test helper code
 		if err != nil {
 			f.t.Logf("failed to add %s to zip, continuing: %s", path, err)
 			return nil
