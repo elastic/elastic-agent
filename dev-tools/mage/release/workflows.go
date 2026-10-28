@@ -99,7 +99,9 @@ type workflowPRResult struct {
 // 1. Creates the release branch from BASE_BRANCH
 // 2. Opens PR-A on main (backport rule + next minor version + docs/manifests)
 // 3. Opens PR-B on release branch (ff-release)
-// 4. Opens PR-D on release branch (next patch prep)
+//
+// Next-patch "Merge after the release" PRs are owned by RunPatchRelease
+// (prepNextPatchOnReleaseBranch), not by feature-freeze.
 //
 // Agent folds next-minor docs/manifests into PR-A (historical vault-bot / make check-ci
 // behavior). Beats keeps a separate after-images docs PR; agent does not.
@@ -142,12 +144,8 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 	if err != nil {
 		return err
 	}
-	prD, err := prepNextPatchOnReleaseBranch(repo, cfg)
-	if err != nil {
-		return err
-	}
 
-	branchesToFinalize := []workflowPR{prA, prB, prD}
+	branchesToFinalize := []workflowPR{prA, prB}
 
 	if cfg.DryRun {
 		fmt.Println("\nDRY RUN: Skipping push and PR creation")
@@ -266,9 +264,11 @@ func prepFFRelease(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	}, nil
 }
 
+// prepNextPatchOnReleaseBranch prepares the next-patch bump PR on the release
+// branch. Patch-pipeline only — called from RunPatchRelease, not RunMajorMinorRelease.
 func prepNextPatchOnReleaseBranch(repo *GitRepo, cfg *ReleaseConfig) (workflowPR, error) {
 	branch := fmt.Sprintf("ff-prep-next-patch-%s", cfg.NextRelease)
-	fmt.Printf("\n--- Preparing PR-D: next patch %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch)
+	fmt.Printf("\n--- Preparing next-patch PR: %s on %s ---\n", cfg.NextRelease, cfg.ReleaseBranch)
 
 	if err := repo.EnsureBranchFrom(cfg.ReleaseBranch, branch); err != nil {
 		return workflowPR{}, err
