@@ -2174,7 +2174,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		require.Len(collect, componentStates, 1)
 		componentState := componentStates[0]
 		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
-	}, time.Millisecond, time.Second*5)
+	}, time.Second*5, time.Millisecond)
 }
 
 func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
@@ -2260,7 +2260,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		require.Len(collect, componentStates, 1)
 		componentState := componentStates[0]
 		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
-	}, time.Millisecond, time.Second*5)
+	}, time.Second*5, time.Millisecond)
 }
 
 func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
