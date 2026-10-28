@@ -359,7 +359,7 @@ collectors:
             enabled: true
           start_at: end
           exclude:
-            # exlude collector logs
+            # exclude collector logs
             - /var/log/pods/*opentelemetry-kube-stack*/*/*.log
           include:
             - /var/log/pods/*/*/*.log
