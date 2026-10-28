@@ -580,6 +580,16 @@ func (c *Component) BeatName() string {
 	return ""
 }
 
+// UsesControlProtocolUnits returns true when the component runs in the OTel runtime with its
+// units sent to the receiver over the control protocol. The runtime manager then serves the
+// control protocol for the component, and the OTel manager runs its receiver.
+func (c *Component) UsesControlProtocolUnits() bool {
+	return c.RuntimeManager == OtelRuntimeManager &&
+		c.InputSpec != nil &&
+		c.InputSpec.Spec.SingleReceiver &&
+		c.InputSpec.Spec.ControlProtocolUnits
+}
+
 // OutputUnit returns the first output unit among c.Units, if any.
 // Agent-built components normally have at most one output unit; if several are present, the first is returned.
 func (c *Component) OutputUnit() (Unit, bool) {

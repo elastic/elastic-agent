@@ -556,6 +556,11 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 		if rs != nil {
 			// Extract the stream's status from its receiver's attributes
 			streamStatus := rs.streams[streamID]
+			if streamStatus == nil && comp.UsesControlProtocolUnits() && len(unit.Config.Streams) == 1 {
+				// The beat transforms these units itself, and Heartbeat names a monitor
+				// after its input unless the monitor comes from the Synthetics app.
+				streamStatus = rs.streams[unit.Config.Id]
+			}
 			if streamStatus != nil {
 				unitStreamStatuses[streamID] = streamStatus
 				streamStatusEvent := streamStatusToStatusEvent(streamStatus)

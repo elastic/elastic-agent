@@ -36,6 +36,10 @@ const (
 	// Our DiagnosticsExtension will use DiagnosticsExtensionSocketName to listen and serve diagnostic requests.
 	DiagnosticsExtensionSocketName = "edot-diagnostics-extension.sock"
 
+	// OtelUnitsSocketName is the socket where the OTel manager serves units to beat
+	// receivers over the control protocol.
+	OtelUnitsSocketName = "edot-units.sock"
+
 	// WindowsControlSocketInstalledPath is the control socket path used when installed on Windows.
 	WindowsControlSocketInstalledPath = `npipe:///elastic-agent-system`
 
@@ -399,6 +403,12 @@ func SocketFromPath(platform string, path string, socketName string) string {
 
 func DiagnosticsExtensionSocket() string {
 	return diagnosticsExtensionSocket
+}
+
+// OtelUnitsSocket returns the address where the OTel manager serves units to beat
+// receivers over the control protocol.
+func OtelUnitsSocket() string {
+	return SocketFromPath(runtime.GOOS, Top(), OtelUnitsSocketName)
 }
 
 func SetDiagnosticsExtensionSocket(path string) {
