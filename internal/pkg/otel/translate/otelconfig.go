@@ -7,11 +7,7 @@ package translate
 import (
 	"errors"
 	"fmt"
-<<<<<<< HEAD
-=======
-	"maps"
 	"net/url"
->>>>>>> e72e648 (add encoding/decoding of component names (#17604))
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -324,14 +320,14 @@ func GetProcessorID(name string) otelcomponent.ID {
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
 // getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 

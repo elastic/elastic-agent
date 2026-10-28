@@ -7,6 +7,7 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -3195,11 +3196,6 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
-// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
-// propagated into the generated beat receiver config.
-func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
-=======
 func TestEncodeNameSegment(t *testing.T) {
 	tests := map[string]struct {
 		in   string
@@ -3238,7 +3234,6 @@ func TestOutputNameDerivedIDsAreEncoded(t *testing.T) {
 			GetExporterID(otelcomponent.MustNewType("elasticsearch"), outputName),
 			GetProcessorID(outputName),
 			getBeatsAuthExtensionID(outputName),
-			getOauth2ClientExtensionID(outputName),
 			getTransformProcessorID(outputName),
 			getKafkaPartitionerExtensionID(outputName),
 		}
@@ -3254,11 +3249,49 @@ func TestOutputNameDerivedIDsAreEncoded(t *testing.T) {
 }
 
 func TestSpacesInOutputNameAndInputID(t *testing.T) {
-	comp := testFilebeatComp("filestream-my output", "my output")
-	comp.RuntimeManager = component.OtelRuntimeManager
-	comp.Units[0].ID = "filestream-my output-filestream-Cisco ISE-c3a2b1"
+	comp := component.Component{
+		ID:             "filestream-my output",
+		InputType:      "filestream",
+		OutputType:     "elasticsearch",
+		OutputName:     "my output",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{Args: []string{"filebeat"}},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-my output-filestream-Cisco ISE-c3a2b1",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"id":         "test",
+					"use_output": "default",
+					"streams": []any{
+						map[string]any{
+							"id":          "test-1",
+							"data_stream": map[string]any{"dataset": "generic-1"},
+							"paths":       []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+			{
+				ID:   "filestream-my output-output",
+				Type: client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"type":     "elasticsearch",
+					"hosts":    []any{"localhost:9200"},
+					"username": "elastic",
+					"password": "password",
+					"preset":   "balanced",
+				}),
+			},
+		},
+	}
 
-	conf, err := GetOtelConfig(&component.Model{Components: []component.Component{comp}}, logp.NewNopLogger())
+	conf, err := GetOtelConfig(&component.Model{Components: []component.Component{comp}}, &info.AgentInfo{}, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.Contains(t, conf.Get("receivers"), "filebeatreceiver/_agent-component/filestream-my%20output/filestream-Cisco%20ISE-c3a2b1-test-1")
 
@@ -3314,8 +3347,9 @@ func TestComponentIDFromReceiverName(t *testing.T) {
 	}
 }
 
-func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
->>>>>>> e72e648 (add encoding/decoding of component names (#17604))
+// TestGetReceiversConfigForComponentFQDN verifies that the agent's FQDN feature flag is
+// propagated into the generated beat receiver config.
+func TestGetReceiversConfigForComponentFQDN(t *testing.T) {
 	comp := &component.Component{
 		ID:        "filestream-fqdn",
 		InputType: "filestream",

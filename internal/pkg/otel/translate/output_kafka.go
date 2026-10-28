@@ -197,99 +197,6 @@ func dynamicTopicSetterProcessor(topic string, outputName string) (map[string]an
 	}, nil
 }
 
-<<<<<<< HEAD
-=======
-func getKafkaPartitionerExtensionConfig(partition map[string]*config.C, _ string) (extensionCfg map[string]any, err error) {
-	if len(partition) == 0 {
-		// default use `hash` partitioner + all partitions (block if unreachable)
-		return map[string]any{}, nil
-	}
-
-	// extract partitioner from config
-	var name string
-	var config *config.C
-	for n, c := range partition {
-		name, config = n, c
-	}
-
-	var partitionMap = make(map[string]any)
-	err = config.Unpack(&partitionMap)
-	if err != nil {
-		return nil, fmt.Errorf("error unpacking partition config: %w", err)
-	}
-
-	partitionerCfg := map[string]any{
-		name: partitionMap,
-	}
-
-	return partitionerCfg, nil
-}
-
-func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extensionCfg map[string]any, err error) {
-	var oauthMap map[string]any
-	err = cfg.Unpack(&oauthMap)
-	if err != nil {
-		return nil, fmt.Errorf("error unpacking oauth2client extension config: %w", err)
-	}
-
-	// Default settings are taken from https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/cbc5a870545d7a25c8bbd62404a025978c907d57/extension/oauth2clientauthextension/factory.go#L28
-	defaultConfig := oauth2clientauthextension.Config{
-		ExpiryBuffer: 5 * time.Minute,
-	}
-
-	err = mapstructure.Decode(oauthMap, &defaultConfig)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding oauth2client extension config: %w", err)
-	}
-
-	if err = defaultConfig.Validate(); err != nil {
-		return nil, fmt.Errorf("error validating oauth2client extension config: %w", err)
-	}
-
-	// Convert config back to map[string]any
-	if err = mapstructure.Decode(defaultConfig, &oauthMap); err != nil {
-		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
-	}
-
-	var newMap map[string]any
-	encoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:     &newMap,
-		DecodeHook: oauth2MapEncodeHook(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed creating encoder: %w", err)
-	}
-	if err = encoder.Decode(oauthMap); err != nil {
-		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
-	}
-
-	extensionID := getOauth2ClientExtensionID(outputName)
-	return map[string]any{
-		extensionID.String(): newMap,
-	}, nil
-}
-
-func oauth2MapEncodeHook() mapstructure.DecodeHookFunc {
-	return func(_ reflect.Type, _ reflect.Type, data any) (any, error) {
-		switch v := data.(type) {
-		case time.Duration:
-			return v.String(), nil
-		case configopaque.String:
-			return string(v), nil
-		case url.URL:
-			return v.String(), nil
-		default:
-			return data, nil
-		}
-	}
-}
-
-func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(oauth2ClientExtensionType), extensionName)
-}
-
->>>>>>> e72e648 (add encoding/decoding of component names (#17604))
 func extractField(field string) string {
 	if len(field) == 0 {
 		return ""
@@ -323,16 +230,6 @@ func getTransformProcessorID(outputName string) otelcomponent.ID {
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
 }
 
-<<<<<<< HEAD
-=======
-// getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
-// outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
-func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
-}
-
->>>>>>> e72e648 (add encoding/decoding of component names (#17604))
 // log warning for unsupported config
 func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
