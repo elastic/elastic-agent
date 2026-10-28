@@ -561,12 +561,16 @@ func (Check) Changes() error {
 	return nil
 }
 
-// All runs all the tests.
-func (Test) All() {
-	mg.SerialDeps(Test.Unit)
+// All runs all the unit tests of the root module (Test.Unit)
+// and internal/edot (Test.UnitEdot). The two run in
+// parallel and write to separate build/TEST-go-unit.* and
+// build/TEST-go-unit_edot.* files.
+func (Test) All(ctx context.Context) {
+	mg.CtxDeps(ctx, Test.Unit, Test.UnitEdot)
 }
 
-// Unit runs all the unit tests.
+// Unit runs all the unit tests of the root Go module. It does not reach
+// internal/edot, which is a separate module; see Test.UnitEdot and Test.All.
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
@@ -583,6 +587,17 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	params.Env["FIPS"] = "true"
 	params.Env["GODEBUG"] = "fips140=only"
 	params.Tags = append(params.Tags, "requirefips")
+	return devtools.GoTest(ctx, params)
+}
+
+// UnitEdot runs all the unit tests of the internal/edot module (the EDOT Collector).
+// internal/edot is a separate Go module, so Test.Unit does not reach its tests;
+// Test.All runs both. Honours the same env vars as Test.Unit (RACE_DETECTOR,
+// TEST_COVERAGE, FIPS); results are written to build/TEST-go-unit_edot.*.
+func (Test) UnitEdot(ctx context.Context) error {
+	mg.Deps(Prepare.Env)
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitEdotArgs(cfg)
 	return devtools.GoTest(ctx, params)
 }
 
@@ -1265,6 +1280,13 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	}
 	os.MkdirAll(flatPath, 0o755)
 	defer os.RemoveAll(flatPath)
+	// the versioned drop dirs are rebuilt from the archives on every run (see flattenDependencies),
+	// so they are not kept with KEEP_ARCHIVE either
+	defer func() {
+		for _, pltf := range platforms {
+			os.RemoveAll(filepath.Join(dropPath, manifest.PlatformPackages[pltf]))
+		}
+	}()
 
 	// extract all dependencies from their archives into flat dir
 	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
@@ -1433,9 +1455,20 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		targetPath := filepath.Join(archivePath, rp)
 		versionedFlatPath := filepath.Join(flatPath, rp)
 		versionedDropPath := filepath.Join(dropPath, rp)
-		os.MkdirAll(targetPath, 0o755)
-		os.MkdirAll(versionedFlatPath, 0o755)
-		os.MkdirAll(versionedDropPath, 0o755)
+		if err := os.MkdirAll(targetPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating target dir %q: %w", targetPath, err))
+		}
+		if err := os.MkdirAll(versionedFlatPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating versioned flat dir %q: %w", versionedFlatPath, err))
+		}
+		// KEEP_ARCHIVE only caches the downloaded archives: the versioned drop dir is rebuilt from them on
+		// every run, so remove what a previous build left there instead of merging into it
+		if err := os.RemoveAll(versionedDropPath); err != nil {
+			panic(fmt.Errorf("cleaning versioned drop dir %q: %w", versionedDropPath, err))
+		}
+		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
+			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
+		}
 
 		// untar all
 		matches, err := filepath.Glob(filepath.Join(targetPath, "*tar.gz"))

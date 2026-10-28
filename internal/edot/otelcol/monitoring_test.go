@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -218,9 +219,15 @@ service:
 
 	// Wrap with HTTP-level request failure logic
 	httpLevelHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only fail bulk requests, so that other requests made by the exporter
+		// (e.g. version detection at startup) do not consume the failure budget.
+		if !strings.HasSuffix(r.URL.Path, "/_bulk") {
+			baseHandler.ServeHTTP(w, r)
+			return
+		}
 		httpRequestCount++
 
-		// Fail the first 3 HTTP requests: initial request + retries
+		// Fail the first 3 bulk requests: initial request + retries
 		if httpRequestCount <= 3 {
 			// force a retry
 			w.WriteHeader(http.StatusTooManyRequests)

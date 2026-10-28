@@ -2889,8 +2889,12 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 		errCh <- err
 	}()
 
-	// build the units to ensure that there is more than double the units required for the GRPC configuration
+	// build the units to ensure that the expected message is larger than the GRPC configuration allows,
+	// so it has to be chunked. Each unit carries a large payload to keep the number of units low: the
+	// test cost scales with the unit count, and tens of thousands of small units make the component miss
+	// check-ins on slow CI runners.
 	minimumMsgSize := int(float64(grpcConfig.MaxMsgSize) * 1.2) // increase by 20%
+	unitPadding := strings.Repeat("x", 64*1024)
 	var units []component.Unit
 	var unitsSize int
 	var nextUnitID int
@@ -2905,7 +2909,7 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 				"message": fmt.Sprintf("Fake Healthy %d", nextUnitID),
 				"payload": map[string]interface{}{
 					"fake-id":    nextUnitID,
-					"extra-data": fmt.Sprintf("extra data for the unit %d to make it some what larger", nextUnitID),
+					"extra-data": unitPadding,
 				},
 			}),
 		}

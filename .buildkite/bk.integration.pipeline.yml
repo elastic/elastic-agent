@@ -11,6 +11,7 @@ env:
   IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1791307568"
   IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1791307568"
   IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1791307568"
+  IMAGE_UBUNTU_2604_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1791307568"
   IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1791307568"
   IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1791307568"
   IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1791307568"

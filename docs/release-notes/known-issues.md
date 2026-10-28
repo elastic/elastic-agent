@@ -225,7 +225,7 @@ On March 5, 2026, a known issue was discovered that prevents {{agent}} 9.3.0 and
 - The OSQuery Manager integration is installed.
 - The host or agent service is restarted.
 
-Users will see error failing with an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent logs files:
+Users will see an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent log files:
 
 ```json
 {"log.level":"error","@timestamp":"2026-02-25T07:19:14.101Z","log.origin":{"function":"github.com/elastic/elastic-agent/internal/pkg/agent/cmd.logReturn","file.name":"cmd/run.go","file.line":152}, "message":"failed to perform permission changes on path /Library/Elastic/Agent: cannot update ownership of \"/Library/Elastic/Agent\": lchown /Library/Elastic/Agent/data/elastic-agent-9.2.5-df1a8d/components/osquery.app: operation not permitted","log.source":"elastic-agent","ecs.version":"1.6.0"}
