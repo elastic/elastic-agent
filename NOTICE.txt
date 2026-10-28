@@ -1253,6 +1253,7 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 
 --------------------------------------------------------------------------------
+<<<<<<< HEAD
 Dependency : github.com/elastic/elastic-agent-system-metrics
 Version: v0.14.5
 Licence type (autodetected): Apache-2.0
@@ -1778,6 +1779,8 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-transpo
 
 
 --------------------------------------------------------------------------------
+=======
+>>>>>>> fe28d25 (Replace elastic-agent-system-metrics with Beats pkg/systemmetrics (#17362))
 Dependency : github.com/elastic/fleet-server/pkg/api
 Version: v0.0.0-20260515154942-99dc973fd52e
 Licence type (autodetected): Elastic
