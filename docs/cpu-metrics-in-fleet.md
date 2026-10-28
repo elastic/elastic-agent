@@ -134,14 +134,14 @@ aggregations are shown; memory-related aggregations are omitted.
 
 ### Agent and Beats collect CPU metrics using the Beats `pkg/systemmetrics` package
 
-At startup, both Agent and Beats call the [`SetupMetrics` function](../beats/pkg/systemmetrics/report/setup.go#L45)
+At startup, both Agent and Beats call the [`SetupMetrics` function](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/report/setup.go#L45)
 from the `github.com/elastic/beats/v7/pkg/systemmetrics/report` package.  This function registers a function with the
 monitoring registry. Whenever this function is called, it calculates and reports CPU and other metrics for the process in
 question.  The calculation of CPU (and other) metrics depends on the OS the Agent or Beat process is running on.
 
 #### Collecting CPU usage metrics on Linux
 
-On Linux, CPU usage metrics are collected by [reading the `/proc/$PID/stat` file](../beats/pkg/systemmetrics/metric/system/process/process_linux_common.go#L389-L390).
+On Linux, CPU usage metrics are collected by [reading the `/proc/$PID/stat` file](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/metric/system/process/process_linux_common.go#L389-L390).
 This file contains whitespace-delimited values (fields) for various process metrics and other information. The field at
 index 13 (0-based indexing) is the number of CPU ticks utilized by the process in user-space since it was started. The
 field at index 14 is the number of CPU ticks utilized by the process in kernel-space since it was started.  As such, both
@@ -154,10 +154,10 @@ over a period of 5 minutes, that would be a CPU utilization of 120 / (5 * 60 * 1
 
 On a typical Linux host, there are 100 ticks per second. The actual value can be checked by running `getconf CLK_TCK`.
 Therefore, if a process utilized T ticks, say in user-space, we can say that the process utilized (T / 100) seconds of
-CPU time == (T / 100) * 1000 milliseconds of CPU time. We do this [conversion](../beats/pkg/systemmetrics/metric/system/process/process_linux_common.go#L412-L413)
+CPU time == (T / 100) * 1000 milliseconds of CPU time. We do this [conversion](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/metric/system/process/process_linux_common.go#L412-L413)
 from ticks to milliseconds for both user-space and kernel-space CPU utilization.
 
-Finally, we [sum up](../beats/pkg/systemmetrics/metric/system/process/process_linux_common.go#L414)
+Finally, we [sum up](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/metric/system/process/process_linux_common.go#L414)
 the user-space and kernel-space CPU utilization (which is now in milliseconds) to arrive at the total CPU utilization.
 
 ##### Comparison between metrics in `top` output and in `/proc/$PID/stat` file
