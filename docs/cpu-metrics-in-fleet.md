@@ -8,9 +8,9 @@ flowchart TD
     M[Metricbeat `http/json` metricset] -- writes to --> E
     M -- reads from --> A[Agent `/stats` endpoint]
     M -- reads from --> B[*Beat `/stats` endpoint]
-    A -- reads from --> L1[`elastic-agent-system-metrics` report.SetupMetrics]
+    A -- reads from --> L1[Beats `pkg/systemmetrics` report.SetupMetrics]
     L1 -- reads from --> H[Host system]
-    B -- reads from --> L2[`elastic-agent-system-metrics` report.SetupMetrics]
+    B -- reads from --> L2[Beats `pkg/systemmetrics` report.SetupMetrics]
     L2 -- reads from --> H[Host system]
 ```
 
@@ -132,16 +132,16 @@ aggregations are shown; memory-related aggregations are omitted.
 ```
 
 
-### Agent and Beats collect CPU metrics using `elastic-agent-system-metrics`
+### Agent and Beats collect CPU metrics using the Beats `pkg/systemmetrics` package
 
-At startup, both Agent and Beats call the [`SetupMetrics` function](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/report/setup.go#L49)
-from the `github.com/elastic/elastic-agent-system-metrics/report` package.  This function registers a function with the
+At startup, both Agent and Beats call the [`SetupMetrics` function](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/report/setup.go#L45)
+from the `github.com/elastic/beats/v7/pkg/systemmetrics/report` package.  This function registers a function with the
 monitoring registry. Whenever this function is called, it calculates and reports CPU and other metrics for the process in
 question.  The calculation of CPU (and other) metrics depends on the OS the Agent or Beat process is running on.
 
 #### Collecting CPU usage metrics on Linux
 
-On Linux, CPU usage metrics are collected by [reading the `/proc/$PID/stat` file](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L351).
+On Linux, CPU usage metrics are collected by [reading the `/proc/$PID/stat` file](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/metric/system/process/process_linux_common.go#L389-L390).
 This file contains whitespace-delimited values (fields) for various process metrics and other information. The field at
 index 13 (0-based indexing) is the number of CPU ticks utilized by the process in user-space since it was started. The
 field at index 14 is the number of CPU ticks utilized by the process in kernel-space since it was started.  As such, both
@@ -154,10 +154,10 @@ over a period of 5 minutes, that would be a CPU utilization of 120 / (5 * 60 * 1
 
 On a typical Linux host, there are 100 ticks per second. The actual value can be checked by running `getconf CLK_TCK`.
 Therefore, if a process utilized T ticks, say in user-space, we can say that the process utilized (T / 100) seconds of
-CPU time == (T / 100) * 1000 milliseconds of CPU time. We do this [conversion](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L374-L375)
+CPU time == (T / 100) * 1000 milliseconds of CPU time. We do this [conversion](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/metric/system/process/process_linux_common.go#L412-L413)
 from ticks to milliseconds for both user-space and kernel-space CPU utilization.
 
-Finally, we [sum up](https://github.com/elastic/elastic-agent-system-metrics/blob/085e4529f3c4f91dd377cadbbe7a2bf321989438/metric/system/process/process_linux_common.go#L376)
+Finally, we [sum up](https://github.com/elastic/beats/blob/6636609f9ac9/pkg/systemmetrics/metric/system/process/process_linux_common.go#L414)
 the user-space and kernel-space CPU utilization (which is now in milliseconds) to arrive at the total CPU utilization.
 
 ##### Comparison between metrics in `top` output and in `/proc/$PID/stat` file

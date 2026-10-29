@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	agentsystemprocess "github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -826,7 +826,7 @@ func (f *Fixture) archiveInstallDirectory(installPath string, outputPath string)
 		if d.IsDir() {
 			return nil
 		}
-		file, err := os.Open(path)
+		file, err := os.Open(path) //nolint:gosec // G122: path is rooted under the walk root; TOCTOU risk is acceptable in test helper code
 		if err != nil {
 			f.t.Logf("failed to add %s to zip, continuing: %s", path, err)
 			return nil
