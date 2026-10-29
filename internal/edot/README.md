@@ -68,6 +68,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202640/README.md) | v0.0.202640 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.163.0/receiver/prometheusreceiver/README.md) | v0.163.0 |
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.163.0/receiver/prometheusremotewritereceiver/README.md) | v0.163.0 |
+| [prometheusscrapereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/prometheusscrapereceiver/v0.77.0/receiver/prometheusscrapereceiver/README.md) | v0.77.0 |
 | [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.163.0/receiver/rabbitmqreceiver/README.md) | v0.163.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.163.0/receiver/receivercreator/README.md) | v0.163.0 |
 | [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.163.0/receiver/receivertest/README.md) | v0.163.0 |
@@ -94,6 +95,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.163.0/exporter/nopexporter/README.md) | v0.163.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.163.0/exporter/otlpexporter/README.md) | v0.163.0 |
 | [otlphttpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlphttpexporter/v0.163.0/exporter/otlphttpexporter/README.md) | v0.163.0 |
+| [prometheusremotewriteexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/prometheusremotewriteexporter/v0.163.0/exporter/prometheusremotewriteexporter/README.md) | v0.163.0 |
 
 ### Processors
 
