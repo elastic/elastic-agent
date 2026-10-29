@@ -23,7 +23,7 @@ This is not needed when you select a local instance provisioner (`docker`, `mult
 or `microshift`) with `INSTANCE_PROVISIONER`.
 
 #### Beats
-The Elastic Agent package that is used for integration tests packages Beats from the beats submodule in this repository. The submodule must be explicitly intialized with `git submodule update --init` on first checkout. The commit of beats packaged and tested in this repository is the commit of
+The Elastic Agent package that is used for integration tests packages Beats from the beats submodule in this repository. The submodule must be explicitly initialized with `git submodule update --init` on first checkout. The commit of beats packaged and tested in this repository is the commit of
 beats pinned in the submodule.
 
 #### Helm & Helm charts
