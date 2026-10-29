@@ -5,10 +5,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/16691
+      issue: []
       impact: ""
       action: ""
       timestamp: 1789581976
@@ -20,10 +18,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/16841
+      issue: []
       impact: ""
       action: ""
       timestamp: 1790375775
@@ -35,10 +31,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/16900
+      issue: []
       impact: ""
       action: ""
       timestamp: 1790692621
@@ -50,10 +44,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/16917
+      issue: []
       impact: ""
       action: ""
       timestamp: 1790772292
@@ -71,10 +63,8 @@ entries:
         `${agent.id} == '<id>'` input conditions that Synthetics private locations assign to agents.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/16972
+      issue: []
       impact: ""
       action: ""
       timestamp: 1790940000
@@ -93,10 +83,9 @@ entries:
         policy's TLS certificate or CAs change, even if the Fleet hosts stay the same.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
+        - https://github.com/elastic/elastic-agent/pull/17014
       issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/issues/17015
       impact: ""
       action: ""
       timestamp: 1791213566
@@ -109,10 +98,9 @@ entries:
         The coordinator's state Broadcaster kept the last published values alive in its ring buffer even when no subscriber could still receive them. These values are now cleared, which lowers live heap for agents running many units.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
+        - https://github.com/elastic/elastic-agent/pull/17107
       issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/synthetics-dev/issues/477
       impact: ""
       action: ""
       timestamp: 1791400000
@@ -137,10 +125,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/17249
+      issue: []
       impact: ""
       action: ""
       timestamp: 1792145980
@@ -152,7 +138,6 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
         - https://github.com/elastic/elastic-agent/pull/17256
       issue:
         - https://github.com/elastic/elastic-agent/issues/16700
@@ -167,10 +152,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17256
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/16700
+        - https://github.com/elastic/elastic-agent/pull/17359
+      issue: []
       impact: ""
       action: ""
       timestamp: 1792577050
