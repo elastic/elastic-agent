@@ -104,9 +104,14 @@ func TestKubernetesAgentBrowserTrustsMountedCA(t *testing.T) {
 				k8sStepBrowserJourney(unprivileged, "failed", "without the CA the browser must reject the server's certificate, or this test proves nothing"),
 				k8sStepBrowserCASetSecret(map[string][]byte{"ca.crt": caPEM}),
 				k8sStepBrowserJourney(unprivileged, "succeeded", "a CA added to the Secret must be trusted by the browser without a restart"),
+			}
+			if !unprivileged {
+				steps = append(steps, k8sStepBrowserCAStoreOwner())
+			}
+			steps = append(steps,
 				k8sStepBrowserCASetSecret(map[string][]byte{}),
 				k8sStepBrowserJourney(unprivileged, "failed", "a CA removed from the Secret must stop being trusted without a restart"),
-			}
+			)
 
 			for _, step := range steps {
 				step(t, ctx, kCtx, testNamespace)
@@ -165,6 +170,7 @@ func k8sStepBrowserCACreateObjects(certPEM, keyPEM []byte) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		labels := map[string]string{"app": browserCAServer}
 		replicas := int32(1)
+		runAsNonRoot, allowPrivilegeEscalation := true, false
 		objects := []k8s.Object{
 			&corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: browserCASecret},
@@ -196,9 +202,16 @@ func k8sStepBrowserCACreateObjects(certPEM, keyPEM []byte) k8sTestStep {
 						ObjectMeta: metav1.ObjectMeta{Labels: labels},
 						Spec: corev1.PodSpec{
 							Containers: []corev1.Container{{
-								Name:  "nginx",
-								Image: "docker.io/library/nginx:1.27-alpine",
+								Name: "nginx",
+								// Runs as any non-root UID, as OpenShift requires.
+								Image: "docker.io/nginxinc/nginx-unprivileged:1.27-alpine",
 								Ports: []corev1.ContainerPort{{ContainerPort: 8443}},
+								SecurityContext: &corev1.SecurityContext{
+									RunAsNonRoot:             &runAsNonRoot,
+									AllowPrivilegeEscalation: &allowPrivilegeEscalation,
+									Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
+									SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeRuntimeDefault},
+								},
 								VolumeMounts: []corev1.VolumeMount{
 									{Name: "conf", MountPath: "/etc/nginx/conf.d", ReadOnly: true},
 									{Name: "tls", MountPath: "/etc/nginx/tls", ReadOnly: true},
@@ -240,18 +253,24 @@ func k8sStepBrowserCASetSecret(data map[string][]byte) k8sTestStep {
 	}
 }
 
+// browserCAAgentPod returns the name of the clusterWide agent pod.
+func browserCAAgentPod(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) string {
+	t.Helper()
+	pods := &corev1.PodList{}
+	err := kCtx.client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
+		opt.LabelSelector = browserCAPodLabel
+	})
+	require.NoError(t, err, "failed to list the agent pods")
+	require.Len(t, pods.Items, 1, "expected one clusterWide agent pod")
+	return pods.Items[0].Name
+}
+
 // k8sStepBrowserJourney runs a one-step browser journey that opens the HTTPS server from
 // the agent pod until it ends with wantStatus ("succeeded" or "failed"). Updated Secrets
 // reach the pod after the kubelet's sync period, hence the long wait.
 func k8sStepBrowserJourney(unprivileged bool, wantStatus, msg string) k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
-		pods := &corev1.PodList{}
-		err := kCtx.client.Resources(namespace).List(ctx, pods, func(opt *metav1.ListOptions) {
-			opt.LabelSelector = browserCAPodLabel
-		})
-		require.NoError(t, err, "failed to list the agent pods")
-		require.Len(t, pods.Items, 1, "expected one clusterWide agent pod")
-		pod := pods.Items[0].Name
+		pod := browserCAAgentPod(t, ctx, kCtx, namespace)
 
 		// As root, Heartbeat runs the browser as the agent user with that user's home:
 		// do the same. Otherwise the browser uses the pod's HOME, as the agent does.
@@ -264,25 +283,43 @@ func k8sStepBrowserJourney(unprivileged bool, wantStatus, msg string) k8sTestSte
 			"cd /tmp && printf '%%s' '%s' | %selastic-synthetics --inline --reporter json --no-throttling",
 			script, env)}
 
-		var lastOutput string
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			var stdout, stderr bytes.Buffer
 			execCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 			defer cancel()
 			// A failed journey exits non-zero: its status is in the output.
 			_ = kCtx.client.Resources().ExecInPod(execCtx, namespace, pod, "agent", cmd, &stdout, &stderr)
-			lastOutput = stdout.String() + stderr.String()
-			assert.Equal(c, wantStatus, journeyEndStatus(stdout.String()), "journey status")
-		}, 5*time.Minute, 5*time.Second, "%s; last output:\n%s", msg, lastOutput)
+			assert.Equal(c, wantStatus, journeyEndStatus(stdout.String()), "journey status; step results and stderr:\n%s",
+				journeyDiagnostics(stdout.String(), stderr.String()))
+		}, 5*time.Minute, 5*time.Second, msg)
+	}
+}
 
-		if !unprivileged {
-			var stdout, stderr bytes.Buffer
-			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod, "agent",
-				[]string{"stat", "-c", "%U", browserAgentHome + "/.pki/nssdb/cert9.db"}, &stdout, &stderr)
-			require.NoError(t, err, "failed to stat the browser trust store: %s", stderr.String())
-			require.Equal(t, "elastic-agent", strings.TrimSpace(stdout.String()), "as root the trust store must belong to the browser user")
+// k8sStepBrowserCAStoreOwner checks that, with the agent running as root, the browser
+// trust store belongs to the user Heartbeat runs the browser as.
+func k8sStepBrowserCAStoreOwner() k8sTestStep {
+	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
+		pod := browserCAAgentPod(t, ctx, kCtx, namespace)
+		var stdout, stderr bytes.Buffer
+		err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod, "agent",
+			[]string{"stat", "-c", "%U", browserAgentHome + "/.pki/nssdb/cert9.db"}, &stdout, &stderr)
+		require.NoError(t, err, "failed to stat the browser trust store: %s", stderr.String())
+		require.Equal(t, "elastic-agent", strings.TrimSpace(stdout.String()), "as root the trust store must belong to the browser user")
+	}
+}
+
+// journeyDiagnostics returns the step and journey results of the JSON output of
+// elastic-synthetics, without screenshots, and the end of its stderr.
+func journeyDiagnostics(stdout, stderr string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(stdout, "\n") {
+		if strings.Contains(line, `"type":"step/end"`) || strings.Contains(line, `"type":"journey/end"`) {
+			b.WriteString(line[:min(len(line), 2000)])
+			b.WriteString("\n")
 		}
 	}
+	b.WriteString(stderr[max(0, len(stderr)-2000):])
+	return b.String()
 }
 
 // journeyEndStatus returns the status of the journey/end event in the JSON output of
