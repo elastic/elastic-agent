@@ -23,8 +23,10 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap"
 
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent-libs/useragent"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -35,10 +37,10 @@ import (
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
 )
 
 const (
@@ -461,7 +463,7 @@ func (m *OTelManager) buildMergedConfig(
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, agentInfo, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -476,6 +478,10 @@ func (m *OTelManager) buildMergedConfig(
 	if componentOtelCfg != nil {
 		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
+		}
+
+		if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
+			return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
 		}
 
 		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
@@ -548,6 +554,48 @@ func injectDiagnosticsExtension(config *confmap.Conf) error {
 			"extensions": []any{"elastic_diagnostics"},
 		},
 	}))
+}
+
+func injectHeaderSetterExtension(config *confmap.Conf, agentInfo info.Agent) error {
+	extensionName := fmt.Sprintf("%s/%s", "headers_setter", translate.OtelNamePrefix)
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			extensionName: map[string]any{
+				"headers": []any{
+					map[string]any{
+						"action": "upsert",
+						"key":    "User-Agent",
+						"value":  generateUserAgent(agentInfo),
+					},
+				},
+			},
+		},
+		"service": map[string]any{
+			"extensions": []any{extensionName},
+		},
+	}))
+}
+
+// generateUserAgent builds the User-Agent the same way libbeat's Beat.GenerateUserAgent does.
+func generateUserAgent(agentInfo info.Agent) string {
+	// A standalone Elastic Agent maps to "Unmanaged": in libbeat's terms, "Standalone"
+	// means a Beat that is not running under Elastic Agent at all.
+	mode := useragent.AgentManagementModeManaged
+	if agentInfo.IsStandalone() {
+		mode = useragent.AgentManagementModeUnmanaged
+	}
+
+	unprivileged := useragent.AgentUnprivilegedModePrivileged
+	if agentInfo.Unprivileged() {
+		unprivileged = useragent.AgentUnprivilegedModeUnprivileged
+	}
+
+	var uaOpts []string
+	if fbfeatures.IsElasticsearchStateStoreEnabled() {
+		uaOpts = append(uaOpts, "agentless")
+	}
+
+	return useragent.UserAgentWithBeatTelemetry("Agent", agentInfo.Version(), mode, unprivileged, release.FIPSDistribution(), uaOpts...)
 }
 
 func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
@@ -743,12 +791,25 @@ func injectMonitoringReceiver(
 			"receivers": []string{connectorID},
 			"exporters": []string{exporterID},
 		}
-		if features.DefaultProcessors() {
-			// This pipeline forwards Agent's own internal telemetry in beats format,
-			// not a specific beat's data, so it always gets the standard default
-			// processors.
+
+		// Find the monitoring output component so per-output default_processors
+		// config is respected alongside the global flags. All monitoring components
+		// share the same output, so which one is found first does not matter; the
+		// processor list itself is always the generic, beat-agnostic one.
+		var monitoringComp *component.Component
+		for i := range components {
+			if components[i].OutputName == componentmonitoring.MonitoringOutput {
+				monitoringComp = &components[i]
+				break
+			}
+		}
+		defaultProcessors, err := translate.EffectiveDefaultMonitoringProcessors(monitoringComp)
+		if err != nil {
+			return fmt.Errorf("could not get effective default processors for monitoring: %w", err)
+		}
+		if len(defaultProcessors) > 0 {
 			collectorCfg["processors"].(map[string]any)[processorID] = map[string]any{
-				"processors": translate.GetDefaultProcessors(""),
+				"processors": defaultProcessors,
 			}
 			logsPipelineCfg["processors"] = []string{processorID}
 		}

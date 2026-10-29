@@ -5,6 +5,7 @@
 package elasticmonitoringprocessor
 
 import (
+	"net/url"
 	"strings"
 
 	"go.opentelemetry.io/collector/component"
@@ -129,6 +130,9 @@ func agentComponentID(otelComponentID string) string {
 	_, after, ok := strings.Cut(otelComponentID, prefix)
 	if !ok {
 		return ""
+	}
+	if decoded, err := url.PathUnescape(after); err == nil {
+		return decoded
 	}
 	return after
 }

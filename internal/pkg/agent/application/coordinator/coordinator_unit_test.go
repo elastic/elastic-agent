@@ -64,6 +64,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
@@ -1039,6 +1040,117 @@ service:
 	assert.Empty(t, components, "empty policy should produce empty component model")
 	assert.True(t, otelUpdated, "empty policy should cause otel manager update")
 	assert.Nil(t, otelConfig, "empty policy should cause otel manager to get nil config")
+}
+
+func TestCoordinatorPolicyChangeUpdatesComponentAgentInfo(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	originalValue := features.IncludeTagsInEvents()
+	t.Cleanup(func() {
+		err := features.Apply(config.MustNewConfigFrom(map[string]any{
+			"agent.features.include_tags_in_events.enabled": originalValue,
+		}))
+		require.NoError(t, err)
+	})
+
+	configChan := make(chan ConfigChange, 1)
+	var components []pkgcomponent.Component
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []pkgcomponent.Component) error {
+			components = comp
+			return nil
+		},
+	}
+	coord := &Coordinator{
+		logger:           logp.NewLogger("testing"),
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	newPolicy := func(enabled bool, tags string) *config.Config {
+		return config.MustNewConfigFrom(fmt.Sprintf(`
+agent:
+  features:
+    include_tags_in_events:
+      enabled: %t
+  tags: %s
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`, enabled, tags))
+	}
+
+	// applyPolicy sends the policy and returns the agent info of the component model
+	// that the runtime manager gets.
+	applyPolicy := func(cfg *config.Config) (*proto.AgentInfo, error) {
+		components = nil
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		if !cfgChange.acked {
+			return nil, errors.New("policy change was not acked")
+		}
+		if cfgChange.err != nil {
+			return nil, fmt.Errorf("policy change failed: %w", cfgChange.err)
+		}
+		if len(components) != 1 {
+			return nil, fmt.Errorf("got %d components, want 1", len(components))
+		}
+		if components[0].AgentInfo == nil {
+			return nil, errors.New("component has no agent info")
+		}
+		return components[0].AgentInfo, nil
+	}
+
+	// The steps run in sequence on one coordinator. Each step depends on the previous one.
+	t.Run("sends the tags to the components", func(t *testing.T) {
+		policy := newPolicy(true, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, proto.AgentManagedMode_MANAGED, agentInfo.GetMode())
+		assert.Equal(t, []string{"production"}, agentInfo.GetTags())
+	})
+
+	t.Run("sends a new tag", func(t *testing.T) {
+		policy := newPolicy(true, "[production, team-payments]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"production", "team-payments"}, agentInfo.GetTags())
+	})
+
+	t.Run("clears the tags when the policy has none", func(t *testing.T) {
+		policy := newPolicy(true, "[]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Empty(t, agentInfo.GetTags())
+	})
+
+	t.Run("sends the tags again when they come back", func(t *testing.T) {
+		policy := newPolicy(true, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"production"}, agentInfo.GetTags())
+	})
+
+	t.Run("drops the tags when the feature is off", func(t *testing.T) {
+		policy := newPolicy(false, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Empty(t, agentInfo.GetTags(), "the tags are not sent when include_tags_in_events is off")
+	})
 }
 
 func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t *testing.T) {
@@ -2741,72 +2853,97 @@ func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 }
 
 func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
-	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
-
-	mockUpgradeManager := &mockUpgradeManager{
-		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+	diskSpaceLowErr := upgradeErrors.DiskSpaceLowError{
+		"need 1 GB at /data",
+		"need 500 MB at /downloads",
 	}
-
-	initialState := State{
-		CoordinatorState:   agentclient.Healthy,
-		CoordinatorMessage: "Running",
-	}
-
-	coord := &Coordinator{
-		state:              initialState,
-		logger:             log,
-		upgradeMgr:         mockUpgradeManager,
-		stateBroadcaster:   broadcaster.New(initialState, 64, 32),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		upgradeDetailsChan: make(chan *details.Details),
-	}
-
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	overrideStates := []agentclient.State{}
-	go func() {
-		state1 := <-coord.overrideStateChan
-		overrideStates = append(overrideStates, state1.state)
-
-		state2 := <-coord.overrideStateChan
-		if state2 != nil {
-			overrideStates = append(overrideStates, state2.state)
-		}
-
-		wg.Done()
-	}()
-
-	upgradeDetails := []*details.Details{}
-	go func() {
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		wg.Done()
-	}()
-
-	err := coord.Upgrade(t.Context(), "", nil, nil)
-	require.Error(t, err)
-	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
-
-	wg.Wait()
-
-	require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
-
-	require.Equal(t, []*details.Details{
+	testCases := []struct {
+		name        string
+		upgradeErr  error
+		expectedErr error
+	}{
 		{
-			TargetVersion: "",
-			State:         details.StateRequested,
-			ActionID:      "",
+			name:        "disk space low joined with os error",
+			upgradeErr:  fmt.Errorf("wrapped: %w", errors.Join(upgradeErrors.OS_DiskSpaceErrors[0], diskSpaceLowErr)),
+			expectedErr: diskSpaceLowErr,
 		},
 		{
-			TargetVersion: "",
-			State:         details.StateFailed,
-			Metadata: details.Metadata{
-				FailedState: details.StateRequested,
-				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
-			},
+			name:        "disk space low",
+			upgradeErr:  fmt.Errorf("wrapped: %w", diskSpaceLowErr),
+			expectedErr: diskSpaceLowErr,
 		},
-	}, upgradeDetails)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
+
+			mockUpgradeManager := &mockUpgradeManager{
+				upgradeErr: tc.upgradeErr,
+			}
+
+			initialState := State{
+				CoordinatorState:   agentclient.Healthy,
+				CoordinatorMessage: "Running",
+			}
+
+			coord := &Coordinator{
+				state:              initialState,
+				logger:             log,
+				upgradeMgr:         mockUpgradeManager,
+				stateBroadcaster:   broadcaster.New(initialState, 64, 32),
+				overrideStateChan:  make(chan *coordinatorOverrideState),
+				upgradeDetailsChan: make(chan *details.Details),
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+
+			overrideStates := []agentclient.State{}
+			go func() {
+				state1 := <-coord.overrideStateChan
+				overrideStates = append(overrideStates, state1.state)
+
+				state2 := <-coord.overrideStateChan
+				if state2 != nil {
+					overrideStates = append(overrideStates, state2.state)
+				}
+
+				wg.Done()
+			}()
+
+			upgradeDetails := []*details.Details{}
+			go func() {
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				wg.Done()
+			}()
+
+			err := coord.Upgrade(t.Context(), "", nil, nil)
+			require.Error(t, err)
+			require.Equal(t, tc.expectedErr, err)
+
+			wg.Wait()
+
+			require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
+
+			require.Equal(t, []*details.Details{
+				{
+					TargetVersion: "",
+					State:         details.StateRequested,
+					ActionID:      "",
+				},
+				{
+					TargetVersion: "",
+					State:         details.StateFailed,
+					Metadata: details.Metadata{
+						FailedState: details.StateRequested,
+						ErrorMsg:    tc.expectedErr.Error(),
+					},
+				},
+			}, upgradeDetails)
+		})
+	}
 }
 
 func TestMaybeOverrideRuntimeForComponent(t *testing.T) {

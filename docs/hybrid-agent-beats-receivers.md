@@ -12,7 +12,7 @@ testing instructions.
 Beat receivers are designed to output the exact same data they do today, and do not output data in the OTLP schema.
 
 Beat receivers will eventually be the default execution mode for Beat inputs in an elastic-agent.yml file (whether
-written by hand or generated via Fleet). Elastic Agent will automatically translate the relevant parts of it's
+written by hand or generated via Fleet). Elastic Agent will automatically translate the relevant parts of its
 elastic-agent.yml file into OpenTelemetry collector configurations and execute them in the collector. This capability
 is currently gated by a feature flag.
 
@@ -197,7 +197,7 @@ outputs:
 ## Hybrid Agent
 
 **Hybrid Agent** refers the capability of Elastic Agent to run OpenTelemetry collector pipelines specified directly in
-it's elastic-agent.yml file. This allows running Beat based ECS data collection alongside OTLP native data collection in
+its elastic-agent.yml file. This allows running Beat based ECS data collection alongside OTLP native data collection in
 the same agent. The diagram below shows the end state of the Elastic Agent where both Beats (via Beat receivers) and OpenTelemetry
 collector receivers run in the same collector process.
 

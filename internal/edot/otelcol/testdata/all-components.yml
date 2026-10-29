@@ -12,6 +12,8 @@ exporters:
   nop:
   logstash:
     hosts: ["localhost:5044"]
+  prometheus_remote_write:
+    endpoint: http://localhost:9090/api/v1/write
 
 extensions:
   health_check:
@@ -65,6 +67,11 @@ processors:
     rate: 1
     burst: 1
   tail_sampling:
+  adaptive_tail_sampling:
+    rules:
+      - name: default
+        sampler:
+          type: always_sample
   log_dedup:
   beat:
 
@@ -90,6 +97,13 @@ receivers:
     config:
       scrape_configs:
         - job_name: 'otel-collector'
+          scrape_interval: 5s
+          static_configs:
+            - targets: ['0.0.0.0:8888']
+  prometheusscrape:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector-passthrough'
           scrape_interval: 5s
           static_configs:
             - targets: ['0.0.0.0:8888']
@@ -125,7 +139,7 @@ receivers:
     region: us-east-1
     logs:
       initial_lookback: 1h
-      poll_interval: 1m
+      poll_interval: 1h
       groups:
         autodiscover:
           limit: 1
@@ -291,6 +305,7 @@ service:
         - nop
         - debug
         - otlp_grpc
+        - prometheus_remote_write
       processors:
         - attributes
         - batch
@@ -306,6 +321,7 @@ service:
         - http_check
         - span_metrics
         - prometheus
+        - prometheusscrape
         - elasticapmintake
         - apache
         - mysql
@@ -352,6 +368,7 @@ service:
         - resource_detection
         - transform
         - elasticapm
+        - adaptive_tail_sampling
       receivers:
         - nop
         - otlp

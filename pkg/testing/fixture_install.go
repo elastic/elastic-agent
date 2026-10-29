@@ -23,8 +23,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	agentsystemprocess "github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 	"github.com/elastic/elastic-agent-libs/mapstr"
-	agentsystemprocess "github.com/elastic/elastic-agent-system-metrics/metric/system/process"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -42,10 +42,11 @@ type CmdOpts interface {
 
 // EnrollOpts specifies the options for the enroll command
 type EnrollOpts struct {
-	ID              string // --id
-	URL             string // --url
-	EnrollmentToken string // --enrollment-token
-	ReplaceToken    string // --replace-token
+	ID              string   // --id
+	URL             string   // --url
+	EnrollmentToken string   // --enrollment-token
+	ReplaceToken    string   // --replace-token
+	Tags            []string // --tag
 
 	// SSL/TLS options
 	CertificateAuthorities []string // --certificate-authorities
@@ -67,6 +68,9 @@ func (e EnrollOpts) toCmdArgs() []string {
 	}
 	if e.ReplaceToken != "" {
 		args = append(args, "--replace-token", e.ReplaceToken)
+	}
+	if len(e.Tags) > 0 {
+		args = append(args, "--tag", strings.Join(e.Tags, ","))
 	}
 
 	if len(e.CertificateAuthorities) > 0 {

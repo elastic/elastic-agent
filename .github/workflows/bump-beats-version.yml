@@ -28,6 +28,7 @@ jobs:
   update-beats:
     permissions:
       contents: write
+      id-token: write
       pull-requests: write
     needs:
     - filter
@@ -36,10 +37,20 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.filter.outputs.matrix) }}
     steps:
+    # Mint before checkout so create-pull-request uses the Vault app (not GITHUB_TOKEN /
+    # github-actions[bot]), avoiding Approve-and-run on the opened PRs.
+    - name: Create ephemeral GitHub token
+      id: github-token
+      uses: elastic/oblt-actions/github/create-token@v1
+      with:
+        # Wildcard policy bump-*.yml@* (catalog token-policy-7821ae69db47)
+        token-policy: token-policy-7821ae69db47
+
     - uses: actions/checkout@v7
       with:
         submodules: true
         ref: ${{ matrix.branch }}
+        token: ${{ steps.github-token.outputs.token }}
 
     - name: Set up Go
       uses: actions/setup-go@v7
@@ -70,7 +81,7 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ steps.github-token.outputs.token }}
         commit-message: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.BEATS_NEW_VERSION }}"
         title: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.BEATS_NEW_VERSION }}"
         body: |

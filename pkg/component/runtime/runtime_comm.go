@@ -154,18 +154,6 @@ func (c *runtimeComm) CheckinExpected(
 	expected *proto.CheckinExpected,
 	observed *proto.CheckinObserved,
 ) {
-	if c.agentInfo != nil && c.agentInfo.AgentID() != "" {
-		expected.AgentInfo = &proto.AgentInfo{
-			Id:           c.agentInfo.AgentID(),
-			Version:      c.agentInfo.Version(),
-			Snapshot:     c.agentInfo.Snapshot(),
-			Mode:         ProtoAgentMode(c.agentInfo),
-			Unprivileged: c.agentInfo.Unprivileged(),
-		}
-	} else {
-		expected.AgentInfo = nil
-	}
-
 	// we need to determine if the communicator is currently waiting to complete the initial checkin process
 	// and if the given observed message is the same as the one the communicator is waiting for
 	c.initCheckinObservedMx.Lock()
@@ -227,7 +215,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		// being destroyed cannot reconnect; close connection
 		c.checkinLock.Unlock()
 		c.logger.Debug("check-in stream being destroyed connection not allowed; closing connection")
-		return status.Error(codes.Unavailable, "component cannot connect being destroyed")
+		return status.Error(codes.Unavailable, "component cannot connect while being destroyed")
 	}
 
 	checkinDone := make(chan bool)
@@ -342,7 +330,7 @@ func (c *runtimeComm) actions(server proto.ElasticAgent_ActionsServer) error {
 		// being destroyed cannot reconnect; close connection
 		c.actionsLock.Unlock()
 		c.logger.Debug("check-in stream being destroyed connection not allowed; closing connection")
-		return status.Error(codes.Unavailable, "application cannot connect being destroyed")
+		return status.Error(codes.Unavailable, "application cannot connect while being destroyed")
 	}
 
 	actionsDone := make(chan bool)

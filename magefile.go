@@ -52,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
 	tcommon "github.com/elastic/elastic-agent/pkg/testing/common"
@@ -61,6 +62,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/gcloud"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/kind"
+	"github.com/elastic/elastic-agent/pkg/testing/kubernetes/microshift"
 	"github.com/elastic/elastic-agent/pkg/testing/local"
 	"github.com/elastic/elastic-agent/pkg/testing/multipass"
 	"github.com/elastic/elastic-agent/pkg/testing/runner"
@@ -169,6 +171,9 @@ type Otel mg.Namespace
 
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
+
+// Release namespace contains tasks for release automation.
+type Release mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -578,12 +583,16 @@ func (Check) Changes() error {
 	return nil
 }
 
-// All runs all the tests.
-func (Test) All() {
-	mg.SerialDeps(Test.Unit)
+// All runs all the unit tests of the root module (Test.Unit)
+// and internal/edot (Test.UnitEdot). The two run in
+// parallel and write to separate build/TEST-go-unit.* and
+// build/TEST-go-unit_edot.* files.
+func (Test) All(ctx context.Context) {
+	mg.CtxDeps(ctx, Test.Unit, Test.UnitEdot)
 }
 
-// Unit runs all the unit tests.
+// Unit runs all the unit tests of the root Go module. It does not reach
+// internal/edot, which is a separate module; see Test.UnitEdot and Test.All.
 func (Test) Unit(ctx context.Context) error {
 	mg.Deps(Prepare.Env, Build.UnitTestBinaries)
 	cfg := devtools.SettingsFromContext(ctx)
@@ -599,6 +608,17 @@ func (Test) FIPSOnlyUnit(ctx context.Context) error {
 	params := devtools.DefaultGoTestUnitArgs(cfg)
 	params.Env["FIPS"] = "true"
 	params.Tags = append(params.Tags, "requirefips")
+	return devtools.GoTest(ctx, params)
+}
+
+// UnitEdot runs all the unit tests of the internal/edot module (the EDOT Collector).
+// internal/edot is a separate Go module, so Test.Unit does not reach its tests;
+// Test.All runs both. Honours the same env vars as Test.Unit (RACE_DETECTOR,
+// TEST_COVERAGE, FIPS); results are written to build/TEST-go-unit_edot.*.
+func (Test) UnitEdot(ctx context.Context) error {
+	mg.Deps(Prepare.Env)
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGoTestUnitEdotArgs(cfg)
 	return devtools.GoTest(ctx, params)
 }
 
@@ -1283,6 +1303,13 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 		return fmt.Errorf("creating flat dir %q: %w", flatPath, err)
 	}
 	defer os.RemoveAll(flatPath)
+	// the versioned drop dirs are rebuilt from the archives on every run (see flattenDependencies),
+	// so they are not kept with KEEP_ARCHIVE either
+	defer func() {
+		for _, pltf := range platforms {
+			os.RemoveAll(filepath.Join(dropPath, manifest.PlatformPackages[pltf]))
+		}
+	}()
 
 	// extract all dependencies from their archives into flat dir
 	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
@@ -1454,6 +1481,11 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		}
 		if err := os.MkdirAll(versionedFlatPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned flat dir %q: %w", versionedFlatPath, err))
+		}
+		// KEEP_ARCHIVE only caches the downloaded archives: the versioned drop dir is rebuilt from them on
+		// every run, so remove what a previous build left there instead of merging into it
+		if err := os.RemoveAll(versionedDropPath); err != nil {
+			panic(fmt.Errorf("cleaning versioned drop dir %q: %w", versionedDropPath, err))
 		}
 		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
@@ -2308,7 +2340,7 @@ func (Integration) Clean(ctx context.Context) error {
 		}
 	}
 
-	r, err := createTestRunner(cfg, false, "", "")
+	r, err := createTestRunner(ctx, cfg, false, "", "")
 	if err != nil {
 		return fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -2424,7 +2456,7 @@ func (i Integration) testServerless(ctx context.Context, matrix bool, testName s
 	return integRunner(ctx, "testing/integration/serverless", matrix, testName)
 }
 
-// TestKubernetes runs the integration tests defined in testing/integration/k8s
+// TestKubernetes runs the integration tests defined in testing/integration/k8s.
 func (i Integration) TestKubernetes(ctx context.Context) error {
 	return i.testKubernetes(ctx, false, "")
 }
@@ -3225,7 +3257,7 @@ func integRunnerOnce(ctx context.Context, matrix bool, testDir string, singleTes
 	if err != nil {
 		return 0, fmt.Errorf("failed to determine batches: %w", err)
 	}
-	r, err := createTestRunner(cfg, matrix, singleTest, goTestFlags, batches...)
+	r, err := createTestRunner(ctx, cfg, matrix, singleTest, goTestFlags, batches...)
 	if err != nil {
 		return 0, fmt.Errorf("error creating test runner: %w", err)
 	}
@@ -3283,7 +3315,7 @@ func getTestRunnerVersions(cfg *devtools.Settings) (string, string, error) {
 	return agentVersion, agentStackVersion, nil
 }
 
-func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
+func createTestRunner(ctx context.Context, cfg *devtools.Settings, matrix bool, singleTest string, goTestFlags string, batches ...define.Batch) (*runner.Runner, error) {
 	goVersion := cfg.GoVersion()
 
 	agentVersion, agentStackVersion, err := getTestRunnerVersions(cfg)
@@ -3336,6 +3368,13 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 			return nil, err
 		}
 		identifier = localIdentifier()
+	case microshift.Name:
+		var err error
+		instanceProvisioner, err = microshift.NewProvisioner()
+		if err != nil {
+			return nil, err
+		}
+		identifier = localIdentifier()
 	case dockerprov.Name:
 		instanceProvisioner, err = dockerprov.NewProvisioner()
 		if err != nil {
@@ -3346,7 +3385,16 @@ func createTestRunner(cfg *devtools.Settings, matrix bool, singleTest string, go
 		instanceProvisioner = local.NewProvisioner()
 		identifier = localIdentifier()
 	default:
-		return nil, fmt.Errorf("INSTANCE_PROVISIONER environment variable must be one of 'gcloud', 'multipass', 'kind', or 'docker', not %s", instanceProvisionerMode)
+		return nil, fmt.Errorf(
+			"INSTANCE_PROVISIONER environment variable must be one of %q, %q, %q, %q, %q, or %q, not %s",
+			gcloud.Name,
+			multipass.Name,
+			kind.Name,
+			microshift.Name,
+			dockerprov.Name,
+			local.Name,
+			instanceProvisionerMode,
+		)
 	}
 
 	// The local stack provisioner runs elastic-package locally and the external one
@@ -4696,4 +4744,67 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+// loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadSettings()
+	if err != nil {
+		return nil, err
+	}
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	cfg := settings.Release
+	return &cfg, nil
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateDocs updates version references in documentation and K8s manifests
+func (Release) UpdateDocs(version string) error {
+	return release.UpdateDocs(version)
+}
+
+// UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
+func (Release) UpdatePatchDocs(version string) error {
+	return release.UpdatePatchDocs(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
+}
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunMajorMinor() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
+}
+
+// RunPatch orchestrates the complete patch release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunPatch() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
+}
+
+// EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
+// CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
 }
