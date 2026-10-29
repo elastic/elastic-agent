@@ -323,6 +323,17 @@ func TestReconcileSkipsUnchangedCertificates(t *testing.T) {
 	assert.Empty(t, fake.calls, "certutil must not run while the certificates are unchanged")
 }
 
+func TestReconcileTouchesNothingWithoutCertificates(t *testing.T) {
+	// On Wolfi the default directory always exists, usually empty: the agent's home
+	// must stay as is (the agent owns all of it when it runs as root).
+	m, fake, _, _ := setup(t)
+
+	require.NoError(t, m.reconcile(t.Context()), "syncing an empty directory")
+
+	assert.Empty(t, fake.calls, "certutil must not run without certificates to import or remove")
+	assert.NoDirExists(t, filepath.Join(m.home, ".pki"), "no database may be created without certificates")
+}
+
 func TestRunRetriesAFailedSyncWithoutFileChanges(t *testing.T) {
 	m, fake, dir, _ := setup(t)
 	write(t, dir, "ca.pem", newCA(t, "ca"))

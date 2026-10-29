@@ -146,11 +146,17 @@ func (m *manager) certificates() (map[string][]byte, error) {
 }
 
 // reconcile makes the database hold exactly the configured certificates. It does
-// nothing when they are the ones the last successful sync applied. On error the
-// change stays pending and the next call retries it.
+// nothing when they are the ones the last successful sync applied, or when there is
+// neither a certificate to import nor a database to clean up: the configured paths
+// may exist empty (always so on Wolfi), and the agent's home must then stay as is.
+// On error the change stays pending and the next call retries it.
 func (m *manager) reconcile(ctx context.Context) error {
 	want, err := m.certificates()
 	if err == nil && m.applied != nil && maps.EqualFunc(want, m.applied, bytes.Equal) {
+		return nil
+	}
+	if err == nil && len(want) == 0 && !exists(filepath.Join(m.dbDir(), "cert9.db")) {
+		m.applied = want
 		return nil
 	}
 	if err := m.sync(ctx, want, err); err != nil {
