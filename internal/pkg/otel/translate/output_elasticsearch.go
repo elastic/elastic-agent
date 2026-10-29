@@ -538,7 +538,7 @@ func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
