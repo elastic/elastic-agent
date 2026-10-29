@@ -5,9 +5,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16691
       issue: []
       impact: ""
       action: ""
@@ -20,9 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16792
       issue: []
       impact: ""
       action: ""
@@ -35,9 +31,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16841
       issue: []
       impact: ""
       action: ""
@@ -50,9 +44,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16900
       issue: []
       impact: ""
       action: ""
@@ -65,9 +57,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16917
       issue: []
       impact: ""
       action: ""
@@ -80,9 +70,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16921
       issue: []
       impact: ""
       action: ""
@@ -97,9 +85,7 @@ entries:
         first host, so all data was sent to that host and the others were never used.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16937
       issue: []
       impact: ""
       action: ""
@@ -118,9 +104,7 @@ entries:
         `${agent.id} == '<id>'` input conditions that Synthetics private locations assign to agents.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/16972
       issue: []
       impact: ""
       action: ""
@@ -140,10 +124,9 @@ entries:
         policy's TLS certificate or CAs change, even if the Fleet hosts stay the same.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/17014
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17015
       impact: ""
       action: ""
       timestamp: 1791213566
@@ -156,10 +139,9 @@ entries:
         The elasticmonitoring receiver waited on a channel that was only closed by the goroutine launched in `Start` causing it to hang on shutdown when a component failed to start.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/17027
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16686
       impact: ""
       action: ""
       timestamp: 1791267968
@@ -172,10 +154,9 @@ entries:
         The coordinator's state Broadcaster kept the last published values alive in its ring buffer even when no subscriber could still receive them. These values are now cleared, which lowers live heap for agents running many units.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/17107
+      issue:
+        - https://github.com/elastic/synthetics-dev/issues/477
       impact: ""
       action: ""
       timestamp: 1791400000
@@ -187,9 +168,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/17118
       issue: []
       impact: ""
       action: ""
@@ -215,9 +194,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/17249
       issue: []
       impact: ""
       action: ""
@@ -230,10 +207,9 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
-      issue: []
+        - https://github.com/elastic/elastic-agent/pull/17256
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16700
       impact: ""
       action: ""
       timestamp: 1792192521
@@ -245,9 +221,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/17359
       issue: []
       impact: ""
       action: ""
@@ -260,9 +234,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/17588
       issue: []
       impact: ""
       action: ""
@@ -278,9 +250,7 @@ entries:
         for Beats based inputs which are configured to retry on 401 by default.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/15433
-        - https://github.com/elastic/elastic-agent/pull/17505
+        - https://github.com/elastic/elastic-agent/pull/17598
       issue:
         - https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52437
       impact: ""
