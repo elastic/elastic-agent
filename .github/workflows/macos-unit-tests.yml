@@ -38,6 +38,10 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: .go-version
+          cache-dependency-path: |
+            go.mod
+            beats/go.mod
+            internal/edot/go.mod
 
       - name: Install make
         run: |
