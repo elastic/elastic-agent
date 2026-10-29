@@ -17,7 +17,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261027225000-67ddf4bed4ed
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261028211320-a6e1521ce133
 	github.com/elastic/cloud-on-k8s/v3 v3.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.19.0
 	github.com/elastic/elastic-agent-libs v0.47.0
