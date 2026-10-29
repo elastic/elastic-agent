@@ -2,6 +2,9 @@
 
 These components are included in {{ "{{agent}}" }} version {{version.edot_collector}}.
 
+:::{table}
+:filterable:
+
 | Component | GitHub Repo | Support status | Component version | Added in Elastic Agent |
 |:---|:---|:---|:---|:---|
 {%if grouped_components['Receivers'] -%}
@@ -44,7 +47,8 @@ These components are included in {{ "{{agent}}" }} version {{version.edot_collec
 {% for comp in grouped_components['Providers'] -%}
 | [{{ comp['name'] }}]({% if comp.get('doc_link') %}{{ comp['doc_link'] }}{% else %}{{ comp['html_url'] }}{% endif %}) | {{ comp['repo_link'] }} | {{ comp['support_status'] }}{% if comp.get('annotation_number') %} [^{{ comp['annotation_number'] }}]{% endif %} | {{ comp['version'] }} | {{ comp.get('since', '') }} |
 {% endfor %}
-{% endif %}
+{% endif -%}
+:::
 {%- if annotations %}
 
 {% for annotation in annotations %}
