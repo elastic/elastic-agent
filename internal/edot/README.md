@@ -113,6 +113,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [k8sattributesprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/k8sattributesprocessor/v1.2.0/processor/k8sattributesprocessor/README.md) | v1.2.0 |
 | [logdedupprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/logdedupprocessor/v0.163.0/processor/logdedupprocessor/README.md) | v0.163.0 |
 | [memorylimiterprocessor](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/memorylimiterprocessor/v0.163.0/processor/memorylimiterprocessor/README.md) | v0.163.0 |
+| [processortest](https://github.com/open-telemetry/opentelemetry-collector/blob/processor/processortest/v0.163.0/processor/processortest/README.md) | v0.163.0 |
 | [ratelimitprocessor](https://github.com/elastic/opentelemetry-collector-components/blob/processor/ratelimitprocessor/v0.77.0/processor/ratelimitprocessor/README.md) | v0.77.0 |
 | [resourcedetectionprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourcedetectionprocessor/v0.163.0/processor/resourcedetectionprocessor/README.md) | v0.163.0 |
 | [resourceprocessor](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/processor/resourceprocessor/v0.163.0/processor/resourceprocessor/README.md) | v0.163.0 |

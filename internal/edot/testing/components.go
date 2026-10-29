@@ -6,6 +6,7 @@ package main
 
 import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/transformprocessor"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/extension"
@@ -21,6 +22,7 @@ import (
 
 // testComponents returns the minimal set of OTel factories needed by the
 // manager unit tests. Tests only use nop receivers/exporters, batch processor,
+// transform processor (injected by the manager into logs pipelines),
 // healthcheckv2 extension (injected by the manager), and elasticdiagnostics
 // extension (force-injected on every startup).
 func testComponents() (otelcol.Factories, error) {
@@ -38,6 +40,7 @@ func testComponents() (otelcol.Factories, error) {
 
 	factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
 		batchprocessor.NewFactory(),
+		transformprocessor.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

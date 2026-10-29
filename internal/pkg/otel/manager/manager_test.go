@@ -474,7 +474,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 
 				// trigger update: switch the collector log level to debug.
@@ -486,12 +486,12 @@ func TestOTelManager_Run(t *testing.T) {
 						},
 					},
 				})))
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil, logp.InfoLevel, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil, "")
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -505,7 +505,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 
 				// stop it, this should be restarted by the manager
@@ -518,7 +518,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil, logp.InfoLevel, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil, "")
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(0), m.recoveryRetries.Load(), "recovery retries should be 0")
@@ -532,7 +532,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 				require.EqualValues(t, 0, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 0")
 
@@ -559,7 +559,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil, logp.InfoLevel, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil, "")
 				e.EnsureOffWithoutError(t, updateTime)
 				assert.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.Equal(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
@@ -577,7 +577,7 @@ func TestOTelManager_Run(t *testing.T) {
 				})
 
 				cfg := confmap.NewFromStringMap(testConfig)
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 				seenRecoveredTimes := uint32(0)
 				require.Eventually(t, func() bool {
@@ -592,7 +592,7 @@ func TestOTelManager_Run(t *testing.T) {
 
 				// no configuration should stop the runner
 				updateTime = time.Now()
-				m.Update(nil, nil, logp.InfoLevel, nil)
+				m.Update(nil, nil, logp.InfoLevel, nil, "")
 				e.EnsureOffWithoutError(t, updateTime)
 				require.True(t, m.recoveryTimer.IsStopped(), "restart timer should be stopped")
 				assert.GreaterOrEqual(t, uint32(3), seenRecoveredTimes, "recovery retries should be 3")
@@ -611,7 +611,7 @@ func TestOTelManager_Run(t *testing.T) {
 				})
 
 				cfg := confmap.NewFromStringMap(testConfig)
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 				// ensure that it reports a generic fatal error for all components, a panic cannot be assigned to
 				// a specific component in the collector
@@ -658,7 +658,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 
 				// stop the manager to simulate that elastic-agent is shutting down
@@ -710,7 +710,7 @@ func TestOTelManager_Run(t *testing.T) {
 				// ensure that it got healthy
 				cfg := confmap.NewFromStringMap(testConfig)
 				updateTime := time.Now()
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 
 				// stop the manager to simulate that elastic-agent is shutting down
@@ -763,7 +763,7 @@ func TestOTelManager_Run(t *testing.T) {
 				require.NoError(t, err, "failed to inject user health extension")
 
 				updateTime := time.Now()
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureHealthy(t, updateTime)
 
 				require.EqualValues(t, 1, countHealthCheckExtensionStatuses(e.getCollectorStatus()), "health check extension status count should be 1")
@@ -785,7 +785,7 @@ func TestOTelManager_Run(t *testing.T) {
 					//
 					// this does give a good test of a truly invalid configuration
 					cfg := confmap.New() // empty config
-					m.Update(cfg, nil, logp.InfoLevel, nil)
+					m.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 					// delay between updates to ensure the collector will have to fail
 					<-time.After(100 * time.Millisecond)
@@ -838,7 +838,7 @@ func TestOTelManager_Run(t *testing.T) {
 						},
 					},
 				})
-				m.Update(cfg, nil, logp.InfoLevel, nil)
+				m.Update(cfg, nil, logp.InfoLevel, nil, "")
 				e.EnsureFatal(t, time.Now().Add(time.Second), func(collectT *assert.CollectT, _ *EventTime[error], latestStatus *EventTime[*status.AggregateStatus]) {
 					status := latestStatus.Value()
 
@@ -972,7 +972,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	})
 
 	cfg := confmap.NewFromStringMap(testConfigDebugLogLevel)
-	m.Update(cfg, nil, logp.InfoLevel, nil)
+	m.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 	// Normal collector logs must appear in the dedicated log file, not in the agent's own log.
 	logFileGlob := filepath.Join(paths.Home(), "logs", CollectorLogFileName+"-*.ndjson")
@@ -1071,7 +1071,7 @@ func TestOTelManager_PartialReceiverReload(t *testing.T) {
 			},
 		},
 	}
-	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil)
+	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil, "")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Positive(collect, countMsg("Everything is ready. Begin running and processing data"),
@@ -1101,7 +1101,7 @@ func TestOTelManager_PartialReceiverReload(t *testing.T) {
 		},
 	}
 	restartsBefore := countMsg("Config updated, restart service")
-	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil)
+	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil, "")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Positive(collect, countMsg("Config updated, performing partial receiver reload"),
@@ -1179,7 +1179,7 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 			},
 		},
 	}
-	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil)
+	m.Update(confmap.NewFromStringMap(initialCfg), nil, logp.InfoLevel, nil, "")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Positive(collect, countMsg("Everything is ready. Begin running and processing data"),
@@ -1209,7 +1209,7 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 		},
 	}
 	restartsBeforeUpdate := countMsg("Config updated, restart service")
-	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil)
+	m.Update(confmap.NewFromStringMap(updatedCfg), nil, logp.InfoLevel, nil, "")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		assert.Greater(collect, countMsg("Config updated, restart service"), restartsBeforeUpdate,
@@ -1295,7 +1295,7 @@ func TestOTelManager_Ports(t *testing.T) {
 
 			cfg := confmap.NewFromStringMap(testConfig)
 			cfg.Delete("service::telemetry::metrics::level") // change this to default
-			m.Update(cfg, nil, logp.InfoLevel, nil)
+			m.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 			// wait until status reflects the config update
 			require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -1418,7 +1418,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	// no retries, collector is not running
 	assert.Equal(t, uint32(0), m.recoveryRetries.Load())
 
-	m.Update(cfg, nil, logp.InfoLevel, nil)
+	m.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 	// wait until status reflects the config update
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
@@ -2095,7 +2095,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 
 	t.Run("collector config is passed down to the collector execution", func(t *testing.T) {
 		logpLevel := logp.InfoLevel
-		mgr.Update(collectorCfg, nil, logpLevel, nil)
+		mgr.Update(collectorCfg, nil, logpLevel, nil, "")
 		select {
 		case <-collectorStarted:
 		case <-ctx.Done():
@@ -2130,7 +2130,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("component config is passed down to the otel manager", func(t *testing.T) {
-		mgr.Update(collectorCfg, nil, logp.InfoLevel, components)
+		mgr.Update(collectorCfg, nil, logp.InfoLevel, components, "")
 		select {
 		case <-configUpdated:
 		case <-ctx.Done():
@@ -2146,7 +2146,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
-		mgr.Update(nil, nil, logp.InfoLevel, components)
+		mgr.Update(nil, nil, logp.InfoLevel, components, "")
 		select {
 		case <-configUpdated:
 		case <-ctx.Done():
@@ -2290,7 +2290,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	// Start the collector with InfoLevel. The config doesn't include a log level,
 	// so the effective collector log level comes from the agent log level parameter.
 	cfg := confmap.NewFromStringMap(testConfigNoLogLevel)
-	mgr.Update(cfg, nil, logp.InfoLevel, nil)
+	mgr.Update(cfg, nil, logp.InfoLevel, nil, "")
 
 	select {
 	case <-collectorStarted:
@@ -2301,7 +2301,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	// Send the same config but with a different agent log level.
 	// The collector must be restarted because the stdout/stderr log writers
 	// are created at startup with a specific level and cannot be reconfigured.
-	mgr.Update(cfg, nil, logp.DebugLevel, nil)
+	mgr.Update(cfg, nil, logp.DebugLevel, nil, "")
 
 	select {
 	case <-collectorStarted:
@@ -2423,7 +2423,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		},
 	}
 	// start the collector by giving it a mock config
-	mgr.Update(nil, nil, logp.InfoLevel, components)
+	mgr.Update(nil, nil, logp.InfoLevel, components, "")
 	select {
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for collector status update")
@@ -2446,7 +2446,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 	assert.Equal(t, componentState.State.State, client.UnitStateHealthy)
 
 	// stop the component by sending a nil config
-	mgr.Update(nil, nil, logp.InfoLevel, nil)
+	mgr.Update(nil, nil, logp.InfoLevel, nil, "")
 
 	// then send a nil status, indicating the collector is not running the component anymore
 	// do this a few times to see if the STOPPED state isn't lost along the way
@@ -2507,7 +2507,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		Event: componentstatus.NewEvent(componentstatus.StatusStarting),
 	}
 	// start the collector by giving it a mock config
-	mgr.Update(nil, nil, logp.InfoLevel, components)
+	mgr.Update(nil, nil, logp.InfoLevel, components, "")
 	select {
 	case <-ctx.Done():
 		t.Fatal("timeout waiting for collector status update")
@@ -2531,7 +2531,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 	assert.Equal(t, componentState.State.Message, "STARTING")
 
 	// stop the component by sending a nil config
-	mgr.Update(nil, nil, logp.InfoLevel, nil)
+	mgr.Update(nil, nil, logp.InfoLevel, nil, "")
 
 	// then send a nil status, indicating the collector is not running the component anymore
 	// do this a few times to see if the STOPPED state isn't lost along the way

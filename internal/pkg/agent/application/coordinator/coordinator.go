@@ -175,8 +175,9 @@ type RuntimeManager interface {
 type OTelManager interface {
 	Runner
 
-	// Update updates the current plain configuration for the otel collector and components.
-	Update(*confmap.Conf, *monitoringCfg.MonitoringConfig, logp.Level, []component.Component)
+	// Update updates the current plain configuration for the otel collector and components. hostname is the
+	// hostname the agent reports, added to logs from the plain configuration.
+	Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component, hostname string)
 
 	// WatchCollector returns a channel to watch for collector status updates.
 	WatchCollector() <-chan *status.AggregateStatus
@@ -246,6 +247,9 @@ type VarsManager interface {
 
 // minManagerShutdownTimeout is the minimum timeout used when no components are running.
 const minManagerShutdownTimeout = 5 * time.Second
+
+// initialHostnameLookupTimeout is how long the Coordinator waits for the hostname when it starts.
+const initialHostnameLookupTimeout = 5 * time.Second
 
 // managerShutdownTimeoutForComponents computes the manager shutdown timeout based on passed components.
 // It returns the maximum stop timeout across all command components plus a buffer,
@@ -480,6 +484,12 @@ type Coordinator struct {
 	componentPIDTicker         *time.Ticker
 	componentPidRequiresUpdate *atomic.Bool
 
+	// hostname is the hostname the agent reports. It's passed to the OTel manager and used in the OTel
+	// configuration. Only accessed from the Coordinator goroutine.
+	hostname string
+	// hostnameCh receives the hostname from watchHostname.
+	hostnameCh chan string
+
 	// Abstraction for diagnostics AddSecretMarkers function for testability
 	secretMarkerFunc func(*logger.Logger, *config.Config) error
 
@@ -609,6 +619,7 @@ func New(
 		heartbeatChan:              make(chan struct{}),
 		componentPIDTicker:         time.NewTicker(time.Second * 30),
 		componentPidRequiresUpdate: &atomic.Bool{},
+		hostnameCh:                 make(chan string),
 
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
@@ -1243,6 +1254,7 @@ func (c *Coordinator) Run(ctx context.Context) error {
 		otelChan = c.otelMgr.WatchComponents()
 	}
 	go c.watchRuntimeComponents(watchCtx, subChan, otelChan)
+	c.startWatchingHostname(watchCtx, initialHostnameLookupTimeout)
 
 	// Close the state broadcaster on finish, but leave it running in the
 	// background until all subscribers have read the final values or their
@@ -1707,6 +1719,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		c.setUpgradeDetails(upgradeDetails)
 
 	case c.heartbeatChan <- struct{}{}:
+
+	case hostname := <-c.hostnameCh:
+		c.processHostname(ctx, hostname)
 
 	case <-c.componentPIDTicker.C:
 		// if we hit the ticker and we've got a new PID,
@@ -2251,7 +2266,89 @@ func (c *Coordinator) applyOTelUpdate(components []component.Component) {
 	if len(ids) > 0 {
 		c.logger.With("component_ids", ids).Info("Using OpenTelemetry collector runtime.")
 	}
-	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, components)
+	c.otelMgr.Update(c.otelCfg, c.currentCfg.Settings.MonitoringConfig, c.state.LogLevel, components, c.hostname)
+}
+
+// startWatchingHostname starts watchHostname, and waits for the first lookup for up to timeout, so the first
+// configuration already uses the hostname. If the lookup takes longer, the run loop applies it when it finishes.
+func (c *Coordinator) startWatchingHostname(ctx context.Context, timeout time.Duration) {
+	firstLookupDone := make(chan struct{})
+	go c.watchHostname(ctx, firstLookupDone)
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case hostname := <-c.hostnameCh:
+		c.hostname = hostname
+	case <-firstLookupDone:
+		// The lookup failed.
+	case <-timer.C:
+		c.logger.Warnf("The agent hostname wasn't determined within %s, continuing without it", timeout)
+	case <-ctx.Done():
+	}
+}
+
+// watchHostname looks up the hostname the agent reports, and again whenever the FQDN feature changes it, and sends it
+// to the run loop. The lookup can take a while, for example when resolving the FQDN, so it doesn't run in the run
+// loop. firstLookupDone is closed after the first lookup.
+func (c *Coordinator) watchHostname(ctx context.Context, firstLookupDone chan<- struct{}) {
+	defer func() {
+		if firstLookupDone != nil {
+			close(firstLookupDone)
+		}
+	}()
+	if c.agentInfo == nil {
+		return
+	}
+	// The callback runs while the feature flags are locked, so it only signals the lookup. It's also called when
+	// the flags are applied without the FQDN feature changing.
+	fqdnChanged := make(chan struct{}, 1)
+	callbackID := fmt.Sprintf("coordinator-%p", c)
+	if err := features.AddFQDNOnChangeCallback(func(newValue, oldValue bool) {
+		if newValue == oldValue {
+			return
+		}
+		select {
+		case fqdnChanged <- struct{}{}:
+		default:
+		}
+	}, callbackID); err != nil {
+		c.logger.Errorf("Failed to watch the FQDN feature, hostname changes won't be applied: %v", err)
+	}
+	defer features.RemoveFQDNOnChangeCallback(callbackID)
+
+	for {
+		// The hostname the agent reports to Fleet, which honours ELASTIC_AGENT_HOSTNAME and the FQDN feature.
+		if ecsMeta, err := c.agentInfo.ECSMetadata(c.logger); err != nil {
+			c.logger.Warnf("Failed to determine the agent hostname: %v", err)
+		} else {
+			select {
+			case c.hostnameCh <- ecsMeta.Host.Hostname:
+			case <-ctx.Done():
+				return
+			}
+		}
+		if firstLookupDone != nil {
+			close(firstLookupDone)
+			firstLookupDone = nil
+		}
+		select {
+		case <-fqdnChanged:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// processHostname refreshes the component model if the hostname changed, so the OTel collector configuration uses it.
+func (c *Coordinator) processHostname(ctx context.Context, hostname string) {
+	if hostname == c.hostname {
+		return
+	}
+	c.hostname = hostname
+	if err := c.refreshComponentModel(ctx); err != nil {
+		c.logger.Errorf("Error refreshing component model for hostname change: %v", err)
+	}
 }
 
 // forceApplyPendingTransitions applies all deferred updates regardless of

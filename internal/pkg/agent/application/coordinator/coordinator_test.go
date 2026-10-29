@@ -2038,6 +2038,7 @@ type fakeOTelManager struct {
 	performDiagnosticsCallback          func(context.Context, ...runtime.ComponentUnitDiagnosticRequest) []runtime.ComponentUnitDiagnostic
 	performComponentDiagnosticsCallback func(context.Context, []cproto.AdditionalDiagnosticRequest, ...component.Component) ([]runtime.ComponentDiagnostic, error)
 	performActionCallback               func(context.Context, component.Component, component.Unit, string, map[string]interface{}) (map[string]interface{}, error)
+	updateHostnameCallback              func(string)
 	errChan                             chan error
 	collectorStatusChan                 chan *status.AggregateStatus
 	componentStateChan                  chan []runtime.ComponentComponentState
@@ -2052,7 +2053,10 @@ func (f *fakeOTelManager) Errors() <-chan error {
 	return f.errChan
 }
 
-func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component) {
+func (f *fakeOTelManager) Update(cfg *confmap.Conf, monitoring *monitoringCfg.MonitoringConfig, ll logp.Level, components []component.Component, hostname string) {
+	if f.updateHostnameCallback != nil {
+		f.updateHostnameCallback(hostname)
+	}
 	var collectorResult, componentResult error
 	if f.updateCollectorCallback != nil {
 		collectorResult = f.updateCollectorCallback(cfg)
