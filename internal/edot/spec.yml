@@ -64,7 +64,7 @@ inputs:
     outputs: *outputs
     command: *auditbeat_command
   - name: aws-cloudwatch
-    description: "AWS Cloudwatch"
+    description: "AWS CloudWatch"
     platforms: *platforms
     outputs: *outputs
     command: &filebeat_command
