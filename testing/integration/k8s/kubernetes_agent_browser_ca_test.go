@@ -82,9 +82,9 @@ func TestKubernetesAgentBrowserTrustsMountedCA(t *testing.T) {
 								"resources": map[string]any{
 									"limits": map[string]any{"memory": "1500Mi"},
 								},
-								"extraEnvs": []map[string]any{
-									{"name": "ELASTIC_NETINFO", "value": "false"},
-									{"name": "ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL", "value": "5s"},
+								"extraEnvs": []any{
+									map[string]any{"name": "ELASTIC_NETINFO", "value": "false"},
+									map[string]any{"name": "ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL", "value": "5s"},
 								},
 							},
 						},
