@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,19 +25,19 @@ func TestSyncWithRealCertutil(t *testing.T) {
 	}
 	dir := t.TempDir()
 	home := t.TempDir()
-	m := New(Config{Dir: dir, Home: home, Interval: time.Second, Runner: ExecRunner(certutil)})
+	m := &manager{paths: []string{dir}, home: home, certs: execRunner(certutil), log: &testLog{}}
 	list := func() string {
-		out, err := ExecRunner(certutil)(t.Context(), "-L", "-d", "sql:"+filepath.Join(home, ".pki", "nssdb"))
+		out, err := m.certs(t.Context(), nil, "-L", "-d", "sql:"+filepath.Join(home, ".pki", "nssdb"))
 		require.NoError(t, err, "listing the database")
 		return string(out)
 	}
 
 	write(t, dir, "bundle.pem", newCA(t, "one")+newCA(t, "two"))
-	require.NoError(t, m.Sync(t.Context()), "importing a bundle")
+	require.NoError(t, m.reconcile(t.Context()), "importing a bundle through certutil's standard input")
 	assert.Equal(t, 2, countManaged(list()), "both certificates of a bundle must be imported:\n%s", list())
 
 	require.NoError(t, os.Remove(filepath.Join(dir, "bundle.pem")), "removing the bundle")
-	require.NoError(t, m.Sync(t.Context()), "removing the certificates")
+	require.NoError(t, m.reconcile(t.Context()), "removing the certificates")
 	assert.Equal(t, 0, countManaged(list()), "removed certificates must leave the database:\n%s", list())
 }
 

@@ -25,6 +25,7 @@ type SettingsConfig struct {
 	Upgrade            *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 	Collector          *CollectorConfig                `yaml:"collector" config:"collector" json:"collector"`
 	Internal           *InternalConfig                 `yaml:"internal" config:"internal" json:"internal"`
+	Synthetics         *SyntheticsConfig               `yaml:"synthetics,omitempty" config:"synthetics,omitempty" json:"synthetics,omitempty"`
 
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`

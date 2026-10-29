@@ -186,20 +186,6 @@ func logInfo(streams *cli.IOStreams, a ...interface{}) {
 	fmt.Fprintln(streams.Out, a...)
 }
 
-// containerBeatHome is the agent user's home in the container images.
-const containerBeatHome = "/usr/share/elastic-agent"
-
-// streamsLogger writes to the container's output streams, for packages that take a logger.
-type streamsLogger struct{ streams *cli.IOStreams }
-
-func (l streamsLogger) Infof(format string, args ...any) {
-	fmt.Fprintf(l.streams.Out, format+"\n", args...)
-}
-
-func (l streamsLogger) Warnf(format string, args ...any) {
-	fmt.Fprintf(l.streams.Err, "WARNING: "+format+"\n", args...)
-}
-
 func logContainerCmd(streams *cli.IOStreams) error {
 	logsPath := envWithDefault("", "LOGS_PATH")
 	if logsPath != "" {
@@ -224,12 +210,6 @@ func containerCmd(streams *cli.IOStreams) error {
 	if err := setPaths("", "", "", "", true); err != nil {
 		return err
 	}
-
-	// Browser monitors (complete images) trust the CAs mounted in the container. This
-	// must run before the agent starts the browser: it may change HOME.
-	caCtx, stopCustomCAs := context.WithCancel(context.Background())
-	defer stopCustomCAs()
-	customca.Start(caCtx, customca.Options{BeatHome: containerBeatHome, Log: streamsLogger{streams}})
 
 	elasticCloud := envBool("ELASTIC_AGENT_CLOUD")
 	// if not in cloud mode, always run the agent
@@ -951,7 +931,50 @@ func containerCfgOverrides(cfg *config.Config) error {
 		}
 	}
 
+	if err := containerBrowserCAOverrides(cfg, uCfg); err != nil {
+		return err
+	}
+
 	return cfg.Merge(uCfg)
+}
+
+// containerBrowserCAOverrides makes browser monitors trust the CAs mounted at
+// customca.DefaultDir and the paths in ELASTIC_AGENT_BROWSER_CA, on top of those in
+// agent.synthetics.browser.certificate_authorities. ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL
+// sets how often they are checked for changes; 0 disables it.
+func containerBrowserCAOverrides(cfg *config.Config, uCfg map[string]any) error {
+	const key = "agent.synthetics.browser.certificate_authorities"
+	cas := []string{customca.DefaultDir}
+	// CountField can't resolve this dotted path, so read until the index runs out.
+	for i := 0; ; i++ {
+		ca, err := cfg.Agent.String(key, i, ucfg.PathSep("."))
+		if err != nil {
+			break
+		}
+		cas = append(cas, ca)
+	}
+	cas = append(cas, cli.StringToSlice(envWithDefault("", "ELASTIC_AGENT_BROWSER_CA"))...)
+	// Set directly, as for FLEET_CA, so merging can't mix it with the configured list.
+	if caChild, err := ucfg.NewFrom(cas); err != nil {
+		return fmt.Errorf("failed to create browser CA config for container override: %w", err)
+	} else if err := cfg.Agent.SetChild(key, -1, caChild, ucfg.PathSep(".")); err != nil {
+		return fmt.Errorf("failed to write browser CA config for container override: %w", err)
+	}
+
+	const reloadEnv = "ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL"
+	if v, ok := os.LookupEnv(reloadEnv); ok {
+		interval, err := time.ParseDuration(v)
+		switch {
+		case err != nil || interval < 0:
+			logp.Warn("cannot parse %s='%s' as a duration, using the default", reloadEnv, v)
+		case interval == 0:
+			uCfg["agent.synthetics.browser.certificate_reload.enabled"] = false
+		default:
+			uCfg["agent.synthetics.browser.certificate_reload.enabled"] = true
+			uCfg["agent.synthetics.browser.certificate_reload.reload_interval"] = interval.String()
+		}
+	}
+	return nil
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {

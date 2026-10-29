@@ -3,11 +3,10 @@
 // you may not use this file except in compliance with the Elastic License 2.0.
 
 // Package customca keeps the NSS database that Chromium reads in sync with the
-// CA certificates mounted in a container, so browser monitors trust them.
+// CA certificates configured under agent.synthetics.browser, so browser monitors
+// trust them.
 //
-// Chromium ignores the system trust store and only reads $HOME/.pki/nssdb. This
-// only applies to the Linux container images; elsewhere Start finds no CA
-// directory or certutil and does nothing.
+// Chromium ignores the system trust store on Linux and only reads $HOME/.pki/nssdb.
 package customca
 
 import (
@@ -20,38 +19,41 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
-	"sync"
 	"time"
 )
 
 const (
-	// DefaultDir is where CAs are mounted: the standard location on Debian-based systems.
+	// DefaultDir is where the container images look for CAs: the standard location on
+	// Debian-based systems, where a Kubernetes Secret is usually mounted.
 	DefaultDir = "/usr/local/share/ca-certificates"
-	// DefaultInterval is how often the directory is checked for changes.
-	DefaultInterval = 30 * time.Second
+	// defaultInterval is how often the CAs are checked for changes when
+	// certificate_reload.reload_interval is not set.
+	defaultInterval = 30 * time.Second
 
 	// nicknamePrefix marks the certificates managed here, so others in the database are left alone.
 	nicknamePrefix = "custom-ca-"
 )
 
-// Logger is the subset of a logger used here.
-type Logger interface {
+// logs is the subset of a logger used here.
+type logs interface {
 	Infof(format string, args ...any)
 	Warnf(format string, args ...any)
 }
 
-// Runner runs certutil with the given arguments.
-type Runner func(ctx context.Context, args ...string) ([]byte, error)
+// runner runs certutil with the given standard input and arguments.
+type runner func(ctx context.Context, stdin []byte, args ...string) ([]byte, error)
 
-// ExecRunner returns a Runner that runs the certutil binary at path.
-func ExecRunner(path string) Runner {
-	return func(ctx context.Context, args ...string) ([]byte, error) {
-		out, err := exec.CommandContext(ctx, path, args...).CombinedOutput()
+func execRunner(path string) runner {
+	return func(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
+		cmd := exec.CommandContext(ctx, path, args...)
+		cmd.Stdin = bytes.NewReader(stdin)
+		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return out, fmt.Errorf("certutil %s: %w: %s", args[0], err, bytes.TrimSpace(out))
 		}
@@ -59,99 +61,61 @@ func ExecRunner(path string) Runner {
 	}
 }
 
-// Owner is the user and group that must own the database, so a browser running as
-// another user can read it. It requires running as root.
-type Owner struct {
-	UID, GID int
+// owner is the user and group that must own the database, so a browser running as
+// another user can read it. Changing it requires running as root.
+type owner struct {
+	uid, gid int
 }
 
-// Config configures a Manager.
-type Config struct {
-	// Dir holds the PEM files (*.crt, *.pem) to trust.
-	Dir string
-	// Home is the browser's home directory; the database is <Home>/.pki/nssdb.
-	Home string
-	// Interval is how often Run checks Dir for changes.
-	Interval time.Duration
-	// Runner runs certutil.
-	Runner Runner
-	// Owner, if set, owns the database after each sync.
-	Owner *Owner
-	Log   Logger
+// manager imports the CAs found in a set of paths into an NSS database and keeps it in sync.
+type manager struct {
+	// paths are PEM files, or directories whose *.crt and *.pem files are read.
+	paths []string
+	// home is the browser's home directory; the database is <home>/.pki/nssdb.
+	home  string
+	certs runner
+	owner *owner // if set, owns the database after each sync
+	log   logs
+
+	// applied holds the certificates of the last successful sync, nil until one
+	// succeeds. A failed sync leaves it unchanged, so the change is retried.
+	applied map[string][]byte
 }
 
-// Manager imports the CAs in a directory into an NSS database and keeps it in sync.
-type Manager struct {
-	cfg Config
-
-	mu sync.Mutex
-	// applied is the digest of the files last synced successfully. A failed sync
-	// leaves it unchanged, so the same change is retried.
-	applied string
-	synced  bool
+func (m *manager) dbDir() string {
+	return filepath.Join(m.home, ".pki", "nssdb")
 }
 
-// New returns a Manager for cfg.
-func New(cfg Config) *Manager {
-	if cfg.Dir == "" {
-		cfg.Dir = DefaultDir
-	}
-	if cfg.Interval <= 0 {
-		cfg.Interval = DefaultInterval
-	}
-	return &Manager{cfg: cfg}
-}
-
-func (m *Manager) dbDir() string {
-	return filepath.Join(m.cfg.Home, ".pki", "nssdb")
-}
-
-// files returns the PEM files in the directory, sorted.
-func (m *Manager) files() []string {
+// files returns the PEM files in the configured paths, sorted and without duplicates.
+func (m *manager) files() []string {
 	var files []string
-	for _, pattern := range []string{"*.crt", "*.pem"} {
-		matches, _ := filepath.Glob(filepath.Join(m.cfg.Dir, pattern))
-		files = append(files, matches...)
-	}
-	var regular []string
-	for _, f := range files {
+	for _, p := range m.paths {
 		// Stat follows symlinks, which is how Kubernetes mounts Secrets.
-		if info, err := os.Stat(f); err == nil && info.Mode().IsRegular() {
-			regular = append(regular, f)
-		}
-	}
-	sort.Strings(regular)
-	return regular
-}
-
-// HasWork reports whether there is anything to sync: CAs to import, or an
-// existing database whose managed certificates may need removing.
-func (m *Manager) HasWork() bool {
-	if len(m.files()) > 0 {
-		return true
-	}
-	_, err := os.Stat(filepath.Join(m.dbDir(), "cert9.db"))
-	return err == nil
-}
-
-// digest hashes the content of the PEM files.
-func (m *Manager) digest() (string, error) {
-	h := sha256.New()
-	for _, f := range m.files() {
-		data, err := os.ReadFile(f)
+		info, err := os.Stat(p)
 		if err != nil {
-			return "", err
+			continue
 		}
-		h.Write([]byte(filepath.Base(f)))
-		h.Write(data)
+		if !info.IsDir() {
+			files = append(files, p)
+			continue
+		}
+		for _, pattern := range []string{"*.crt", "*.pem"} {
+			matches, _ := filepath.Glob(filepath.Join(p, pattern))
+			files = append(files, matches...)
+		}
 	}
-	return hex.EncodeToString(h.Sum(nil)), nil
+	files = slices.DeleteFunc(files, func(f string) bool {
+		info, err := os.Stat(f)
+		return err != nil || !info.Mode().IsRegular()
+	})
+	slices.Sort(files)
+	return slices.Compact(files)
 }
 
-// certificates decodes the CAs in the directory, keyed by nickname. The nickname
-// derives from the decoded certificate, so reformatting a PEM or listing a CA twice
-// never renames or drops it.
-func (m *Manager) certificates() (map[string][]byte, error) {
+// certificates decodes the configured CAs, keyed by nickname. The nickname derives
+// from the decoded certificate, so reformatting a PEM or listing a CA twice never
+// renames or drops it.
+func (m *manager) certificates() (map[string][]byte, error) {
 	want := map[string][]byte{}
 	var errs []error
 	for _, f := range m.files() {
@@ -171,7 +135,7 @@ func (m *Manager) certificates() (map[string][]byte, error) {
 			}
 			if _, err := x509.ParseCertificate(block.Bytes); err != nil {
 				// Retrying can't fix it: skip it, don't fail the sync.
-				m.warnf("ignoring an invalid certificate in %s: %v", filepath.Base(f), err)
+				m.log.Warnf("ignoring an invalid certificate in %s: %v", filepath.Base(f), err)
 				continue
 			}
 			sum := sha256.Sum256(block.Bytes)
@@ -181,36 +145,39 @@ func (m *Manager) certificates() (map[string][]byte, error) {
 	return want, errors.Join(errs...)
 }
 
-// Sync makes the database hold exactly the certificates in the directory. It
-// returns an error if anything could not be done; the change stays pending and
-// Run retries it. Certificates already in the database are never touched, so
-// running browsers see no gap.
-func (m *Manager) Sync(ctx context.Context) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.syncLocked(ctx)
+// reconcile makes the database hold exactly the configured certificates. It does
+// nothing when they are the ones the last successful sync applied. On error the
+// change stays pending and the next call retries it.
+func (m *manager) reconcile(ctx context.Context) error {
+	want, err := m.certificates()
+	if err == nil && m.applied != nil && maps.EqualFunc(want, m.applied, bytes.Equal) {
+		return nil
+	}
+	if err := m.sync(ctx, want, err); err != nil {
+		return err
+	}
+	m.applied = want
+	return nil
 }
 
-func (m *Manager) syncLocked(ctx context.Context) error {
-	// Hash first: if the files change while syncing, the next check sees it.
-	sum, err := m.digest()
-	if err != nil {
-		return fmt.Errorf("reading CA files: %w", err)
-	}
-
+// sync imports the certificates in want that the database lacks and removes the
+// managed ones it no longer wants. Certificates already in the database are never
+// touched, so running browsers see no gap. readErr, from reading the CA files, fails
+// the sync once everything else is done.
+func (m *manager) sync(ctx context.Context, want map[string][]byte, readErr error) error {
 	db := m.dbDir()
 	dbArg := "sql:" + db
 	if err := os.MkdirAll(db, 0o700); err != nil {
 		return fmt.Errorf("creating %s: %w", db, err)
 	}
 	if _, err := os.Stat(filepath.Join(db, "cert9.db")); err != nil {
-		if _, err := m.cfg.Runner(ctx, "-N", "-d", dbArg, "--empty-password"); err != nil {
+		if _, err := m.certs(ctx, nil, "-N", "-d", dbArg, "--empty-password"); err != nil {
 			return fmt.Errorf("creating NSS database: %w", err)
 		}
 	}
 
 	// Listing fails first on a corrupt database: stop before any change.
-	out, err := m.cfg.Runner(ctx, "-L", "-d", dbArg)
+	out, err := m.certs(ctx, nil, "-L", "-d", dbArg)
 	if err != nil {
 		return fmt.Errorf("reading NSS database (corrupt?): %w", err)
 	}
@@ -221,26 +188,15 @@ func (m *Manager) syncLocked(ctx context.Context) error {
 		}
 	}
 
-	want, errCerts := m.certificates()
-	errs := []error{errCerts}
-
-	tmp, err := os.MkdirTemp("", "customca-")
-	if err != nil {
-		return fmt.Errorf("creating a temporary directory: %w", err)
-	}
-	defer os.RemoveAll(tmp)
-
+	errs := []error{readErr}
 	var added, removed int
 	for nick, der := range want {
 		if existing[nick] {
 			continue
 		}
-		file := filepath.Join(tmp, nick+".pem")
-		if err := os.WriteFile(file, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0o600); err != nil {
-			errs = append(errs, err)
-			continue
-		}
-		if _, err := m.cfg.Runner(ctx, "-A", "-d", dbArg, "-n", nick, "-t", "C,,", "-i", file); err != nil {
+		// Without -i, certutil reads the certificate from its standard input.
+		ca := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+		if _, err := m.certs(ctx, ca, "-A", "-d", dbArg, "-n", nick, "-t", "C,,", "-a"); err != nil {
 			errs = append(errs, fmt.Errorf("importing %s: %w", nick, err))
 			continue
 		}
@@ -250,7 +206,7 @@ func (m *Manager) syncLocked(ctx context.Context) error {
 		if _, ok := want[nick]; ok {
 			continue
 		}
-		if _, err := m.cfg.Runner(ctx, "-D", "-d", dbArg, "-n", nick); err != nil {
+		if _, err := m.certs(ctx, nil, "-D", "-d", dbArg, "-n", nick); err != nil {
 			errs = append(errs, fmt.Errorf("removing %s: %w", nick, err))
 			continue
 		}
@@ -258,8 +214,8 @@ func (m *Manager) syncLocked(ctx context.Context) error {
 	}
 
 	// The browser may run as another user: it must be able to read the database.
-	if m.cfg.Owner != nil {
-		if err := chownTree(filepath.Join(m.cfg.Home, ".pki"), m.cfg.Owner); err != nil {
+	if m.owner != nil {
+		if err := chownTree(filepath.Join(m.home, ".pki"), m.owner); err != nil {
 			errs = append(errs, fmt.Errorf("changing the database owner: %w", err))
 		}
 	}
@@ -267,17 +223,15 @@ func (m *Manager) syncLocked(ctx context.Context) error {
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
-	m.applied, m.synced = sum, true
 	if added > 0 || removed > 0 {
-		m.infof("Custom CA certificates in the browser trust store: %d (added %d, removed %d)", len(want), added, removed)
+		m.log.Infof("Custom CA certificates in the browser trust store: %d (added %d, removed %d)", len(want), added, removed)
 	}
 	return nil
 }
 
-// Run checks the directory every Interval and syncs when its content changed or
-// the last sync failed, until ctx is done.
-func (m *Manager) Run(ctx context.Context) {
-	ticker := time.NewTicker(m.cfg.Interval)
+// run reconciles every interval until ctx is done.
+func (m *manager) run(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -285,21 +239,13 @@ func (m *Manager) Run(ctx context.Context) {
 			return
 		case <-ticker.C:
 		}
-		m.mu.Lock()
-		sum, err := m.digest()
-		unchanged := m.synced && sum == m.applied
-		if err == nil && (unchanged || (!m.synced && !m.HasWork())) {
-			m.mu.Unlock()
-			continue
+		if err := m.reconcile(ctx); err != nil {
+			m.log.Warnf("custom CA certificates not updated, will retry: %v", err)
 		}
-		if err := m.syncLocked(ctx); err != nil {
-			m.warnf("custom CA certificates not updated, will retry: %v", err)
-		}
-		m.mu.Unlock()
 	}
 }
 
-func chownTree(dir string, o *Owner) error {
+func chownTree(dir string, o *owner) error {
 	// Walk through a Root so symlinks can't lead the chown outside of dir.
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -310,18 +256,6 @@ func chownTree(dir string, o *Owner) error {
 		if err != nil {
 			return err
 		}
-		return root.Lchown(path, o.UID, o.GID)
+		return root.Lchown(path, o.uid, o.gid)
 	})
-}
-
-func (m *Manager) infof(format string, args ...any) {
-	if m.cfg.Log != nil {
-		m.cfg.Log.Infof(format, args...)
-	}
-}
-
-func (m *Manager) warnf(format string, args ...any) {
-	if m.cfg.Log != nil {
-		m.cfg.Log.Warnf(format, args...)
-	}
 }

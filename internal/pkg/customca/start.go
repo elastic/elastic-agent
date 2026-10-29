@@ -10,39 +10,102 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"runtime"
+	"slices"
 	"strconv"
-	"strings"
-	"time"
+
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const (
-	// IntervalEnv sets the check interval in seconds (or as a Go duration); 0 disables it.
-	IntervalEnv = "ELASTIC_AGENT_CUSTOM_CA_RELOAD_INTERVAL"
-	// BrowserUserEnv names the user the browser runs as when the agent starts as root.
-	BrowserUserEnv = "BEAT_SETUID_AS"
-)
+// browserUserEnv names the user Heartbeat runs the browser as when it starts as root.
+const browserUserEnv = "BEAT_SETUID_AS"
 
-// BrowserHome returns the home directory of the browser, whose .pki/nssdb Chromium
-// reads, and whether HOME must be changed to it.
+// Config is the agent.synthetics.browser section of the agent configuration.
+type Config struct {
+	// CertificateAuthorities are PEM files, or directories of *.crt and *.pem files,
+	// whose CAs browser monitors trust.
+	CertificateAuthorities []string `config:"certificate_authorities" yaml:"certificate_authorities,omitempty" json:"certificate_authorities,omitempty"`
+	// CertificateReload keeps checking the CAs for changes, so none needs a restart.
+	CertificateReload tlscommon.CertificateReload `config:"certificate_reload" yaml:"certificate_reload,omitempty" json:"certificate_reload,omitempty"`
+}
+
+// Start imports the configured CAs into the browser's trust store and, unless
+// certificate_reload is disabled, keeps it in sync until ctx is done. It does
+// nothing outside Linux, when none of the configured paths exists, or without
+// certutil. It never returns an error: a failure only logs a warning, so it can't
+// stop the agent from starting.
 //
-// As root, Heartbeat runs the browser as another user with that user's home, so
-// that is beatHome. Arbitrary UIDs (e.g. on OpenShift) get a read-only "/" as HOME:
-// then beatHome is used, and must be exported before the agent starts, because the
-// browser inherits the environment of the process that launches it.
-func BrowserHome(isRoot bool, home, beatHome string) (dir string, setHome bool) {
+// It must run before the agent starts the browser, because it may change HOME.
+func Start(ctx context.Context, log *logger.Logger, cfg Config) {
+	if runtime.GOOS != "linux" || !slices.ContainsFunc(cfg.CertificateAuthorities, exists) {
+		return
+	}
+	m := &manager{paths: cfg.CertificateAuthorities, log: log}
+	certutil, err := exec.LookPath("certutil")
+	if err != nil {
+		if len(m.files()) > 0 {
+			log.Warnf("certutil not found, the custom CAs for browser monitors are not imported")
+		}
+		return
+	}
+	m.certs = execRunner(certutil)
+	m.home, m.owner = browserHome(log)
+
+	reload := cfg.CertificateReload.IsEnabled()
+	if err := m.reconcile(ctx); err != nil {
+		if reload {
+			log.Warnf("custom CA certificates not imported, will retry: %v", err)
+		} else {
+			log.Warnf("custom CA certificates not imported: %v", err)
+		}
+	}
+	if reload {
+		interval := cfg.CertificateReload.ReloadInterval
+		if interval <= 0 {
+			interval = defaultInterval
+		}
+		go m.run(ctx, interval)
+	}
+}
+
+func exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// browserHome returns the home directory whose .pki/nssdb the browser reads, and
+// the owner the database needs.
+//
+// As root, Heartbeat runs the browser as BEAT_SETUID_AS with that user's home, so
+// the database goes there and is given to that user. Otherwise the browser uses
+// HOME, unless HOME isn't writable (arbitrary UIDs on OpenShift get "/"): then HOME
+// is changed to that user's home, which the browser inherits when it starts.
+func browserHome(log logs) (string, *owner) {
+	home := os.Getenv("HOME")
+	isRoot := os.Geteuid() == 0
+	if !isRoot && writable(home) {
+		return home, nil
+	}
+	userHome, o, err := lookupBrowserUser(os.Getenv(browserUserEnv))
+	if err != nil {
+		log.Warnf("the browser may not read the custom CAs: %v", err)
+	}
+	if userHome == "" {
+		return home, nil
+	}
 	if isRoot {
-		return beatHome, false
+		return userHome, o
 	}
-	if writable(home) {
-		return home, false
-	}
-	return beatHome, true
+	_ = os.Setenv("HOME", userHome)
+	return userHome, nil
 }
 
 func writable(dir string) bool {
 	if dir == "" {
 		return false
 	}
+	// Probe through a Root: the directory comes from HOME, so stay inside it.
 	root, err := os.OpenRoot(dir)
 	if err != nil {
 		return false
@@ -58,107 +121,20 @@ func writable(dir string) bool {
 	return true
 }
 
-// ParseInterval parses the value of IntervalEnv: whole seconds, or a Go duration.
-func ParseInterval(v string) time.Duration {
-	v = strings.TrimSpace(v)
-	if v == "" {
-		return DefaultInterval
-	}
-	if secs, err := strconv.Atoi(v); err == nil && secs >= 0 {
-		return time.Duration(secs) * time.Second
-	}
-	if d, err := time.ParseDuration(v); err == nil && d >= 0 {
-		return d
-	}
-	return DefaultInterval
-}
-
-// Options are the inputs of Start.
-type Options struct {
-	// Dir is the directory with the CAs; DefaultDir when empty.
-	Dir string
-	// BeatHome is the browser user's home when it can't be looked up from BEAT_SETUID_AS.
-	BeatHome string
-	// Log receives progress and warnings.
-	Log Logger
-}
-
-// Start imports the CAs mounted in the container and keeps them in sync until ctx
-// is done. It does nothing unless the CA directory exists, and never returns an
-// error: a failure only logs a warning, so it can't stop the agent from starting.
-//
-// It must run before the agent starts the browser, because it may change HOME.
-func Start(ctx context.Context, opts Options) {
-	dir := opts.Dir
-	if dir == "" {
-		dir = DefaultDir
-	}
-	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		return
-	}
-	certutil, err := exec.LookPath("certutil")
-	if err != nil {
-		if len((&Manager{cfg: Config{Dir: dir}}).files()) > 0 && opts.Log != nil {
-			opts.Log.Warnf("certutil not found, custom CAs in %s are not imported", dir)
-		}
-		return
-	}
-
-	// The browser runs as this user when the agent starts as root, and its home is
-	// where Heartbeat points HOME, so it is also the fallback for arbitrary UIDs.
-	browserUser, owner, err := lookupBrowserUser(os.Getenv(BrowserUserEnv))
-	if err != nil && opts.Log != nil {
-		opts.Log.Warnf("the browser may not read the custom CAs: %v", err)
-	}
-	beatHome := opts.BeatHome
-	if browserUser != nil && browserUser.HomeDir != "" {
-		beatHome = browserUser.HomeDir
-	}
-
-	isRoot := os.Geteuid() == 0
-	home, setHome := BrowserHome(isRoot, os.Getenv("HOME"), beatHome)
-	if setHome {
-		_ = os.Setenv("HOME", home)
-	}
-	if !isRoot {
-		owner = nil // only root can give files away
-	}
-
-	m := New(Config{
-		Dir:      dir,
-		Home:     home,
-		Interval: ParseInterval(os.Getenv(IntervalEnv)),
-		Runner:   ExecRunner(certutil),
-		Owner:    owner,
-		Log:      opts.Log,
-	})
-	if m.HasWork() {
-		// On failure Run retries it.
-		if err := m.Sync(ctx); err != nil && opts.Log != nil {
-			opts.Log.Warnf("custom CA certificates not imported, will retry: %v", err)
-		}
-	}
-	if m.cfg.Interval > 0 {
-		go m.Run(ctx)
-	}
-}
-
-// lookupBrowserUser looks up the user the browser runs as. It returns nil, nil, nil when none is configured.
-func lookupBrowserUser(name string) (*user.User, *Owner, error) {
+// lookupBrowserUser returns the home and the owner of the user the browser runs as,
+// or nothing when none is configured.
+func lookupBrowserUser(name string) (string, *owner, error) {
 	if name == "" {
-		return nil, nil, nil
+		return "", nil, nil
 	}
 	u, err := user.Lookup(name)
 	if err != nil {
-		return nil, nil, fmt.Errorf("looking up %s: %w", BrowserUserEnv, err)
+		return "", nil, fmt.Errorf("looking up %s: %w", browserUserEnv, err)
 	}
-	uid, err := strconv.Atoi(u.Uid)
-	if err != nil {
-		return u, nil, err
+	uid, errUID := strconv.Atoi(u.Uid)
+	gid, errGID := strconv.Atoi(u.Gid)
+	if errUID != nil || errGID != nil {
+		return u.HomeDir, nil, fmt.Errorf("user %s has a non-numeric uid %q or gid %q", name, u.Uid, u.Gid)
 	}
-	gid, err := strconv.Atoi(u.Gid)
-	if err != nil {
-		return u, nil, err
-	}
-	return u, &Owner{UID: uid, GID: gid}, nil
+	return u.HomeDir, &owner{uid: uid, gid: gid}, nil
 }

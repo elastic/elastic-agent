@@ -27,6 +27,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 // newCA returns a self-signed CA certificate in PEM form.
@@ -59,7 +61,7 @@ type fakeNSS struct {
 
 func newFakeNSS() *fakeNSS { return &fakeNSS{certs: map[string]bool{}} }
 
-func (f *fakeNSS) run(_ context.Context, args ...string) ([]byte, error) {
+func (f *fakeNSS) run(_ context.Context, stdin []byte, args ...string) ([]byte, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	op := args[0]
@@ -91,11 +93,7 @@ func (f *fakeNSS) run(_ context.Context, args ...string) ([]byte, error) {
 		f.calls = append(f.calls, "-L")
 		return []byte(b.String()), nil
 	case "-A":
-		data, err := os.ReadFile(arg("-i"))
-		if err != nil {
-			return nil, err
-		}
-		if block, _ := pem.Decode(data); block == nil || block.Type != "CERTIFICATE" {
+		if block, _ := pem.Decode(stdin); block == nil || block.Type != "CERTIFICATE" {
 			return nil, errors.New("not a certificate")
 		}
 		f.certs[arg("-n")] = true
@@ -164,14 +162,16 @@ func write(t *testing.T, dir, name, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600), "writing %s", name)
 }
 
-func setup(t *testing.T) (*Manager, *fakeNSS, string, *testLog) {
+func setup(t *testing.T) (*manager, *fakeNSS, string, *testLog) {
 	t.Helper()
 	dir := t.TempDir()
 	fake := newFakeNSS()
 	log := &testLog{}
-	m := New(Config{Dir: dir, Home: t.TempDir(), Interval: 10 * time.Millisecond, Runner: fake.run, Log: log})
+	m := &manager{paths: []string{dir}, home: t.TempDir(), certs: fake.run, log: log}
 	return m, fake, dir, log
 }
+
+const testInterval = 10 * time.Millisecond
 
 func TestSyncImportsEveryCertificate(t *testing.T) {
 	m, fake, dir, _ := setup(t)
@@ -180,7 +180,7 @@ func TestSyncImportsEveryCertificate(t *testing.T) {
 	write(t, dir, "ignored.txt", newCA(t, "ignored"))
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "sub.crt"), 0o700), "creating a directory named like a certificate")
 
-	require.NoError(t, m.Sync(t.Context()), "syncing")
+	require.NoError(t, m.reconcile(t.Context()), "syncing")
 
 	assert.Len(t, fake.nicknames(), 3, "every certificate of every .crt/.pem file must be imported, and only those: %v", fake.nicknames())
 }
@@ -192,7 +192,7 @@ func TestSyncFollowsSymlinks(t *testing.T) {
 	write(t, filepath.Dir(target), "real", newCA(t, "linked"))
 	require.NoError(t, os.Symlink(target, filepath.Join(dir, "ca.crt")), "creating symlink")
 
-	require.NoError(t, m.Sync(t.Context()), "syncing")
+	require.NoError(t, m.reconcile(t.Context()), "syncing")
 
 	assert.Len(t, fake.nicknames(), 1, "a symlinked certificate must be imported")
 }
@@ -201,14 +201,14 @@ func TestSyncReformattedPEMKeepsCertificate(t *testing.T) {
 	m, fake, dir, _ := setup(t)
 	ca := newCA(t, "ca")
 	write(t, dir, "ca.pem", ca)
-	require.NoError(t, m.Sync(t.Context()), "first sync")
+	require.NoError(t, m.reconcile(t.Context()), "first sync")
 	before := fake.nicknames()
 	fake.reset()
 
 	// Same certificate, different line endings, wrapping and surrounding text.
 	body := strings.ReplaceAll(strings.TrimSpace(ca), "\n", "\r\n")
 	write(t, dir, "ca.pem", "# my corporate CA\r\n"+body+"\r\n\r\n")
-	require.NoError(t, m.Sync(t.Context()), "second sync")
+	require.NoError(t, m.reconcile(t.Context()), "second sync")
 
 	assert.ElementsMatch(t, before, fake.nicknames(), "a reformatted PEM must keep the same certificate")
 	assert.Empty(t, fake.callsWith("-A"), "an unchanged certificate must not be imported again")
@@ -220,11 +220,11 @@ func TestSyncDuplicateCertificateSurvivesRemovingOneCopy(t *testing.T) {
 	ca := newCA(t, "ca")
 	write(t, dir, "a.pem", ca)
 	write(t, dir, "b.pem", strings.ReplaceAll(ca, "\n", "\r\n"))
-	require.NoError(t, m.Sync(t.Context()), "first sync")
+	require.NoError(t, m.reconcile(t.Context()), "first sync")
 	require.Len(t, fake.nicknames(), 1, "two copies of a CA are one certificate")
 
 	require.NoError(t, os.Remove(filepath.Join(dir, "b.pem")), "removing one copy")
-	require.NoError(t, m.Sync(t.Context()), "second sync")
+	require.NoError(t, m.reconcile(t.Context()), "second sync")
 
 	assert.Len(t, fake.nicknames(), 1, "the CA must stay trusted while one copy remains")
 }
@@ -233,11 +233,11 @@ func TestSyncRemovesCertificatesNoLongerMounted(t *testing.T) {
 	m, fake, dir, _ := setup(t)
 	write(t, dir, "keep.pem", newCA(t, "keep"))
 	write(t, dir, "drop.pem", newCA(t, "drop"))
-	require.NoError(t, m.Sync(t.Context()), "first sync")
+	require.NoError(t, m.reconcile(t.Context()), "first sync")
 	require.Len(t, fake.nicknames(), 2, "both certificates imported")
 
 	require.NoError(t, os.Remove(filepath.Join(dir, "drop.pem")), "removing a CA")
-	require.NoError(t, m.Sync(t.Context()), "second sync")
+	require.NoError(t, m.reconcile(t.Context()), "second sync")
 
 	assert.Len(t, fake.nicknames(), 1, "a removed CA must stop being trusted")
 }
@@ -247,7 +247,7 @@ func TestSyncLeavesOtherCertificatesAlone(t *testing.T) {
 	fake.certs["someone-elses-ca"] = true
 	write(t, dir, "ca.pem", newCA(t, "ca"))
 
-	require.NoError(t, m.Sync(t.Context()), "syncing")
+	require.NoError(t, m.reconcile(t.Context()), "syncing")
 
 	assert.True(t, fake.certs["someone-elses-ca"], "certificates not imported by the agent must not be removed")
 }
@@ -257,7 +257,7 @@ func TestSyncSkipsInvalidCertificatesWithoutFailing(t *testing.T) {
 	write(t, dir, "bad.pem", "-----BEGIN CERTIFICATE-----\nbm90IGEgY2VydA==\n-----END CERTIFICATE-----\n")
 	write(t, dir, "good.pem", newCA(t, "good"))
 
-	require.NoError(t, m.Sync(t.Context()), "an invalid certificate can't be fixed by retrying, so it must not fail the sync")
+	require.NoError(t, m.reconcile(t.Context()), "an invalid certificate can't be fixed by retrying, so it must not fail the sync")
 
 	assert.Len(t, fake.nicknames(), 1, "the valid certificate must still be imported")
 	assert.True(t, log.has("invalid certificate"), "the invalid certificate must be reported: %v", log.logs)
@@ -273,7 +273,7 @@ func TestSyncCorruptDatabaseChangesNothing(t *testing.T) {
 		return nil
 	}
 
-	err := m.Sync(t.Context())
+	err := m.reconcile(t.Context())
 
 	require.Error(t, err, "a corrupt database must be reported")
 	assert.Empty(t, fake.callsWith("-A"), "nothing may be imported when the database can't be read")
@@ -295,9 +295,32 @@ func TestSyncReportsPartialFailure(t *testing.T) {
 		return nil
 	}
 
-	require.Error(t, m.Sync(t.Context()), "a failed import must fail the sync")
+	require.Error(t, m.reconcile(t.Context()), "a failed import must fail the sync")
 
 	assert.Len(t, fake.nicknames(), 1, "the other certificate must still be imported")
+}
+
+func TestReconcileImportsConfiguredFilesAndDirectories(t *testing.T) {
+	m, fake, dir, _ := setup(t)
+	write(t, dir, "in-dir.crt", newCA(t, "in dir"))
+	file := filepath.Join(t.TempDir(), "listed.cer")
+	require.NoError(t, os.WriteFile(file, []byte(newCA(t, "listed")), 0o600), "writing a listed file")
+	m.paths = append(m.paths, file, dir, filepath.Join(t.TempDir(), "missing"))
+
+	require.NoError(t, m.reconcile(t.Context()), "syncing")
+
+	assert.Len(t, fake.nicknames(), 2, "a listed file is read whatever its extension, a directory once, a missing path skipped")
+}
+
+func TestReconcileSkipsUnchangedCertificates(t *testing.T) {
+	m, fake, dir, _ := setup(t)
+	write(t, dir, "ca.crt", newCA(t, "ca"))
+	require.NoError(t, m.reconcile(t.Context()), "first sync")
+	fake.reset()
+
+	require.NoError(t, m.reconcile(t.Context()), "second sync")
+
+	assert.Empty(t, fake.calls, "certutil must not run while the certificates are unchanged")
 }
 
 func TestRunRetriesAFailedSyncWithoutFileChanges(t *testing.T) {
@@ -313,11 +336,11 @@ func TestRunRetriesAFailedSyncWithoutFileChanges(t *testing.T) {
 		}
 		return nil
 	}
-	require.Error(t, m.Sync(t.Context()), "the first sync must fail")
+	require.Error(t, m.reconcile(t.Context()), "the first sync must fail")
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	go m.Run(ctx)
+	go m.run(ctx, testInterval)
 	time.Sleep(50 * time.Millisecond)
 	require.Empty(t, fake.nicknames(), "nothing is imported while the database can't be created")
 
@@ -331,15 +354,12 @@ func TestRunRetriesAFailedSyncWithoutFileChanges(t *testing.T) {
 
 func TestRunAppliesChangesWhileRunning(t *testing.T) {
 	m, fake, dir, _ := setup(t)
+	require.NoError(t, m.reconcile(t.Context()), "starting with no CA")
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	go m.Run(ctx)
+	go m.run(ctx, testInterval)
 
-	time.Sleep(50 * time.Millisecond)
-	assert.Empty(t, fake.callsWith("-L"), "nothing to do while no CA was ever mounted: the database must not even be created")
-
-	ca := newCA(t, "ca")
-	write(t, dir, "ca.crt", ca)
+	write(t, dir, "ca.crt", newCA(t, "ca"))
 	assert.Eventually(t, func() bool { return len(fake.nicknames()) == 1 }, 5*time.Second, 10*time.Millisecond,
 		"a CA mounted while running must be imported")
 
@@ -352,86 +372,87 @@ func TestRunStopsWithItsContext(t *testing.T) {
 	m, _, _, _ := setup(t)
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
-	go func() { m.Run(ctx); close(done) }()
+	go func() { m.run(ctx, testInterval); close(done) }()
 
 	cancel()
 
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		require.Fail(t, "Run must return once its context is done")
+		require.Fail(t, "run must return once its context is done")
 	}
 }
 
 func TestSyncChownsTheDatabase(t *testing.T) {
 	// Chowning to oneself works without root and proves the call is made.
 	m, _, dir, _ := setup(t)
-	m.cfg.Owner = &Owner{UID: os.Getuid(), GID: os.Getgid()}
+	m.owner = &owner{uid: os.Getuid(), gid: os.Getgid()}
 	write(t, dir, "ca.pem", newCA(t, "ca"))
 
-	require.NoError(t, m.Sync(t.Context()), "syncing as the database owner")
+	require.NoError(t, m.reconcile(t.Context()), "syncing as the database owner")
 
-	assert.DirExists(t, filepath.Join(m.cfg.Home, ".pki", "nssdb"), "database directory")
+	assert.DirExists(t, filepath.Join(m.home, ".pki", "nssdb"), "database directory")
 }
 
 func TestBrowserHome(t *testing.T) {
-	writableHome := t.TempDir()
-	tests := []struct {
-		name        string
-		isRoot      bool
-		home        string
-		wantHome    string
-		wantSetHome bool
-	}{
-		{"root uses the browser user's home and leaves HOME alone", true, "/root", "/beat", false},
-		{"a writable HOME is used", false, writableHome, writableHome, false},
-		{"a read-only HOME falls back to the agent home", false, "/proc", "/beat", true},
-		{"a missing HOME falls back to the agent home", false, "", "/beat", true},
+	if os.Geteuid() == 0 {
+		t.Skip("covers a browser that runs as the agent's own, non-root user")
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			home, set := BrowserHome(tc.isRoot, tc.home, "/beat")
-			assert.Equal(t, tc.wantHome, home, "home directory")
-			assert.Equal(t, tc.wantSetHome, set, "whether HOME must be changed")
-		})
-	}
+	cur, err := user.Current()
+	require.NoError(t, err, "current user")
+
+	t.Run("a writable HOME is used as is", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(browserUserEnv, cur.Username)
+
+		got, o := browserHome(&testLog{})
+
+		assert.Equal(t, home, got, "browser home")
+		assert.Nil(t, o, "only root changes the owner")
+		assert.Equal(t, home, os.Getenv("HOME"), "HOME must not change")
+	})
+
+	t.Run("a read-only HOME falls back to the browser user's home", func(t *testing.T) {
+		t.Setenv("HOME", "/proc")
+		t.Setenv(browserUserEnv, cur.Username)
+
+		got, o := browserHome(&testLog{})
+
+		assert.Equal(t, cur.HomeDir, got, "browser home")
+		assert.Nil(t, o, "only root changes the owner")
+		assert.Equal(t, cur.HomeDir, os.Getenv("HOME"), "HOME must be exported for the browser")
+	})
+
+	t.Run("without a browser user a read-only HOME is kept", func(t *testing.T) {
+		t.Setenv("HOME", "/proc")
+		t.Setenv(browserUserEnv, "")
+
+		got, _ := browserHome(&testLog{})
+
+		assert.Equal(t, "/proc", got, "browser home")
+	})
 }
 
-func TestParseInterval(t *testing.T) {
-	tests := map[string]time.Duration{
-		"":         DefaultInterval,
-		"5":        5 * time.Second,
-		"0":        0,
-		"2m":       2 * time.Minute,
-		"500ms":    500 * time.Millisecond,
-		"nonsense": DefaultInterval,
-		"-3":       DefaultInterval,
-	}
-	for in, want := range tests {
-		assert.Equal(t, want, ParseInterval(in), "ParseInterval(%q)", in)
-	}
-}
-
-func TestStartDoesNothingWithoutTheDirectory(t *testing.T) {
-	log := &testLog{}
-	Start(t.Context(), Options{Dir: filepath.Join(t.TempDir(), "missing"), BeatHome: t.TempDir(), Log: log})
-	assert.Empty(t, log.logs, "nothing may be logged or done when no CA directory is mounted")
+func TestStartDoesNothingWithoutTheConfiguredPaths(t *testing.T) {
+	log, logs := loggertest.New(t.Name())
+	Start(t.Context(), log, Config{CertificateAuthorities: []string{filepath.Join(t.TempDir(), "missing")}})
+	assert.Zero(t, logs.Len(), "nothing may be logged or done when no configured path exists")
 }
 
 func TestLookupBrowserUser(t *testing.T) {
 	cur, err := user.Current()
 	require.NoError(t, err, "current user")
 
-	u, owner, err := lookupBrowserUser(cur.Username)
+	home, o, err := lookupBrowserUser(cur.Username)
 	require.NoError(t, err, "looking up an existing user")
-	assert.Equal(t, cur.HomeDir, u.HomeDir, "the browser's home is the user's home")
-	assert.Equal(t, os.Getuid(), owner.UID, "owner UID")
-	assert.Equal(t, os.Getgid(), owner.GID, "owner GID")
+	assert.Equal(t, cur.HomeDir, home, "the browser's home is the user's home")
+	assert.Equal(t, &owner{uid: os.Getuid(), gid: os.Getgid()}, o, "owner")
 
-	u, owner, err = lookupBrowserUser("")
+	home, o, err = lookupBrowserUser("")
 	require.NoError(t, err, "no configured user is not an error")
-	assert.Nil(t, u, "no user when none is configured")
-	assert.Nil(t, owner, "no owner when none is configured")
+	assert.Empty(t, home, "no home when no user is configured")
+	assert.Nil(t, o, "no owner when no user is configured")
 
 	_, _, err = lookupBrowserUser("no-such-user-for-customca")
 	assert.Error(t, err, "an unknown user must be reported")

@@ -37,6 +37,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
+	"github.com/elastic/elastic-agent/internal/pkg/customca"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -1804,6 +1805,71 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 				loaded := reloader.Configuration()
 				require.Equal(t, tc.wantCAs, loaded.Fleet.Client.Transport.TLS.CAs)
 			}
+		})
+	}
+}
+
+func TestContainerBrowserCAOverrides(t *testing.T) {
+	tests := []struct {
+		name         string
+		configured   []string
+		env          map[string]string
+		wantCAs      []string
+		wantReload   bool
+		wantInterval time.Duration
+	}{
+		{
+			name:       "the mounted directory by default",
+			wantCAs:    []string{customca.DefaultDir},
+			wantReload: true,
+		},
+		{
+			name:       "configured paths and ELASTIC_AGENT_BROWSER_CA add to the mounted directory",
+			configured: []string{"/etc/cas/configured.pem"},
+			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA": "/etc/cas/a.pem, /etc/cas/more"},
+			wantCAs:    []string{customca.DefaultDir, "/etc/cas/configured.pem", "/etc/cas/a.pem", "/etc/cas/more"},
+			wantReload: true,
+		},
+		{
+			name:         "a reload interval",
+			env:          map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "2m"},
+			wantCAs:      []string{customca.DefaultDir},
+			wantReload:   true,
+			wantInterval: 2 * time.Minute,
+		},
+		{
+			name:       "a zero reload interval disables reloading",
+			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "0"},
+			wantCAs:    []string{customca.DefaultDir},
+			wantReload: false,
+		},
+		{
+			name:       "an invalid reload interval keeps the default",
+			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "soon"},
+			wantCAs:    []string{customca.DefaultDir},
+			wantReload: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			raw := map[string]any{}
+			if tc.configured != nil {
+				raw["agent.synthetics.browser.certificate_authorities"] = tc.configured
+			}
+			rawCfg := config.MustNewConfigFrom(raw)
+			require.NoError(t, containerCfgOverrides(rawCfg))
+
+			cfg, err := configuration.NewFromConfig(rawCfg)
+			require.NoError(t, err)
+			require.NotNil(t, cfg.Settings.Synthetics, "agent.synthetics must be set")
+			browser := cfg.Settings.Synthetics.Browser
+			require.Equal(t, tc.wantCAs, browser.CertificateAuthorities, "certificate authorities")
+			require.Equal(t, tc.wantReload, browser.CertificateReload.IsEnabled(), "certificate reload enabled")
+			require.Equal(t, tc.wantInterval, browser.CertificateReload.ReloadInterval, "certificate reload interval")
 		})
 	}
 }
