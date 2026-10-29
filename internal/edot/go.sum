@@ -521,8 +521,8 @@ github.com/elastic/go-lumber v0.2.0 h1:BVGh+jq6tmp5ajAQ4QaPLcwC8vYqQ0yzt0tmWfuz7
 github.com/elastic/go-lumber v0.2.0/go.mod h1:HHaWnZamYKWsR9/eZNHqRHob8iQDKnchHmmskT/SKko=
 github.com/elastic/go-perf v0.0.0-20260224073651-af0ee0c731b7 h1:fGi5uudj7m5O1RgQl+bSZmwlqvuUMEi97X7TzWBOMGk=
 github.com/elastic/go-perf v0.0.0-20260224073651-af0ee0c731b7/go.mod h1:ucTo2u8JvFyIPQOaRlX7aVF0d3wwmF1dy/PVp5GUHZI=
-github.com/elastic/go-quark v0.9.0 h1:Bq8QA5+V0uF1b1XRENnUaaZ7O3NA4Tr1RiB2YE7PDSw=
-github.com/elastic/go-quark v0.9.0/go.mod h1:2l83bPMooZU3Cqp3/MdrEL34fW14K2pO6IwKIeV0TdY=
+github.com/elastic/go-quark v0.10.0 h1:Pz0OUQkOMxAO5p9BI/an1K3lff2V37YWAsGF6774dPg=
+github.com/elastic/go-quark v0.10.0/go.mod h1:2l83bPMooZU3Cqp3/MdrEL34fW14K2pO6IwKIeV0TdY=
 github.com/elastic/go-seccomp-bpf v1.6.0 h1:NYduiYxRJ0ZkIyQVwlSskcqPPSg6ynu5pK0/d7SQATs=
 github.com/elastic/go-seccomp-bpf v1.6.0/go.mod h1:5tFsTvH4NtWGfpjsOQD53H8HdVQ+zSZFRUDSGevC0Kc=
 github.com/elastic/go-sfdc v0.0.0-20260504130806-a46e22d049d9 h1:UbquKP8gHTRugCZQ/KoVQrz8XnHzncsrHFfgTa+PfTg=
@@ -648,8 +648,8 @@ github.com/go-errors/errors v1.5.1 h1:ZwEMSLRCapFLflTpT7NKaAc7ukJ8ZPEjzlxt8rPN8b
 github.com/go-errors/errors v1.5.1/go.mod h1:sIVyrIiJhuEF+Pj9Ebtd6P/rEYROXFi3BopGUQ5a5Og=
 github.com/go-faker/faker/v4 v4.2.0 h1:dGebOupKwssrODV51E0zbMrv5e2gO9VWSLNC1WDCpWg=
 github.com/go-faker/faker/v4 v4.2.0/go.mod h1:F/bBy8GH9NxOxMInug5Gx4WYeG6fHJZ8Ol/dhcpRub4=
-github.com/go-jose/go-jose/v4 v4.1.4 h1:moDMcTHmvE6Groj34emNPLs/qtYXRVcd6S7NHbHz3kA=
-github.com/go-jose/go-jose/v4 v4.1.4/go.mod h1:x4oUasVrzR7071A4TnHLGSPpNOm2a21K9Kf04k1rs08=
+github.com/go-jose/go-jose/v4 v4.1.6 h1:sNRkftxFJxwsILiQukqp5z83QBSmntVwmgRY7AqBDO4=
+github.com/go-jose/go-jose/v4 v4.1.6/go.mod h1:x4oUasVrzR7071A4TnHLGSPpNOm2a21K9Kf04k1rs08=
 github.com/go-kit/kit v0.8.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
 github.com/go-kit/kit v0.9.0/go.mod h1:xBxKIO96dXMWWy0MnWVtmwkA9/13aqxPnvrjFYMA2as=
 github.com/go-kit/log v0.2.1 h1:MRVx0/zhvdseW+Gza6N9rVzU/IVzaeE1SFI4raAhmBU=
@@ -1682,8 +1682,8 @@ github.com/vishvananda/netlink v1.1.0/go.mod h1:cTgwzPIzzgDAYoQrMm0EdrjRUBkTqKYp
 github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df/go.mod h1:JP3t17pCcGlemwknint6hfoeCVQrEMVwxRLRjXpq+BU=
 github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f h1:p4VB7kIXpOQvVn1ZaTIVp+3vuYAXFe3OJEvjbUYJLaA=
 github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f/go.mod h1:DD4vA1DwXk04H54A1oHXtwZmA0grkVMdPxx/VGLCah0=
-github.com/vmware/govmomi v0.56.1 h1:vOnG+U3kVJ1jaRix8tkkPYCweLkh28bE5rjmzBZb6Tw=
-github.com/vmware/govmomi v0.56.1/go.mod h1:XI+N/NkdbIz5rOAVzfg4wbNJVj2CXUAZmzEEA7RCMh4=
+github.com/vmware/govmomi v0.56.2 h1:cCgoNrsi35Yka91004gmDYHTbsDtxs8RC4IkV+Wg81I=
+github.com/vmware/govmomi v0.56.2/go.mod h1:XI+N/NkdbIz5rOAVzfg4wbNJVj2CXUAZmzEEA7RCMh4=
 github.com/vultr/govultr/v3 v3.33.0 h1:SD8y4tmoSXbpX137JT5k7jLxJ5j0WcnRtDbq/+P26IA=
 github.com/vultr/govultr/v3 v3.33.0/go.mod h1:2zyUw9yADQaGwKnwDesmIOlBNLrm7edsCfWHFJpWKf8=
 github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0 h1:Td76iyy/ufS5It3kYVgEWxsXzlLuCH10HfNocTkf25c=

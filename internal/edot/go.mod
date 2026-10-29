@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261027225000-67ddf4bed4ed
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261028211320-a6e1521ce133
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
@@ -123,7 +123,7 @@ require (
 	github.com/elastic/entcollect v0.0.0-20260916061436-646037f10512 // indirect
 	github.com/elastic/go-libaudit/v2 v2.6.2 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
-	github.com/elastic/go-quark v0.9.0 // indirect
+	github.com/elastic/go-quark v0.10.0 // indirect
 	github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.77.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
@@ -467,7 +467,7 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/getsentry/sentry-go v0.37.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.8 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.6 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-ldap/ldap/v3 v3.4.15 // indirect
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
@@ -686,7 +686,7 @@ require (
 	github.com/ua-parser/uap-go v0.0.0-20251207011819-db9adb27a0b8 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	github.com/valyala/fastjson v1.6.10 // indirect
-	github.com/vmware/govmomi v0.56.1 // indirect
+	github.com/vmware/govmomi v0.56.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.2.0 // indirect
