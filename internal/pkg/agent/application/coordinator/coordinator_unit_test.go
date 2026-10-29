@@ -3143,7 +3143,7 @@ func TestCoordinator_Restart(t *testing.T) {
 		coord := &Coordinator{
 			// buffered so SetOverrideState (via ReExec) never blocks without a run loop
 			overrideStateChan: make(chan *coordinatorOverrideState, 2),
-			canReExec:         func() bool { return false },
+			canRestart:        func() bool { return false },
 			reexecMgr:         reexecMgr,
 			logger:            logp.NewLogger("testing"),
 		}
@@ -3157,7 +3157,7 @@ func TestCoordinator_Restart(t *testing.T) {
 		reexecMgr := &recordingReExecManager{}
 		coord := &Coordinator{
 			overrideStateChan: make(chan *coordinatorOverrideState, 2),
-			canReExec:         func() bool { return true },
+			canRestart:        func() bool { return true },
 			reexecMgr:         reexecMgr,
 			logger:            logp.NewLogger("testing"),
 		}

@@ -85,8 +85,8 @@ var ErrNotUpgradable = errors.New(
 // because the agent is not running in an environment where a re-execution
 // would be recovered.
 var ErrNotRestartable = errors.New(
-	"cannot be restarted; must be installed with install sub-command and " +
-		"running under control of the systems supervisor")
+	"cannot be restarted; must be running under the control of the system " +
+		"supervisor (an installed, DEB or RPM agent running as a service)")
 
 // ErrUpgradeInProgress error is returned if two or more upgrades are
 // attempted at the same time.
@@ -346,11 +346,12 @@ type Coordinator struct {
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
-	// canReExec reports whether a re-execution of the process will be recovered
-	// (installed and running under a system supervisor). It is a field so tests
-	// can override it; it defaults to reexec.CanReExec. Both the upgrade path
-	// (via UpgradeManager.Upgradeable) and the restart path rely on this check.
-	canReExec func() bool
+	// canRestart reports whether a RESTART action can be performed (the process
+	// is running under a system supervisor, so the re-execution is recovered). It
+	// is a field so tests can override it; it defaults to reexec.CanRestart.
+	// Unlike the upgrade path it does not require the installed layout, so DEB/RPM
+	// agents can be restarted as well.
+	canRestart func() bool
 
 	monitoringServerReloader configReloader
 
@@ -612,7 +613,7 @@ func New(
 
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
-		canReExec:        reexec.CanReExec,
+		canRestart:       reexec.CanRestart,
 
 		renderCache:         transpiler.NewRenderCache(),
 		expectedConfigCache: component.NewExpectedConfigCache(),
@@ -728,13 +729,14 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 
 // Restart re-executes the agent to fulfil a RESTART action. It reuses the same
 // re-exec machinery as an upgrade, but performs no upgrade steps (no download,
-// marker, or version change). Unlike an upgrade it does not consider the
-// release-level upgrade flag; it only requires that a re-execution will be
-// recovered (canReExec). The action is not acknowledged here; it is
-// acknowledged on the next startup by the managed config manager.
+// marker, or version change). Unlike an upgrade it does not require the
+// installed layout: it only requires that a re-execution will be recovered
+// (canRestart), so DEB/RPM agents running under a supervisor can be restarted.
+// The action is not acknowledged here; it is acknowledged on the next startup
+// by the managed config manager.
 // Called from external goroutines.
 func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) error {
-	if !c.canReExec() {
+	if !c.canRestart() {
 		return ErrNotRestartable
 	}
 

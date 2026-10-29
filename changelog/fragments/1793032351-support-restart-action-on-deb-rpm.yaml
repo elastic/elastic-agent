@@ -1,0 +1,16 @@
+kind: enhancement
+
+summary: Support the Fleet RESTART action for DEB and RPM installations.
+
+description: |
+  The RESTART action previously required an agent installed with the install
+  sub-command. It now only requires the agent to run under the control of the
+  system supervisor, so agents installed from DEB or RPM packages (managed by
+  systemd) can be restarted as well. The restart re-executes the agent process
+  in place without touching the installation layout. Containers (where the agent
+  runs as PID 1) and bare, non-supervised binaries remain excluded, and the
+  UPGRADE action still requires the installed layout.
+
+component: elastic-agent
+
+# issue: https://github.com/elastic/elastic-agent/issues/17231
