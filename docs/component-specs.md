@@ -50,7 +50,7 @@ The output types this input supports.
 
 ### `proxied_actions` (list of strings)
 
-The action types that should be forwarded to the corresponding component. Currently these actions types are sent ("proxied") to the components in parallel. The agent action handler awaits for actions responses. If any of the proxied actions fail, the action is considered failed by the agent.  Inital application for this was forwarding the Agent actions such as UNENROLL and UPGRADE to Endpoint service as a part of the Agent/Endpoint tamper protection feature.
+The action types that should be forwarded to the corresponding component. Currently these actions types are sent ("proxied") to the components in parallel. The agent action handler awaits for actions responses. If any of the proxied actions fail, the action is considered failed by the agent.  Initial application for this was forwarding the Agent actions such as UNENROLL and UPGRADE to Endpoint service as a part of the Agent/Endpoint tamper protection feature.
 
 Example for Endpoint spec:
 ```
