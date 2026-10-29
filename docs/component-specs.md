@@ -184,3 +184,7 @@ operations:
 #### `service.timeouts.checkin`
 
 The timeout duration for checkins with this component
+
+#### `service.timeouts.start_failed_after`
+
+How long start attempts can keep failing before the component is reported as failed instead of degraded. It is checked after each failed attempt, and the start is retried in both cases. Defaults to `5m`.
