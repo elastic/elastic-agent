@@ -15,6 +15,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -169,6 +171,11 @@ func validateFileTree(dir string, uid uint32, gid uint32) error {
 			if filepath.Base(file) == "elastic-agent-metrics.ndjson" {
 				return nil
 			}
+			// launchd creates the service's StandardOutPath/StandardErrorPath files itself, with its
+			// default umask (0644), and the plist of already released versions cannot be changed.
+			if runtime.GOOS == "darwin" && isLaunchdLogFile(file) {
+				return nil
+			}
 			return fmt.Errorf("%s has world access", file)
 		}
 		return nil
@@ -198,4 +205,11 @@ func waitForNoError(ctx context.Context, fun func(ctx context.Context) error, ti
 			lastErr = err
 		}
 	}
+}
+
+// isLaunchdLogFile returns true for the stdout/stderr files launchd creates for the agent service.
+func isLaunchdLogFile(file string) bool {
+	base := filepath.Base(file)
+	return strings.HasPrefix(base, "co.elastic.elastic-agent") &&
+		(strings.HasSuffix(base, ".out.log") || strings.HasSuffix(base, ".err.log"))
 }

@@ -154,6 +154,10 @@ func GetUpgradableVersions() ([]*version.ParsedSemVer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse version %q from %s: %w", v, AgentVersionsFilename, err)
 		}
+		// 7.x has no darwin/arm64 artifacts, so it cannot be used as an upgrade start version there.
+		if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" && parsed.Major() == 7 {
+			continue
+		}
 		parsedVersions = append(parsedVersions, parsed)
 	}
 

@@ -58,7 +58,12 @@ else
   mage build:integrationTestBinaries
 
   if [ "$TEST_SUDO" == "true" ]; then
-    sudo -E .buildkite/scripts/buildkite-integration-tests.sh "$@"
+    if [ "$(uname -s)" == "Darwin" ]; then
+      # keep the build user's toolchain (asdf shims) and caches when running as root
+      sudo -E env "PATH=$PATH" "HOME=$HOME" .buildkite/scripts/buildkite-integration-tests.sh "$@"
+    else
+      sudo -E .buildkite/scripts/buildkite-integration-tests.sh "$@"
+    fi
   else
     .buildkite/scripts/buildkite-integration-tests.sh "$@"
   fi

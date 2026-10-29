@@ -799,6 +799,7 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 	}
 	f.installed = false
 	f.workDir = f.extractDir
+	f.removeDarwinKeychainItem(ctx)
 
 	// Check that Elastic Agent files are actually removed
 	basePath := f.installOpts.BasePath
@@ -821,6 +822,26 @@ func (f *Fixture) uninstallNoPkgManager(ctx context.Context, uninstallOpts *Unin
 	}
 
 	return out, nil
+}
+
+// removeDarwinKeychainItem deletes the agent key that a macOS install leaves behind in the System keychain.
+// The item is shared by every agent installation of the machine and survives an uninstall, so a test would
+// start with the key of a previous one while its own fleet.enc is gone (or the other way around), which
+// shows up as -25300 / "cipher: message authentication failed". Failing to delete it (e.g. it does not
+// exist) is not an error. Only runs on Buildkite.
+func (f *Fixture) removeDarwinKeychainItem(ctx context.Context) {
+	// Only on CI machines: on a developer machine the item may belong to a real agent installation.
+	if runtime.GOOS != "darwin" || os.Getenv("BUILDKITE") == "" {
+		return
+	}
+	name := paths.AgentKeychainName()
+	out, err := exec.CommandContext(ctx, "security", "delete-generic-password",
+		"-a", name, "-s", name, "/Library/Keychains/System.keychain").CombinedOutput()
+	if err != nil {
+		f.t.Logf("keychain item %q not removed: %v: %s", name, err, strings.TrimSpace(string(out)))
+		return
+	}
+	f.t.Logf("removed keychain item %q left by the uninstalled agent", name)
 }
 
 func (f *Fixture) collectDiagnostics() {
