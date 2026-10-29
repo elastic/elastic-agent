@@ -203,6 +203,16 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
     chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/connectors
 {{- end }}
 
+{{- if eq .Variant "service" }}
+# Elastic Open Web Crawler: the application, its JRuby runtime and its trimmed JDK are taken
+# from the crawler image of the same release; the component launcher expects them at these paths.
+COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} /opt/jdk-crawler /opt/jdk-crawler
+COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} /opt/jruby /opt/jruby
+COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} /usr/local/bundle /usr/local/bundle
+COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} --chown={{ .user }}:{{ .user }} /home/app /usr/share/crawler
+RUN chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/crawler
+{{- end }}
+
 {{- if (and (eq .Variant "complete") (and (contains .from "redhat/ubi") (contains .from "-minimal") ))  }}
 USER root
 ENV NODE_PATH={{ $beatHome }}/.node
