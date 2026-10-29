@@ -250,7 +250,6 @@ common:
 
 steps:
   - label: "Custom ECH Testing"
-    skip: "Temporarily skipped to test Windows ARM64 only"
     key: integration-tests-ech
     depends_on:
       - packaging-containers-amd64
@@ -305,7 +304,6 @@ steps:
       - integration-ess
     steps:
       - label: "Windows:2022:amd64:sudo"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -329,7 +327,6 @@ steps:
           - *vault_github_token
 
       - label: "Windows:2025:amd64:sudo"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -353,7 +350,6 @@ steps:
           - *vault_github_token
 
       - label: "Ubuntu:2404:amd64:sudo"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -386,7 +382,6 @@ steps:
       - integration-ess
     steps:
       - label: "windows:amd64:tier1:sudo:{{matrix.variant}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -413,7 +408,6 @@ steps:
             variant: *windows_variants
 
       - label: "windows:amd64:tier1:non-sudo:{{matrix.variant}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -456,7 +450,6 @@ steps:
       - integration-ess
     steps:
       - label: "windows:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -488,7 +481,6 @@ steps:
             variant: *windows_variants
 
       - label: "windows:amd64:tier2:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -524,8 +516,7 @@ steps:
     key: integration-tests-win-tier-3
     # NOTE: as long as we use the scheduler pipeline we need to use BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG.
     #       We use that pipeline to run the tier 3 tests on a schedule for the active branches.
-    # TODO: restore this condition after the Windows ARM64 tests pass.
-    # if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
+    if: build.source == "schedule" || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "elastic-agent-pipeline-scheduler"
     notify:
       - github_commit_status:
           context: "buildkite/elastic-agent-extended-testing - Windows - tier 3"
@@ -533,7 +524,6 @@ steps:
       - integration-ess
     steps:
       - label: "windows:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -566,7 +556,6 @@ steps:
             variant: *windows_variants
 
       - label: "windows:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -598,7 +587,6 @@ steps:
             variant: *windows_variants
 
       - label: "windows:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -656,13 +644,9 @@ steps:
           - *vault_github_token
         matrix:
           setup:
-            # TODO: restore *windows_variants after the Windows ARM64 tests pass.
-            variant:
-              - default     # TestPbReceiverSubcomponentStatus
-              - fleet-proxy # TestNetworkTraffic
+            variant: *windows_variants
 
       - label: "windows:arm64:tier3:non-sudo:{{matrix.variant}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-arm64
         env:
@@ -701,7 +685,6 @@ steps:
       - integration-ess
     steps:
       - label: "linux:amd64:tier1:non-sudo:{{matrix.variant}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -729,7 +712,6 @@ steps:
               - default
 
       - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -756,7 +738,6 @@ steps:
             variant: *linux_variants
 
       - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
           - packaging-linux-amd64-deb-rpm
@@ -785,7 +766,6 @@ steps:
             variant: *linux_deb_variants
 
       - label: "linux:amd64:tier1:sudo:heartbeat-complete"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-containers-amd64
         env:
@@ -822,7 +802,6 @@ steps:
       - integration-ess
     steps:
       - label: "linux:amd64:tier2:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -852,7 +831,6 @@ steps:
               - default
 
       - label: "linux:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -881,7 +859,6 @@ steps:
             variant: *linux_variants
 
       - label: "linux:amd64:tier2:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
           - packaging-linux-amd64-deb-rpm
@@ -912,7 +889,6 @@ steps:
             variant: *linux_deb_variants
 
       - label: "linux:amd64:tier2:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64-deb-rpm
         env:
@@ -955,7 +931,6 @@ steps:
       - integration-ess
     steps:
       - label: "linux:amd64:tier3:non-sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -989,7 +964,6 @@ steps:
               - stress
 
       - label: "linux:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:
@@ -1021,7 +995,6 @@ steps:
             variant: *linux_variants
 
       - label: "linux:amd64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
           - packaging-linux-amd64-deb-rpm
@@ -1055,7 +1028,6 @@ steps:
             variant: *linux_deb_variants
 
       - label: "linux:amd64:tier3:{{matrix.sudo}}:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64-deb-rpm
         # due to deb group present in matrix tar.gz and deb packages artifacts are required
@@ -1088,7 +1060,6 @@ steps:
             variant: *linux_rpm_variants
 
       - label: "linux:arm64:tier3:sudo:{{matrix.variant}}:{{matrix.os}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-arm64
         env:
@@ -1159,7 +1130,6 @@ steps:
       - packaging-containers-amd64
     steps:
       - label: "kubernetes:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -1182,7 +1152,6 @@ steps:
               *k8s_test_versions
 
       - label: "openshift:tier1:{{matrix.version}}:amd64:{{matrix.variants}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         # OpenShift differs from Kubernetes in the deployment manifests and container images, not in the agent code.
         # Tier 3 catches the rare exceptions.
         if_changed:
@@ -1235,7 +1204,6 @@ steps:
       - packaging-containers-amd64
     steps:
       - label: "kubernetes:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         env:
           *k8s_test_env
         command: *k8s_test_command
@@ -1259,7 +1227,6 @@ steps:
               - *k8s_max_test_version
 
       - label: "openshift:tier2:{{matrix.version}}:amd64:{{matrix.variants}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         # OpenShift differs from Kubernetes in the deployment manifests and container images, not in the agent code.
         # Tier 3 catches the rare exceptions.
         if_changed:
@@ -1307,7 +1274,6 @@ steps:
       - packaging-containers-amd64
     steps:
       - label: "kubernetes:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         env:
           *k8s_test_env
         command: *k8s_test_command_with_sleep
@@ -1330,7 +1296,6 @@ steps:
               *k8s_test_versions_without_min_max
 
       - label: "openshift:tier3:{{matrix.version}}:amd64:{{matrix.variants}}"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         env:
           *openshift_test_env
         command: *openshift_test_command_with_sleep
@@ -1361,7 +1326,6 @@ steps:
           context: "buildkite/elastic-agent-extended-testing - Serverless integration test"
     steps:
       - label: "Windows:2022:amd64:sudo"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -1385,7 +1349,6 @@ steps:
           - *gcp_serverless_secrets_plugin
 
       - label: "Windows:2025:amd64:sudo"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-windows-amd64
         env:
@@ -1408,7 +1371,6 @@ steps:
           - *google_oidc_plugin
           - *gcp_serverless_secrets_plugin
       - label: "Ubuntu:2404:amd64:sudo"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         depends_on:
           - packaging-linux-amd64
         env:

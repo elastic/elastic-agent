@@ -47,7 +47,6 @@ steps:
       # third step because building them takes several extra minutes and only the
       # deb and rpm test groups need them.
       - label: ":package: linux/amd64: tar.gz"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-linux-amd64
         env:
           PLATFORMS: "linux/amd64"
@@ -66,7 +65,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: windows/amd64: zip"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-windows-amd64
         env:
           PLATFORMS: "windows/amd64"
@@ -85,7 +83,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: linux/amd64: rpm,deb"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-linux-amd64-deb-rpm
         env:
           PLATFORMS: "linux/amd64"
@@ -104,7 +101,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS tar.gz,zip (linux,windows,macos)"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: "packaging-amd64-fips"
         env:
           PACKAGES: "tar.gz,zip"
@@ -143,7 +139,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS tar.gz,zip (linux,windows,macos)"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: "packaging-arm64-fips"
         env:
           PACKAGES: "tar.gz,zip"
@@ -163,7 +158,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: amd64: Containers"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-containers-amd64
         env:
           PACKAGES: "docker"
@@ -183,7 +177,6 @@ steps:
           - *vault_docker_login
 
       - label: ":package: arm64: Containers"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-containers-arm64
         env:
           PACKAGES: "docker"
@@ -201,7 +194,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: amd64: FIPS Containers"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-containers-amd64-fips
         env:
           PACKAGES: "docker"
@@ -222,7 +214,6 @@ steps:
           - *google_oidc_plugin
 
       - label: ":package: arm64: FIPS Containers"
-        skip: "Temporarily skipped to test Windows ARM64 only"
         key: packaging-containers-arm64-fips
         env:
           PACKAGES: "docker"
@@ -242,7 +233,6 @@ steps:
 
   ## PRs
   - label: "Triggering custom FIPS integration tests"
-    skip: "Temporarily skipped to test Windows ARM64 only"
     if: build.pull_request.id != null
     key: "fips-its-prs"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
@@ -257,7 +247,6 @@ steps:
 
   ## Branches
   - label: "Triggering custom FIPS integration tests (branches)"
-    skip: "Temporarily skipped to test Windows ARM64 only"
     if: build.pull_request.id == null
     key: "fips-its-branches"
     command: "buildkite-agent pipeline upload .buildkite/bk.integration-fips.pipeline.yml"
