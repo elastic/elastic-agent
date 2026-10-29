@@ -667,6 +667,7 @@ func TestAgentComponentID(t *testing.T) {
 	}{
 		{"filebeatreceiver/_agent-component/filebeat-default", "filebeat-default"},
 		{"elasticsearch/_agent-component/monitoring", "monitoring"},
+		{"filebeatreceiver/_agent-component/filestream-my%20output", "filestream-my output"},
 		{"filebeatreceiver/some-other-prefix", ""},
 		{"no-prefix-at-all", ""},
 	}
