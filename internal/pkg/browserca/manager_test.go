@@ -324,8 +324,8 @@ func TestReconcileSkipsUnchangedCertificates(t *testing.T) {
 }
 
 func TestReconcileTouchesNothingWithoutCertificates(t *testing.T) {
-	// On Wolfi the default directory always exists, usually empty: the agent's home
-	// must stay as is (the agent owns all of it when it runs as root).
+	// A mounted Secret may be empty: the agent's home must then stay as is (the agent
+	// owns all of it when it runs as root).
 	m, fake, _, _ := setup(t)
 
 	require.NoError(t, m.reconcile(t.Context()), "syncing an empty directory")

@@ -1819,34 +1819,42 @@ func TestContainerBrowserCAOverrides(t *testing.T) {
 		wantInterval time.Duration
 	}{
 		{
-			name:       "the mounted directory by default",
-			wantCAs:    []string{browserca.DefaultDir},
+			name:       "no CA by default",
 			wantReload: true,
 		},
 		{
-			name:       "configured paths and ELASTIC_AGENT_BROWSER_CA add to the mounted directory",
+			name:       "configured paths without ELASTIC_AGENT_BROWSER_CA",
+			configured: []string{"/etc/cas/configured.pem"},
+			wantCAs:    []string{"/etc/cas/configured.pem"},
+			wantReload: true,
+		},
+		{
+			name:       "ELASTIC_AGENT_BROWSER_CA replaces configured paths",
 			configured: []string{"/etc/cas/configured.pem"},
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA": "/etc/cas/a.pem, /etc/cas/more"},
-			wantCAs:    []string{browserca.DefaultDir, "/etc/cas/configured.pem", "/etc/cas/a.pem", "/etc/cas/more"},
+			wantCAs:    []string{"/etc/cas/a.pem", "/etc/cas/more"},
+			wantReload: true,
+		},
+		{
+			name:       "an empty ELASTIC_AGENT_BROWSER_CA clears configured paths",
+			configured: []string{"/etc/cas/configured.pem"},
+			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA": ""},
 			wantReload: true,
 		},
 		{
 			name:         "a reload interval",
 			env:          map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "2m"},
-			wantCAs:      []string{browserca.DefaultDir},
 			wantReload:   true,
 			wantInterval: 2 * time.Minute,
 		},
 		{
 			name:       "a zero reload interval disables reloading",
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "0"},
-			wantCAs:    []string{browserca.DefaultDir},
 			wantReload: false,
 		},
 		{
 			name:       "an invalid reload interval keeps the default",
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "soon"},
-			wantCAs:    []string{browserca.DefaultDir},
 			wantReload: true,
 		},
 	}
@@ -1865,9 +1873,11 @@ func TestContainerBrowserCAOverrides(t *testing.T) {
 
 			cfg, err := configuration.NewFromConfig(rawCfg)
 			require.NoError(t, err)
-			require.NotNil(t, cfg.Settings.Synthetics, "agent.synthetics must be set")
-			browser := cfg.Settings.Synthetics.Browser
-			require.Equal(t, tc.wantCAs, browser.CertificateAuthorities, "certificate authorities")
+			var browser browserca.Config
+			if cfg.Settings.Synthetics != nil {
+				browser = cfg.Settings.Synthetics.Browser
+			}
+			require.ElementsMatch(t, tc.wantCAs, browser.CertificateAuthorities, "certificate authorities")
 			require.Equal(t, tc.wantReload, browser.CertificateReload.IsEnabled(), "certificate reload enabled")
 			require.Equal(t, tc.wantInterval, browser.CertificateReload.ReloadInterval, "certificate reload interval")
 		})

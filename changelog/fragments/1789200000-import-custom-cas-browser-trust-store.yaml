@@ -9,12 +9,13 @@ description: >
   It does it at startup and again while running when they change, as set by
   agent.synthetics.browser.certificate_reload (enabled by default, every 30s).
   Browser monitors can then reach endpoints signed by an internal CA without
-  building a custom image or ignoring TLS errors. In containers the CAs mounted
-  in /usr/local/share/ca-certificates are always trusted, ELASTIC_AGENT_BROWSER_CA
-  adds paths and ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL sets the interval
-  (0 disables it). The complete images ship certutil (nss-tools / libnss-tools)
-  for this. The Helm chart gains `agent.customCAs.secretName` to mount a Secret
-  with the CAs in /usr/local/share/ca-certificates.
+  building a custom image or ignoring TLS errors. Only the browser trusts them:
+  the trust store of the operating system is unchanged. In containers
+  ELASTIC_AGENT_BROWSER_CA sets the paths and ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL
+  the interval (0 disables it). The complete images ship certutil (nss-tools /
+  libnss-tools) for this. The Helm chart gains `agent.browserCAs.secretName` to
+  mount a Secret with the CAs at /etc/elastic-agent/browser-cas and set
+  ELASTIC_AGENT_BROWSER_CA to it.
 
 component: elastic-agent
 

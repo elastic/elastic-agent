@@ -154,8 +154,8 @@ inputs:
 
 # agent.synthetics.browser:
 #   # CAs that browser monitors trust: PEM files, or directories of *.crt and *.pem files.
-#   # Containers always add /usr/local/share/ca-certificates, and the paths in
-#   # ELASTIC_AGENT_BROWSER_CA. Requires certutil (in the complete images), Linux only.
+#   # In containers, ELASTIC_AGENT_BROWSER_CA replaces this list when it is set.
+#   # Requires certutil (in the complete images), Linux only.
 #   certificate_authorities: []
 #   certificate_reload:
 #     # check the CAs for changes while running, so none needs a restart

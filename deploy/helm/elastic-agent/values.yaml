@@ -477,9 +477,10 @@ agent:
       # -- create the SecurityContextConstraints and RoleBindings that let the agent and kube-state-metrics service accounts run on OpenShift
       # @section -- 6 - Elastic-Agent Configuration
       create: true
-  customCAs:
-    # -- name of an existing Secret with PEM CA certificates (`*.crt` or `*.pem` keys) to trust in browser monitors. It is mounted at `/usr/local/share/ca-certificates`
-    # and imported by the `complete` image variants, so use one of them. Changes to the Secret are picked up without a restart.
+  browserCAs:
+    # -- name of an existing Secret with PEM CA certificates (`*.crt` or `*.pem` keys) that browser monitors trust. It is mounted at `/etc/elastic-agent/browser-cas`,
+    # which `ELASTIC_AGENT_BROWSER_CA` is set to. Only the `complete` image variants run browser monitors, so use one of them. Changes to the Secret are picked up
+    # without a restart. This does not change the trust store of the operating system.
     # @section -- 6 - Elastic-Agent Configuration
     secretName: ""
   fleet:

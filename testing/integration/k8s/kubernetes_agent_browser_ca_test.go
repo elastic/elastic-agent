@@ -68,7 +68,7 @@ func TestKubernetesAgentBrowserCASecret(t *testing.T) {
 							"tag":        kCtx.agentImageTag,
 							"pullPolicy": "Never",
 						},
-						"customCAs": map[string]any{
+						"browserCAs": map[string]any{
 							"secretName": browserCASecret,
 						},
 						"presets": map[string]any{

@@ -29,9 +29,6 @@ import (
 )
 
 const (
-	// DefaultDir is where the container images look for CAs: the standard location on
-	// Debian-based systems, where a Kubernetes Secret is usually mounted.
-	DefaultDir = "/usr/local/share/ca-certificates"
 	// defaultInterval is how often the CAs are checked for changes when
 	// certificate_reload.reload_interval is not set.
 	defaultInterval = 30 * time.Second
@@ -148,7 +145,7 @@ func (m *manager) certificates() (map[string][]byte, error) {
 // reconcile makes the database hold exactly the configured certificates. It does
 // nothing when they are the ones the last successful sync applied, or when there is
 // neither a certificate to import nor a database to clean up: the configured paths
-// may exist empty (always so on Wolfi), and the agent's home must then stay as is.
+// may exist empty (e.g. an empty Secret), and the agent's home must then stay as is.
 // On error the change stays pending and the next call retries it.
 func (m *manager) reconcile(ctx context.Context) error {
 	want, err := m.certificates()

@@ -576,14 +576,14 @@
                         }
                     }
                 },
-                "customCAs": {
+                "browserCAs": {
                     "type": "object",
-                    "description": "Custom certificate authorities to trust in browser monitors.",
+                    "description": "Certificate authorities that browser monitors trust.",
                     "additionalProperties": false,
                     "properties": {
                         "secretName": {
                             "type": "string",
-                            "description": "Name of an existing Secret with PEM CA certificates (*.crt or *.pem keys), mounted at /usr/local/share/ca-certificates. Requires a complete image variant."
+                            "description": "Name of an existing Secret with PEM CA certificates (*.crt or *.pem keys), mounted at /etc/elastic-agent/browser-cas and set as ELASTIC_AGENT_BROWSER_CA. Requires a complete image variant."
                         }
                     }
                 },

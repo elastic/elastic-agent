@@ -41,7 +41,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
-	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -938,27 +937,19 @@ func containerCfgOverrides(cfg *config.Config) error {
 	return cfg.Merge(uCfg)
 }
 
-// containerBrowserCAOverrides makes browser monitors trust the CAs mounted at
-// browserca.DefaultDir and the paths in ELASTIC_AGENT_BROWSER_CA, on top of those in
-// agent.synthetics.browser.certificate_authorities. ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL
-// sets how often they are checked for changes; 0 disables it.
+// containerBrowserCAOverrides sets the CAs browser monitors trust to the paths in
+// ELASTIC_AGENT_BROWSER_CA, files or directories, when it is defined, as FLEET_CA does
+// for Fleet. ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL sets how often they are checked
+// for changes; 0 disables it.
 func containerBrowserCAOverrides(cfg *config.Config, uCfg map[string]any) error {
-	const key = "agent.synthetics.browser.certificate_authorities"
-	cas := []string{browserca.DefaultDir}
-	// CountField can't resolve this dotted path, so read until the index runs out.
-	for i := 0; ; i++ {
-		ca, err := cfg.Agent.String(key, i, ucfg.PathSep("."))
-		if err != nil {
-			break
+	// Override even with an empty value. ucfg Merge won't allow an empty array to
+	// overwrite, so we have to edit cfg instead of uCfg here.
+	if caEnv, ok := os.LookupEnv("ELASTIC_AGENT_BROWSER_CA"); ok {
+		if caChild, err := ucfg.NewFrom(cli.StringToSlice(caEnv)); err != nil {
+			return fmt.Errorf("failed to create browser CA config for container override: %w", err)
+		} else if err := cfg.Agent.SetChild("agent.synthetics.browser.certificate_authorities", -1, caChild, ucfg.PathSep(".")); err != nil {
+			return fmt.Errorf("failed to write browser CA config for container override: %w", err)
 		}
-		cas = append(cas, ca)
-	}
-	cas = append(cas, cli.StringToSlice(envWithDefault("", "ELASTIC_AGENT_BROWSER_CA"))...)
-	// Set directly, as for FLEET_CA, so merging can't mix it with the configured list.
-	if caChild, err := ucfg.NewFrom(cas); err != nil {
-		return fmt.Errorf("failed to create browser CA config for container override: %w", err)
-	} else if err := cfg.Agent.SetChild(key, -1, caChild, ucfg.PathSep(".")); err != nil {
-		return fmt.Errorf("failed to write browser CA config for container override: %w", err)
 	}
 
 	const reloadEnv = "ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL"
