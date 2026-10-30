@@ -66,7 +66,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.163.0/receiver/prometheusremotewritereceiver/README.md) | v0.163.0 |
 | [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.163.0/receiver/rabbitmqreceiver/README.md) | v0.163.0 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.163.0/receiver/receivercreator/README.md) | v0.163.0 |
-| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.163.0/receiver/receivertest/README.md) | v0.163.0 |
+| [receivertest](https://github.com/open-telemetry/opentelemetry-collector/blob/receiver/receivertest/v0.164.0/receiver/receivertest/README.md) | v0.164.0 |
 | [redisreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/redisreceiver/v0.163.0/receiver/redisreceiver/README.md) | v0.163.0 |
 | [snmpreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/snmpreceiver/v0.163.0/receiver/snmpreceiver/README.md) | v0.163.0 |
 | [sqlserverreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/sqlserverreceiver/v0.163.0/receiver/sqlserverreceiver/README.md) | v0.163.0 |
@@ -81,10 +81,10 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
-| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.163.0/exporter/debugexporter/README.md) | v0.163.0 |
-| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.163.0/exporter/elasticsearchexporter/README.md) | v0.163.0 |
+| [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.164.0/exporter/debugexporter/README.md) | v0.164.0 |
+| [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.164.1/exporter/elasticsearchexporter/README.md) | v0.164.1 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.163.0/exporter/fileexporter/README.md) | v0.163.0 |
-| [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.163.0/exporter/kafkaexporter/README.md) | v0.163.0 |
+| [kafkaexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/kafkaexporter/v0.164.1/exporter/kafkaexporter/README.md) | v0.164.1 |
 | [loadbalancingexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/loadbalancingexporter/v0.163.0/exporter/loadbalancingexporter/README.md) | v0.163.0 |
 | [nopexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/nopexporter/v0.163.0/exporter/nopexporter/README.md) | v0.163.0 |
 | [otlpexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/otlpexporter/v0.163.0/exporter/otlpexporter/README.md) | v0.163.0 |
