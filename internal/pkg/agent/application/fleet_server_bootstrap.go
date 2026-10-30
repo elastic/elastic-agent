@@ -31,22 +31,25 @@ const (
 // bootstrapped with the required command-line arguments for the Elastic Agent to be able to run the Fleet Server.
 var ErrFleetServerNotBootstrapped = errors.New("elastic-agent must be bootstrapped with a fleet-server; re-install or re-enroll with --fleet-server-* options")
 
-// injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
-// the components before sending them to the runtime manager.
-var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
-	"outputs": map[string]interface{}{
-		"default": map[string]interface{}{
-			"type":  elasticsearch,
-			"hosts": []string{"localhost:9200"},
+// newFleetServerInputConfig returns the base configuration that is used plus the FleetServerComponentModifier that
+// adjusts the components before sending them to the runtime manager. A new config is built for every config change
+// as the coordinator consumes the inputs of the configs it processes.
+func newFleetServerInputConfig() *config.Config {
+	return config.MustNewConfigFrom(map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":  elasticsearch,
+				"hosts": []string{"localhost:9200"},
+			},
 		},
-	},
-	"inputs": []interface{}{
-		map[string]interface{}{
-			"id":   fleetServer,
-			"type": fleetServer,
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"id":   fleetServer,
+				"type": fleetServer,
+			},
 		},
-	},
-})
+	})
+}
 
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
@@ -222,7 +225,7 @@ func (m *fleetServerBootstrapManager) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case m.ch <- &localConfigChange{injectFleetServerInput}:
+	case m.ch <- &localConfigChange{newFleetServerInputConfig()}:
 	}
 
 	<-ctx.Done()
