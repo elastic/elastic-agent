@@ -19,13 +19,15 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/cache"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/storage/filesystem"
 )
 
 const (
 	submoduleSyncAttempts  = 5
 	submoduleSyncRetryWait = 200 * time.Millisecond
+	// pushTimeout bounds native git push so Buildkite jobs fail fast instead of
+	// hanging until the step timeout (go-git push stalls on reference clones).
+	pushTimeout = 10 * time.Minute
 )
 
 // isSubmoduleIndexLockError reports whether git submodule update failed because
@@ -325,8 +327,8 @@ func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
 	}
 
 	httpsURL, rewritten := githubHTTPSPushURL(urls[0])
-	if !strings.HasPrefix(httpsURL, "https://") && !strings.HasPrefix(httpsURL, "http://") {
-		return fmt.Errorf("remote %s URL %q is not HTTPS; token push requires an HTTPS remote", remoteName, urls[0])
+	if !isTokenPushRemoteURL(httpsURL) {
+		return fmt.Errorf("remote %s URL %q is not HTTPS or file://; token push requires an HTTPS remote", remoteName, urls[0])
 	}
 	if !rewritten {
 		return nil
@@ -337,7 +339,17 @@ func (g *GitRepo) ensureHTTPSRemote(remoteName string) error {
 	return nil
 }
 
+// isTokenPushRemoteURL reports whether the remote URL can be used with a
+// token-authenticated git push (HTTPS for GitHub, file:// for local tests).
+func isTokenPushRemoteURL(u string) bool {
+	return strings.HasPrefix(u, "https://") ||
+		strings.HasPrefix(u, "http://") ||
+		strings.HasPrefix(u, "file://")
+}
+
 // Push pushes the current branch to the remote using the given GitHub token.
+// It uses the git CLI (not go-git) so Buildkite reference clones can pack and
+// upload objects from shared mirrors; go-git Push hangs in that layout.
 func (g *GitRepo) Push(remoteName, token string) error {
 	if token == "" {
 		return fmt.Errorf("GitHub token is required for pushing")
@@ -352,18 +364,25 @@ func (g *GitRepo) Push(remoteName, token string) error {
 		return err
 	}
 
-	refSpec := config.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", currentBranch, currentBranch))
+	refSpec := fmt.Sprintf("refs/heads/%s:refs/heads/%s", currentBranch, currentBranch)
+	fmt.Printf("Pushing branch %s to remote %s via git CLI...\n", currentBranch, remoteName)
 
-	err = g.repo.Push(&git.PushOptions{
-		RemoteName: remoteName,
-		RefSpecs:   []config.RefSpec{refSpec},
-		Auth: &http.BasicAuth{
-			Username: "git",
-			Password: token,
-		},
-	})
-	if err != nil && !errors.Is(err, git.NoErrAlreadyUpToDate) {
-		return fmt.Errorf("failed to push: %w", err)
+	ctx, cancel := context.WithTimeout(context.Background(), pushTimeout)
+	defer cancel()
+
+	// Native git understands alternates from --reference clones; go-git does not
+	// pack them reliably. Auth via header so the token never lands in the remote URL.
+	cmd := exec.CommandContext(ctx, "git",
+		"-c", "http.extraHeader=Authorization: Bearer "+token,
+		"push", remoteName, refSpec,
+	)
+	cmd.Dir = g.path
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("failed to push: timed out after %s: %w", pushTimeout, err)
+		}
+		return fmt.Errorf("failed to push: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
 	fmt.Printf("Pushed branch %s to remote: %s\n", currentBranch, remoteName)
