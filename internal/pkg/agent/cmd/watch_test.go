@@ -89,9 +89,37 @@ func TestInitUpgradeDetails(t *testing.T) {
 	require.Equal(t, `unable to save upgrade marker after clearing upgrade details: some error`, logs[0].Message)
 }
 
+// setupFailingWatch saves the upgrade marker of an upgrade from 9.2.0 to 9.3.0 and makes the watcher report a
+// failure. It returns the versioned home of the previous version.
+func setupFailingWatch(t *testing.T, topDir string, watcher *mockAgentWatcher) string {
+	t.Helper()
+	dataDirPath := paths.DataFrom(topDir)
+	require.NoError(t, os.MkdirAll(dataDirPath, 0755))
+	previousVersionedHome := filepath.Join("data", "elastic-agent-9.2.0-prvver")
+	require.NoError(t, upgrade.SaveMarker(
+		dataDirPath,
+		&upgrade.UpdateMarker{
+			Version:           "9.3.0",
+			Hash:              "newver",
+			VersionedHome:     filepath.Join("data", "elastic-agent-9.3.0-newver"),
+			UpdatedOn:         time.Now(),
+			PrevVersion:       "9.2.0",
+			PrevHash:          "prvver",
+			PrevVersionedHome: previousVersionedHome,
+		},
+		true,
+	))
+	watcher.EXPECT().
+		Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(errors.New("some watch error due to agent misbehaving"))
+	return previousVersionedHome
+}
+
 func Test_watchCmd(t *testing.T) {
 	type args struct {
 		cfg *configuration.UpgradeWatcherConfig
+		// noLogsRetention runs the watcher with a logs retention of 0, otherwise it is an hour
+		noLogsRetention bool
 	}
 	tests := []struct {
 		name               string
@@ -154,42 +182,45 @@ func Test_watchCmd(t *testing.T) {
 		{
 			name: "unhappy path: error watching, rollback to previous install, leaving the upgrade marker",
 			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
-				dataDirPath := paths.DataFrom(topDir)
-				err := os.MkdirAll(dataDirPath, 0755)
-				require.NoError(t, err)
-				previousVersionedHome := filepath.Join("data", "elastic-agent-9.2.0-prvver")
-				err = upgrade.SaveMarker(
-					dataDirPath,
-					&upgrade.UpdateMarker{
-						Version:           "9.3.0",
-						Hash:              "newver",
-						VersionedHome:     filepath.Join("data", "elastic-agent-9.3.0-newver"),
-						UpdatedOn:         time.Now(),
-						PrevVersion:       "9.2.0",
-						PrevHash:          "prvver",
-						PrevVersionedHome: previousVersionedHome,
-						Acked:             false,
-						Action:            nil,
-						Details:           nil,
-					},
-					true,
-				)
-				require.NoError(t, err)
-
-				watcher.EXPECT().
-					Watch(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(errors.New("some watch error due to agent misbehaving"))
+				previousVersionedHome := setupFailingWatch(t, topDir, watcher)
 				installModifier.EXPECT().
 					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), previousVersionedHome, "prvver", mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
 						settings := upgrade.NewRollbackSettings()
 						opt(settings)
 
 						return !settings.RemoveMarker
-					}), mock.Anything).
+					}), mock.Anything, mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+						// the logs of the failed version must be retained
+						settings := upgrade.NewRollbackSettings()
+						opt(settings)
+
+						return settings.LogsRetention != nil && settings.LogsRetention.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-9.3.0-newver") && settings.LogsRetention.Duration == time.Hour
+					})).
 					Return(nil)
 			},
 			args: args{
 				cfg: configuration.DefaultUpgradeConfig().Watcher,
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "unhappy path: error watching, rollback to previous install, without retaining the logs when the retention is 0",
+			setupUpgradeMarker: func(t *testing.T, topDir string, watcher *mockAgentWatcher, installModifier *mockInstallationModifier) {
+				previousVersionedHome := setupFailingWatch(t, topDir, watcher)
+				withoutLogsRetention := mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+					settings := upgrade.NewRollbackSettings()
+					opt(settings)
+
+					return settings.LogsRetention == nil
+				})
+				// the marker option and the hook are the only options, none of them retains the logs
+				installModifier.EXPECT().
+					Rollback(mock.Anything, mock.Anything, mock.Anything, paths.Top(), previousVersionedHome, "prvver", withoutLogsRetention, withoutLogsRetention).
+					Return(nil)
+			},
+			args: args{
+				cfg:             configuration.DefaultUpgradeConfig().Watcher,
+				noLogsRetention: true,
 			},
 			wantErr: assert.NoError,
 		},
@@ -234,7 +265,12 @@ func Test_watchCmd(t *testing.T) {
 							opt(settings)
 
 							return settings.RemoveMarker
-						}), mock.Anything).Return(nil)
+						}), mock.Anything, mock.MatchedBy(func(opt upgrade.RollbackOption) bool {
+							settings := upgrade.NewRollbackSettings()
+							opt(settings)
+
+							return settings.LogsRetention != nil && settings.LogsRetention.FailedUpgrade.VersionedHome == filepath.Join("data", "elastic-agent-4.5.6-newver") && settings.LogsRetention.Duration == time.Hour
+						})).Return(nil)
 			},
 			args: args{
 				cfg: configuration.DefaultUpgradeConfig().Watcher,
@@ -370,7 +406,11 @@ func Test_watchCmd(t *testing.T) {
 			mockWatcher := newMockAgentWatcher(t)
 			mockInstallModifier := newMockInstallationModifier(t)
 			tt.setupUpgradeMarker(t, tmpDir, mockWatcher, mockInstallModifier)
-			tt.wantErr(t, watchCmd(log, tmpDir, tt.args.cfg, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
+			logsRetention := time.Hour
+			if tt.args.noLogsRetention {
+				logsRetention = 0
+			}
+			tt.wantErr(t, watchCmd(log, tmpDir, tt.args.cfg, logsRetention, mockWatcher, mockInstallModifier), fmt.Sprintf("watchCmd(%v, ...)", tt.args.cfg))
 			t.Log("watchCmd logs:\n")
 			for _, osbLog := range obs.All() {
 				t.Logf("\t%s - %s - %v\n", osbLog.Level, osbLog.Message, osbLog.Context)
@@ -435,7 +475,7 @@ func Test_watchCmd_MarkerPointsToSelf(t *testing.T) {
 
 	cfg := configuration.DefaultUpgradeConfig().Watcher
 
-	err := watchCmd(log, topDir, cfg, mockWatcher, realModifier)
+	err := watchCmd(log, topDir, cfg, time.Hour, mockWatcher, realModifier)
 
 	if t.Failed() || err != nil {
 		for _, l := range obs.All() {

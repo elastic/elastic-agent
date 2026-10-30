@@ -143,6 +143,11 @@ inputs:
 #   rollback:
 #       # duration in which an upgraded Agent may be manually rolled back.
 #       window: 168h
+#       # duration for which the logs of an upgrade that failed and was rolled back are kept, so that they can be
+#       # used to troubleshoot it. The next upgrade removes them earlier. It is not recommended to set it to 0,
+#       # the logs of a failed upgrade are then removed right after the rollback. This setting is only read from
+#       # this file, a value set in the Fleet policy is not used for it.
+#       logs_retention: 720h
 
 # agent.process:
 #   # timeout for creating new processes. when process is not successfully created by this timeout

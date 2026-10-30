@@ -9,15 +9,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
+	"github.com/elastic/elastic-agent-libs/file"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-const ttlMarkerName = ".ttl"
+// MarkerFileName is the name of the TTL marker file inside a versioned home.
+const MarkerFileName = ".ttl"
 
-var defaultMarkerGlobPattern = filepath.Join("data", "elastic-agent-*", ttlMarkerName)
+var defaultMarkerGlobPattern = filepath.Join("data", "elastic-agent-*", MarkerFileName)
 
 type TTLMarkerRegistry struct {
 	baseDir               string
@@ -51,7 +54,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 			continue
 		}
 		T.log.Infof("Removing TTL marker for %s: not in new desired state", versionedHome)
-		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, MarkerFileName))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
@@ -65,7 +68,7 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 		}
 		T.log.Infow("Sweeping malformed TTL marker: not in new desired state",
 			"versionedHome", versionedHome, "error.message", parseErr.Error())
-		err = os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+		err = os.Remove(filepath.Join(T.baseDir, versionedHome, MarkerFileName))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 		}
@@ -74,8 +77,18 @@ func (T TTLMarkerRegistry) Set(m map[string]TTLMarker) error {
 	return T.addOrReplace(m)
 }
 
+// Add writes the TTL marker of a single versioned home, creating or overwriting it.
+// Unlike Set it leaves every other marker untouched.
+func (T TTLMarkerRegistry) Add(versionedHome string, marker TTLMarker) error {
+	dstFilePath := filepath.Join(T.baseDir, versionedHome, MarkerFileName)
+	if err := writeTTLMarker(dstFilePath, marker); err != nil {
+		return fmt.Errorf("writing marker %q: %w", dstFilePath, err)
+	}
+	return nil
+}
+
 func (T TTLMarkerRegistry) Remove(versionedHome string) error {
-	err := os.Remove(filepath.Join(T.baseDir, versionedHome, ttlMarkerName))
+	err := os.Remove(filepath.Join(T.baseDir, versionedHome, MarkerFileName))
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("removing ttl marker for %q: %w", versionedHome, err)
 	}
@@ -129,12 +142,26 @@ func (T TTLMarkerRegistry) GetAll() (map[string]TTLMarker, map[string]error, err
 	return ttlMarkers, malformed, nil
 }
 
+// GetAvailableRollbacks returns the markers of GetAll that are rollback targets valid now: of the rollback kind
+// and not expired. Unparseable markers are not rollback targets either.
+func (T TTLMarkerRegistry) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+	markers, _, err := T.GetAll()
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	for versionedHome, marker := range markers {
+		if !marker.IsRollbackTarget() || !now.Before(marker.ValidUntil) {
+			delete(markers, versionedHome)
+		}
+	}
+	return markers, nil
+}
+
 func (T TTLMarkerRegistry) addOrReplace(m map[string]TTLMarker) error {
 	for versionedHome, marker := range m {
-		dstFilePath := filepath.Join(T.baseDir, versionedHome, ttlMarkerName)
-		err := writeTTLMarker(dstFilePath, marker)
-		if err != nil {
-			return fmt.Errorf("writing marker %q: %w", dstFilePath, err)
+		if err := T.Add(versionedHome, marker); err != nil {
+			return err
 		}
 	}
 
@@ -158,18 +185,35 @@ func readTTLMarker(filePath string) (TTLMarker, error) {
 	return ttlMarker, nil
 }
 
-func writeTTLMarker(filePath string, marker TTLMarker) error {
-	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0660)
+// writeTTLMarker writes the marker to a temporary file that is rotated over filePath, so a crash never leaves a
+// truncated marker behind: a corrupt marker makes its install look like an orphan to the cleanup.
+// The temporary file does not match the marker glob pattern. Like the upgrade marker, the file is only accessible to
+// the user running the agent.
+func writeTTLMarker(filePath string, marker TTLMarker) (err error) {
+	tmp, err := os.CreateTemp(filepath.Dir(filePath), MarkerFileName+"-*.tmp")
 	if err != nil {
-		return fmt.Errorf("failed to open %q: %w", filePath, err)
+		return fmt.Errorf("failed to create a temporary file for %q: %w", filePath, err)
 	}
-	defer func(file *os.File) {
-		_ = file.Close()
-	}(file)
+	tmpPath := tmp.Name()
+	defer func() {
+		if err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
 
-	err = yaml.NewEncoder(file).Encode(marker)
-	if err != nil {
-		return fmt.Errorf("failed to encode %q: %w", filePath, err)
+	if err = yaml.NewEncoder(tmp).Encode(marker); err != nil {
+		return fmt.Errorf("failed to encode %q: %w", tmpPath, err)
+	}
+	if err = tmp.Sync(); err != nil {
+		return fmt.Errorf("failed to sync %q: %w", tmpPath, err)
+	}
+	// close before rotating: on Windows an open file cannot be renamed
+	if err = tmp.Close(); err != nil {
+		return fmt.Errorf("failed to close %q: %w", tmpPath, err)
+	}
+	if err = file.SafeFileRotate(filePath, tmpPath); err != nil {
+		return fmt.Errorf("failed to safe rotate %q over %q: %w", tmpPath, filePath, err)
 	}
 
 	return nil

@@ -6,6 +6,7 @@ package upgrade
 
 import (
 	"context"
+	"time"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -17,6 +18,7 @@ type RollbackOptionSetter interface {
 	SetSkipRestart(skipRestart bool)
 	SetPreRestartHook(preRestartHook RollbackHook)
 	SetRemoveMarker(removeMarker bool)
+	SetLogsRetention(failedUpgrade *UpdateMarker, retention time.Duration)
 }
 
 type RollbackOption func(ros RollbackOptionSetter)
