@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Fix components and units that are removed and quickly re-added by a policy change staying stopped until the agent restarts
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/17714
