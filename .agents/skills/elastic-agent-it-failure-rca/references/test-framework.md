@@ -25,16 +25,7 @@ Subtest names in CI replace spaces with `_` — `Upgrade_RPM_from_9.0` is `t.Run
 
 ## Diagnostics bundle naming
 
-Each agent that calls `diagnostics collect` during a test writes a zip file named:
-
-```
-<TestName>-<RFC3339-timestamp>-diagnostics.zip
-```
-
-Subtests use `/` replaced with `-`:
-- Test `TestNetworkTraffic/TestBeatsMetrics/otel` → `TestNetworkTraffic-TestBeatsMetrics-otel-2026-05-20T14-30-06Z-diagnostics.zip`
-
-The prefix is fixed the first time a fixture asks for it (`Fixture.FileNamePrefix` in `pkg/testing/fixture.go`), so the test-name part is the test that *created* the fixture — for suite-style tests that can be the parent rather than the failing subtest. List candidates with `ls "$RCA_DIR"/build/diagnostics/<TopLevelTest>-*`.
+Bundles are named `<TestName>-<RFC3339-timestamp>-diagnostics.zip`, subtests with `/` replaced by `-`, and the name part is the test that created the fixture (see the dev guide's [§"Auto diagnostics retrieval"](../../../../docs/test-framework-dev-guide.md)) — for suite-style tests that can be the parent rather than the failing subtest. List candidates with `ls "$RCA_DIR"/build/diagnostics/<TopLevelTest>-*`.
 
 When a test runs multiple agents (e.g. fleet-server + agent under test), each produces its own zip at roughly the same timestamp. Use both for cross-agent analysis.
 
