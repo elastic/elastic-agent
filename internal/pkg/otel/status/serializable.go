@@ -57,6 +57,13 @@ func (e *healthCheckEvent) Attributes() pcommon.Map        { return e.attributes
 
 // FromSerializableStatus reconstructs an AggregateStatus from serializableStatus.
 func FromSerializableStatus(ss *SerializableStatus) (*status.AggregateStatus, error) {
+	if ss == nil {
+		return nil, errors.New("cannot reconstruct AggregateStatus from nil SerializableStatus")
+	}
+	if ss.SerializableEvent == nil {
+		return nil, errors.New("serializable status must contain an event")
+	}
+
 	ev, err := FromSerializableEvent(ss.SerializableEvent)
 	if err != nil {
 		return nil, err
@@ -116,6 +123,11 @@ func CompareStatuses(s1, s2 *status.AggregateStatus) bool {
 	}
 	if s1 == nil || s2 == nil {
 		// one of them is nil
+		return false
+	}
+
+	if s1.Event == nil || s2.Event == nil {
+		// A status without an event is malformed, so it can never match.
 		return false
 	}
 
