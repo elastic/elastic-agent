@@ -6,7 +6,9 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -227,6 +229,78 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 		err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, &agentID)
 		assert.EqualError(t, err, "notify Fleet: failed")
 
+	})
+}
+
+func TestAckFleetUninstallAction(t *testing.T) {
+	const actionID = "uninstall-action-id"
+	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())
+	pt := &noopProgressDescriber{}
+	var agentID agentInfo = "testID"
+
+	newCfg := func(host string) *configuration.Configuration {
+		return &configuration.Configuration{
+			Fleet: &configuration.FleetAgentConfig{
+				AccessAPIKey: "example-key",
+				Client: remote.Config{
+					Protocol: remote.ProtocolHTTP,
+					Host:     host,
+				},
+			},
+		}
+	}
+
+	t.Run("acks the action successfully", func(t *testing.T) {
+		var gotPath string
+		var gotBody string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"action":"acks"}`))
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID, nil)
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("/api/fleet/agents/%s/acks", agentID), gotPath,
+			"ack must be sent to the agent's acks endpoint")
+		assert.Contains(t, gotBody, actionID, "ack request must carry the action id")
+	})
+
+	t.Run("a failure ack carries the error", func(t *testing.T) {
+		var gotBody string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"action":"acks"}`))
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID,
+			errors.New("uninstall failed before point of no return"))
+		require.NoError(t, err)
+		assert.Contains(t, gotBody, "uninstall failed before point of no return",
+			"a failure ack must include the action error so Fleet learns the uninstall did not complete")
+	})
+
+	t.Run("returns an error when Fleet rejects the ack", func(t *testing.T) {
+		fleetAuditAttempts = 1
+		t.Cleanup(func() { fleetAuditAttempts = 10 })
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("returns an error when no fleet configuration is available", func(t *testing.T) {
+		err := ackFleetUninstallAction(context.Background(), log, pt, &configuration.Configuration{}, &agentID, actionID, nil)
+		require.Error(t, err)
 	})
 }
 

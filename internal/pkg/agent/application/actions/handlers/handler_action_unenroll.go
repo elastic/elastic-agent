@@ -103,9 +103,18 @@ func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	// Generate empty policy change, this removing all the running components
 	stopComponents(ctx, h.ch, a, acker, backupCallback)
 
-	// close fleet gateway loop
-	for _, c := range h.closers {
-		c()
+	// A Fleet-delivered UNENROLL is the first step of the remote-uninstall flow:
+	// keep the Fleet gateway open so the agent keeps checking in and can still
+	// receive the follow-up UNINSTALL action (and its grace-period CANCEL). Fleet
+	// Server keeps the agent's credentials and delivers only UNINSTALL/CANCEL
+	// while the agent is pending uninstall.
+	//
+	// An agent-detected unenroll (IsDetected, e.g. an invalid API key) is not part
+	// of that flow and cannot keep communicating, so close the gateway loop.
+	if action.IsDetected {
+		for _, c := range h.closers {
+			c()
+		}
 	}
 
 	return nil
