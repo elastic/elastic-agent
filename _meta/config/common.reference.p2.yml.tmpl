@@ -152,6 +152,16 @@ inputs:
 #   # is force killed
 #   stop_timeout: 30s
 
+# agent.synthetics.browser:
+#   # CAs that browser monitors trust: PEM files, or directories of *.crt and *.pem files.
+#   # In containers, ELASTIC_AGENT_BROWSER_CA replaces this list when it is set.
+#   # Requires certutil (in the complete images), Linux only.
+#   certificate_authorities: []
+#   certificate_reload:
+#     # check the CAs for changes while running, so none needs a restart
+#     enabled: true
+#     reload_interval: 30s
+
 # agent.grpc:
 #   # listen address for the GRPC server that spawned processes connect back to.
 #   address: localhost
