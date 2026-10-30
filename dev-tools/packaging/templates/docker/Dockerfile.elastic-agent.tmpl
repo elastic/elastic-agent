@@ -205,11 +205,12 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
 
 {{- if eq .Variant "service" }}
 # Elastic Open Web Crawler: the application, its JRuby runtime and its trimmed JDK are taken
-# from the crawler image of the same release; the component launcher expects them at these paths.
-COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} /opt/jdk-crawler /opt/jdk-crawler
-COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} /opt/jruby /opt/jruby
-COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} /usr/local/bundle /usr/local/bundle
-COPY --from=docker.elastic.co/integrations/crawler:{{ agent_core_version }} --chown={{ .user }}:{{ .user }} /home/app /usr/share/crawler
+# from the crawler release image; the component launcher expects them at these paths.
+# The crawler has its own release cadence, bump the tag when a new crawler version is adopted.
+COPY --from=docker.elastic.co/integrations/crawler:1.2.0 /opt/jdk-crawler /opt/jdk-crawler
+COPY --from=docker.elastic.co/integrations/crawler:1.2.0 /opt/jruby /opt/jruby
+COPY --from=docker.elastic.co/integrations/crawler:1.2.0 /usr/local/bundle /usr/local/bundle
+COPY --from=docker.elastic.co/integrations/crawler:1.2.0 --chown={{ .user }}:{{ .user }} /home/app /usr/share/crawler
 RUN chmod 0755 {{ $beatHome }}/data/elastic-agent-*/components/crawler
 {{- end }}
 
