@@ -57,6 +57,7 @@ Example for Endpoint spec:
 proxied_actions:
   - UNENROLL
   - UPGRADE
+  - MIGRATE
 ```
 
 ### `runtime.preventions`
@@ -141,11 +142,15 @@ Some components (particularly Beats) terminate when they receive a new configura
 
 ### `service` (input only)
 
-Inputs that are run as a system service (like Endpoint Security) can use `service` instead of `command` to indicate that Agent should only monitor them, not manage their execution. `service` consists of the following subfields:
+Inputs that are run as a system service (like Endpoint Security) can use `service` instead of `command` to indicate that Agent should install and uninstall the service and monitor it, but not manage its process directly. `service` consists of the following subfields:
 
 #### `service.cport` (int, required)
 
-The TCP port on localhost where the service listens for connections from Agent.
+The TCP port on localhost of the connection info server. The Agent hosts this server, and the service connects to it to obtain its connection information. Currently the Agent always uses the local socket from `service.csocket` instead, so `cport` is only a fallback.
+
+#### `service.csocket` (string, required)
+
+The name of the local socket the Agent's connection info server listens on, for example `.eaci.sock`. On Linux and macOS this is a unix socket at that path relative to the Agent's top directory (`path.top`), on Windows it is a named pipe.
 
 #### `service.log.path` (string)
 
@@ -158,6 +163,7 @@ The path to this service's logs directory.
 - `args` (identical to `command.args`): the command-line arguments to pass for this operation
 - `env` (identical to `command.env`): the environment variables to set for this operation
 - `timeout`: the timeout duration for this operation.
+- `non_fatal_exit_codes`: a list of exit codes that are not treated as a failure. Currently only the list on the `install` operation is used: if starting the service fails with one of these exit codes, the Agent logs a warning and keeps running instead of retrying the start.
 
 For example:
 

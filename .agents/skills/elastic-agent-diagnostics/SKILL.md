@@ -30,8 +30,8 @@ Tools: `jq` for NDJSON logs and JSON; `yq` for YAML. The recipes assume kislyuk'
 
 1. **Quick triage first** — [references/playbooks.md](references/playbooks.md) §1. Version, agent and Fleet state, per-component state, expected-vs-actual drift, per-file error/warning counts. If everything is healthy and there are no errors, say so and stop — don't manufacture issues.
 2. **Establish each component's runtime** — OTel receiver, beat process, or OS service (Elastic Endpoint) — with [references/runtimes.md](references/runtimes.md). Logs, health reporting, and failure modes differ per runtime, and Endpoint has its own lifecycle, logs, and diagnostics.
-3. Skim [references/bundle-layout.md](references/bundle-layout.md) for what each file holds.
-4. Decode state integers with [references/state-enums.md](references/state-enums.md).
+3. Skim [docs/diagnostics.md](../../../docs/diagnostics.md) for what each file holds, and [references/bundle-layout.md](references/bundle-layout.md) for analysis notes.
+4. Decode state integers with [docs/diagnostics.md](../../../docs/diagnostics.md) §"State values" (interpretation notes and a decode one-liner in [references/state-enums.md](references/state-enums.md)).
 5. Go deeper with the relevant playbook section:
    - **Log analysis** — errors/warnings, partitioning by management layer (L1–L4), cross-layer timeline, state transitions.
    - **Component & policy inspection** — what's expected vs running, what each component does.
