@@ -653,6 +653,10 @@ func (Test) Coverage() error {
 //
 // SNAPSHOT, FIPS, VERSION_QUALIFIER, DOCKER_VARIANTS, AGENT_DROP_PATH, and
 // KEEP_ARCHIVE apply as documented on their respective settings.
+//
+// BEATS_SHA, a full elastic/beats commit SHA, checks out that commit in the
+// beats submodule before elastic-agent-core is compiled. It only applies when
+// AGENT_CORE_SOURCE is "local".
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	start := time.Now()
@@ -695,6 +699,11 @@ func Package(ctx context.Context) error {
 	ctx = devtools.ContextWithSettings(ctx, cfg)
 
 	if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+		if cfg.Packaging.BeatsSHA != "" {
+			if err := checkoutBeatsSHA(cfg.Packaging.BeatsSHA); err != nil {
+				return fmt.Errorf("failed checking out BEATS_SHA: %w", err)
+			}
+		}
 		mg.CtxDeps(ctx, PackageAgentCore)
 	}
 
@@ -4161,6 +4170,23 @@ func (Otel) PrepareBeats() error {
 	}
 
 	fmt.Println(">> Successfully converted beats/.git to a directory")
+	return nil
+}
+
+// checkoutBeatsSHA checks out the given elastic/beats commit in the beats submodule.
+// The new gitlink is staged because restoreBeatsSubmodule runs `git submodule update`,
+// which would otherwise reset the submodule to the commit pinned in the repository.
+func checkoutBeatsSHA(sha string) error {
+	fmt.Printf(">> Checking out beats submodule at %s\n", sha)
+	for _, args := range [][]string{
+		{"-C", "beats", "fetch", "origin", sha},
+		{"-C", "beats", "checkout", "--detach", sha},
+		{"add", "beats"},
+	} {
+		if err := sh.RunV("git", args...); err != nil {
+			return fmt.Errorf("git %s failed: %w", strings.Join(args, " "), err)
+		}
+	}
 	return nil
 }
 
