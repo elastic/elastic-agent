@@ -204,10 +204,10 @@ RUN apk add --no-cache git make python-3.11 py3.11-pip && \
 {{- end }}
 
 {{- if eq .Variant "service" }}
-# Elastic Open Web Crawler: the application, its JRuby runtime and its trimmed JDK are taken
-# from the crawler release image; the component launcher expects them at these paths.
+# Elastic Open Web Crawler: the Java runtime comes from the base image's package repository, the
+# application with its JRuby runtime and gems is taken from the crawler release image.
 # The crawler has its own release cadence, bump the tag when a new crawler version is adopted.
-COPY --from=docker.elastic.co/integrations/crawler:1.2.0 /opt/jdk-crawler /opt/jdk-crawler
+RUN apk add --no-cache openjdk-21-jre
 COPY --from=docker.elastic.co/integrations/crawler:1.2.0 /opt/jruby /opt/jruby
 COPY --from=docker.elastic.co/integrations/crawler:1.2.0 /usr/local/bundle /usr/local/bundle
 COPY --from=docker.elastic.co/integrations/crawler:1.2.0 --chown={{ .user }}:{{ .user }} /home/app /usr/share/crawler
