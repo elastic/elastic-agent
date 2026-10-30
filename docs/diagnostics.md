@@ -1,8 +1,9 @@
 # Diagnostics bundle
 
 `elastic-agent diagnostics` writes a `.zip` bundle with the agent's state, configuration, logs, component diagnostics
-and Go pprof profiles. This page describes what is in it. Passwords, tokens, API keys and certificates are redacted
-(see [PII_HANDLING.md](./PII_HANDLING.md)). The bundle is a snapshot: `state.yaml` and the configs reflect the moment
+and Go pprof profiles. This page describes what is in it. Common sensitive fields in structured diagnostics are redacted
+on a best-effort basis, but logs and other content may still contain sensitive data. Review the bundle before sharing
+it (see [PII_HANDLING.md](./PII_HANDLING.md)). The bundle is a snapshot: `state.yaml` and the configs reflect the moment
 the command ran, only the logs cover history. All timestamps are UTC.
 
 Which files are present depends on the agent version, mode and runtimes in use, so a missing file is information
@@ -12,8 +13,8 @@ rather than a broken bundle (see [Missing files](#missing-files)).
 
 | File | Contents |
 |---|---|
-| `version.txt` | Agent binary version, as YAML: `version`, `commit`, `build_time`, `snapshot`, `fips` |
-| `package.version` | Installed package version. Differs from `version.txt` while an upgrade is in progress |
+| `version.txt` | Agent version and build metadata, as YAML: `version`, `commit`, `build_time`, `snapshot`, `fips` |
+| `package.version` | Package version read from disk. `version.txt.version` is initialized from this file at startup, falling back to the binary's default version if it cannot be read or parsed |
 | `agent-info.yaml` | Agent identity, log levels and metadata (host, build, `upgradeable`, ...) |
 | `local-config.yaml`, `pre-config.yaml` | The on-disk agent config, and the policy before variable substitution |
 | `environment.yaml` | The agent process's environment variables |
@@ -25,6 +26,9 @@ rather than a broken bundle (see [Missing files](#missing-files)).
 | `otel-merged.yaml` | The merged OTel collector config (agent-managed components plus `otel.yaml`): which receivers, exporters and pipelines the collector is running |
 | `variables.yaml` | Values of the dynamic variables provided to the policy (host metadata, cloud provider info, ...) |
 | `*.pprof.gz` | Agent process profiles: `goroutine`, `heap`, `allocs`, `block`, `mutex`, `threadcreate`, and `cpu.pprof` only when collected with `--cpu-profile` |
+
+`components-expected.yaml` and `components-actual.yaml` omit unit configurations. Use `computed-config.yaml` to
+inspect the resolved policy.
 
 ## `state.yaml`
 
@@ -48,11 +52,11 @@ components:
       version_info:
         name: <string> # identifies the runtime, see below
       pid: <int>      # only non-zero for service components (Endpoint)
-    units:
-      <input|output>-<unit id>:
-        state: <int>
-        message: <string>
-        payload: {}   # unit specific runtime state
+      units:
+        <input|output>-<unit id>:
+          state: <int>
+          message: <string>
+          payload: {} # unit specific runtime state
 ```
 
 The runtime of a component can be told from `state.version_info.name`: `beats-receiver` for the OTel runtime,
@@ -77,8 +81,10 @@ the snapshot, if the component switched runtimes the logs contain both.
 | 7 | UPGRADING |
 | 8 | ROLLBACK |
 
-`fleet_state` other than 2 means Fleet Server connectivity is broken. After an unenroll the Fleet gateway is stopped
-and `fleet_state` keeps its last value. A component that stays in STOPPING did not acknowledge a stop request.
+For managed agents, `fleet_state` and `fleet_message` describe the Fleet connection. Standalone agents report
+STOPPED with `Not enrolled into Fleet`; a non-HEALTHY value does not necessarily mean a connection failure.
+After an unenroll the Fleet gateway is stopped and `fleet_state` can keep its last value. A component that stays
+in STOPPING did not acknowledge a stop request.
 
 `collector.status` is the OTel `componentstatus.Status` of the whole collector: 0 None, 1 Starting, 2 OK,
 3 RecoverableError, 4 PermanentError, 5 FatalError, 6 Stopping, 7 Stopped. It only covers the components the collector
@@ -126,11 +132,11 @@ Per-component directories, named after the component id with `/` replaced by `-`
 `beat_metrics.json` (libbeat pipeline and output statistics), `input_metrics.json`, and for Filebeat
 `registry.tar.gz` (omitted when the registry is large). For Endpoint, `components/endpoint/` holds Endpoint's own diagnostics:
 `policy_response.json`, `elastic-endpoint.yaml`, `metrics.json`, `version.txt` and `system_info.txt`, or `error.txt`
-if Endpoint did not answer within 20 seconds.
+if diagnostics failed. The response timeout is 20 seconds, or 60 seconds when CPU profiling is requested.
 
 ## `edot/`
 
-Present when the OTel runtime is in use: `otel-merged-actual.yaml` (the config the collector process is actually
+Present when diagnostics can be retrieved from the supervised collector: `otel-merged-actual.yaml` (the config the collector process is actually
 running, which can differ from `otel-merged.yaml` during a transition), the collector's `environment.yaml` and its
 pprof profiles (`*.profile.gz`).
 
@@ -138,7 +144,7 @@ pprof profiles (`*.profile.gz`).
 
 | Missing | Likely reason |
 |---|---|
-| `edot/` | No component runs in the OTel runtime |
+| `edot/` | No supervised collector is running, or collector diagnostics could not be retrieved |
 | `components/` entry for a component | The component was not running when the bundle was collected |
 | `registry.tar.gz` | The registry was too large to include |
 | `cpu.pprof` | The bundle was collected without `--cpu-profile` |

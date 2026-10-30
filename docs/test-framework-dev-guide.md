@@ -484,7 +484,8 @@ When an integration test fails the testing fixture will try its best to automati
 information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
 automatically transfer any collected diagnostics from the instance back to the running host. The results of the
 diagnostic collection are placed in `build/diagnostics`.
-Each bundle is named `<TestName>-<timestamp>-diagnostics.zip`, with `/` in subtest names replaced by `-`. The test name is
+Each bundle is named `<TestName>-<timestamp>-diagnostics.zip`, with `/` in subtest names replaced by `-` and `:` in
+timestamps replaced by `-`. The test name is
 the one the fixture was created with (`Fixture.FileNamePrefix`), which for suite-style tests can be the parent test.
 A test that runs several agents, for example Fleet Server and the agent under test, produces one bundle per agent.
 See [diagnostics.md](./diagnostics.md) for what is in a bundle.
@@ -559,7 +560,7 @@ that passes locally can flake weeks later, so keep these in mind:
   the serial waits inside it.
 - **Assert on the `*assert.CollectT` inside `EventuallyWithT`**, not on the outer `t`, otherwise the first transient
   error fails the test instead of being retried. Don't call `require` or `assert` on `t` from a goroutine that can
-  outlive the test, and use `t.Context()` rather than `context.Background()` so waits respect the test deadline.
+  outlive the test, and use `t.Context()` rather than `context.Background()` so waits are canceled before test cleanup.
 - **Produce your own data and filter on it.** Don't wait for ambient events (audit, network traffic) the test did not
   cause, and filter Elasticsearch queries on values the test controls (namespace, tag, a generated message). Capture
   a `@timestamp` lower bound *before* the action that produces the document.
@@ -592,15 +593,16 @@ outweigh the benefits of creating another group.
 
   When creating a new test group, it is important to add the new group to the variant lists at the top of the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
 
-  The groups are defined as YAML anchors (`windows_variants`, `linux_deb_variants`, `linux_rpm_variants`, `linux_arm_variants`),
-  which the tiered steps reference as the `variant` axis of their `matrix`. Add the new group to every list for a platform it should run on.
+  The groups are defined as YAML anchors (`windows_variants`, `linux_variants`, `linux_deb_variants`, `linux_rpm_variants`, `linux_arm_variants`),
+  which the tiered steps reference as the `variant` axis of their `matrix`. `linux_variants` runs against tar.gz packages;
+  `linux_deb_variants` and `linux_rpm_variants` contain only the package-specific `deb` and `rpm` groups.
+  Add the new group to the lists for the platforms and package types it should run on.
   Some steps (for example the non-sudo ones) list only the `default` variant instead of an anchor, so check which tiers and steps should run the new group.
   Example:
 
   ```yaml
-  - linux_deb_variants: &linux_deb_variants
+  - linux_variants: &linux_variants
     - container
-    - deb
     - default
     - your-new-group
     # ...
@@ -609,7 +611,7 @@ outweigh the benefits of creating another group.
     # ...
     matrix:
       setup:
-        variant: *linux_deb_variants
+        variant: *linux_variants
   ```
 
   Test results are not collected in each of these steps: they upload `build/*` (including the JUnit `.xml` reports) as artifacts, and the single

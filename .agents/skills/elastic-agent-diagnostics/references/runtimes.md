@@ -1,12 +1,12 @@
 # Component runtimes: OTel receiver, beat process, OS service
 
-Timings below are given as the constant that defines them, with its value on main at the time of writing (2026-09); if a number matters to your conclusion, read the constant at the build's commit.
+Timings below reflect this branch; if a number matters to your conclusion, read the constant at the build's commit.
 
 Not everything runs in the EDOT collector. Each component runs in one of three runtimes, and each has different logs, health reporting, and failure modes. Establish the runtime of every component involved **before** interpreting logs — the four-layer model (L1 supervisor → L2 collector core → L3 pipeline component → L4 beat) only fully applies to the OTel runtime.
 
 | Runtime | What runs | Used for | Managed by |
 |---|---|---|---|
-| **otel** | the beat as a receiver (`<beat>receiver`) inside the `elastic-otel-collector` subprocess | beat inputs, by default (see below) | OTel manager (`internal/pkg/otel/manager/`) |
+| **otel** | the beat as a receiver (`<beat>receiver`) inside the `elastic-otel-collector` subprocess | non-dynamic Metricbeat inputs and self-monitoring by default (see below) | OTel manager (`internal/pkg/otel/manager/`) |
 | **process** | a separate beat subprocess, `elastic-otel-collector <beat> -E …` (the beats ship inside the EDOT binary) | beat inputs that aren't in otel mode; other process components (e.g. `apm-server`, `fleet-server`, `cloudbeat`) | runtime manager, `CommandRuntime` (`pkg/component/runtime/command.go`) |
 | **service** | an OS service installed and supervised by the agent — **Elastic Endpoint (Elastic Defend)** | `endpoint` | runtime manager, `ServiceRuntime` (`pkg/component/runtime/service.go`) |
 
@@ -16,9 +16,9 @@ The collector itself is always a subprocess on current versions (the in-process 
 
 There is an ongoing migration from process to otel; defaults differ by agent version, so check the bundle's `version.txt` and read the code at the build's commit when it matters. The defaults, the override precedence (look for the keys in `computed-config.yaml` / `pre-config.yaml`) and the automatic fallbacks are documented in [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md); `DefaultRuntimeConfig` in `pkg/component/component.go` is authoritative. Agent self-monitoring has its own switch, `agent.monitoring._runtime_experimental` (default `otel`; env `AGENT_MONITORING_RUNTIME_EXPERIMENTAL`).
 
-- Because heartbeat has no beat-level default, it is exactly the beat that a global `agent.internal.runtime.default: otel` moves — that's what the Fleet runtime-switch tests set (`switchPolicyToOtelRuntime`).
+- Only Filebeat and Metricbeat have Beat-level runtime settings on this branch. Metricbeat defaults to `otel`; Filebeat and Beats without a Beat-level setting inherit the global default (`process`).
 - Fallbacks to process are logged by the coordinator: `otel runtime is not supported for component <id>, switching to process runtime, reason: …` (also for monitoring: `… for monitoring output …`) and `Component <id> uses dynamic variable providers, switching to <runtime> runtime` (warn).
-- Whether dynamic components move depends on the **version**: `agent.internal.runtime.dynamic_inputs` defaults to `process` in 9.3, 9.4 and 9.5 (dynamic components run as beat processes), and is empty on main / 9.6 since #15536 (2026-07-15; they stay otel). Main's setting is still in flux and is to be decided before the 9.6.0 feature freeze, so treat it as version-dependent. Read `DefaultRuntimeConfig` at the build's commit.
+- `agent.internal.runtime.dynamic_inputs` defaults to `process` on 9.4. This branch supports only a runtime string, not per-Beat settings or `static_variables` exemptions; see the linked guide's "Dynamic Inputs" section.
 
 ## Telling the runtime from a bundle
 
@@ -43,12 +43,12 @@ yq -r '.components[] | "\(.id)\t\(.state.version_info.name // "?")\t\(.state.sta
 ## Health reporting and failure signatures per runtime
 
 - **otel**: the OTel manager polls the collector's healthcheck extension every second and maps pipeline `logs/_agent-component/<id>` status to component state; a component missing from the collector's status is reported STOPPED. After `maxFailuresDuration` (130 s) without an answer (`execution_subprocess.go`): `failed to connect to collector`. Collector crash loops (logger `otel_manager`): `collector exited with error (will try to recover in …)`, `collector recovery restarting, total retries: N`, `supervised collector (pid: N) exited with error: …`. One broken receiver can take down the whole collector, and with it every otel component — look for the first `failed to build pipelines` (may be logged at debug).
-- **process**: gRPC check-ins. `Degraded: pid '<n>' missed 1 check-in`; after `maxCheckinMisses` (3, `runtime/manager.go`) `Failed: pid '<n>' missed 3 check-ins and will be killed`; unexpected exits as `Failed: pid '<n>' exited with code '<c>'`. A requested stop is SIGTERM, then SIGKILL after `ProcessStopTimeout` (30 s, `runtime/command.go`), and a clean one ends in `Stopped: pid '<n>' exited with code '0'`. Each process fails independently.
-- **service**: see Endpoint below — check-ins, but FAILED only after a miss threshold scaled to the longest service operation timeout (see Endpoint below).
+- **process**: gRPC check-ins. `Degraded: pid '<n>' missed 1 check-in`; after `maxCheckinMisses` (3, `runtime/manager.go`) `Failed: pid '<n>' missed 3 check-ins and will be killed`; unexpected exits as `Failed: pid '<n>' exited with code '<c>'`. A requested stop is SIGTERM, then SIGKILL after the grace period (`command.timeouts.stop`, default `ProcessStopTimeout` of 30 s, minus `ShutdownBuffer` of 5 s; `runtime/command.go`), and a clean one ends in `Stopped: pid '<n>' exited with code '0'`. Each process fails independently.
+- **service**: check-in failures use a miss threshold scaled to the longest service operation timeout; repeated installer failures have a separate timeout (see Endpoint below).
 
 ## Runtime switches
 
-Tests that compare runtimes (`TestBeatsMetrics/otel|process|compare`, `TestMonitoringNoDuplicates`, `TestComponentWorkDir`, …; mostly `testing/integration/ess/beat_receivers_test.go` and the `*_monitoring_test.go` runners) switch a component between runtimes via policy. How the coordinator sequences a switch, and the log lines it emits, is in [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) §"Runtime switches". `Runtime transition timeout exceeded, force-applying deferred manager updates` (warn) means the old instance didn't stop in time; suspect it first. Data duplicated or missing around a switch is often the transition itself, not a steady-state bug.
+Tests such as `TestMonitoringNoDuplicates` and `TestComponentWorkDir` in `testing/integration/ess/beat_receivers_test.go` switch a component between runtimes via policy. On 9.4 the coordinator updates both managers without waiting for the old instance to stop; see [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) §"Runtime switches". Data duplicated or missing around a switch can be the transition itself, not a steady-state bug.
 
 ## Elastic Endpoint (Elastic Defend)
 
@@ -56,7 +56,7 @@ Service components in general are documented in [docs/component-specs.md](../../
 
 **Lifecycle** (`ServiceRuntime`, `specs/endpoint-security.spec.yml`):
 - On start the agent runs the installer shipped in its own components dir, `data/elastic-agent-<hash>/components/endpoint-security`: `verify`, and if that fails `install --upgrade --resources endpoint-security-resources.zip` (operation timeouts are in `specs/endpoint-security.spec.yml`: 600 s for install and uninstall). Logged as `check if endpoint service is installed` → `after check if endpoint service is installed, err: …` → `failed check endpoint service: … try install` (normal on first install: "Endpoint is not installed"). Connection info is served on a local socket (`.eaci.sock` under the agent's top path), not a TCP port.
-- **Install failures don't mark the component FAILED.** The component can sit in `Starting` while the agent logs `failed to start endpoint service, err: …, restarting after waiting for <serviceRestartDelay>` (30 s) and retries. Search the logs; don't trust `state.yaml` alone.
+- **Install failures are reported as DEGRADED, then FAILED.** The agent logs `failed to start endpoint service, err: …, restarting after waiting for <serviceRestartDelay>` (30 s) and retries. Failed attempts become FAILED once `service.timeouts.start_failed_after` elapses (5 minutes by default), and retries continue. The connection info server opens only after the installer completes, preventing the old service from being adopted during an upgrade.
 - Health is by check-in (`defaultCheckServiceStatusInterval`, 30 s, `runtime/service.go`). `Degraded: endpoint service missed 1 check-in`, `Degraded: endpoint missed N check-ins`; `Failed: endpoint service missed N check-ins` only after about longest-operation-timeout ÷ check-in-interval misses (600 s ÷ 30 s = 20, ≈10 min; `TestServiceCheckinFailureTimeout` in `service_test.go` pins the arithmetic).
 - **Removed, then back within seconds?** `Stopped: endpoint service runtime` followed shortly by `Spawned new component endpoint: Starting: endpoint service runtime` means a policy containing Endpoint was applied again after the removal — look for policy changes after it (playbooks §"Policy changes") and at the revision in `computed-config.yaml`.
 - **Agent shutdown or restart only stops supervision; Endpoint keeps running.** Removing Endpoint from the policy (including via unenroll) runs `uninstall` (up to the spec's uninstall timeout): `stopping endpoint service runtime` → `endpoint service has checked in, send stopping state to service` (or `…had never checked in, proceed to uninstall`) → `uninstall endpoint service` → `Stopped: endpoint service runtime`, or `failed endpoint service uninstall, err: …`.

@@ -4,7 +4,7 @@ The bundle layout — top-level files, `state.yaml` structure, log files and fie
 
 ## Analysis notes
 
-- `components-expected.yaml` and `components-actual.yaml` share the schema of `state.yaml`'s `components:` list but carry the full compiled spec (binary path, spec, units with config). In `components-*.yaml` a unit's type is a `UnitType` integer: `0` = INPUT, `1` = OUTPUT; in `state.yaml` it is the key prefix (`input-<id>` / `output-<id>`).
+- `components-expected.yaml` and `components-actual.yaml` contain compiled component definitions (binary path, spec and units), not the `state.yaml` component-state schema. Unit configurations are omitted; inspect `computed-config.yaml` instead. In `components-*.yaml` a unit's type is a `UnitType` integer: `0` = INPUT, `1` = OUTPUT; in `state.yaml` it is the key prefix (`input-<id>` / `output-<id>`).
 - A new log file starts on rotation or process restart: the un-suffixed file is the **oldest** of the day, then `-1`, `-2`, …. Concatenate and sort by `@timestamp` rather than relying on names.
 - `beat_metrics.json` top-level keys: `libbeat.pipeline.events`, `libbeat.output`, `libbeat.config`, `system.cpu`, `system.load`; `registry.tar.gz` extracts to `registry/filebeat/{log,meta}.json`.
 - Profiles are readable directly by `go tool pprof`: agent-process profiles at the bundle root, EDOT collector profiles in `edot/*.profile.gz`.

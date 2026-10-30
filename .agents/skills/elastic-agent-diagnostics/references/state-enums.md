@@ -6,7 +6,7 @@ The integer states in `state.yaml` — the `cproto.State` enum (0 STARTING … 8
 
 Interpretation notes:
 
-- `fleet_state` other than 2 means Fleet Server connectivity is broken. The converse doesn't hold: after an unenroll the Fleet gateway is stopped and `fleet_state` / `fleet_message` stay frozen (often `2` / `Connected`).
+- For managed agents, inspect `fleet_state` together with `fleet_message` for connection problems. Standalone agents report STOPPED with `Not enrolled into Fleet`. After an unenroll the Fleet gateway is stopped and `fleet_state` / `fleet_message` can stay frozen (often `2` / `Connected`).
 - A component stuck at **5 (STOPPING)** is a common failure mode — the supervisor told it to stop but it never acknowledged. Look for cross-layer discrepancies between L1 and L2/L3.
 - Always cross-check `otel-merged.yaml` or `edot/otel-merged-actual.yaml` against `components-expected.yaml` to confirm all expected receivers are in the running pipeline.
 

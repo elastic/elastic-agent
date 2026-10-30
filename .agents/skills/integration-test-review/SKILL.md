@@ -13,7 +13,7 @@ modes actually observed in a year of flake fixes (see
 [references/flake-taxonomy.md](references/flake-taxonomy.md) for the evidence: every
 rule below cites real incidents).
 
-The condensed, general version of these rules for test authors is in the dev guide's [§"Writing stable tests"](../../../docs/test-framework-dev-guide.md); this skill is the detailed review checklist.
+The condensed, general version of these rules for test authors is in the dev guide's [§"Writing stable tests"](../../../docs/test-framework-dev-guide.md#writing-stable-tests); this skill is the detailed review checklist.
 
 ## Method
 
