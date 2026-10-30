@@ -382,7 +382,7 @@ func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("timeout while waiting for fleet server start: %w", ctx.Err())
-	case m.ch <- &localConfigChange{injectFleetServerInput}:
+	case m.ch <- &localConfigChange{newFleetServerInputConfig()}:
 	}
 
 	return m.waitForFleetServer(ctx)
