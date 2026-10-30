@@ -414,8 +414,6 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
 	if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("timeout") {
-		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Child("ssl", -1); err == nil {
 		if value.HasField("ca_trusted_fingerprint") {
 			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
@@ -426,6 +424,10 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
 	if cfg.HasField("bulk_flush_frequency") {
 		logger.Warn("bulk_flush_frequency is deprecated")
+	}
+
+	if cfg.HasField("timeout") {
+		logger.Warn("timeout is not supported, use broker_timeout instead")
 	}
 
 	return nil
