@@ -82,7 +82,8 @@ steps:
 
   - label: ":grey_question: Promote agentless app release if validation passes"
     # DRY_RUN will help to skip this step when set to true
-    if: build.env("DRY_RUN") == null || build.env("DRY_RUN") == "false"
+    # BEATS_SHA builds a custom test image with a different elastic/beats commit, which must never be promoted
+    if: (build.env("DRY_RUN") == null || build.env("DRY_RUN") == "false") && (build.env("BEATS_SHA") == null || build.env("BEATS_SHA") == "")
     depends_on: "mirror-elastic-agent"
     command: |
       export COMMIT_HASH=$$(buildkite-agent meta-data get git-short-commit)

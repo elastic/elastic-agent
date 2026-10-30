@@ -292,6 +292,7 @@ var (
 	agentCoreVersionRegex  = regexp.MustCompile(`(?m)^const defaultBeatVersion = "(.+)"\r?$`)
 	beatDocBranchRegex     = regexp.MustCompile(`(?m)doc-branch:\s*([^\s]+)\r?$`)
 	beatDocSiteBranchRegex = regexp.MustCompile(`(?m)doc-site-branch:\s*([^\s]+)\r?$`)
+	fullCommitSHARegex     = regexp.MustCompile(`^[0-9a-f]{40}$`)
 )
 
 // ParseAgentCoreVersion extracts defaultBeatVersion from version/version.go contents.
@@ -1259,6 +1260,11 @@ type PackagingSettings struct {
 	// CoreSource selects where elastic-agent-core comes from when running
 	// Package. Defaults to CoreSourceLocal (from AGENT_CORE_SOURCE env var).
 	CoreSource CoreSource
+
+	// BeatsSHA is an optional full elastic/beats commit SHA to check out in the
+	// beats submodule before compiling elastic-agent-core (from BEATS_SHA env
+	// var). Empty keeps the commit pinned by the submodule.
+	BeatsSHA string
 }
 
 // IntegrationTestSettings contains integration test related settings.
@@ -1673,6 +1679,12 @@ func (s *Settings) loadPackagingSettingsFromEnv() error {
 		s.Packaging.CoreSource = CoreSourceManifest
 	default:
 		return fmt.Errorf("unknown AGENT_CORE_SOURCE=%s", v)
+	}
+	if v := os.Getenv("BEATS_SHA"); v != "" {
+		if !fullCommitSHARegex.MatchString(v) {
+			return fmt.Errorf("BEATS_SHA must be a full 40-character lowercase hex commit SHA, got %q", v)
+		}
+		s.Packaging.BeatsSHA = v
 	}
 
 	return nil
