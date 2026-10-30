@@ -1,0 +1,24 @@
+type: awsidentityfederation
+scope_name: github.com/elastic/elastic-agent/internal/edot/extensions/awsidentityfederationextension
+github_project: elastic/elastic-agent
+
+description: |
+  This extension resolves AWS credentials for the Identity Federation flow of Elastic
+  managed integrations. It fetches a JWT from the Elastic workload-identity-issuer over
+  mTLS and assumes the customer's IAM role with sts:AssumeRoleWithWebIdentity, then shares
+  the credentials with AWS-SDK-based components (for example the awscloudwatch receiver)
+  through their credentials_provider option.
+
+status:
+  class: extension
+  stability:
+    development: [extension]
+  distributions: []
+  codeowners:
+    active: [jeniawhite]
+
+tests:
+  # The generated lifecycle tests would make extensiontest a direct dependency, which the
+  # README generator lists as a component. TestFactoryLifecycle covers the same ground.
+  skip_lifecycle: true
+  skip_shutdown: true
