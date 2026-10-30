@@ -31,17 +31,23 @@ type Config struct {
 }
 
 // Start imports the configured CAs into the browser's trust store and, unless
-// certificate_reload is disabled, keeps it in sync until ctx is done. It does
-// nothing outside Linux, when none of the configured paths exists, or without
-// certutil. It never returns an error: a failure only logs a warning, so it can't
-// stop the agent from starting.
+// certificate_reload is disabled, keeps it in sync until ctx is done. A store left
+// by a previous run is cleaned up even when no CA is configured any more. It does
+// nothing outside Linux, when there are neither configured paths that exist nor a
+// store, or without certutil. It never returns an error: a failure only logs a
+// warning, so it can't stop the agent from starting.
 //
 // It must run before the agent starts the browser, because it may change HOME.
 func Start(ctx context.Context, log *logger.Logger, cfg Config) {
-	if runtime.GOOS != "linux" || !slices.ContainsFunc(cfg.CertificateAuthorities, exists) {
+	if runtime.GOOS != "linux" {
 		return
 	}
 	m := &manager{paths: cfg.CertificateAuthorities, log: log}
+	var setHome bool
+	m.home, m.owner, setHome = browserHome(log)
+	if !slices.ContainsFunc(m.paths, exists) && !m.hasDB() {
+		return
+	}
 	certutil, err := exec.LookPath("certutil")
 	if err != nil {
 		if len(m.files()) > 0 {
@@ -49,10 +55,12 @@ func Start(ctx context.Context, log *logger.Logger, cfg Config) {
 		}
 		return
 	}
+	if setHome {
+		_ = os.Setenv("HOME", m.home)
+	}
 	m.certs = execRunner(certutil)
-	m.home, m.owner = browserHome(log)
 
-	reload := cfg.CertificateReload.IsEnabled()
+	reload := cfg.CertificateReload.IsEnabled() && len(m.paths) > 0
 	if err := m.reconcile(ctx); err != nil {
 		if reload {
 			log.Warnf("custom CA certificates not imported, will retry: %v", err)
@@ -74,31 +82,30 @@ func exists(path string) bool {
 	return err == nil
 }
 
-// browserHome returns the home directory whose .pki/nssdb the browser reads, and
-// the owner the database needs.
+// browserHome returns the home directory whose .pki/nssdb the browser reads, the
+// owner the database needs, and whether HOME must be changed to that directory.
 //
 // As root, Heartbeat runs the browser as BEAT_SETUID_AS with that user's home, so
 // the database goes there and is given to that user. Otherwise the browser uses
 // HOME, unless HOME isn't writable (arbitrary UIDs on OpenShift get "/"): then HOME
-// is changed to that user's home, which the browser inherits when it starts.
-func browserHome(log logs) (string, *owner) {
+// must be changed to that user's home, which the browser inherits when it starts.
+func browserHome(log logs) (string, *owner, bool) {
 	home := os.Getenv("HOME")
 	isRoot := os.Geteuid() == 0
 	if !isRoot && writable(home) {
-		return home, nil
+		return home, nil, false
 	}
 	userHome, o, err := lookupBrowserUser(os.Getenv(browserUserEnv))
 	if err != nil {
 		log.Warnf("the browser may not read the custom CAs: %v", err)
 	}
 	if userHome == "" {
-		return home, nil
+		return home, nil, false
 	}
 	if isRoot {
-		return userHome, o
+		return userHome, o, false
 	}
-	_ = os.Setenv("HOME", userHome)
-	return userHome, nil
+	return userHome, nil, true
 }
 
 func writable(dir string) bool {

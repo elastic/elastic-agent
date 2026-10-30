@@ -152,25 +152,34 @@ func (m *manager) certificates() (map[string][]byte, error) {
 // On error the change stays pending and the next call retries it.
 func (m *manager) reconcile(ctx context.Context) error {
 	want, err := m.certificates()
-	if err == nil && m.applied != nil && maps.EqualFunc(want, m.applied, bytes.Equal) {
+	if err != nil {
+		// Leave the database alone until every CA file can be read: syncing a partial
+		// set would remove the unreadable files' CAs, and once they are readable again
+		// nothing would differ from the last successful sync to bring them back.
+		return fmt.Errorf("reading CA files: %w", err)
+	}
+	if m.applied != nil && maps.EqualFunc(want, m.applied, bytes.Equal) {
 		return nil
 	}
-	if err == nil && len(want) == 0 && !exists(filepath.Join(m.dbDir(), "cert9.db")) {
+	if len(want) == 0 && !m.hasDB() {
 		m.applied = want
 		return nil
 	}
-	if err := m.sync(ctx, want, err); err != nil {
+	if err := m.sync(ctx, want); err != nil {
 		return err
 	}
 	m.applied = want
 	return nil
 }
 
+func (m *manager) hasDB() bool {
+	return exists(filepath.Join(m.dbDir(), "cert9.db"))
+}
+
 // sync imports the certificates in want that the database lacks and removes the
 // managed ones it no longer wants. Certificates already in the database are never
-// touched, so running browsers see no gap. readErr, from reading the CA files, fails
-// the sync once everything else is done.
-func (m *manager) sync(ctx context.Context, want map[string][]byte, readErr error) error {
+// touched, so running browsers see no gap.
+func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 	db := m.dbDir()
 	dbArg := "sql:" + db
 	if err := os.MkdirAll(db, 0o700); err != nil {
@@ -194,7 +203,7 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte, readErr erro
 		}
 	}
 
-	errs := []error{readErr}
+	var errs []error
 	var added, removed int
 	for nick, der := range want {
 		if existing[nick] {

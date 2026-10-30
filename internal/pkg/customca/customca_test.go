@@ -334,6 +334,27 @@ func TestReconcileTouchesNothingWithoutCertificates(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(m.home, ".pki"), "no database may be created without certificates")
 }
 
+func TestReconcileLeavesTheDatabaseAloneOnReadErrors(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read a file whatever its mode")
+	}
+	m, fake, dir, _ := setup(t)
+	write(t, dir, "a.pem", newCA(t, "a"))
+	write(t, dir, "b.pem", newCA(t, "b"))
+	require.NoError(t, m.reconcile(t.Context()), "first sync")
+	require.Len(t, fake.nicknames(), 2, "both certificates imported")
+	fake.reset()
+
+	b := filepath.Join(dir, "b.pem")
+	require.NoError(t, os.Chmod(b, 0), "making a CA file unreadable")
+	require.Error(t, m.reconcile(t.Context()), "an unreadable CA file must fail the sync")
+	assert.Empty(t, fake.calls, "nothing may change while a CA file can't be read")
+
+	require.NoError(t, os.Chmod(b, 0o600), "making the CA file readable again")
+	require.NoError(t, m.reconcile(t.Context()), "sync once readable")
+	assert.Len(t, fake.nicknames(), 2, "a CA whose file was briefly unreadable must still be trusted")
+}
+
 func TestRunRetriesAFailedSyncWithoutFileChanges(t *testing.T) {
 	m, fake, dir, _ := setup(t)
 	write(t, dir, "ca.pem", newCA(t, "ca"))
@@ -417,35 +438,39 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", home)
 		t.Setenv(browserUserEnv, cur.Username)
 
-		got, o := browserHome(&testLog{})
+		got, o, setHome := browserHome(&testLog{})
 
 		assert.Equal(t, home, got, "browser home")
 		assert.Nil(t, o, "only root changes the owner")
-		assert.Equal(t, home, os.Getenv("HOME"), "HOME must not change")
+		assert.False(t, setHome, "HOME must not change")
 	})
 
 	t.Run("a read-only HOME falls back to the browser user's home", func(t *testing.T) {
 		t.Setenv("HOME", "/proc")
 		t.Setenv(browserUserEnv, cur.Username)
 
-		got, o := browserHome(&testLog{})
+		got, o, setHome := browserHome(&testLog{})
 
 		assert.Equal(t, cur.HomeDir, got, "browser home")
 		assert.Nil(t, o, "only root changes the owner")
-		assert.Equal(t, cur.HomeDir, os.Getenv("HOME"), "HOME must be exported for the browser")
+		assert.True(t, setHome, "HOME must be changed for the browser")
+		assert.Equal(t, "/proc", os.Getenv("HOME"), "browserHome itself must not change HOME")
 	})
 
 	t.Run("without a browser user a read-only HOME is kept", func(t *testing.T) {
 		t.Setenv("HOME", "/proc")
 		t.Setenv(browserUserEnv, "")
 
-		got, _ := browserHome(&testLog{})
+		got, _, setHome := browserHome(&testLog{})
 
 		assert.Equal(t, "/proc", got, "browser home")
+		assert.False(t, setHome, "HOME must not change")
 	})
 }
 
-func TestStartDoesNothingWithoutTheConfiguredPaths(t *testing.T) {
+func TestStartDoesNothingWithoutTheConfiguredPathsOrAStore(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv(browserUserEnv, "")
 	log, logs := loggertest.New(t.Name())
 	Start(t.Context(), log, Config{CertificateAuthorities: []string{filepath.Join(t.TempDir(), "missing")}})
 	assert.Zero(t, logs.Len(), "nothing may be logged or done when no configured path exists")

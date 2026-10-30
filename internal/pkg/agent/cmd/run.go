@@ -371,10 +371,13 @@ func runElasticAgent(
 	cfg := configReloader.Configuration()
 
 	// Browser monitors trust the configured CAs. This must run before any component
-	// starts the browser: it may change HOME, which the browser inherits.
+	// starts the browser: it may change HOME, which the browser inherits. It runs
+	// without configuration too, to clean up CAs a previous run imported.
+	var browserCAs customca.Config
 	if synthetics := cfg.Settings.Synthetics; synthetics != nil {
-		customca.Start(ctx, l.Named("customca"), synthetics.Browser)
+		browserCAs = synthetics.Browser
 	}
+	customca.Start(ctx, l.Named("customca"), browserCAs)
 
 	logLvl := logger.DefaultLogLevel
 	if cfg.Settings.LoggingConfig != nil {
