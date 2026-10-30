@@ -1816,8 +1816,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		c.otelCfg = cfg.OTel
 	}
 
-	// perform and verify ast translation
-	m, err := cfg.ToMapStr()
+	// perform and verify ast translation; nothing reads the inputs from cfg after this
+	m, err := cfg.ToMapStrReleasing("inputs")
 	if err != nil {
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
@@ -1845,6 +1845,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	if err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
+	// Only Settings is read later; holding UCfg would retain a full copy of the policy tree.
+	currentCfg.UCfg = nil
 	c.currentCfg = currentCfg
 
 	// Standalone mode has no dedicated notification channel unlike managed mode,
