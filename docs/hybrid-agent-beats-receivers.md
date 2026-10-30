@@ -43,16 +43,9 @@ collector configuration used to run the Beat receivers.
 
 ### Beat Receivers for Data Collection
 
-<<<<<<< HEAD
 The capability to use Beat receivers is being enabled on per Beat and per input type basis. At the time of writing (August 2025),
 Filebeat and Metricbeat can run as receivers and both the `filestream` and `system/metrics` inputs work outside of
 monitoring use cases.
-=======
-The runtime is selected on a per Beat and per input type basis. By default, the Filebeat, Metricbeat, Auditbeat,
-Osquerybeat and Packetbeat inputs run as beats receivers (`otel`). Heartbeat has no Beat-level default, so its inputs
-use the global default, which is `process`. See `DefaultRuntimeConfig` in `pkg/component/component.go`. Inputs that
-the `otel` runtime cannot handle (for example because of unsupported output options) fall back to the `process` runtime.
->>>>>>> 4dc1254 (Fix drifted docs and add a diagnostics bundle reference (#17597))
 
 With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
 the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
