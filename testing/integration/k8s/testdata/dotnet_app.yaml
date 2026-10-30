@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: dotnet-app
+  name: dotnet-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dotnet-app
+  template:
+    metadata:
+      labels:
+        app: dotnet-app
+      annotations:
+        instrumentation.opentelemetry.io/inject-dotnet: "true"
+        instrumentation.opentelemetry.io/container-names: "dotnet-app"
+        instrumentation.opentelemetry.io/otel-dotnet-auto-runtime: "linux-musl-x64"
+    spec:
+      containers:
+        - name: dotnet-app
+          image: mcr.microsoft.com/dotnet/samples:aspnetapp-10.0@sha256:8e37900b31ad2f92fb2921676f79a9c8693e242354fdcb32954ff51dca86d654
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: dotnet-app
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            timeoutSeconds: 5
+        - name: traffic-generator
+          image: docker.io/busybox:1.37.0
+          command: ["sh", "-c"]
+          args:
+            - |
+              while true; do
+                wget -q -O /dev/null -T 5 http://127.0.0.1:8080/
+                sleep 1
+              done
