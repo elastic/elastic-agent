@@ -1393,8 +1393,7 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Description: "current computed configuration of the running Elastic Agent after variable substitution",
 			ContentType: "application/yaml",
 			Hook: func(_ context.Context) []byte {
-				cfg := c.derivedConfig
-				o, err := yaml.Marshal(cfg)
+				o, err := marshalPolicyYAML(c.derivedConfig)
 				if err != nil {
 					return []byte(fmt.Sprintf("error: %q", err))
 				}
