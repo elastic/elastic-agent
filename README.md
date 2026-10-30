@@ -23,6 +23,24 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 The following are exclusively focused on getting developers started building code for Elastic Agent.
 
+### Repository prerequisites
+
+After cloning, initialize the `beats` git submodule:
+
+```sh
+git submodule update --init
+```
+
+`go.mod` replaces `github.com/elastic/beats/v7` with the local `./beats` directory, so until
+the submodule is populated any command that resolves dependencies (`go build`, `go vet`,
+`go test`) fails before it reaches your changes:
+
+```text
+internal/pkg/composable/providers/docker/docker.go:11:2: github.com/elastic/beats/v7 (replaced by ./beats): reading beats/go.mod: open beats/go.mod: no such file or directory
+```
+
+`git submodule status` should then list `beats` without a leading `-`.
+
 ### Development Installations
 
 > :warning: Development installations are not officially supported and are intended for Elastic Agent developers.
