@@ -1,0 +1,323 @@
+version: 9.5.6
+entries:
+    - kind: bug-fix
+      summary: Mark the elastic-agent-wolfi-complete image as complete
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16841
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790375775
+      file:
+        name: 1790375775-mark-wolfi-complete-image.yaml
+        checksum: e751cd58d6811344372375bfa9e0671e47ea3a5d
+    - kind: bug-fix
+      summary: fix OTel collector crash when all streams for a component are disabled
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16900
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790692621
+      file:
+        name: 1790692621-fix-otel-collector-crash-when-all-linux-metrics-streams-are-disabled.yaml
+        checksum: 86c79ffef84e679cfe03cc9fb50ec6e1e0eb6d53
+    - kind: bug-fix
+      summary: Fix service runtime race that left Endpoint tamper-protected after upgrade
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16917
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790772292
+      file:
+        name: 1790772292-drosiek-endpoint-upgrade-race.yaml
+        checksum: 85ff008cdcd884b1374f55b139449c38d928cbe7
+    - kind: bug-fix
+      summary: Notify Endpoint of upgrade before symlink swap even when policy arrives after the upgrade action
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16921
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790777487
+      file:
+        name: 1790777487-sdh-854-upgrade-race.yaml
+        checksum: 4214a1b67317d5a24d520f6eb34fd5ddc7e8c9e1
+    - kind: bug-fix
+      summary: Fix Elasticsearch output parameters sending all data to the first host when running beats as OTel receivers
+      description: |
+        When an Elasticsearch output with several hosts set `parameters`, every exporter endpoint was replaced with the
+        first host, so all data was sent to that host and the others were never used.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16937
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790837054
+      file:
+        name: 1790837054-fix-elasticsearch-parameters-dropping-all-but-the-first-host.yaml
+        checksum: e51393bf14bad37ac6d9f392992d961999154ef1
+    - kind: bug-fix
+      summary: Fix variables in Fleet policy inputs and outputs being resolved too early outside of the main agent process
+      description: |
+        When loading the full agent configuration, the Fleet policy was merged without protecting inputs and outputs
+        from go-ucfg variable expansion. Variables referencing values present in the agent's own configuration
+        (`agent.*`, `host.id`, `path.*`, `runtime.*`) were substituted as unquoted text before the transpiler
+        evaluated them. This broke `elastic-agent uninstall`, `elastic-agent inspect`, and switching between
+        privileged and unprivileged mode for policies using such variables, for example the
+        `${agent.id} == '<id>'` input conditions that Synthetics private locations assign to agents.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16972
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790940000
+      file:
+        name: 1790940000-fix-early-resolution-of-policy-input-variables.yaml
+        checksum: 73c916f2eaf4637a25ecbdb9b9ede3c16770168f
+    - kind: bug-fix
+      summary: Fleet client is rebuilt when only TLS/CA settings change in a policy
+      description: |
+        A policy change that only added or rotated a Fleet Server CA
+        (`ssl.agent_certificate_authorities`) with the Fleet hosts list unchanged was
+        silently ignored for already-enrolled agents, which kept trusting only their
+        original enrollment CA. If Fleet Server then rotated its serving certificate
+        to the new CA, those agents went offline with an x509 "certificate signed by
+        unknown authority" error. The Fleet client is now rebuilt whenever the
+        policy's TLS certificate or CAs change, even if the Fleet hosts stay the same.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17014
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791213566
+      file:
+        name: 1791213566-fleet-client-rebuilt-on-ca-only-policy-change.yaml
+        checksum: 8e858c6e36235be1ac071f2d7bcc3df5c0474854
+    - kind: bug-fix
+      summary: Fix EDOT collector hanging on shutdown when a component fails to start
+      description: |
+        The elasticmonitoring receiver waited on a channel that was only closed by the goroutine launched in `Start` causing it to hang on shutdown when a component failed to start.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17027
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791267968
+      file:
+        name: 1791267968-fix-elasticmonitoring-receiver-shutdown-hang.yaml
+        checksum: ab7c9c337d2fc8f40090b4c884ee90f3b036b094
+    - kind: bug-fix
+      summary: Fix agent retaining component states that no broadcaster subscriber can receive
+      description: |
+        The coordinator's state Broadcaster kept the last published values alive in its ring buffer even when no subscriber could still receive them. These values are now cleared, which lowers live heap for agents running many units.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17107
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791400000
+      file:
+        name: 1791400000-release-unreachable-broadcaster-values.yaml
+        checksum: e7d0b22ff0d8981252b0a95b87d7c227cf399d4d
+    - kind: feature
+      summary: Add OpenShift support to the Helm chart
+      description: |
+        The elastic-agent Helm chart now supports OpenShift. The chart detects
+        OpenShift and creates the SecurityContextConstraints and RBAC objects that the
+        agent needs to run on OpenShift. The `agent.unprivileged` value can be
+        configured to run the agent with least-privilege permissions.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17112
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791549397
+      file:
+        name: 1791549397-helm-openshift-support.yaml
+        checksum: 36e62c8339029dfcb8325a865d467db8bcf15961
+    - kind: feature
+      summary: Add OpenShift support to the Kustomize manifests
+      description: |
+        The elastic-agent standalone Kustomize manifests now have an OpenShift overlay
+        in `deploy/kubernetes/elastic-agent-kustomize/openshift/default`. The overlay
+        creates the SecurityContextConstraints and RBAC objects that the agent and
+        kube-state-metrics need to run on OpenShift.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17113
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791549397
+      file:
+        name: 1791549397-kustomize-openshift-support.yaml
+        checksum: 632cea20e59809903633c97da96fc91e738c1677
+    - kind: bug-fix
+      summary: Fix Ironbank Dockerfile to restore elastic-otel-collector execute permission (0755) after broad 0666 chmod.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17118
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791560000
+      file:
+        name: 1791560000-ironbank-fix-otel-collector-permissions.yaml
+        checksum: 588c44c461b6783b0686e24b2e8763a4629aba59
+    - kind: unknown
+      summary: Keep streams with identical IDs from different inputs separate in the OTel runtime
+      description: |
+        The receiver name now includes the input ID, so two inputs of the same type with identically named streams no longer collapse into a single receiver.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17148
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791563264
+      file:
+        name: 1791563264-Keep-streams-with-identical-IDs-from-different-inputs-separate-in-the-OTel-runtime.yaml
+        checksum: 4064b0cb4ca3ffb8375da97917926d932683f0a3
+    - kind: enhancement
+      summary: Update Go to 1.26.9
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17161
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791837127
+      file:
+        name: 1791837127-update-go-to-1.26.9.yaml
+        checksum: 0f74b42998dc706c5a61bfdbacd462a9afa81de1
+    - kind: bug-fix
+      summary: Fix multi-valued `component.id` in Elastic Agent self-monitoring metrics
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17233
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792079227
+      file:
+        name: 1792079227-fix-multi-valued-component-id-in-self-monitoring-metrics.yaml
+        checksum: 64103fadd0b96c3bc90f7f234902d58394495d6d
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.163.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17249
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792145980
+      file:
+        name: 1792145980-update-otel-components-to-v0.163.0.yaml
+        checksum: 461034f4a71ce0728d50cae3553107d72bb2c83b
+    - kind: bug-fix
+      summary: Fix artifact downloader not using Fleet Server URI for PGP fallback
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17256
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792192521
+      file:
+        name: 1792192521-fix-upgrader-fleet-client-uri.yaml
+        checksum: 6f988754d1770f075c95353d356bcba7d8445626
+    - kind: security
+      summary: Bump npm to 12.2.1 and Node.js to 22.23.4 (24.22.1 on Wolfi) in the Elastic Agent complete Docker images to remove vulnerable undici copies.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17359
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792577050
+      file:
+        name: 1792577050-bump-heartbeat-nodejs-22.23.4.yaml
+        checksum: 79bcd65087498f89b44ced7a9b0777b1384c923e
+    - kind: enhancement
+      summary: Reduce the cost of OTel status updates for receivers that run many single-stream units, like Synthetics monitors
+      description: |
+        A status update decoded the input statuses of a receiver once per unit. When
+        one receiver runs many units with one stream each, like Synthetics monitors
+        with single_receiver, every status update was quadratic in the number of
+        monitors: about 3.7s for 1000 monitors.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17576
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1793037812
+      file:
+        name: 1793037812-Decode-receiver-input-statuses-once-per-component-status-update.yaml
+        checksum: 9ef252f64ffa2ae181dbcfa70b76a461de7bb47d
+    - kind: bug-fix
+      summary: Fix the otel collector rejecting its configuration when an input ID contains whitespace or symbols
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17604
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17590
+      impact: ""
+      action: ""
+      timestamp: 1793094000
+      file:
+        name: 1793094000-Escape-invalid-characters-in-OTel-component-names.yaml
+        checksum: 75b0261362dd56a5caeb6397346c1b27bb55d68c
+    - kind: bug-fix
+      summary: Increase kube-stack cluster collector default memory limit to 256Mi
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17588
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1793106015
+      file:
+        name: 1793106015-increase-kube-stack-cluster-collector-default-memory-limit-to-256mi.yaml
+        checksum: c7a4be7708af3d7071d461e1cd4db3df5dfda8c3
+    - kind: bug-fix
+      summary: Fix OTel collector startup delay caused by the Elasticsearch exporter version check.
+      description: |
+        The Elasticsearch exporter in contrib v0.163.0 checks the Elasticsearch version at
+        startup without sending credentials, and retries the 401 response until it times out
+        for Beats based inputs which are configured to retry on 401 by default.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17598
+      issue:
+        - https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52437
+      impact: ""
+      action: ""
+      timestamp: 1793122141
+      file:
+        name: 1793122141-disable-elasticsearch-exporter-version-detection-to-avoid-delayed-otel-collector-startup.yaml
+        checksum: ff00953c05860430e072e9b3a638bfa753c4e3cb
