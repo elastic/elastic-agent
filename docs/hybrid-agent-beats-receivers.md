@@ -12,10 +12,10 @@ releases at a technical preview level and are not enabled or used by default.
 **Beat Receivers** are beat inputs and processors executing as a receiver in an OpenTelemetry collector pipeline.
 Beat receivers are designed to output the exact same data they do today, and do not output data in the OTLP schema.
 
-Beat receivers will eventually be the default execution mode for Beat inputs in an elastic-agent.yml file (whether
-written by hand or generated via Fleet). Elastic Agent will automatically translate the relevant parts of its
-elastic-agent.yml file into OpenTelemetry collector configurations and execute them in the collector. This capability
-is currently gated by a feature flag.
+Beat receivers are the default execution mode for most Beat inputs in an elastic-agent.yml file (whether
+written by hand or generated via Fleet). Elastic Agent automatically translates the relevant parts of its
+elastic-agent.yml file into OpenTelemetry collector configurations and executes them in the collector. The runtime
+can be selected per Beat and per input type, see [Beat Receivers for Data Collection](#beat-receivers-for-data-collection).
 
 ### Beat Receivers for Agent Monitoring
 
@@ -43,10 +43,27 @@ collector configuration used to run the Beat receivers.
 
 ### Beat Receivers for Data Collection
 
+<<<<<<< HEAD
 The capability to use Beat receivers is being enabled on per Beat and per input type basis. At the time of writing (August 2025),
 Filebeat and Metricbeat can run as receivers and both the `filestream` and `system/metrics` inputs work outside of
 monitoring use cases. An example showing how to set the feature flag to run the `filestream` and `system/metrics` inputs as Beat
 receivers follows below.
+=======
+The runtime is selected on a per Beat and per input type basis. By default, the Filebeat, Metricbeat, Auditbeat,
+Osquerybeat and Packetbeat inputs run as beats receivers (`otel`). Heartbeat has no Beat-level default, so its inputs
+use the global default, which is `process`. See `DefaultRuntimeConfig` in `pkg/component/component.go`. Inputs that
+the `otel` runtime cannot handle (for example because of unsupported output options) fall back to the `process` runtime.
+
+With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
+the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
+input basis.
+
+At the time of writing (January 2026), the logic for selecting the
+runtime prioritises the most specific setting, which might be hard
+coded. Therefore it is recommended to always set the desired runtime
+for the specific input. For example to run the `filestream` and
+`system/metrics` inputs as Beat receivers:
+>>>>>>> 4dc1254 (Fix drifted docs and add a diagnostics bundle reference (#17597))
 
 ```yaml
 inputs:
@@ -70,6 +87,162 @@ outputs:
     api_key: placeholder
 ```
 
+<<<<<<< HEAD
+=======
+With changes in https://github.com/elastic/elastic-agent/pull/12852, user can also control the runtime of the inputs based on output type.
+This can be done by setting `agent.internal.runtime.output.[output_type]` to `otel` or `process`. For example, below config would override all inputs used with elasticsearch output to use otel runtime
+
+```yaml
+agent:
+  internal:
+    runtime:
+      default: process
+      filebeat:
+        filestream: otel
+      metricbeat:
+        system/metrics: otel
+      output: # Override the runtime used based on the output type.
+        elasticsearch: otel # Force all inputs using the Elasticearch output to use the otel runtime
+        logstash: process # Force all inputs using the Logstash output to use the process runtime
+        kafka: process # Force all inputs using the kafka output to use the process runtime
+```
+
+### Runtime precedence and automatic fallback
+
+For each input the runtime is the first one set in this list (highest precedence first):
+
+1. the input's own `_runtime_experimental: otel|process`
+2. `agent.internal.runtime.output.<output type>`, when that output is enabled
+3. `agent.internal.runtime.<beat>.<input type>`
+4. `agent.internal.runtime.<beat>.default`
+5. `agent.internal.runtime.default`
+
+Because most Beats have a Beat-level default of `otel`, setting only the global `default: process` does not move them
+back to the process runtime. See `RuntimeManagerForInputType` in `pkg/component/component.go`.
+
+Even when `otel` is selected, the Elastic Agent falls back to the `process` runtime for components that cannot run in
+the collector, and logs why (`maybeOverrideRuntimeForComponent` in
+`internal/pkg/agent/application/coordinator/coordinator.go`):
+
+- `otel runtime is not supported for component <id>, switching to process runtime, reason: ...`: for example an output
+  type other than `elasticsearch`, `logstash` or `kafka`, or unsupported output options.
+- `Component <id> uses dynamic variable providers, switching to <runtime> runtime`: see [Dynamic Inputs](#dynamic-inputs).
+
+### Dynamic Inputs
+
+Inputs rendered from a [dynamic variable provider](https://www.elastic.co/docs/reference/fleet/dynamic-input-configuration)
+(`kubernetes`, `docker`, `local_dynamic`) can be added and removed while the Elastic Agent is running. Every such change
+requires a configuration reload, which is significantly more expensive for the OpenTelemetry collector than for a Beat
+sub-process. Components containing such inputs are therefore flagged as dynamic and can be moved to a different runtime
+with `agent.internal.runtime.dynamic_inputs`.
+
+The setting was introduced in https://github.com/elastic/elastic-agent/pull/12438 as a single runtime name, which is
+still supported:
+
+```yaml
+agent:
+  internal:
+    runtime:
+      dynamic_inputs: process # Run every component with dynamic inputs as a sub-process.
+```
+
+The full form allows setting the runtime per Beat and per input type, using the same precedence scheme as
+`agent.internal.runtime` itself: the per input type value wins over the per Beat `default`, which wins over the
+top-level `default`. An unset (or empty) value at the end of that chain means the feature is disabled and dynamic
+components are left in the runtime they were assigned by `agent.internal.runtime`.
+
+```yaml
+agent:
+  internal:
+    runtime:
+      dynamic_inputs:
+        default: process # Move every component with dynamic inputs to the process runtime, unless overridden below.
+        filebeat:
+          default: process # Move Filebeat components with dynamic inputs to the process runtime.
+          filestream: otel # Except filestream ones, which stay as beats receivers.
+        metricbeat:
+          default: otel # Keep Metricbeat components with dynamic inputs as beats receivers.
+        static_variables: # Variables that cannot change at runtime, listed here so they don't make an input dynamic.
+          - kubernetes.node # Matches kubernetes.node and everything below it, e.g. kubernetes.node.name.
+          - local_dynamic.group # Matches only local_dynamic.group.
+```
+
+`static_variables` lets you narrow down which inputs are considered dynamic. While rendering the policy, the Elastic
+Agent records the variables each input actually resolves. An input is only treated as dynamic if at least one of the
+variables it resolved from its dynamic provider is not covered by `static_variables`. This is useful for variables that
+come from a dynamic provider but never change while the Elastic Agent runs, such as `${kubernetes.node.name}`.
+
+Entries match a variable name exactly, or as a `.`-separated path prefix, so `kubernetes.node` covers
+`kubernetes.node.name` and `kubernetes.node.labels.*` but not `kubernetes.nodename`. Trailing `.` characters are
+ignored, so `kubernetes.node.` is equivalent to `kubernetes.node`. Only variables namespaced under the
+input's dynamic provider are taken into account; variables of context providers can never make an input dynamic.
+
+Running the Elastic Agent with `agent.logging.level: debug` logs the dynamic provider and the resolved provider
+variables for every rendered input, along with the inputs that were excluded by `static_variables`.
+
+### Runtime switches
+
+Changing the runtime of a running component, for example by changing `agent.internal.runtime` in the policy, moves it
+between the collector and a Beat process. The old instance has to stop before the new one starts, otherwise both would
+collect the same data. The coordinator therefore defers the update of the new runtime until the old instances are
+stopped, and queues newer component models while a transition is in progress. It logs:
+
+- `Deferring OTel components until process instances stop` (or `Deferring runtime components until OTel instances stop`
+  for the opposite direction)
+- `Component "<id>" stopped, N remaining before deferred update`
+- `Runtime transition timeout exceeded, force-applying deferred manager updates`: the old instance did not stop within
+  `transitionTimeout` (the process stop timeout plus 3 seconds), so the update is applied anyway.
+
+Duplicated or missing data around a switch is often the transition itself, with both instances or neither briefly
+collecting.
+
+### Configuration Translation Overrides
+
+When an input is executed as a Beat receiver, it is injected into an OpenTelemetry collector pipeline that was
+generated based on the associated output. The `ssl`, `proxy*`, and other transport settings are added to a generated
+[beatsauth extension](https://github.com/elastic/beats/tree/da79b6ecce2fd9cc9403f8041aea10616ba93c57/x-pack/otel/extension/beatsauthextension)
+instance which allows the collector to use the Beat SSL settings and underlying HTTP transport to guarantee the behavior is the same as before.
+Similarly, when using the Elasticsearch output an [elasticsearch exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/elasticsearchexporter)
+instance is generated with a configuration equivalent to the previous Elasticsearch output in Beats using the `bodymap` mapping mode to
+continue to generate ECS documents.
+
+The changes in https://github.com/elastic/elastic-agent/pull/10992 added a way to override or extend the translated beatsauth extension and
+elasticsearch exporter parameters in case there is a problem or bug with the translation process. For example:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      extensions:
+        beatsauth:
+          timeout: "60s" # Override the connection timeout from the translated value.
+      exporter:
+        include_source_on_error: false # Override the generated value of include_source_on_error.
+```
+
+Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. By default, batching uses an items sizer that limits only the number of events per batch. In rare cases, very large events may cause batches to become unbalanced, allowing the total request size to exceed Elasticsearch limits and resulting in 413 (Request Entity Too Large) errors.
+
+To avoid this, the batching strategy can be configured to use a bytes sizer so that batches are constrained by their total size:
+
+```yaml
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [127.0.0.1:9200]
+    api_key: "example-key"
+    otel:
+      exporter:
+        sending_queue:
+          batch:
+            min_size: 1e+6 # 1MB
+            max_size: 5e+6 # 5MB
+            sizer: bytes
+```
+
+>>>>>>> 4dc1254 (Fix drifted docs and add a diagnostics bundle reference (#17597))
 ## Hybrid Agent
 
 **Hybrid Agent** refers the capability of Elastic Agent to run OpenTelemetry collector pipelines specified directly in
@@ -97,7 +270,7 @@ outputs:
 inputs:
   - id: filestream-system-66cab0a6-6fa3-46b1-9af1-2ea171fbd887
     type: filestream
-    # _runtime_experimental: otel # Optional - also run the filestream input as a collector receiver.
+    # _runtime_experimental: otel # Optional - explicitly run the filestream input as a collector receiver.
     data_stream:
       namespace: default
     streams:
