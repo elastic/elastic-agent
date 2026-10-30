@@ -17,7 +17,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"go.uber.org/zap"
@@ -92,9 +91,7 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 		logger.Info("Azure identity federation credential configured (ClientAssertion)")
 
 	case authConfig.UseDefaultCredentials:
-		cred, err = azidentity.NewDefaultAzureCredential(
-			&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOpts},
-		)
+		cred, err = newAzureDefaultCredential(clientOpts)
 		if err != nil {
 			logger.Warn("Failed to create Azure default credential", zap.Error(err))
 			closeAll()

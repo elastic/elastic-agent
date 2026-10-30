@@ -13,8 +13,8 @@ import (
 	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
 )
 
-// azureIdentityFederationSupported reports whether Azure identity federation is
-// compiled into this build.
+// azureIdentityFederationSupported reports whether Azure credentials (identity
+// federation and default credentials) are compiled into this build.
 const azureIdentityFederationSupported = true
 
 // newAzureIdentityFederationCredential builds the OIDC client-assertion
@@ -26,4 +26,12 @@ func newAzureIdentityFederationCredential(authConfig AzureAuthConfig, clientOpts
 		JWTFilePath: authConfig.IDTokenFile,
 		Options:     &azidentity.ClientAssertionCredentialOptions{ClientOptions: clientOpts},
 	})
+}
+
+// newAzureDefaultCredential builds a DefaultAzureCredential (testing only: uses
+// az login / env vars).
+func newAzureDefaultCredential(clientOpts azcore.ClientOptions) (azcore.TokenCredential, error) {
+	return azidentity.NewDefaultAzureCredential(
+		&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOpts},
+	)
 }

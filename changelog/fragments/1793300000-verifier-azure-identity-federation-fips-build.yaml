@@ -5,8 +5,9 @@ summary: Fix FIPS build of the verifier receiver after consolidating Identity Fe
 description: >
   The beats Azure identity federation package is excluded from FIPS builds
   (build tag !requirefips), so the Azure verifier no longer compiled with
-  requirefips. Azure identity federation is now compiled out of FIPS builds of
-  the verifier receiver; the Azure verifier reports itself as not configured
-  there.
+  requirefips. Azure credential creation (identity federation and default
+  credentials) is now compiled out of FIPS builds of the verifier receiver,
+  which therefore no longer links azidentity; the Azure verifier reports itself
+  as not configured there.
 
 component: elastic-agent
