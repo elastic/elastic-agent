@@ -11,4 +11,4 @@ export BUNDLE_SILENCE_ROOT_WARNING=1
 export IS_DOCKER=1
 
 cd "$CRAWLER_HOME"
-exec bin/crawler "$@"
+exec /opt/jruby/bin/jruby bin/crawler "$@"
