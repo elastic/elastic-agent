@@ -4,7 +4,7 @@
 
 //go:build !windows
 
-package customca
+package browserca
 
 import (
 	"os"

@@ -34,10 +34,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
-	"github.com/elastic/elastic-agent/internal/pkg/customca"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -1820,33 +1820,33 @@ func TestContainerBrowserCAOverrides(t *testing.T) {
 	}{
 		{
 			name:       "the mounted directory by default",
-			wantCAs:    []string{customca.DefaultDir},
+			wantCAs:    []string{browserca.DefaultDir},
 			wantReload: true,
 		},
 		{
 			name:       "configured paths and ELASTIC_AGENT_BROWSER_CA add to the mounted directory",
 			configured: []string{"/etc/cas/configured.pem"},
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA": "/etc/cas/a.pem, /etc/cas/more"},
-			wantCAs:    []string{customca.DefaultDir, "/etc/cas/configured.pem", "/etc/cas/a.pem", "/etc/cas/more"},
+			wantCAs:    []string{browserca.DefaultDir, "/etc/cas/configured.pem", "/etc/cas/a.pem", "/etc/cas/more"},
 			wantReload: true,
 		},
 		{
 			name:         "a reload interval",
 			env:          map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "2m"},
-			wantCAs:      []string{customca.DefaultDir},
+			wantCAs:      []string{browserca.DefaultDir},
 			wantReload:   true,
 			wantInterval: 2 * time.Minute,
 		},
 		{
 			name:       "a zero reload interval disables reloading",
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "0"},
-			wantCAs:    []string{customca.DefaultDir},
+			wantCAs:    []string{browserca.DefaultDir},
 			wantReload: false,
 		},
 		{
 			name:       "an invalid reload interval keeps the default",
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "soon"},
-			wantCAs:    []string{customca.DefaultDir},
+			wantCAs:    []string{browserca.DefaultDir},
 			wantReload: true,
 		},
 	}

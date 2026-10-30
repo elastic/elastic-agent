@@ -4,10 +4,10 @@
 
 package configuration
 
-import "github.com/elastic/elastic-agent/internal/pkg/customca"
+import "github.com/elastic/elastic-agent/internal/pkg/browserca"
 
 // SyntheticsConfig configures the Synthetics monitors the agent runs.
 type SyntheticsConfig struct {
 	// Browser configures the browser of browser monitors: the CAs it trusts.
-	Browser customca.Config `yaml:"browser,omitempty" config:"browser,omitempty" json:"browser,omitempty"`
+	Browser browserca.Config `yaml:"browser,omitempty" config:"browser,omitempty" json:"browser,omitempty"`
 }

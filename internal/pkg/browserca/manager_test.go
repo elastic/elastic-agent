@@ -4,7 +4,7 @@
 
 //go:build !windows
 
-package customca
+package browserca
 
 import (
 	"context"
@@ -490,6 +490,6 @@ func TestLookupBrowserUser(t *testing.T) {
 	assert.Empty(t, home, "no home when no user is configured")
 	assert.Nil(t, o, "no owner when no user is configured")
 
-	_, _, err = lookupBrowserUser("no-such-user-for-customca")
+	_, _, err = lookupBrowserUser("no-such-user-for-browserca")
 	assert.Error(t, err, "an unknown user must be reported")
 }

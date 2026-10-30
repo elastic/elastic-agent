@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package customca
+package browserca
 
 import (
 	"context"
@@ -118,7 +118,7 @@ func writable(dir string) bool {
 		return false
 	}
 	defer root.Close()
-	probe := fmt.Sprintf(".customca-%d", os.Getpid())
+	probe := fmt.Sprintf(".browserca-%d", os.Getpid())
 	f, err := root.OpenFile(probe, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return false

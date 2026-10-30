@@ -2,12 +2,12 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-// Package customca keeps the NSS database that Chromium reads in sync with the
+// Package browserca keeps the NSS database that Chromium reads in sync with the
 // CA certificates configured under agent.synthetics.browser, so browser monitors
 // trust them.
 //
 // Chromium ignores the system trust store on Linux and only reads $HOME/.pki/nssdb.
-package customca
+package browserca
 
 import (
 	"bytes"

@@ -41,11 +41,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
-	"github.com/elastic/elastic-agent/internal/pkg/customca"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
@@ -939,12 +939,12 @@ func containerCfgOverrides(cfg *config.Config) error {
 }
 
 // containerBrowserCAOverrides makes browser monitors trust the CAs mounted at
-// customca.DefaultDir and the paths in ELASTIC_AGENT_BROWSER_CA, on top of those in
+// browserca.DefaultDir and the paths in ELASTIC_AGENT_BROWSER_CA, on top of those in
 // agent.synthetics.browser.certificate_authorities. ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL
 // sets how often they are checked for changes; 0 disables it.
 func containerBrowserCAOverrides(cfg *config.Config, uCfg map[string]any) error {
 	const key = "agent.synthetics.browser.certificate_authorities"
-	cas := []string{customca.DefaultDir}
+	cas := []string{browserca.DefaultDir}
 	// CountField can't resolve this dotted path, so read until the index runs out.
 	for i := 0; ; i++ {
 		ca, err := cfg.Agent.String(key, i, ucfg.PathSep("."))

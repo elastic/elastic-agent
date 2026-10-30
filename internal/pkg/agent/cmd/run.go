@@ -52,10 +52,10 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/customca"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -373,11 +373,11 @@ func runElasticAgent(
 	// Browser monitors trust the configured CAs. This must run before any component
 	// starts the browser: it may change HOME, which the browser inherits. It runs
 	// without configuration too, to clean up CAs a previous run imported.
-	var browserCAs customca.Config
+	var browserCAs browserca.Config
 	if synthetics := cfg.Settings.Synthetics; synthetics != nil {
 		browserCAs = synthetics.Browser
 	}
-	customca.Start(ctx, l.Named("customca"), browserCAs)
+	browserca.Start(ctx, l.Named("browserca"), browserCAs)
 
 	logLvl := logger.DefaultLogLevel
 	if cfg.Settings.LoggingConfig != nil {
