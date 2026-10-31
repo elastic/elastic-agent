@@ -76,9 +76,12 @@ common:
         - .tool-versions
         - version/version.go
         - testing/integration/testdata/preinstalled_packages.json
-  # Variants/Groups for the Windows ITs
+  # Variants/Groups for the Windows ITs.
+  # "<group>@<i>of<n>" runs shard i of n of a group as its own job; see the
+  # "Test group" section of docs/test-framework-dev-guide.md.
   - windows_variants: &windows_variants
-      - "default"
+      - "default@0of2"
+      - "default@1of2"
       - "fleet"
       - "fleet-endpoint-security"
       - "fleet-endpoint-security-mtls"
@@ -94,7 +97,8 @@ common:
   # Variants/Groups for the Linux AMD64 ITs (tar.gz package)
   - linux_variants: &linux_variants
     - container
-    - default
+    - default@0of2
+    - default@1of2
     - fleet
     - fleet-airgapped
     - fleet-airgapped-privileged
@@ -176,7 +180,10 @@ common:
       - slim-wolfi
       - wolfi
     default_variants: &k8s_test_default_variants
-      - wolfi
+      # wolfi runs the most tests, so it is split in two shards (see the "Test
+      # group" section of docs/test-framework-dev-guide.md).
+      - wolfi@0of2
+      - wolfi@1of2
       - complete
       - elastic-otel-collector
     all_variants_without_default: &k8s_test_all_variants_without_default
