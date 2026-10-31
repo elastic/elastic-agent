@@ -66,14 +66,22 @@ and defaults to:
  - ECS/JSON are not explicitly set
 
 ## Collecting logs for diagnostics
-The Elastic-Agent will only collect
-`data/elastic-agent-<hash>/logs`. The functions responsible for
-collecting logs during diagnostics are:
- - [`zipLogs`](https://github.com/elastic/elastic-agent/blob/574aa5db629231d56062ab40d27ccceb02cbbe4d/internal/pkg/diagnostics/diagnostics.go#L383-L415)
- - [`zipLogsWithPath`](https://github.com/elastic/elastic-agent/blob/574aa5db629231d56062ab40d27ccceb02cbbe4d/internal/pkg/diagnostics/diagnostics.go#L418-L476)
+The diagnostics bundle collects the following logs:
+ - `data/elastic-agent-<hash>/logs`, into `logs/<elastic-agent-<hash>>/`
+ - `data/elastic-agent-<hash>/components/logs`, into `logs/<elastic-agent-<hash>>/components/`
+ - the log directory of every service input that sets `service.log.path` in its
+   spec (for example Endpoint's), into `logs/services/`
+
+The functions responsible for collecting logs during diagnostics, all in
+[`internal/pkg/diagnostics/diagnostics.go`](../internal/pkg/diagnostics/diagnostics.go), are:
+ - `zipLogs`
+ - `zipLogsWithPath`
+ - `collectServiceComponentsLogs`
 
 `zipLogsWithPath` always appends the `/logs` to whatever path it
 receives.
+
+The layout of the whole bundle is described in [diagnostics.md](./diagnostics.md).
 
 ## Total footprint
 Given the two log outputs and their default log rotation policies, the

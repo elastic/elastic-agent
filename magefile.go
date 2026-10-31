@@ -52,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/dev-tools/mage/downloads"
 	"github.com/elastic/elastic-agent/dev-tools/mage/manifest"
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
+	"github.com/elastic/elastic-agent/dev-tools/mage/release"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/pkg/testing/buildkite"
@@ -170,6 +171,9 @@ type Otel mg.Namespace
 
 // Devmachine namespace contains tasks related to remote development machines.
 type Devmachine mg.Namespace
+
+// Release namespace contains tasks for release automation.
+type Release mg.Namespace
 
 func CheckNoChanges() error {
 	fmt.Println(">> fmt - go run")
@@ -1299,6 +1303,13 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 		return fmt.Errorf("creating flat dir %q: %w", flatPath, err)
 	}
 	defer os.RemoveAll(flatPath)
+	// the versioned drop dirs are rebuilt from the archives on every run (see flattenDependencies),
+	// so they are not kept with KEEP_ARCHIVE either
+	defer func() {
+		for _, pltf := range platforms {
+			os.RemoveAll(filepath.Join(dropPath, manifest.PlatformPackages[pltf]))
+		}
+	}()
 
 	// extract all dependencies from their archives into flat dir
 	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
@@ -1470,6 +1481,11 @@ func flattenDependencies(cfg *devtools.Settings, platforms []string, dependencie
 		}
 		if err := os.MkdirAll(versionedFlatPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned flat dir %q: %w", versionedFlatPath, err))
+		}
+		// KEEP_ARCHIVE only caches the downloaded archives: the versioned drop dir is rebuilt from them on
+		// every run, so remove what a previous build left there instead of merging into it
+		if err := os.RemoveAll(versionedDropPath); err != nil {
+			panic(fmt.Errorf("cleaning versioned drop dir %q: %w", versionedDropPath, err))
 		}
 		if err := os.MkdirAll(versionedDropPath, 0o755); err != nil {
 			panic(fmt.Errorf("creating versioned drop dir %q: %w", versionedDropPath, err))
@@ -4741,4 +4757,67 @@ func getMacOSMajorVersion() (int, error) {
 	}
 
 	return majorVer, nil
+}
+
+// loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
+func loadReleaseConfig() (*release.ReleaseConfig, error) {
+	settings, err := devtools.LoadSettings()
+	if err != nil {
+		return nil, err
+	}
+	if err := settings.RequireRelease(); err != nil {
+		return nil, err
+	}
+	cfg := settings.Release
+	return &cfg, nil
+}
+
+// UpdateVersion updates the version in version/version.go
+func (Release) UpdateVersion(version string) error {
+	return release.UpdateVersion(version)
+}
+
+// UpdateDocs updates version references in documentation and K8s manifests
+func (Release) UpdateDocs(version string) error {
+	return release.UpdateDocs(version)
+}
+
+// UpdatePatchDocs updates :stack-version: in version/docs/version.asciidoc
+func (Release) UpdatePatchDocs(version string) error {
+	return release.UpdatePatchDocs(version)
+}
+
+// UpdateMergify adds a new backport rule to .mergify.yml
+func (Release) UpdateMergify(version string) error {
+	return release.UpdateMergify(version)
+}
+
+// RunMajorMinor orchestrates the complete major/minor release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunMajorMinor() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunMajorMinorRelease(cfg)
+}
+
+// RunPatch orchestrates the complete patch release workflow
+// Set DRY_RUN=true to preview changes without pushing
+func (Release) RunPatch() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.RunPatchRelease(cfg)
+}
+
+// EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
+// CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
+func (Release) EnsureIssueTracker() error {
+	cfg, err := loadReleaseConfig()
+	if err != nil {
+		return err
+	}
+	return release.EnsureReleaseIssueTracker(cfg, nil)
 }

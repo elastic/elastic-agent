@@ -49,10 +49,3 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   export TEST_INTEG_AUTH_ESS_APIKEY_FILE=$(realpath ./apiKey)
 fi
 
-if [[ "$BUILDKITE_PIPELINE_SLUG" == "elastic-agent-binary-dra" ]]; then
-  if [[ ("$BUILDKITE_STEP_KEY" == "publish-dra-snapshot" || "$BUILDKITE_STEP_KEY" == "publish-dra-staging") ]]; then
-    echo "+++ Setting DRA params"
-    # Shared secret path containing the dra creds for project teams
-    release_manager_login
-  fi
-fi
