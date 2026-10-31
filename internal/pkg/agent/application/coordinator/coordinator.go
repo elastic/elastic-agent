@@ -1006,11 +1006,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sources []str
 		}
 
 		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
-		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
-		// the error to ErrInsufficientDiskSpace so that the error message is
-		// more concise and clear.
-		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
-			err = upgradeErrors.ErrInsufficientDiskSpace
+		// If DiskSpaceLowError is in the error chain, we want to set the error
+		// to it so that the error message is clear.
+		var diskSpaceLowErr upgradeErrors.DiskSpaceLowError
+		if errors.As(err, &diskSpaceLowErr) {
+			err = diskSpaceLowErr
 		}
 
 		// MarkUpgradeFailed updates det in-memory and, when an upgrade marker
@@ -1816,8 +1816,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		c.otelCfg = cfg.OTel
 	}
 
-	// perform and verify ast translation
-	m, err := cfg.ToMapStr()
+	// perform and verify ast translation; nothing reads the inputs from cfg after this
+	m, err := cfg.ToMapStrReleasing("inputs")
 	if err != nil {
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
@@ -1845,6 +1845,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	if err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
+	// Only Settings is read later; holding UCfg would retain a full copy of the policy tree.
+	currentCfg.UCfg = nil
 	c.currentCfg = currentCfg
 
 	// Standalone mode has no dedicated notification channel unlike managed mode,

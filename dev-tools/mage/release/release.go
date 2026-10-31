@@ -197,8 +197,8 @@ func UpdateDocsWithOptions(opts DocsUpdateOptions) error {
 // UpdateDeploymentManifests updates Helm/K8s deployment manifests to newVersion.
 // Mirrors the helm/k8s portion of make check-ci after a version.go bump
 // (mage helm:updateAgentVersion + rendered/kustomize manifests), without
-// touching version.asciidoc or README branch refs. Used by FF/patch PR-D
-// (prepare-next-release).
+// touching version.asciidoc or README branch refs. Used by the patch next-patch
+// PR (prepNextPatchOnReleaseBranch / prepare-next-release).
 func UpdateDeploymentManifests(newVersion string) error {
 	if newVersion == "" {
 		return fmt.Errorf("version is required")

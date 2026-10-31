@@ -146,6 +146,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		close(retrierRun)
 	}()
 
+	if m.cfg.Fleet.Server == nil {
+		for _, cs := range m.initialClientSetters {
+			cs.SetClient(m.client)
+		}
+	}
+
 	action := m.stateStore.Action()
 	stateRestored := false
 	if action != nil && !m.wasUnenrolled() {
@@ -376,7 +382,7 @@ func (m *managedConfigManager) initFleetServer(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return fmt.Errorf("timeout while waiting for fleet server start: %w", ctx.Err())
-	case m.ch <- &localConfigChange{injectFleetServerInput}:
+	case m.ch <- &localConfigChange{newFleetServerInputConfig()}:
 	}
 
 	return m.waitForFleetServer(ctx)
