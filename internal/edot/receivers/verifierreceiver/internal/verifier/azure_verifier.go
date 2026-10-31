@@ -17,12 +17,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"go.uber.org/zap"
-
-	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
 )
 
 // AzureVerifier implements permission verification for Azure.
@@ -84,13 +81,8 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 	switch {
 	case authConfig.IsIdentityFederation():
 		// Identity federation OIDC flow: use the JWT as a federated client assertion.
-		// The JWT file is re-read on each token refresh via identityfederation.AzureNewClientAssertionCredential.
-		cred, err = identityfederation.AzureNewClientAssertionCredential(identityfederation.AzureParams{
-			TenantID:    authConfig.TenantID,
-			ClientID:    authConfig.ClientID,
-			JWTFilePath: authConfig.IDTokenFile,
-			Options:     &azidentity.ClientAssertionCredentialOptions{ClientOptions: clientOpts},
-		})
+		// The JWT file is re-read on each token refresh. Not available in FIPS builds.
+		cred, err = newAzureIdentityFederationCredential(authConfig, clientOpts)
 		if err != nil {
 			logger.Warn("Failed to create Azure client assertion credential", zap.Error(err))
 			closeAll()
@@ -99,9 +91,7 @@ func NewAzureVerifier(ctx context.Context, logger *zap.Logger, authConfig AzureA
 		logger.Info("Azure identity federation credential configured (ClientAssertion)")
 
 	case authConfig.UseDefaultCredentials:
-		cred, err = azidentity.NewDefaultAzureCredential(
-			&azidentity.DefaultAzureCredentialOptions{ClientOptions: clientOpts},
-		)
+		cred, err = newAzureDefaultCredential(clientOpts)
 		if err != nil {
 			logger.Warn("Failed to create Azure default credential", zap.Error(err))
 			closeAll()
