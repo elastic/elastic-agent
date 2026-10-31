@@ -59,9 +59,29 @@ common:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
       elastic/vault-github-token#v0.2.1:
-  # Variants/Groups for the Windows ITs
+  # Sparse checkout for steps that only run .buildkite scripts (stack
+  # provisioning and cleanup, report aggregation). A full clone of this
+  # repository takes ~1.5 minutes on those agents; the sparse checkout takes
+  # seconds. The paths cover what the scripts and the repository hooks read:
+  # .buildkite/hooks/pre-command sources common.sh, which reads version/version.go,
+  # and the oblt-cli plugin reads .oblt-cli-version. In cone mode a file path
+  # checks out the files of its parent directories as well.
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - .package-version
+        - .oblt-cli-version
+        - .tool-versions
+        - version/version.go
+        - testing/integration/testdata/preinstalled_packages.json
+  # Variants/Groups for the Windows ITs.
+  # "<group>@<i>of<n>" runs shard i of n of a group as its own job; see the
+  # "Test group" section of docs/test-framework-dev-guide.md.
   - windows_variants: &windows_variants
-      - "default"
+      - "default@0of2"
+      - "default@1of2"
       - "fleet"
       - "fleet-endpoint-security"
       - "fleet-endpoint-security-mtls"
@@ -77,7 +97,8 @@ common:
   # Variants/Groups for the Linux AMD64 ITs (tar.gz package)
   - linux_variants: &linux_variants
     - container
-    - default
+    - default@0of2
+    - default@1of2
     - fleet
     - fleet-airgapped
     - fleet-airgapped-privileged
@@ -159,7 +180,10 @@ common:
       - slim-wolfi
       - wolfi
     default_variants: &k8s_test_default_variants
-      - wolfi
+      # wolfi runs the most tests, so it is split in two shards (see the "Test
+      # group" section of docs/test-framework-dev-guide.md).
+      - wolfi@0of2
+      - wolfi@1of2
       - complete
       - elastic-otel-collector
     all_variants_without_default: &k8s_test_all_variants_without_default
@@ -291,6 +315,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *sparse_checkout_plugin
       - *google_oidc_observability_plugin
       - *oblt_cli_plugin
       - *vault_github_token
@@ -1412,6 +1437,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *sparse_checkout_plugin
       - *google_oidc_observability_plugin
       - *oblt_cli_plugin
       - *vault_github_token
@@ -1440,6 +1466,7 @@ steps:
     soft_fail:
       - exit_status: "*"
     plugins:
+      - *sparse_checkout_plugin
       - elastic/vault-secrets#v0.1.0:
           path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
           field: "token"

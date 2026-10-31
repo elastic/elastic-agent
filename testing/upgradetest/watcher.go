@@ -15,14 +15,43 @@ import (
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
+const (
+	// FastWatcherGracePeriod is the grace period used by FastWatcherCfg.
+	//
+	// The upgraded agent gets statusCheckMissesAllowed+1 (5) connection attempts,
+	// one every FastWatcherErrorCheckInterval, before the watcher rolls back, so
+	// the interval bounds how long the agent may take to restart: 10s leaves 50s,
+	// which covers the 20+ s a slow Windows VM needs. The grace period only has to
+	// outlast that window plus the time PerformUpgrade needs to observe the
+	// UPG_WATCHING state (typically <20 s after the marker is written). 60s does
+	// that and removes ~40 s of idle waiting from every upgrade compared with the
+	// previous 100s/15s configuration. Tests that need the watcher to stay alive
+	// for longer should use WatcherCfg with their own grace period.
+	FastWatcherGracePeriod = 60 * time.Second
+	// FastWatcherErrorCheckInterval is the error check interval used by FastWatcherCfg.
+	FastWatcherErrorCheckInterval = 10 * time.Second
+
+	// StatusPollInterval is how often the upgrade helpers poll `elastic-agent status`
+	// and similar cheap local checks while waiting for a state change.
+	StatusPollInterval = 2 * time.Second
+	// WatcherPollInterval is how often the upgrade helpers scan the process list
+	// for the upgrade watcher.
+	WatcherPollInterval = time.Second
+)
+
 // FastWatcherCfg is configuration that makes the watcher run faster.
-// we need to set grace period to 100s to be able to detect 5 failures 15 seconds apart and have a little buffer.
-const FastWatcherCfg = `
+// See FastWatcherGracePeriod for how the values were chosen.
+var FastWatcherCfg = WatcherCfg(FastWatcherGracePeriod, FastWatcherErrorCheckInterval)
+
+// WatcherCfg returns an Elastic Agent configuration snippet that sets the
+// upgrade watcher grace period and error check interval.
+func WatcherCfg(gracePeriod, errorCheckInterval time.Duration) string {
+	return fmt.Sprintf(`
 agent.upgrade.watcher:
-  grace_period: 100s
-  error_check.interval: 15s
-  crash_check.interval: 15s
-`
+  grace_period: %s
+  error_check.interval: %s
+`, gracePeriod, errorCheckInterval)
+}
 
 // ConfigureFastWatcher writes an Elastic Agent configuration that
 // adjusts the watcher to be faster.
@@ -30,8 +59,29 @@ agent.upgrade.watcher:
 // Note: Not all versions or modes of the Elastic Agent respect this option
 // that is why the `WaitForNoWatcher` should also be used to ensure that the
 // watcher stops or is killed before continuing.
+//
+// For a Fleet-managed agent this must be called after enrollment, see
+// ConfigureWatcherForManagedAgent.
 func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 	return f.Configure(ctx, []byte(FastWatcherCfg))
+}
+
+// ConfigureWatcherForManagedAgent writes the watcher configuration cfg to the
+// elastic-agent.yml of an installed, Fleet-managed agent.
+//
+// The upgrade watcher reads its settings only from elastic-agent.yml, and
+// enrollment replaces that file with the default Fleet configuration, so a
+// configuration written before `install --enrollment-token` is lost. Call this
+// after the install so the watcher picks the settings up; `fleet.enabled: true`
+// is kept so the agent stays managed. Modifying the file of a running managed
+// agent is a test-only shortcut, not a supported way to configure the watcher.
+func ConfigureWatcherForManagedAgent(ctx context.Context, f *atesting.Fixture, cfg string) error {
+	return f.Configure(ctx, []byte("fleet.enabled: true\n"+cfg))
+}
+
+// ConfigureFastWatcherForManagedAgent is ConfigureWatcherForManagedAgent with FastWatcherCfg.
+func ConfigureFastWatcherForManagedAgent(ctx context.Context, f *atesting.Fixture) error {
+	return ConfigureWatcherForManagedAgent(ctx, f, FastWatcherCfg)
 }
 
 // WaitForWatchingState polls UpgradeDetails until the upgrade reaches

@@ -317,7 +317,7 @@ func PerformUpgrade(
 		}
 
 		// wait for the agent to be healthy and correct version
-		err = WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
+		err = WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, StatusPollInterval, logger)
 		if err != nil {
 			// context added by WaitHealthyAndVersion
 			return err
@@ -412,7 +412,7 @@ func PerformUpgrade(
 
 	// wait for the watcher to show up
 	logger.Logf("waiting for upgrade watcher to start")
-	err = WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	err = WaitForWatcher(ctx, 5*time.Minute, WatcherPollInterval)
 	if err != nil {
 		return fmt.Errorf("failed to find watcher: %w", err)
 	}
@@ -435,7 +435,7 @@ func PerformUpgrade(
 	}
 
 	// wait for the agent to be healthy and correct version
-	err = WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, logger)
+	err = WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, StatusPollInterval, logger)
 	if err != nil {
 		// agent never got healthy, but we need to ensure the watcher is stopped before continuing
 		// this kills the watcher instantly and waits for it to be gone before continuing
@@ -453,7 +453,7 @@ func PerformUpgrade(
 	// do not respect the `ConfigureFastWatcher` so we have to kill the watcher after the
 	// 10 minute window (10 min 15 seconds for grace) has passed.
 	logger.Logf("waiting for upgrade watcher to finish")
-	err = WaitForNoWatcher(ctx, 12*time.Minute, 10*time.Second, 10*time.Minute+15*time.Second)
+	err = WaitForNoWatcher(ctx, 12*time.Minute, WatcherPollInterval, 10*time.Minute+15*time.Second)
 	if err != nil {
 		return fmt.Errorf("watcher never stopped running: %w", err)
 	}
@@ -463,7 +463,7 @@ func PerformUpgrade(
 	// from Agent status.
 	if !upgradeOpts.disableUpgradeWatcherUpgradeDetailsCheck {
 		logger.Logf("Checking upgrade details state after successful upgrade")
-		if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, 10*time.Second, logger); err != nil {
+		if err := waitUpgradeDetailsState(ctx, startFixture, "", 2*time.Minute, StatusPollInterval, logger); err != nil {
 			// error context added by checkUpgradeDetailsState
 			return err
 		}

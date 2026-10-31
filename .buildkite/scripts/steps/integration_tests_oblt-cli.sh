@@ -54,8 +54,7 @@ if [[ "${GROUP_NAME}" == "kubernetes" || "${GROUP_NAME}" == "openshift" ]]; then
   .buildkite/scripts/buildkite-k8s-integration-tests.sh "$@"
 else
   # test binaries are needed only when running integration tests outside of k8s
-  echo "~~~ Building test binaries"
-  mage build:integrationTestBinaries
+  .buildkite/scripts/build-integration-test-binaries.sh
 
   if [ "$TEST_SUDO" == "true" ]; then
     sudo -E .buildkite/scripts/buildkite-integration-tests.sh "$@"

@@ -57,8 +57,12 @@ foreach ($name in $envMap.Keys) {
 }
 Write-Output "Elasticsearch Host: $env:ELASTICSEARCH_HOST"
 
+# Build the helper binaries the integration tests need directly with `go build`
+# instead of `mage build:integrationTestBinaries`: compiling the magefile costs
+# ~2.5 minutes on a fresh agent, the binary itself builds in seconds. Keep in
+# sync with getIntegrationTestBinariesPath in magefile.go.
 Write-Output "~~~ Building integration test binaries"
-& mage build:integrationTestBinaries
+& go build -v -o pkg\component\fake\component\component.exe .\pkg\component\fake\component
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to build test binaries"
     exit 1
