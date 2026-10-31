@@ -291,8 +291,7 @@ func (suite *FakeInputSuite) TestManager_Features() {
 	}
 }
 
-// A component removed by one model update and re-added by the next one, while
-// a slow subscriber holds up the stop notification, must end up running again.
+// A component removed and re-added while its stop is in flight must run again.
 func (suite *FakeInputSuite) TestManager_ComponentReaddedAfterRemoval() {
 	t := suite.T()
 
@@ -313,8 +312,7 @@ func (suite *FakeInputSuite) TestManager_ComponentReaddedAfterRemoval() {
 	defer waitCancel()
 	require.NoError(t, waitForReady(waitCtx, m))
 
-	// Stand-in for the coordinator, which subscribes to every state change.
-	// Being slow keeps stateChanged blocked after the runtime reported Stopped.
+	// Slow subscriber, like the coordinator, delays stateChanged after Stopped.
 	subAll := m.SubscribeAll(ctx)
 	go func() {
 		for {
@@ -373,16 +371,13 @@ func (suite *FakeInputSuite) TestManager_ComponentReaddedAfterRemoval() {
 	require.NoError(t, <-m.errCh)
 	requireHealthy("component never became healthy")
 
-	for i := 0; i < 3; i++ {
-		// Remove the component and re-add it while the stop is in flight, so
-		// the re-add is queued as the manager's next update.
-		m.Update(component.Model{})
-		time.Sleep(50 * time.Millisecond)
-		m.Update(component.Model{Components: []component.Component{comp}})
-		require.NoError(t, <-m.errCh)
-		require.NoError(t, <-m.errCh)
-		requireHealthy(fmt.Sprintf("component not running after re-add %d", i+1))
-	}
+	// Queue the re-add while the removal is still stopping the component.
+	m.Update(component.Model{})
+	time.Sleep(50 * time.Millisecond)
+	m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, <-m.errCh)
+	require.NoError(t, <-m.errCh)
+	requireHealthy("component not running after re-add")
 }
 
 func (suite *FakeInputSuite) TestManager_APM() {

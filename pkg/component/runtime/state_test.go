@@ -16,8 +16,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
-// A unit removed from the model and re-added before the component confirms it
-// stopped must be expected to run again.
+// A unit re-added before the component confirmed its stop must run again.
 func TestComponentState_UnitReaddedBeforeStopConfirmed(t *testing.T) {
 	const keep, flap = "unit-keep", "unit-flap"
 	flapKey := ComponentUnitKey{UnitType: client.UnitTypeInput, UnitID: flap}

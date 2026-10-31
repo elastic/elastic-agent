@@ -793,9 +793,7 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 				m.logger.Errorf("updating components: failed waiting %s stop",
 					state.id)
 			} else {
-				// The runtime reports Stopped before stateChanged removes it from
-				// m.current. Remove it here so a following update that re-adds the
-				// component starts a new instance instead of updating this one.
+				// Stopped is reported before stateChanged removes it; a re-add must not reuse it
 				m.removeCurrent(state)
 			}
 			stoppedWg.Done()
@@ -918,8 +916,7 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	return exit
 }
 
-// removeCurrent removes state from the current components, unless the
-// component ID already points to a newer instance.
+// removeCurrent removes state from m.current unless its ID points to a newer instance.
 func (m *Manager) removeCurrent(state *componentRuntimeState) {
 	m.currentMx.Lock()
 	defer m.currentMx.Unlock()
