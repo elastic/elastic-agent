@@ -647,6 +647,23 @@ are defined the more instances will be provisioned to complete all tests. A bala
 groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
 outweigh the benefits of creating another group.
 
+#### Sharding a group across several instances
+
+When a group is too long for one instance but its tests have no reason to be split into separate groups, it can be
+sharded instead: `-integration.shard=<index>/<count>` (or the `TEST_SHARD` environment variable, for runners that
+can only forward `-test.*` flags) makes a test binary run only the tests whose stable hash of the top-level test name
+falls into shard `index` of `count`, and skip the rest. Every shard computes the same split without coordination, so
+`count` jobs with `index` 0 to `count-1` together run the whole group exactly once. Subtests follow their parent test.
+The split only depends on the test names (plus a fixed seed in `pkg/testing/define/define_shard.go`), so it is stable
+across runs; renaming or adding tests can move tests between shards, which only changes the per-shard duration.
+
+In the Buildkite pipeline a shard is expressed as a matrix variant `<group>@<index>of<count>`, for example
+`default@0of2` and `default@1of2` in place of `default`. `.buildkite/scripts/buildkite-integration-tests.sh` (and the
+`.ps1` equivalent) strip the suffix, pass `-integration.shard=0/2` to the tests and add the shard to the result file
+names. Kubernetes variants work the same way (`wolfi@0of2` in `DOCKER_VARIANTS`, handled by
+`.buildkite/scripts/buildkite-k8s-integration-tests.sh`). Sharding costs one extra instance per shard (a few minutes
+of setup each), so only shard groups that are clearly longer than the other jobs of the same platform.
+
 #### Creating a new test group and Buildkite integration tests
 
   When creating a new test group, it is important to add the new group to the variant lists at the top of the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
@@ -654,6 +671,7 @@ outweigh the benefits of creating another group.
   The groups are defined as YAML anchors (`windows_variants`, `linux_deb_variants`, `linux_rpm_variants`, `linux_arm_variants`),
   which the tiered steps reference as the `variant` axis of their `matrix`. Add the new group to every list for a platform it should run on.
   Some steps (for example the non-sudo ones) list only the `default` variant instead of an anchor, so check which tiers and steps should run the new group.
+  A variant may carry a shard suffix (`default@0of2`, see [Sharding a group](#sharding-a-group-across-several-instances)).
   Example:
 
   ```yaml
