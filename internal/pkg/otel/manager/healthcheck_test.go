@@ -242,7 +242,7 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, true, extHealthCheck.Get("use_v2"))
-		assert.Equal(t, fmt.Sprintf("localhost:%d", testPort), extHealthCheck.Get("http::endpoint"))
+		assert.Equal(t, fmt.Sprintf("127.0.0.1:%d", testPort), extHealthCheck.Get("http::endpoint"))
 		assert.Equal(t, healthCheckHealthStatusPath, extHealthCheck.Get("http::status::path"))
 		assert.Equal(t, healthCheckHealthStatusEnabled, extHealthCheck.Get("http::status::enabled"))
 		assert.Equal(t, healthCheckHealthConfigPath, extHealthCheck.Get("http::config::path"))
