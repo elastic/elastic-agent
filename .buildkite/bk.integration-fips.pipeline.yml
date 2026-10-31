@@ -35,6 +35,23 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
+  # Sparse checkout for steps that only run .buildkite scripts (stack
+  # provisioning and cleanup, report aggregation). A full clone of this
+  # repository takes ~1.5 minutes on those agents; the sparse checkout takes
+  # seconds. The paths cover what the scripts and the repository hooks read:
+  # .buildkite/hooks/pre-command sources common.sh, which reads version/version.go,
+  # and ess.sh runs terraform in test_infra/ess. In cone mode a file path checks
+  # out the files of its parent directories as well.
+  - sparse_checkout_plugin: &sparse_checkout_plugin
+      sparse-checkout#v1.6.0:
+        paths:
+        - .buildkite
+        - .go-version
+        - .package-version
+        - .tool-versions
+        - version/version.go
+        - test_infra/ess
+        - testing/integration/testdata/preinstalled_packages.json
 
 steps:
   - label: Start ESS stack for FIPS integration tests
@@ -58,6 +75,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *sparse_checkout_plugin
       - *google_oidc_plugin
       - *vault_ec_key_prod
 
@@ -247,6 +265,7 @@ steps:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
+      - *sparse_checkout_plugin
       - *google_oidc_plugin
       - *vault_ec_key_prod
 
@@ -263,6 +282,7 @@ steps:
     soft_fail:
       - exit_status: "*"
     plugins:
+      - *sparse_checkout_plugin
       - elastic/vault-secrets#v0.1.0:
           path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
           field: "token"
