@@ -23,7 +23,8 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 
@@ -185,22 +186,24 @@ func getESClient() (*elasticsearch.Client, error) {
 	if esHost == "" || esUser == "" || esPass == "" {
 		return nil, errors.New("ELASTICSEARCH_* must be defined by the test runner")
 	}
-	c, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{esHost},
-		Username:  esUser,
-		Password:  esPass,
+	c, err := elasticsearch.New(
+		elasticsearch.WithAddresses(esHost),
+		elasticsearch.WithBasicAuth(esUser, esPass),
 		// Retry transient failures with a backoff, mirroring the Kibana client
 		// below. The transport defaults (3 immediate retries on 502/503/504
 		// only) leave 429 - common on ESS and serverless - and 500 unhandled.
-		MaxRetries:    5,
-		RetryOnStatus: []int{429, 500, 502, 503, 504},
-		RetryBackoff: func(attempt int) time.Duration {
-			base := time.Second
-			maxWait := 10 * time.Second
-			wait := (1 << (attempt - 1)) * base
-			return min(wait, maxWait)
-		},
-	})
+		elasticsearch.WithRetry(5, 429, 500, 502, 503, 504),
+		// There is no elasticsearch.Option for the retry backoff, so reach for
+		// the underlying transport option directly.
+		elasticsearch.WithTransportOptions(
+			elastictransport.WithRetryBackoff(func(attempt int) time.Duration {
+				base := time.Second
+				maxWait := 10 * time.Second
+				wait := (1 << (attempt - 1)) * base
+				return min(wait, maxWait)
+			}),
+		),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create elasticsearch client: %w", err)
 	}
