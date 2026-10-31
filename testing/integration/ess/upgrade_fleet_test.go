@@ -456,14 +456,16 @@ func PerformManagedUpgrade(
 		}
 	}
 
-	// start fixture gets the agent configured to use a faster watcher
-	// THIS IS A HACK: we are modifying elastic-agent.yaml after enrollment because the watcher reads only that file to
-	// configure itself. This is obviously not fit for production code or even guaranteed to be stable.
-	if upgradeOpts.CustomWatcherCfg != "" {
-		t.Log("Setting custom watcher config")
-		if err = startFixture.Configure(ctx, []byte("fleet.enabled: true\n"+upgradeOpts.CustomWatcherCfg)); err != nil {
-			return fmt.Errorf("failed to configure agent watcher: %w", err)
-		}
+	// start fixture gets the agent configured to use a faster watcher. This has
+	// to happen after enrollment, which replaces elastic-agent.yml (the only file
+	// the watcher reads), see upgradetest.ConfigureWatcherForManagedAgent.
+	watcherCfg := upgradeOpts.CustomWatcherCfg
+	if watcherCfg == "" {
+		watcherCfg = upgradetest.FastWatcherCfg
+	}
+	t.Log("Setting watcher config")
+	if err = upgradetest.ConfigureWatcherForManagedAgent(ctx, startFixture, watcherCfg); err != nil {
+		return fmt.Errorf("failed to configure agent watcher: %w", err)
 	}
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
@@ -868,9 +870,6 @@ func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	fleetServerURL, err := fleettools.DefaultURL(ctx, kibClient)
 	require.NoError(t, err)
 
-	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
-	require.NoError(t, err, "unable to write fast watcher config")
-
 	t.Log("Installing Elastic Agent...")
 	installOpts := atesting.InstallOpts{
 		Force: true,
@@ -882,6 +881,11 @@ func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	output, err := startFixture.Install(ctx, &installOpts)
 	t.Logf("Install agent output:\n%s", string(output))
 	require.NoError(t, err)
+
+	// Enrollment replaced elastic-agent.yml, so the fast watcher configuration
+	// has to be written now that the agent is installed and enrolled.
+	err = upgradetest.ConfigureFastWatcherForManagedAgent(ctx, startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)

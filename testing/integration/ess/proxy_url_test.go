@@ -915,9 +915,6 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
-	require.NoError(t, err, "unable to write fast watcher config")
-
 	t.Log("Installing Elastic Agent...")
 	installOpts := atesting.InstallOpts{
 		Force: true,
@@ -929,6 +926,11 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	output, err := startFixture.Install(ctx, &installOpts)
 	t.Logf("Install agent output:\n%s", string(output))
 	require.NoError(t, err)
+
+	// Enrollment replaced elastic-agent.yml, so the fast watcher configuration
+	// has to be written now that the agent is installed and enrolled.
+	err = upgradetest.ConfigureFastWatcherForManagedAgent(ctx, startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
@@ -1141,9 +1143,6 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = upgradetest.ConfigureFastWatcher(t.Context(), startFixture)
-	require.NoError(t, err, "unable to write fast watcher config")
-
 	t.Log("Installing Elastic Agent...")
 	installOpts := atesting.InstallOpts{
 		Force: true,
@@ -1155,6 +1154,11 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	output, err := startFixture.Install(t.Context(), &installOpts)
 	t.Logf("Install agent output:\n%s", string(output))
 	require.NoError(t, err)
+
+	// Enrollment replaced elastic-agent.yml, so the fast watcher configuration
+	// has to be written now that the agent is installed and enrolled.
+	err = upgradetest.ConfigureFastWatcherForManagedAgent(t.Context(), startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
 	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
