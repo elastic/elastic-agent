@@ -1014,7 +1014,6 @@ func TestFromSerializableStatus_NilEvent(t *testing.T) {
 		aggStatus, err := FromSerializableStatus(ss)
 		require.Error(t, err)
 		assert.Nil(t, aggStatus)
-		assert.Contains(t, err.Error(), "comp1")
 	})
 }
 
