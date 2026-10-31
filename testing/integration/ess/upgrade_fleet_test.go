@@ -467,7 +467,7 @@ func PerformManagedUpgrade(
 	}
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	if err != nil {
 		return fmt.Errorf("waiting for agent to become healthy: %w", err)
 	}
@@ -486,7 +486,7 @@ func PerformManagedUpgrade(
 			return checkSuccessful, fmt.Errorf("agent status is not online")
 		}
 		return checkSuccessful, nil
-	}, backoff.WithMaxElapsedTime(2*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(10*time.Second)))
+	}, backoff.WithMaxElapsedTime(2*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(5*time.Second)))
 	if err != nil {
 		return fmt.Errorf("waiting for upgraded agent to be online: %w", err)
 	}
@@ -516,7 +516,7 @@ func PerformManagedUpgrade(
 
 	// wait for the watcher to show up
 	t.Logf("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, upgradetest.WatcherPollInterval)
 	if err != nil {
 		return fmt.Errorf("waiting for upgrade watcher to start: %w", err)
 	}
@@ -529,7 +529,7 @@ func PerformManagedUpgrade(
 	}
 
 	// wait for the agent to be healthy and correct version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	if err != nil {
 		return fmt.Errorf("waiting for agent to be healthy and version %s: %w", endVersionInfo.Binary.String(), err)
 	}
@@ -541,7 +541,7 @@ func PerformManagedUpgrade(
 			return checkSuccessful, fmt.Errorf("agent status is not online")
 		}
 		return checkSuccessful, nil
-	}, backoff.WithMaxElapsedTime(10*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(15*time.Second)))
+	}, backoff.WithMaxElapsedTime(10*time.Minute), backoff.WithBackOff(backoff.NewConstantBackOff(5*time.Second)))
 
 	if err != nil {
 		return fmt.Errorf("waiting for upgraded agent to be online: %w", err)
@@ -565,7 +565,7 @@ func PerformManagedUpgrade(
 	}
 
 	t.Logf("Waiting for upgrade watcher to finish...")
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 1*time.Minute+15*time.Second)
 	if err != nil {
 		return fmt.Errorf("waiting for upgrade watcher to finish: %w", err)
 	}
@@ -884,7 +884,7 @@ func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Waiting for Agent to be correct version and healthy...")
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err)
 
 	agentID, err := startFixture.AgentID(ctx)
@@ -911,11 +911,11 @@ func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	}, time.Minute*5, time.Second, "Agent does not report upgrade_details.")
 
 	t.Log("Waiting for upgrade watcher to start...")
-	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, upgradetest.WatcherPollInterval)
 	require.NoError(t, err)
 	t.Log("Upgrade watcher started")
 
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgraded Agent status to be online...")
@@ -931,7 +931,7 @@ func TestFleetUpgradeCommandToPRBuildWithSource(t *testing.T) {
 	}, time.Minute*5, time.Second)
 
 	t.Log("Waiting for upgrade watcher to finish...")
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 1*time.Minute+15*time.Second)
 	require.NoError(t, err)
 
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
