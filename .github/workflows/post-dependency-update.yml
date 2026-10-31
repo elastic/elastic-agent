@@ -1,6 +1,10 @@
 # Follow-on actions for dependency update PRs (Dependabot and Renovate). Any changes to
 # dependencies in go.mod require the NOTICE.txt and NOTICE-fips.txt files to be updated.
 # This workflow applies those follow-on changes to the dependency update branch.
+#
+# The committer identity below ('github-actions[bot]') is listed in `gitIgnoredAuthors`
+# in renovate.json so that these follow-on commits do not make Renovate treat the branch
+# as modified by a human and stop updating it. Keep the two in sync.
 name: post-dependency-update
 
 on:
