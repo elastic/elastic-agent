@@ -3105,6 +3105,48 @@ func (w *ZapWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
+// kafkaTestdataDir returns the directory holding the Kafka test broker fixture
+// (testing/integration/testdata/kafka): the broker start and health check scripts
+// and the TLS material the agent's kafka output trusts.
+func kafkaTestdataDir(t *testing.T) string {
+	t.Helper()
+	_, currentFile, _, ok := runtime.Caller(0)
+	require.True(t, ok, "failed to get current file path")
+	return filepath.Join(filepath.Dir(currentFile), "..", "testdata", "kafka")
+}
+
+// kafkaComposeContent returns a docker compose definition for a single-node
+// KRaft Kafka broker, reachable from the host on localhost:9094 (plaintext) and
+// localhost:9093 (SASL_SSL: PLAIN, SCRAM-SHA-256, SCRAM-SHA-512 and OAUTHBEARER).
+// It runs the official apache/kafka image with the fixture scripts mounted in,
+// so no image has to be built: building the beats Kafka image from source used
+// to take about 10 minutes on a fresh CI worker.
+func kafkaComposeContent(kafkaDir string) string {
+	return fmt.Sprintf(`
+services:
+  kafka:
+    image: apache/kafka:3.9.1
+    entrypoint: ["/kafka-scripts/run.sh"]
+    ports:
+      - 9092:9092
+      - 9093:9093
+      - 9094:9094
+    environment:
+      - KAFKA_ADVERTISED_HOST=localhost
+      - _JAVA_OPTIONS=-Djava.net.preferIPv4Stack=true
+    volumes:
+      - "%[1]s/run.sh:/kafka-scripts/run.sh:ro"
+      - "%[1]s/healthcheck.sh:/kafka-scripts/healthcheck.sh:ro"
+      - "%[1]s/certs:/kafka-certs:ro"
+    healthcheck:
+      test: ["CMD", "/kafka-scripts/healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 36
+      start_period: 10s
+`, kafkaDir)
+}
+
 func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -3122,24 +3164,8 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 	)
 	tokenServer := newOAuth2TokenMockServer(t, oauthClientID, oauthClientSecret)
 
-	_, currentFile, _, ok := runtime.Caller(0)
-	require.True(t, ok, "failed to get current file path")
-	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
-
-	composeContent := fmt.Sprintf(`
-services:
-  kafka:
-    build: %s
-    ports:
-      - 9092:9092
-      - 9093:9093
-      - 9094:9094
-      - 2181:2181
-    environment:
-      - KAFKA_ADVERTISED_HOST=localhost
-`, kafkaPath)
-
-	stack := newDockerCompose(t, composeContent)
+	kafkaPath := kafkaTestdataDir(t)
+	stack := newDockerCompose(t, kafkaComposeContent(kafkaPath))
 	t.Cleanup(func() { _ = stack.down(context.Background()) }) //nolint:forbidigo // t.Context() is cancelled by cleanup time
 	err := stack.up(t.Context())
 	require.NoError(t, err)
@@ -3347,24 +3373,8 @@ func TestKafkaOutputPartitioningWithOtelRuntime(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
-	_, currentFile, _, ok := runtime.Caller(0)
-	require.True(t, ok, "failed to get current file path")
-	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
-
-	composeContent := fmt.Sprintf(`
-services:
-  kafka:
-    build: %s
-    ports:
-      - 9092:9092
-      - 9093:9093
-      - 9094:9094
-      - 2181:2181
-    environment:
-      - KAFKA_ADVERTISED_HOST=localhost
-`, kafkaPath)
-
-	stack := newDockerCompose(t, composeContent)
+	kafkaPath := kafkaTestdataDir(t)
+	stack := newDockerCompose(t, kafkaComposeContent(kafkaPath))
 	t.Cleanup(func() { _ = stack.down(context.Background()) }) //nolint:forbidigo // t.Context() is cancelled by cleanup time
 	err := stack.up(t.Context())
 	require.NoError(t, err)

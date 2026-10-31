@@ -269,6 +269,10 @@ func TestClassicAndReceiverAgentMonitoring(t *testing.T) {
 	processNamespace := fmt.Sprintf("%s-%s", info.Namespace, "process")
 	policy.Agent.Monitoring["namespace"] = processNamespace
 	policy.Agent.Monitoring["_runtime_experimental"] = "process"
+	// Collect monitoring metrics more often than the 60s default so the first
+	// documents of each dataset are indexed sooner; the test compares document
+	// keys, not values, so the period does not affect the assertions.
+	policy.Agent.Monitoring["metrics_period"] = "10s"
 
 	updatedPolicyBytes, err := yaml.Marshal(policy)
 	require.NoErrorf(t, err, "error marshalling policy, struct was %v", policy)
