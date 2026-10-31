@@ -68,6 +68,17 @@ func runOrSkip(t *testing.T, req Requirements, local bool) *Info {
 		discoverTest(t, req)
 	}
 
+	// sharding splits the selected tests across runners; it comes after
+	// autodiscovery so the discovered set stays complete
+	shard, sharded, err := activeShard()
+	if err != nil {
+		panic(fmt.Sprintf("test %s: invalid shard configuration: %s", t.Name(), err))
+	}
+	if sharded && !shard.Contains(t.Name()) {
+		t.Skipf("test is not in shard %s. Skipping", shard)
+		return nil
+	}
+
 	if !req.Local && local {
 		t.Skip("running local only tests and this test doesn't support local")
 		return nil
@@ -235,4 +246,19 @@ func getKibanaClient() (*kibana.Client, error) {
 		return nil, fmt.Errorf("failed to create kibana client: %w", err)
 	}
 	return c, nil
+}
+
+func dryRun(t *testing.T, req Requirements) *Info {
+	// always validate requirement is valid
+	if err := req.Validate(); err != nil {
+		t.Logf("test %s has invalid requirements: %s", t.Name(), err)
+		t.FailNow()
+		return nil
+	}
+	// skip the test as we are in dry run
+	t.Run("dry-run", func(t *testing.T) {
+		t.Log("Test dry-run successful")
+	})
+	t.Skip("Skipped because dry-run mode has been specified.")
+	return nil
 }
