@@ -64,7 +64,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-16"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
@@ -83,7 +83,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-16"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
@@ -102,7 +102,7 @@ steps:
             limit: 1
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-16"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
@@ -180,7 +180,7 @@ steps:
           - build/distributions/**
         agents:
           provider: "gcp"
-          machineType: "n2-standard-8"
+          machineType: "n2-standard-16"
           diskSizeGb: 200
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
