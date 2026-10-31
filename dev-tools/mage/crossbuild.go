@@ -309,6 +309,8 @@ func (b GolangCrossBuilder) Build() error {
 		"-v", fmt.Sprintf("%s:%s", hostCacheDir, buildCacheLocation),
 	)
 
+	args = append(args, cacheprogArgs()...)
+
 	// Mount /opt/git-mirrors (if present) to resolve git alternates in CI
 	if _, err := os.Stat("/opt/git-mirrors"); err == nil {
 		args = append(args, "-v", "/opt/git-mirrors:/opt/git-mirrors:ro")
@@ -351,6 +353,34 @@ func (b GolangCrossBuilder) Build() error {
 	)
 
 	return dockerRun(args...)
+}
+
+// cacheprogArgs returns docker arguments that make the Go toolchain inside the
+// container use the S3-backed GOCACHEPROG set up for the host by
+// .buildkite/scripts/setup-cacheprog.sh. It returns nil when that isn't
+// configured (CACHEPROG_CROSSBUILD_DIR is only set on Linux CI hosts, whose
+// architecture matches the container's).
+func cacheprogArgs() []string {
+	dir := os.Getenv("CACHEPROG_CROSSBUILD_DIR")
+	if dir == "" || os.Getenv("GOCACHEPROG") == "" {
+		return nil
+	}
+	args := []string{
+		"-v", dir + ":/cacheprog",
+		"--env", "GOCACHEPROG=/cacheprog/cacheprog-wrapper-container",
+		"--env", "CACHEPROG_ROOT_DIRECTORY=/cacheprog/disk-container",
+	}
+	// Pass the S3 settings and the AWS credentials by name only, so that the
+	// secrets don't end up in the logged docker command line.
+	for _, kv := range os.Environ() {
+		name, _, _ := strings.Cut(kv, "=")
+		switch {
+		case name == "CACHEPROG_ROOT_DIRECTORY", name == "CACHEPROG_CROSSBUILD_DIR":
+		case strings.HasPrefix(name, "CACHEPROG_"), strings.HasPrefix(name, "AWS_"):
+			args = append(args, "--env", name)
+		}
+	}
+	return args
 }
 
 // isRootlessDocker returns true when the Docker daemon is running in rootless
