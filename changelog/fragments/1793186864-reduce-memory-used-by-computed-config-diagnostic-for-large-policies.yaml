@@ -1,0 +1,8 @@
+kind: bug-fix
+summary: Reduce memory used by the computed-config diagnostic for policies with many inputs.
+description: |
+  The computed-config diagnostic now encodes the rendered policy one input at a time.
+  Encoding the whole policy in one call could get Elastic Agent OOM-killed while
+  collecting diagnostics for very large policies, such as Synthetics private locations
+  with thousands of monitors. The diagnostic output is unchanged.
+component: elastic-agent
