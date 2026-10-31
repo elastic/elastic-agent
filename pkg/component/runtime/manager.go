@@ -792,6 +792,9 @@ func (m *Manager) update(model component.Model, teardown bool) error {
 			if err != nil {
 				m.logger.Errorf("updating components: failed waiting %s stop",
 					state.id)
+			} else {
+				// Stopped is reported before stateChanged removes it; a re-add must not reuse it
+				m.removeCurrent(state)
 			}
 			stoppedWg.Done()
 		}(existing)
@@ -906,13 +909,20 @@ func (m *Manager) stateChanged(state *componentRuntimeState, latest ComponentSta
 	shutdown := state.shuttingDown.Load()
 	if shutdown && latest.State == client.UnitStateStopped {
 		// shutdown is complete; remove from currComp
-		m.currentMx.Lock()
-		delete(m.current, state.id)
-		m.currentMx.Unlock()
+		m.removeCurrent(state)
 
 		exit = true
 	}
 	return exit
+}
+
+// removeCurrent removes state from m.current unless its ID points to a newer instance.
+func (m *Manager) removeCurrent(state *componentRuntimeState) {
+	m.currentMx.Lock()
+	defer m.currentMx.Unlock()
+	if m.current[state.id] == state {
+		delete(m.current, state.id)
+	}
 }
 
 func (m *Manager) getCertificate(chi *tls.ClientHelloInfo) (*tls.Certificate, error) {

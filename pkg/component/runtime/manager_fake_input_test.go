@@ -291,6 +291,95 @@ func (suite *FakeInputSuite) TestManager_Features() {
 	}
 }
 
+// A component removed and re-added while its stop is in flight must run again.
+func (suite *FakeInputSuite) TestManager_ComponentReaddedAfterRemoval() {
+	t := suite.T()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		&info.AgentInfo{},
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		testGrpcConfig())
+	require.NoError(t, err)
+	go func() { _ = m.Run(ctx) }()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer waitCancel()
+	require.NoError(t, waitForReady(waitCtx, m))
+
+	// Slow subscriber, like the coordinator, delays stateChanged after Stopped.
+	subAll := m.SubscribeAll(ctx)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-subAll.Ch():
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}()
+
+	const compID = "fake-default"
+	comp := component.Component{
+		ID: compID,
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryPath: testBinary(t, "component"),
+			Spec:       fakeInputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelInfo,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy",
+				}),
+			},
+		},
+	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	defer func() { _ = comp.RemoveWorkDir(runPath) }()
+
+	componentState := func() (client.UnitState, bool) {
+		m.currentMx.RLock()
+		defer m.currentMx.RUnlock()
+		state, ok := m.current[compID]
+		if !ok {
+			return client.UnitStateStopped, false
+		}
+		return state.getLatest().State, true
+	}
+	requireHealthy := func(msg string) {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			state, ok := componentState()
+			assert.True(c, ok, "component not in manager")
+			assert.Equal(c, client.UnitStateHealthy, state)
+		}, 15*time.Second, 50*time.Millisecond, msg)
+	}
+
+	m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, <-m.errCh)
+	requireHealthy("component never became healthy")
+
+	// Queue the re-add while the removal is still stopping the component.
+	m.Update(component.Model{})
+	time.Sleep(50 * time.Millisecond)
+	m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, <-m.errCh)
+	require.NoError(t, <-m.errCh)
+	requireHealthy("component not running after re-add")
+}
+
 func (suite *FakeInputSuite) TestManager_APM() {
 	t := suite.T()
 
