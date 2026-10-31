@@ -43,6 +43,7 @@ require (
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/josephspurrier/goversioninfo v1.7.0
 	github.com/kardianos/service v1.3.0
+	github.com/klauspost/pgzip v1.3.0
 	github.com/knadh/koanf/maps v0.1.3
 	github.com/magefile/mage v1.17.2
 	github.com/moby/moby/api v1.56.1
