@@ -21,11 +21,12 @@
 # is handled by a bucket lifecycle rule on the go-build/ prefix; cacheprog does
 # not delete anything itself.
 #
-# Only builds of main and release branches write to the cache. Pull request
-# builds restore from it but never write (CACHEPROG_DISABLE_PUT): the cache is
-# shared by every build of the pipeline, and a build of an unreviewed change
-# should not be able to feed objects to the builds of main. The build cache is
-# content addressed, so a PR still hits every package it did not change.
+# Every build reads from and writes to the cache, so a pull request benefits
+# from its own earlier builds as well as from the builds of main. The cache is
+# content addressed (objects are keyed by the hash of their inputs) and only
+# builds of this pipeline can write to the bucket. Set GO_BUILD_CACHE_READ_ONLY
+# to "true" on a step to restore without writing (CACHEPROG_DISABLE_PUT), for
+# example to keep experiments from populating the shared cache.
 #
 # If anything here fails, we leave GOCACHEPROG unset and Go falls back to the
 # local GOCACHE, so a cache problem never fails a build.
@@ -138,9 +139,8 @@ setup_cacheprog() {
   # rather than a cacheprog template, so the crossbuild containers (which get
   # the CACHEPROG_* variables but not GO_VERSION) use the same prefix.
   export CACHEPROG_S3_PREFIX="go-build/go${GO_VERSION}"
-  # Pull request builds are read-only, see the header. Pushes to main and the
-  # release branches are the only writers.
-  if [[ "${BUILDKITE_PULL_REQUEST:-false}" != "false" ]]; then
+  # Opt-out knob for steps that should restore but not write, see the header.
+  if [[ "${GO_BUILD_CACHE_READ_ONLY:-false}" == "true" ]]; then
     export CACHEPROG_DISABLE_PUT="true"
   fi
   # Persistent per-user dir so objects survive across builds on the same agent
