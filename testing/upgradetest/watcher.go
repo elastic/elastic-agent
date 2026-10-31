@@ -59,8 +59,29 @@ agent.upgrade.watcher:
 // Note: Not all versions or modes of the Elastic Agent respect this option
 // that is why the `WaitForNoWatcher` should also be used to ensure that the
 // watcher stops or is killed before continuing.
+//
+// For a Fleet-managed agent this must be called after enrollment, see
+// ConfigureWatcherForManagedAgent.
 func ConfigureFastWatcher(ctx context.Context, f *atesting.Fixture) error {
 	return f.Configure(ctx, []byte(FastWatcherCfg))
+}
+
+// ConfigureWatcherForManagedAgent writes the watcher configuration cfg to the
+// elastic-agent.yml of an installed, Fleet-managed agent.
+//
+// The upgrade watcher reads its settings only from elastic-agent.yml, and
+// enrollment replaces that file with the default Fleet configuration, so a
+// configuration written before `install --enrollment-token` is lost. Call this
+// after the install so the watcher picks the settings up; `fleet.enabled: true`
+// is kept so the agent stays managed. Modifying the file of a running managed
+// agent is a test-only shortcut, not a supported way to configure the watcher.
+func ConfigureWatcherForManagedAgent(ctx context.Context, f *atesting.Fixture, cfg string) error {
+	return f.Configure(ctx, []byte("fleet.enabled: true\n"+cfg))
+}
+
+// ConfigureFastWatcherForManagedAgent is ConfigureWatcherForManagedAgent with FastWatcherCfg.
+func ConfigureFastWatcherForManagedAgent(ctx context.Context, f *atesting.Fixture) error {
+	return ConfigureWatcherForManagedAgent(ctx, f, FastWatcherCfg)
 }
 
 // WaitForWatchingState polls UpgradeDetails until the upgrade reaches
