@@ -8,10 +8,21 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   fi
   source "${WORKSPACE}/.buildkite/scripts/common.sh"
 
-  # Perform cleanup of integration tests resources
+  # Perform cleanup of integration tests resources.
+  # A failed cleanup must not fail the job: the test results are already in,
+  # and the ephemeral resources expire on their own. Steps that never used the
+  # Go test runner (for example the ECH step) have nothing to clean up, and
+  # compiling mage here can fail when a sudo'ed `go test` left root-owned
+  # directories in the shared module cache.
   echo "--- Cleaning up integration test resources"
-  STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
-  SNAPSHOT=true mage integration:clean
+  if ! STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean; then
+    echo "^^^ +++"
+    echo "Warning: mage integration:clean (serverless) failed, continuing"
+  fi
+  if ! SNAPSHOT=true mage integration:clean; then
+    echo "^^^ +++"
+    echo "Warning: mage integration:clean failed, continuing"
+  fi
 fi
 
 if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
