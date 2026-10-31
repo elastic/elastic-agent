@@ -293,7 +293,10 @@ func (f *Fixture) Prepare(ctx context.Context, components ...UsableComponent) er
 
 	extractDir := createTempDir(f.t)
 	finalDir := filepath.Join(extractDir, name)
-	err = ExtractArtifact(f.t, src, extractDir)
+	// Extracted once per process and shared through the extraction cache,
+	// see extract_cache.go for what the fixture may and may not do with the
+	// files it gets.
+	err = extractArtifactCached(f.t, src, extractDir)
 	if err != nil {
 		return fmt.Errorf("extracting artifact %q in %q: %w", src, extractDir, err)
 	}
@@ -1229,6 +1232,13 @@ func (f *Fixture) prepareComponents(workDir string, components ...UsableComponen
 		destBinary := filepath.Join(componentsDir, comp.Name)
 		if f.operatingSystem == "windows" {
 			destBinary += ".exe"
+		}
+		// copy.Copy truncates an existing destination in place. The binaries
+		// of the extracted package may be hardlinks into the extraction cache
+		// (see extract_cache.go), so remove the destination first to get a
+		// private file instead of overwriting the shared one.
+		if err := os.Remove(destBinary); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("failed to remove %s before replacing it: %w", destBinary, err)
 		}
 		if err := copy.Copy(comp.BinaryPath, destBinary); err != nil {
 			return fmt.Errorf("failed to copy %s to %s: %w", comp.BinaryPath, destBinary, err)
