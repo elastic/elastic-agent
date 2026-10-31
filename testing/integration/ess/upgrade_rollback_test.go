@@ -150,7 +150,7 @@ inputs:
 	// rollback should now occur
 
 	// wait for the agent to be healthy and back at the start version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 10*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 10*time.Minute, upgradetest.StatusPollInterval, t)
 	if err != nil {
 		// agent never got healthy, but we need to ensure the watcher is stopped before continuing (this
 		// prevents this test failure from interfering with another test)
@@ -192,7 +192,7 @@ inputs:
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
 	// stopped on its own, and we don't want this test to hide that fact
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 3*time.Minute)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 3*time.Minute)
 	require.NoError(t, err)
 
 	// now that the watcher has stopped lets ensure that it's still the expected
@@ -391,7 +391,7 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 			if assert.NoError(ct, sErr) {
 				assert.Equal(ct, "online", status, msg)
 			}
-		}, 2*time.Minute, 10*time.Second)
+		}, 2*time.Minute, 5*time.Second)
 	}
 
 	// 1. Perform managed upgrade (from -> to) and let it complete fully.
@@ -418,7 +418,7 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 			assert.Nil(ct, agentResp.UpgradeDetails,
 				"Fleet upgrade_details should be nil after upgrade completes")
 		}
-	}, 5*time.Minute, 15*time.Second)
+	}, 5*time.Minute, 5*time.Second)
 
 	// 3. Request rollback via Fleet API
 	t.Logf("Requesting rollback via Fleet API for agent %s", agentID)
@@ -428,7 +428,7 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 	// 3. Wait for agent to be healthy at original version.
 	// Use a longer timeout (4 min) because the rollback involves watcher
 	// takedown, symlink switch, and a full agent restart.
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 4*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 4*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err, "agent should be healthy at original version after rollback")
 
 	// 4. Verify Fleet/Kibana reflects the rollback: agent should be online
@@ -444,7 +444,7 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 			assert.Equal(ct, startVersionInfo.Binary.Version, fleetVersion,
 				"Fleet should report the rolled-back agent version")
 		}
-	}, 2*time.Minute, 10*time.Second)
+	}, 2*time.Minute, 5*time.Second)
 
 	agentData, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 	require.NoError(t, err, "failed to get agent from Fleet API")
@@ -456,7 +456,7 @@ func TestFleetManagedUpgradeRollback(t *testing.T) {
 	// Server → Agent layer (stale ackToken causes re-delivery of the same
 	// UPGRADE action). That path is covered by TestStandaloneUpgradeReplayedRollback.
 	// Here we verify the Fleet API rollback completed cleanly end-to-end.
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err, "agent should stay healthy after rollback")
 
 	t.Log("Verifying agent status in Fleet after rollback completes...")
@@ -544,7 +544,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 						// on windows the update marker is not removed when cleaning up
 						assert.NoFileExists(collect, filepath.Join(startFixture.WorkDir(), "data", ".update-marker"))
 					}
-				}, 4*time.Minute, 10*time.Second)
+				}, 4*time.Minute, upgradetest.StatusPollInterval)
 				t.Log("elastic agent is out of grace period.")
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
 				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
@@ -621,7 +621,7 @@ func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
 	t.Logf("replayed rollback output: %s", retVal)
 
 	// Verify agent stays healthy and is not stuck in failed state
-	err = upgradetest.WaitHealthyAndVersion(ctx, fromFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, fromFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err, "agent should remain healthy after replayed rollback")
 
 	state, err := replayClient.State(ctx)
@@ -689,7 +689,7 @@ func TestCleanupRollbacks(t *testing.T) {
 				require.EventuallyWithT(t, func(collect *assert.CollectT) {
 					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
 					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
-				}, 2*time.Minute, 10*time.Second)
+				}, 2*time.Minute, upgradetest.StatusPollInterval)
 			},
 		},
 		{
@@ -806,7 +806,7 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 	restartAgentVersion(restartContext, t, installedAgentClient, targetVersion.Binary, 10*time.Second)
 
 	// wait for the agent to be healthy and correct version
-	err = upgradetest.WaitHealthyAndVersion(ctx, from, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, from, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err, "agent never came online with version %s", startVersionInfo.Binary.String())
 
 	agentID, err := from.AgentID(ctx)
@@ -830,7 +830,7 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
 	// stopped on its own, and we don't want this test to hide that fact
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 3*time.Minute)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 3*time.Minute)
 	require.NoError(t, err)
 
 	// now that the watcher has stopped lets ensure that it's still the expected
@@ -889,7 +889,7 @@ func standaloneRollbackTest(ctx context.Context, t *testing.T, startFixture *ate
 	rollbackTrigger(ctx, t, elasticAgentClient, startFixture, endFixture)
 
 	// wait for the agent to be healthy and back at the start version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	if err != nil {
 		// agent never got healthy, but we need to ensure the watcher is stopped before continuing
 		// this kills the watcher instantly and waits for it to be gone before continuing
@@ -921,7 +921,7 @@ func standaloneRollbackTest(ctx context.Context, t *testing.T, startFixture *ate
 	// rollback should stop the watcher
 	// killTimeout is greater than timeout as the watcher should have been
 	// stopped on its own, and we don't want this test to hide that fact
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 3*time.Minute)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 3*time.Minute)
 	require.NoError(t, err)
 
 	// now that the watcher has stopped lets ensure that it's still the expected

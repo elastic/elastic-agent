@@ -37,7 +37,7 @@ type UnpackResult struct {
 
 type copyFunc func(dst io.Writer, src io.Reader) (written int64, err error)
 type openFileFunc func(name string, flag int, perm fs.FileMode) (*os.File, error)
-type unarchiveFunc func(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error)
+type unarchiveFunc func(log *logger.Logger, archivePath, dataDir string, flavor string, metadata packageMetadata, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error)
 
 type unpacker struct {
 	log *logger.Logger
@@ -62,15 +62,19 @@ func newUnpacker(log *logger.Logger) *unpacker {
 }
 
 // unpack unpacks archive correctly, skips root (symlink, config...) unpacks data/*
-func (u *unpacker) unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error) {
+//
+// metadata must be the result of getPackageMetadata for the same archive: the
+// caller has already read it, and reading it again would mean another full
+// decompression pass over the archive.
+func (u *unpacker) unpack(version, archivePath, dataDir string, flavor string, metadata packageMetadata) (UnpackResult, error) {
 	// unpack must occur in directory that holds the installation directory
 	// or the extraction will be double nested
 	var unpackRes UnpackResult
 	var err error
 	if runtime.GOOS == windowsOSName {
-		unpackRes, err = u.unzip(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
+		unpackRes, err = u.unzip(u.log, archivePath, dataDir, flavor, metadata, u.copy, u.mkdirAll, u.openFile)
 	} else {
-		unpackRes, err = u.untar(u.log, archivePath, dataDir, flavor, u.copy, u.mkdirAll, u.openFile)
+		unpackRes, err = u.untar(u.log, archivePath, dataDir, flavor, metadata, u.copy, u.mkdirAll, u.openFile)
 	}
 
 	if err != nil {
@@ -117,7 +121,7 @@ func (u *unpacker) getPackageMetadata(archivePath string) (packageMetadata, erro
 }
 
 // injecting copy, mkdirAll and openFile for testability
-func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
+func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, metadata packageMetadata, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 	var hash, rootDir string
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -130,11 +134,9 @@ func unzip(log *logger.Logger, archivePath, dataDir string, flavor string, copy 
 	pm := pathMapper{}
 	var versionedHome string
 
-	metadata, err := getPackageMetadataFromZipReader(r, fileNamePrefix)
-	if err != nil {
-		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
+	if len(metadata.hash) < HashLen {
+		return UnpackResult{}, fmt.Errorf("package metadata hash %q for %q is shorter than %d characters", metadata.hash, archivePath, HashLen)
 	}
-
 	hash = metadata.hash[:HashLen]
 	var registry map[string][]string
 	if metadata.manifest != nil {
@@ -367,19 +369,17 @@ func getPackageMetadataFromZipReader(r *zip.ReadCloser, fileNamePrefix string) (
 }
 
 // injecting copy, mkdirAll and openFile for testability
-func untar(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
+func untar(log *logger.Logger, archivePath, dataDir string, flavor string, metadata packageMetadata, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 	var versionedHome string
 	var rootDir string
 	var hash string
 
-	// Look up manifest in the archive and prepare path mappings, if any
+	// Prepare path mappings from the manifest, if any
 	pm := pathMapper{}
 
-	metadata, err := getPackageMetadataFromTar(archivePath)
-	if err != nil {
-		return UnpackResult{}, fmt.Errorf("retrieving package metadata from %q: %w", archivePath, err)
+	if len(metadata.hash) < HashLen {
+		return UnpackResult{}, fmt.Errorf("package metadata hash %q for %q is shorter than %d characters", metadata.hash, archivePath, HashLen)
 	}
-
 	hash = metadata.hash[:HashLen]
 	var registry map[string][]string
 
@@ -564,11 +564,11 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, regist
 	if err != nil {
 		return nil, err
 	}
-	// go through all the content of a tar archive
-	// if elastic-agent.active.commit file is found, get commit of the version unpacked
-	// otherwise copy everything inside data directory (everything related to new version),
-	// pieces outside of data we already have and should not be overwritten as they are usually configs
-	for {
+	// go through the content of the tar archive looking for the spec files of the
+	// flavor's components. Decompressing the whole archive takes several seconds,
+	// so stop as soon as every spec in the registry has been seen; the archive
+	// may legitimately not contain all of them, in which case we read to EOF.
+	for len(specs) > 0 {
 		f, err := tr.Next()
 		if errors.Is(err, io.EOF) {
 			break
@@ -589,6 +589,7 @@ func skipFnFromTar(log *logger.Logger, archivePath string, flavor string, regist
 			// component not present in a package, skip processing
 			continue
 		}
+		delete(specs, filepath.Base(fileName))
 
 		fi := f.FileInfo()
 		mode := fi.Mode()
@@ -748,9 +749,11 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 		fileset[fName] = struct{}{}
 	}
 
-	// go through all the content of a tar archive
-	// if one of the listed files is found, read the contents and set a byte reader into the result map
-	for {
+	// go through the content of the tar archive until every listed file has been
+	// found (or EOF): decompressing the rest of the archive takes several seconds
+	// and the metadata files are small. If a name appears more than once in the
+	// archive the first occurrence wins.
+	for len(result) < len(fileset) {
 		f, err := tr.Next()
 		if errors.Is(err, io.EOF) {
 			break
