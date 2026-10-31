@@ -73,7 +73,7 @@ type artifactDownloadHandler interface {
 	withFleetServerURI(fleetServerURI string)
 }
 type unpackHandler interface {
-	unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error)
+	unpack(version, archivePath, dataDir string, flavor string, metadata packageMetadata) (UnpackResult, error)
 	getPackageMetadata(archivePath string) (packageMetadata, error)
 }
 
@@ -503,7 +503,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("could not remove disk space reservation file %s: %w", installReservation, err)
 	}
 
-	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
+	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor, metadata)
 
 	// If VersionedHome is empty then unpack has not started unpacking the
 	// archive yet. There's nothing to clean up. Return the error.
