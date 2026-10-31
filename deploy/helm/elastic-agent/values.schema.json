@@ -576,6 +576,17 @@
                         }
                     }
                 },
+                "browserCAs": {
+                    "type": "object",
+                    "description": "Certificate authorities that browser monitors trust.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "secretName": {
+                            "type": "string",
+                            "description": "Name of an existing Secret with PEM CA certificates (*.crt or *.pem keys), mounted at /etc/elastic-agent/browser-cas and set as ELASTIC_AGENT_BROWSER_CA. Requires a complete image variant."
+                        }
+                    }
+                },
                 "fleet": {
                     "type": "object",
                     "description": "Elastic-Agent managed configuration.",
