@@ -40,8 +40,9 @@ common:
   # repository takes ~1.5 minutes on those agents; the sparse checkout takes
   # seconds. The paths cover what the scripts and the repository hooks read:
   # .buildkite/hooks/pre-command sources common.sh, which reads version/version.go,
-  # and ess.sh runs terraform in test_infra/ess. In cone mode a file path checks
-  # out the files of its parent directories as well.
+  # ess.sh runs terraform in test_infra/ess, and test_infra/ess/deployment.tf
+  # reads pkg/testing/ess/create_deployment_csp_configuration.yaml. In cone mode
+  # a file path checks out the files of its parent directories as well.
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
@@ -51,6 +52,7 @@ common:
         - .tool-versions
         - version/version.go
         - test_infra/ess
+        - pkg/testing/ess/create_deployment_csp_configuration.yaml
         - testing/integration/testdata/preinstalled_packages.json
 
 steps:
