@@ -89,10 +89,10 @@ The following actions are possible and grouped based on the actions.
   FLEET_URL - URL of the Fleet Server to enroll into
   FLEET_ENROLLMENT_TOKEN - token to use for enrollment. This is not needed in case FLEET_SERVER_ENABLE and FLEET_ENROLL is set. Then the token is fetched from Kibana.
   FLEET_ENROLL_TIMEOUT - The timeout duration for the enroll command. Defaults to 10m. A negative value disables the timeout.
-  FLEET_CA - path to certificate authority to use with communicate with Fleet Server [$KIBANA_CA]
+  FLEET_CA - path to certificate authority to communicate with Fleet Server [$KIBANA_CA]
   FLEET_INSECURE - communicate with Fleet with either insecure HTTP or unverified HTTPS
   ELASTIC_AGENT_CERT - path to certificate to use for connecting to fleet-server.
-  ELASTIC_AGENT_CERT_KEY - path to private key use for connecting to fleet-server.
+  ELASTIC_AGENT_CERT_KEY - path to private key to use for connecting to fleet-server.
 
   The following vars are needed in the scenario that Elastic Agent should automatically fetch its own token.
 
@@ -134,7 +134,7 @@ The following actions are possible and grouped based on the actions.
   KIBANA_FLEET_HOST - Kibana host accessible from Fleet Server. [$KIBANA_HOST]
   KIBANA_FLEET_USERNAME - Kibana username for service token [$KIBANA_USERNAME]
   KIBANA_FLEET_PASSWORD - Kibana password for service token [$KIBANA_PASSWORD]
-  KIBANA_FLEET_CA - path to certificate authority to use with communicate with Kibana [$KIBANA_CA]
+  KIBANA_FLEET_CA - path to certificate authority to communicate with Kibana [$KIBANA_CA]
   KIBANA_REQUEST_RETRY_SLEEP - sleep duration taken when agent performs a request to Kibana [default 1s]
   KIBANA_REQUEST_RETRY_COUNT - number of retries agent performs when executing a request to Kibana [default 30]
 
@@ -148,7 +148,7 @@ be used when the same credentials will be used across all the possible actions a
   KIBANA_HOST - Kibana host [http://kibana:5601]
   KIBANA_FLEET_USERNAME - Kibana username to enable Fleet [$ELASTICSEARCH_USERNAME]
   KIBANA_FLEET_PASSWORD - Kibana password to enable Fleet [$ELASTICSEARCH_PASSWORD]
-  KIBANA_CA - path to certificate authority to use with communicate with Kibana [$ELASTICSEARCH_CA]
+  KIBANA_CA - path to certificate authority to communicate with Kibana [$ELASTICSEARCH_CA]
   ELASTIC_AGENT_TAGS - user provided tags for the agent [linux,staging]
   ELASTIC_AGENT_HOSTNAME - override the hostname reported by Elastic Agent and supported supervised Beat workloads (Cloudbeat unaffected)
 
