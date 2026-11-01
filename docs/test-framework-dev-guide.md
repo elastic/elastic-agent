@@ -550,7 +550,7 @@ See [diagnostics.md](./diagnostics.md) for what is in a bundle.
 
 #### Gather diagnostics manually
 In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
-every tests you can use the environment variable `AGENT_COLLECT_DIAG=true`. When that environment variable is defined
+every test you can use the environment variable `AGENT_COLLECT_DIAG=true`. When that environment variable is defined
 it will cause the testing fixture to always collect diagnostics before the uninstall in the cleanup step of a test.
 
 #### Keeping Elastic Agent installed
