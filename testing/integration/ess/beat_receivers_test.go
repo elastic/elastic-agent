@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/gofrs/uuid/v5"
 	"gopkg.in/yaml.v2"
@@ -35,7 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
