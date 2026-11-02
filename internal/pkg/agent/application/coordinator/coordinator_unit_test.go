@@ -3174,4 +3174,25 @@ func TestCoordinator_Restart(t *testing.T) {
 			t.Fatal("expected an override state to be set")
 		}
 	})
+
+	t.Run("containerized environment returns ErrContainerNotSupported and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		platformSpecs, _ := pkgcomponent.NewRuntimeSpecs(pkgcomponent.PlatformDetail{
+			Platform: pkgcomponent.Platform{OS: pkgcomponent.Container},
+		}, nil)
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			// canRestart would otherwise allow the restart (a containerized agent
+			// runs under an init such as tini and appears supervised), so this
+			// proves the container guard takes precedence.
+			canRestart: func() bool { return true },
+			reexecMgr:  reexecMgr,
+			specs:      platformSpecs,
+			logger:     logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrContainerNotSupported)
+		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
+	})
 }

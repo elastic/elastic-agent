@@ -736,6 +736,13 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 // by the managed config manager.
 // Called from external goroutines.
 func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) error {
+	// Containers are excluded even though canRestart would otherwise be satisfied:
+	// the agent runs under an init process (for example tini) so it appears to be
+	// under a supervisor, but a container's lifecycle is owned by its orchestrator,
+	// not a Fleet RESTART action. This mirrors the Uninstall/Migrate handling.
+	if c.isContainerizedEnvironment() {
+		return ErrContainerNotSupported
+	}
 	if !c.canRestart() {
 		return ErrNotRestartable
 	}
