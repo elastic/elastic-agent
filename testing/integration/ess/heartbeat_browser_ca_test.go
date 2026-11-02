@@ -50,9 +50,10 @@ const (
 
 // browserCAAgent is an Elastic Agent container that runs the browser monitor.
 type browserCAAgent struct {
-	name   string // e.g. "complete-root"
-	root   bool
-	runner *HeartbeatRunner
+	name     string // e.g. "complete-root"
+	root     bool
+	policyID string
+	runner   *HeartbeatRunner
 }
 
 // TestHeartbeatBrowserTrustsMountedCA runs a Fleet browser monitor from a private
@@ -104,20 +105,11 @@ func TestHeartbeatBrowserTrustsMountedCA(t *testing.T) {
 	caDir := t.TempDir()
 	require.NoError(t, os.Chmod(caDir, 0o755), "making the CA directory readable by the agents")
 
-	policy, err := info.KibanaClient.CreatePolicy(ctx, kibana.AgentPolicy{
-		Name:        "browser-ca-policy-" + testID,
-		Namespace:   info.Namespace,
-		Description: "Browser CA test policy " + testID,
-		MonitoringEnabled: []kibana.MonitoringEnabledOption{
-			kibana.MonitoringEnabledLogs,
-		},
-	})
-	require.NoError(t, err, "creating Fleet agent policy")
-	enrollmentToken, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policy.ID)
-	require.NoError(t, err, "creating Fleet enrollment token")
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "getting default Fleet Server URL")
 
+	// Each agent gets its own policy, and below its own private location: Synthetics
+	// runs a monitor on only one agent of a location's policy.
 	var agents []*browserCAAgent
 	for _, variant := range []string{"complete", "complete-wolfi"} {
 		for _, root := range []bool{false, true} {
@@ -125,10 +117,22 @@ func TestHeartbeatBrowserTrustsMountedCA(t *testing.T) {
 			if root {
 				name += "-root"
 			}
+			policy, err := info.KibanaClient.CreatePolicy(ctx, kibana.AgentPolicy{
+				Name:        "browser-ca-" + name + "-" + testID,
+				Namespace:   info.Namespace,
+				Description: "Browser CA test policy " + testID,
+				MonitoringEnabled: []kibana.MonitoringEnabledOption{
+					kibana.MonitoringEnabledLogs,
+				},
+			})
+			require.NoError(t, err, "creating the %s agent's Fleet policy", name)
+			enrollmentToken, err := tools.CreateEnrollmentToken(t, ctx, info.KibanaClient, policy.ID)
+			require.NoError(t, err, "creating the %s agent's enrollment token", name)
 			a := &browserCAAgent{
-				name:   name,
-				root:   root,
-				runner: &HeartbeatRunner{info: info, containerName: "browser-ca-" + name + "-" + shortID},
+				name:     name,
+				root:     root,
+				policyID: policy.ID,
+				runner:   &HeartbeatRunner{info: info, containerName: "browser-ca-" + name + "-" + shortID},
 			}
 			startBrowserCAAgent(ctx, t, a, images[variant], network, caDir, fleetServerURL, enrollmentToken.APIKey)
 			agents = append(agents, a)
@@ -137,13 +141,17 @@ func TestHeartbeatBrowserTrustsMountedCA(t *testing.T) {
 	waitBrowserCAAgentsEnrolled(ctx, t, agents)
 
 	// Kibana only sends browser monitors to agents reporting the complete image.
-	location, err := createSyntheticsPrivateLocation(ctx, info.KibanaClient, "browser-ca-location-"+testID, policy.ID)
-	require.NoError(t, err, "creating Synthetics private location")
+	var locations []string
+	for _, a := range agents {
+		location, err := createSyntheticsPrivateLocation(ctx, info.KibanaClient, "browser-ca-"+a.name+"-"+testID, a.policyID)
+		require.NoError(t, err, "creating the %s agent's Synthetics private location", a.name)
+		locations = append(locations, location)
+	}
 	require.NoError(t, createSyntheticsUIMonitor(ctx, info.KibanaClient, map[string]any{
 		"type":              "browser",
 		"name":              "browser-ca-monitor-" + testID,
 		"enabled":           true,
-		"private_locations": []string{location},
+		"private_locations": locations,
 		"schedule":          1,
 		"inline_script":     fmt.Sprintf(`step("load", async () => { await page.goto("https://%s:8443"); });`, server),
 	}), "creating browser monitor")
