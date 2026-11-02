@@ -30,8 +30,8 @@ require (
 	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/go-git/go-billy/v5 v5.8.0
-	github.com/go-git/go-git/v5 v5.17.0
+	github.com/go-git/go-billy/v5 v5.9.2
+	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/gofrs/flock v0.13.1
 	github.com/gofrs/uuid/v5 v5.5.1
@@ -51,7 +51,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.164.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.164.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.164.1
-	github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0
+	github.com/openshift/api v0.0.0-20261102174502-e51674a80650
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
 	github.com/sajari/regression v1.0.1
@@ -76,7 +76,7 @@ require (
 	go.opentelemetry.io/collector/pipeline v1.70.0
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.uber.org/zap v1.28.0
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/crypto v0.58.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.62.0
@@ -86,8 +86,8 @@ require (
 	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
-	google.golang.org/api v0.307.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/api v0.310.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/ini.v1 v1.67.3
 	gopkg.in/yaml.v2 v2.4.0
@@ -214,8 +214,8 @@ require (
 	github.com/google/s2a-go v0.1.11 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.23 // indirect
-	github.com/googleapis/gax-go/v2 v2.26.2 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.24 // indirect
+	github.com/googleapis/gax-go/v2 v2.27.0 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0 // indirect
@@ -281,7 +281,7 @@ require (
 	github.com/otiai10/mint v1.6.3 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
-	github.com/pjbgf/sha1cd v0.3.2 // indirect
+	github.com/pjbgf/sha1cd v0.7.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20260805114148-88456608a4f6 // indirect
@@ -394,7 +394,7 @@ require (
 	golang.org/x/tools v0.52.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20261012220534-4341edf3f941 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
