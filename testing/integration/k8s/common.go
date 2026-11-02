@@ -44,7 +44,13 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
+<<<<<<< HEAD
 	"github.com/elastic/go-elasticsearch/v8"
+=======
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
+>>>>>>> 994eb25 (Migrate test infrastructure to go-elasticsearch v9 (#17737))
 )
 
 var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")

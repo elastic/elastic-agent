@@ -24,10 +24,14 @@ import (
 	"github.com/gofrs/uuid/v5"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
+=======
+	"github.com/elastic/go-elasticsearch/v9"
+>>>>>>> 994eb25 (Migrate test infrastructure to go-elasticsearch v9 (#17737))
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	semver "github.com/elastic/elastic-agent/pkg/version"
