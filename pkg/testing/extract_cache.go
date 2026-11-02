@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,17 +44,26 @@ const extractCacheHardlinkMinSize = 1 << 20
 // the job. With the cache the archive is inflated once and each fixture gets
 // its tree in well under a second.
 //
-// Large regular files are hard-linked, so they share an inode with the cached
-// tree and with every other fixture of the same archive. That is safe as long
-// as nothing writes to them in place, which holds for the test framework and
-// the tests: the fixture writes elastic-agent.yml, otel.yml and other small
-// files (private copies), removes spec files (unlink only affects this tree),
-// and prepareComponents removes a destination before copying a binary over it;
-// the agent itself only writes new files under data/ when run from the work
-// directory, and `elastic-agent install` copies the tree instead of modifying
-// it. Directories and symlinks are always recreated. A helper that needs to
-// modify a binary in place must remove it first or write a new file and rename
-// it over the old one.
+// On Linux and macOS large regular files are hard-linked, so they share an
+// inode with the cached tree and with every other fixture of the same archive.
+// That is safe as long as nothing writes to them in place, which holds for the
+// test framework and the tests: the fixture writes elastic-agent.yml, otel.yml
+// and other small files (private copies), removes spec files (unlink only
+// affects this tree), and prepareComponents removes a destination before
+// copying a binary over it; the agent itself only writes new files under data/
+// when run from the work directory, and `elastic-agent install` copies the
+// tree instead of modifying it. Directories and symlinks are always recreated.
+// A helper that needs to modify a binary in place must remove it first or
+// write a new file and rename it over the old one.
+//
+// On Windows every file is copied: the fixture cleanup goes through
+// install.RemovePath, which deletes an executable that is still running by
+// renaming its primary data stream into an alternate data stream
+// (removeBlockingExe). A data stream belongs to the file, not to the directory
+// entry, so with hard links that would empty the cached binary and every other
+// fixture's link to it; this is exactly what happened to
+// elastic-otel-collector.exe the first time a test's collector outlived the
+// test. Copying 1.3 GB per fixture still beats inflating it.
 type extractCache struct {
 	mu      sync.Mutex
 	root    string
@@ -67,6 +77,11 @@ type extractCacheEntry struct {
 }
 
 var sharedExtractCache = &extractCache{}
+
+// extractCacheHardlinks controls whether populateFromExtractCache hard-links
+// large files or copies everything. See the extractCache documentation for
+// why Windows must copy.
+var extractCacheHardlinks = runtime.GOOS != "windows"
 
 // extractCacheEnabled reports whether the extraction cache is in use.
 func extractCacheEnabled() bool {
@@ -188,9 +203,10 @@ func extractCacheKey(artifactFile string) (string, error) {
 
 // populateFromExtractCache recreates the tree under cacheDir in outputDir:
 // directories and symlinks are recreated, regular files of at least
-// extractCacheHardlinkMinSize are hard-linked (copied if the link fails, for
-// example across file systems) and smaller files are copied. Both trees are
-// accessed through an os.Root so no entry can escape either directory.
+// extractCacheHardlinkMinSize are hard-linked where extractCacheHardlinks
+// allows it (copied if the link fails, for example across file systems) and
+// everything else is copied. Both trees are accessed through an os.Root so no
+// entry can escape either directory.
 func populateFromExtractCache(cacheDir, outputDir string) error {
 	src, err := os.OpenRoot(cacheDir)
 	if err != nil {
@@ -226,7 +242,7 @@ func populateFromExtractCache(cacheDir, outputDir string) error {
 			}
 			return dst.Symlink(target, rel)
 		case mode.IsRegular():
-			if info.Size() >= extractCacheHardlinkMinSize {
+			if extractCacheHardlinks && info.Size() >= extractCacheHardlinkMinSize {
 				// os.Root cannot link across two roots. Both paths are the
 				// root directories joined with an entry name that was walked
 				// in one of them, so they cannot escape.
