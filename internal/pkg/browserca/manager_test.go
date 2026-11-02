@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -355,6 +356,82 @@ func TestReconcileLeavesTheDatabaseAloneOnReadErrors(t *testing.T) {
 	assert.Len(t, fake.nicknames(), 2, "a CA whose file was briefly unreadable must still be trusted")
 }
 
+func TestReconcileLeavesTheDatabaseAloneWhenADirectoryCantBeListed(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can list a directory whatever its mode")
+	}
+	m, fake, dir, _ := setup(t)
+	write(t, dir, "ca.pem", newCA(t, "ca"))
+	require.NoError(t, m.reconcile(t.Context()), "first sync")
+	fake.reset()
+
+	require.NoError(t, os.Chmod(dir, 0), "making the CA directory unreadable")
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	require.Error(t, m.reconcile(t.Context()), "a CA directory that can't be listed must fail the sync")
+	assert.Empty(t, fake.calls, "nothing may change while a CA directory can't be listed")
+	assert.Len(t, fake.nicknames(), 1, "the CA of a directory that can't be listed must stay trusted")
+}
+
+func TestReconcileAfterAFailedSyncComparesWithTheDatabase(t *testing.T) {
+	// A is applied, then replaced with B: B is imported but A can't be removed. When A
+	// comes back, the configuration equals what the last successful sync applied, yet
+	// B must still be removed from the database.
+	m, fake, dir, _ := setup(t)
+	a, b := newCA(t, "a"), newCA(t, "b")
+	write(t, dir, "ca.pem", a)
+	require.NoError(t, m.reconcile(t.Context()), "applying A")
+	nickA := fake.nicknames()[0]
+
+	write(t, dir, "ca.pem", b)
+	fake.fail = func(op string, _ []string) error {
+		if op == "-D" {
+			return errors.New("database is locked")
+		}
+		return nil
+	}
+	require.Error(t, m.reconcile(t.Context()), "replacing A with B must fail to remove A")
+	require.Len(t, fake.nicknames(), 2, "B imported, A still there")
+
+	fake.fail = nil
+	write(t, dir, "ca.pem", a)
+	require.NoError(t, m.reconcile(t.Context()), "restoring A")
+	assert.Equal(t, []string{nickA}, fake.nicknames(), "B must be removed once A is configured again")
+}
+
+func TestRunRetriesAFailedCleanupWithoutConfiguredPaths(t *testing.T) {
+	m, fake, dir, _ := setup(t)
+	write(t, dir, "ca.pem", newCA(t, "previous run"))
+	require.NoError(t, m.reconcile(t.Context()), "importing a CA in a previous run")
+
+	// Restart without any CA configured, with a cleanup that fails at first.
+	m.paths, m.applied = nil, nil
+	var mu sync.Mutex
+	broken := true
+	fake.fail = func(op string, _ []string) error {
+		mu.Lock()
+		defer mu.Unlock()
+		if broken && op == "-D" {
+			return errors.New("database is locked")
+		}
+		return nil
+	}
+	require.Error(t, m.reconcile(t.Context()), "the first cleanup must fail")
+
+	done := make(chan struct{})
+	go func() { m.run(t.Context(), testInterval); close(done) }()
+	mu.Lock()
+	broken = false
+	mu.Unlock()
+
+	assert.Eventually(t, func() bool { return len(fake.nicknames()) == 0 }, 5*time.Second, 10*time.Millisecond,
+		"a failed cleanup must be retried until it succeeds")
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "without configured paths, run must stop once the cleanup succeeded")
+	}
+}
+
 func TestRunRetriesAFailedSyncWithoutFileChanges(t *testing.T) {
 	m, fake, dir, _ := setup(t)
 	write(t, dir, "ca.pem", newCA(t, "ca"))
@@ -418,7 +495,10 @@ func TestRunStopsWithItsContext(t *testing.T) {
 func TestSyncChownsTheDatabase(t *testing.T) {
 	// Chowning to oneself works without root and proves the call is made.
 	m, _, dir, _ := setup(t)
-	m.owner = &owner{uid: os.Getuid(), gid: os.Getgid()}
+	cur, err := user.Current()
+	require.NoError(t, err, "current user")
+	_, m.owner, err = lookupBrowserUser(cur.Username)
+	require.NoError(t, err, "looking up the current user")
 	write(t, dir, "ca.pem", newCA(t, "ca"))
 
 	require.NoError(t, m.reconcile(t.Context()), "syncing as the database owner")
@@ -483,7 +563,9 @@ func TestLookupBrowserUser(t *testing.T) {
 	home, o, err := lookupBrowserUser(cur.Username)
 	require.NoError(t, err, "looking up an existing user")
 	assert.Equal(t, cur.HomeDir, home, "the browser's home is the user's home")
-	assert.Equal(t, &owner{uid: os.Getuid(), gid: os.Getgid()}, o, "owner")
+	require.NotNil(t, o, "owner")
+	assert.Equal(t, cur.Uid, strconv.FormatUint(uint64(o.uid), 10), "owner UID")
+	assert.Equal(t, cur.Gid, strconv.FormatUint(uint64(o.gid), 10), "owner GID")
 
 	home, o, err = lookupBrowserUser("")
 	require.NoError(t, err, "no configured user is not an error")

@@ -46,10 +46,15 @@ type logs interface {
 // runner runs certutil with the given standard input and arguments.
 type runner func(ctx context.Context, stdin []byte, args ...string) ([]byte, error)
 
-func execRunner(path string) runner {
+// execRunner runs the certutil at path, as o when it is set, so that certutil only
+// gets the access to the database that the browser has.
+func execRunner(path string, o *owner) runner {
 	return func(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
 		cmd := exec.CommandContext(ctx, path, args...)
 		cmd.Stdin = bytes.NewReader(stdin)
+		if o != nil {
+			runAs(cmd, o)
+		}
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return out, fmt.Errorf("certutil %s: %w: %s", args[0], err, bytes.TrimSpace(out))
@@ -58,10 +63,10 @@ func execRunner(path string) runner {
 	}
 }
 
-// owner is the user and group that must own the database, so a browser running as
-// another user can read it. Changing it requires running as root.
+// owner is the user and group the browser runs as when the agent runs as root. They
+// own the database, and certutil runs as them.
 type owner struct {
-	uid, gid int
+	uid, gid uint32
 }
 
 // manager imports the CAs found in a set of paths into an NSS database and keeps it in sync.
@@ -71,11 +76,11 @@ type manager struct {
 	// home is the browser's home directory; the database is <home>/.pki/nssdb.
 	home  string
 	certs runner
-	owner *owner // if set, owns the database after each sync
+	owner *owner // if set, owns the database; certs runs as it too
 	log   logs
 
 	// applied holds the certificates of the last successful sync, nil until one
-	// succeeds. A failed sync leaves it unchanged, so the change is retried.
+	// succeeds and after one fails, so that the next check reconciles again.
 	applied map[string][]byte
 }
 
@@ -84,38 +89,61 @@ func (m *manager) dbDir() string {
 }
 
 // files returns the PEM files in the configured paths, sorted and without duplicates.
-func (m *manager) files() []string {
+// A path that doesn't exist has no CA, but any other error is returned: a CA that is
+// configured but can't be listed must not be removed.
+func (m *manager) files() ([]string, error) {
 	var files []string
+	var errs []error
 	for _, p := range m.paths {
 		// Stat follows symlinks, which is how Kubernetes mounts Secrets.
 		info, err := os.Stat(p)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
+			errs = append(errs, err)
 			continue
 		}
 		if !info.IsDir() {
 			files = append(files, p)
 			continue
 		}
-		for _, pattern := range []string{"*.crt", "*.pem"} {
-			matches, _ := filepath.Glob(filepath.Join(p, pattern))
-			files = append(files, matches...)
+		entries, err := os.ReadDir(p)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		for _, e := range entries {
+			if ext := filepath.Ext(e.Name()); ext != ".crt" && ext != ".pem" {
+				continue
+			}
+			f := filepath.Join(p, e.Name())
+			info, err := os.Stat(f)
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				// A dangling symlink.
+			case err != nil:
+				errs = append(errs, err)
+			case info.Mode().IsRegular():
+				files = append(files, f)
+			}
 		}
 	}
-	files = slices.DeleteFunc(files, func(f string) bool {
-		info, err := os.Stat(f)
-		return err != nil || !info.Mode().IsRegular()
-	})
 	slices.Sort(files)
-	return slices.Compact(files)
+	return slices.Compact(files), errors.Join(errs...)
 }
 
 // certificates decodes the configured CAs, keyed by nickname. The nickname derives
 // from the decoded certificate, so reformatting a PEM or listing a CA twice never
 // renames or drops it.
 func (m *manager) certificates() (map[string][]byte, error) {
+	files, err := m.files()
+	if err != nil {
+		return nil, err
+	}
 	want := map[string][]byte{}
 	var errs []error
-	for _, f := range m.files() {
+	for _, f := range files {
 		data, err := os.ReadFile(f)
 		if err != nil {
 			errs = append(errs, err)
@@ -150,9 +178,8 @@ func (m *manager) certificates() (map[string][]byte, error) {
 func (m *manager) reconcile(ctx context.Context) error {
 	want, err := m.certificates()
 	if err != nil {
-		// Leave the database alone until every CA file can be read: syncing a partial
-		// set would remove the unreadable files' CAs, and once they are readable again
-		// nothing would differ from the last successful sync to bring them back.
+		// Leave the database alone until every CA file can be listed and read: syncing a
+		// partial set would remove the CAs of the files that can't be.
 		return fmt.Errorf("reading CA files: %w", err)
 	}
 	if m.applied != nil && maps.EqualFunc(want, m.applied, bytes.Equal) {
@@ -163,6 +190,9 @@ func (m *manager) reconcile(ctx context.Context) error {
 		return nil
 	}
 	if err := m.sync(ctx, want); err != nil {
+		// The failed sync may have changed the database already: compare with it again
+		// next time, not with what the last successful sync applied.
+		m.applied = nil
 		return err
 	}
 	m.applied = want
@@ -177,11 +207,11 @@ func (m *manager) hasDB() bool {
 // managed ones it no longer wants. Certificates already in the database are never
 // touched, so running browsers see no gap.
 func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
+	if err := m.prepareDBDir(); err != nil {
+		return err
+	}
 	db := m.dbDir()
 	dbArg := "sql:" + db
-	if err := os.MkdirAll(db, 0o700); err != nil {
-		return fmt.Errorf("creating %s: %w", db, err)
-	}
 	if _, err := os.Stat(filepath.Join(db, "cert9.db")); err != nil {
 		if _, err := m.certs(ctx, nil, "-N", "-d", dbArg, "--empty-password"); err != nil {
 			return fmt.Errorf("creating NSS database: %w", err)
@@ -225,13 +255,6 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 		removed++
 	}
 
-	// The browser may run as another user: it must be able to read the database.
-	if m.owner != nil {
-		if err := chownTree(filepath.Join(m.home, ".pki"), m.owner); err != nil {
-			errs = append(errs, fmt.Errorf("changing the database owner: %w", err))
-		}
-	}
-
 	if err := errors.Join(errs...); err != nil {
 		return err
 	}
@@ -241,7 +264,36 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 	return nil
 }
 
-// run reconciles every interval until ctx is done.
+// prepareDBDir creates the database directory and, when the browser runs as another
+// user, gives it .pki: the agent may have taken ownership of its home at startup. It
+// works through a Root anchored at the home, so that a symlink in .pki, which the
+// browser user controls, can't lead it anywhere else. certutil then runs as that user.
+func (m *manager) prepareDBDir() error {
+	root, err := os.OpenRoot(m.home)
+	if err != nil {
+		return fmt.Errorf("opening the browser home: %w", err)
+	}
+	defer root.Close()
+	if err := root.MkdirAll(filepath.Join(".pki", "nssdb"), 0o700); err != nil {
+		return fmt.Errorf("creating the database directory: %w", err)
+	}
+	if m.owner == nil {
+		return nil
+	}
+	err = fs.WalkDir(root.FS(), ".pki", func(path string, _ fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		return root.Lchown(path, int(m.owner.uid), int(m.owner.gid))
+	})
+	if err != nil {
+		return fmt.Errorf("changing the database owner: %w", err)
+	}
+	return nil
+}
+
+// run reconciles every interval until ctx is done. Without configured paths there is
+// nothing to watch: it only retries a failed cleanup, and stops once one succeeds.
 func (m *manager) run(ctx context.Context, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -253,21 +305,10 @@ func (m *manager) run(ctx context.Context, interval time.Duration) {
 		}
 		if err := m.reconcile(ctx); err != nil {
 			m.log.Warnf("custom CA certificates not updated, will retry: %v", err)
+			continue
+		}
+		if len(m.paths) == 0 {
+			return
 		}
 	}
-}
-
-func chownTree(dir string, o *owner) error {
-	// Walk through a Root so symlinks can't lead the chown outside of dir.
-	root, err := os.OpenRoot(dir)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
-	return fs.WalkDir(root.FS(), ".", func(path string, _ fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		return root.Lchown(path, o.uid, o.gid)
-	})
 }

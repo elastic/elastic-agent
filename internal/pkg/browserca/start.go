@@ -50,7 +50,7 @@ func Start(ctx context.Context, log *logger.Logger, cfg Config) {
 	}
 	certutil, err := exec.LookPath("certutil")
 	if err != nil {
-		if len(m.files()) > 0 {
+		if files, _ := m.files(); len(files) > 0 {
 			log.Warnf("certutil not found, the custom CAs for browser monitors are not imported")
 		}
 		return
@@ -58,17 +58,19 @@ func Start(ctx context.Context, log *logger.Logger, cfg Config) {
 	if setHome {
 		_ = os.Setenv("HOME", m.home)
 	}
-	m.certs = execRunner(certutil)
+	m.certs = execRunner(certutil, m.owner)
 
-	reload := cfg.CertificateReload.IsEnabled() && len(m.paths) > 0
-	if err := m.reconcile(ctx); err != nil {
+	reload := cfg.CertificateReload.IsEnabled()
+	err = m.reconcile(ctx)
+	if err != nil {
 		if reload {
 			log.Warnf("custom CA certificates not imported, will retry: %v", err)
 		} else {
 			log.Warnf("custom CA certificates not imported: %v", err)
 		}
 	}
-	if reload {
+	// Without configured paths there is nothing to watch, only a failed cleanup to retry.
+	if reload && (len(m.paths) > 0 || err != nil) {
 		interval := cfg.CertificateReload.ReloadInterval
 		if interval <= 0 {
 			interval = defaultInterval
@@ -138,10 +140,10 @@ func lookupBrowserUser(name string) (string, *owner, error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("looking up %s: %w", browserUserEnv, err)
 	}
-	uid, errUID := strconv.Atoi(u.Uid)
-	gid, errGID := strconv.Atoi(u.Gid)
+	uid, errUID := strconv.ParseUint(u.Uid, 10, 32)
+	gid, errGID := strconv.ParseUint(u.Gid, 10, 32)
 	if errUID != nil || errGID != nil {
-		return u.HomeDir, nil, fmt.Errorf("user %s has a non-numeric uid %q or gid %q", name, u.Uid, u.Gid)
+		return u.HomeDir, nil, fmt.Errorf("user %s has an invalid uid %q or gid %q", name, u.Uid, u.Gid)
 	}
-	return u.HomeDir, &owner{uid: uid, gid: gid}, nil
+	return u.HomeDir, &owner{uid: uint32(uid), gid: uint32(gid)}, nil
 }
