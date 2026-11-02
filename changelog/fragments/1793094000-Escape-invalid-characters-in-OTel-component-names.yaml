@@ -1,4 +1,0 @@
-kind: bug-fix
-summary: Fix the otel collector rejecting its configuration when an input ID contains whitespace or symbols
-component: elastic-agent
-issue: https://github.com/elastic/elastic-agent/issues/17590
