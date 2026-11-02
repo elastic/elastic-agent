@@ -9,9 +9,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
+	"fmt"
+	"hash/crc32"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -137,7 +143,20 @@ func newTestExtractCache(t *testing.T) *extractCache {
 	return c
 }
 
+// withHardlinks runs the test with the hard-link population mode forced on or
+// off, independent of the platform default.
+func withHardlinks(t *testing.T, enabled bool) {
+	t.Helper()
+	old := extractCacheHardlinks
+	extractCacheHardlinks = enabled
+	t.Cleanup(func() { extractCacheHardlinks = old })
+}
+
 func TestExtractArtifactCached_TarGz(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("hard links are not used on Windows, see TestExtractArtifactCached_CopyMode")
+	}
+	withHardlinks(t, true)
 	c := newTestExtractCache(t)
 	archive := filepath.Join(t.TempDir(), "elastic-agent-9.9.9-linux-x86_64.tar.gz")
 	writeTestTarGz(t, archive)
@@ -262,8 +281,13 @@ func TestExtractRealArchiveTiming(t *testing.T) {
 	t.Cleanup(func() { _ = RemoveExtractCache() })
 
 	start := time.Now()
-	require.NoError(t, ExtractArtifact(t, archive, t.TempDir()))
+	direct := t.TempDir()
+	require.NoError(t, ExtractArtifact(t, archive, direct))
 	t.Logf("direct extraction: %s", time.Since(start).Round(time.Millisecond))
+	if strings.HasSuffix(archive, ".zip") {
+		assertZipExtracted(t, archive, direct)
+		t.Logf("all extracted files match the zip central directory (size and CRC32)")
+	}
 
 	start = time.Now()
 	require.NoError(t, extractArtifactCached(t, archive, t.TempDir()))
@@ -272,6 +296,139 @@ func TestExtractRealArchiveTiming(t *testing.T) {
 	start = time.Now()
 	require.NoError(t, extractArtifactCached(t, archive, t.TempDir()))
 	t.Logf("second cached extraction (populate only): %s", time.Since(start).Round(time.Millisecond))
+}
+
+// TestExtractArtifactCached_CopyMode is the population mode used on Windows:
+// nothing is hard-linked, so cleanup tricks that operate on a file's data
+// (install.RemovePath renaming a running executable's data stream into an
+// alternate data stream) only ever affect one fixture.
+func TestExtractArtifactCached_CopyMode(t *testing.T) {
+	withHardlinks(t, false)
+	c := newTestExtractCache(t)
+	archive := filepath.Join(t.TempDir(), "elastic-agent-9.9.9-linux-x86_64.tar.gz")
+	writeTestTarGz(t, archive)
+
+	out1 := t.TempDir()
+	require.NoError(t, extractArtifactCached(t, archive, out1))
+	assertExtractedTree(t, out1, true)
+	out2 := t.TempDir()
+	require.NoError(t, extractArtifactCached(t, archive, out2))
+	assertExtractedTree(t, out2, true)
+
+	entries, err := os.ReadDir(c.root)
+	require.NoError(t, err)
+	require.Len(t, entries, 1)
+	cached := filepath.Join(c.root, entries[0].Name())
+	bigRel := filepath.FromSlash("elastic-agent-9.9.9/data/elastic-agent-abcdef/elastic-agent")
+	assert.False(t, sameFile(t, filepath.Join(cached, bigRel), filepath.Join(out1, bigRel)), "large file must be a copy")
+	assert.False(t, sameFile(t, filepath.Join(out1, bigRel), filepath.Join(out2, bigRel)), "fixtures must not share files")
+
+	// emptying the binary in one fixture (what the ADS trick does to a running
+	// executable on Windows) leaves the cache and the other fixture intact
+	require.NoError(t, os.Truncate(filepath.Join(out1, bigRel), 0))
+	for _, p := range []string{filepath.Join(cached, bigRel), filepath.Join(out2, bigRel)} {
+		info, err := os.Stat(p)
+		require.NoError(t, err)
+		assert.Greater(t, info.Size(), int64(extractCacheHardlinkMinSize), p)
+	}
+}
+
+// writeRandomZip writes a zip with the given entries (name -> size); the
+// content is random so that CRC mismatches are detectable. Names may repeat,
+// in which case the later entry has different content.
+func writeRandomZip(t *testing.T, path string, entries []struct {
+	name string
+	size int
+}) {
+	t.Helper()
+	f, err := os.Create(path)
+	require.NoError(t, err)
+	defer f.Close()
+	zw := zip.NewWriter(f)
+	for _, e := range entries {
+		hdr := &zip.FileHeader{Name: e.name, Method: zip.Deflate}
+		if strings.HasSuffix(e.name, "/") {
+			hdr.SetMode(0o755 | os.ModeDir)
+			_, err := zw.CreateHeader(hdr)
+			require.NoError(t, err)
+			continue
+		}
+		hdr.SetMode(0o644)
+		w, err := zw.CreateHeader(hdr)
+		require.NoError(t, err)
+		buf := make([]byte, e.size)
+		_, err = rand.Read(buf)
+		require.NoError(t, err)
+		_, err = w.Write(buf)
+		require.NoError(t, err)
+	}
+	require.NoError(t, zw.Close())
+}
+
+// assertZipExtracted checks that every regular file under dir has the size
+// and CRC32 of the archive's last entry with that name, and that nothing else
+// was extracted.
+func assertZipExtracted(t *testing.T, archive, dir string) {
+	t.Helper()
+	r, err := zip.OpenReader(archive)
+	require.NoError(t, err)
+	defer r.Close()
+	want := make(map[string]*zip.File)
+	for _, f := range r.File {
+		if !f.FileInfo().Mode().IsDir() {
+			want[f.Name] = f // last entry wins, as in sequential extraction
+		}
+	}
+	root, err := os.OpenRoot(dir)
+	require.NoError(t, err)
+	defer root.Close()
+	got := 0
+	err = fs.WalkDir(root.FS(), ".", func(rel string, d fs.DirEntry, err error) error {
+		require.NoError(t, err)
+		if d.IsDir() {
+			return nil
+		}
+		f, ok := want[rel]
+		require.True(t, ok, "unexpected file %s", rel)
+		got++
+		fh, err := root.Open(rel)
+		require.NoError(t, err)
+		defer fh.Close()
+		h := crc32.NewIEEE()
+		n, err := io.Copy(h, fh)
+		require.NoError(t, err)
+		assert.Equal(t, f.UncompressedSize64, uint64(n), "size of %s", rel) //nolint:gosec // G115: n is a non-negative byte count
+		assert.Equal(t, f.CRC32, h.Sum32(), "crc of %s", rel)
+		return nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, len(want), got, "number of extracted files")
+}
+
+// TestUnzipLargeAndDuplicateEntries extracts a zip with more entries than
+// workers, one entry larger than 8 MiB and a name that appears twice, through
+// the parallel unzip and verifies every file against the central directory.
+func TestUnzipLargeAndDuplicateEntries(t *testing.T) {
+	type entry = struct {
+		name string
+		size int
+	}
+	entries := []entry{{name: "pkg/", size: 0}, {name: "pkg/components/", size: 0}}
+	entries = append(entries, entry{name: "pkg/components/big.bin", size: 9 << 20})
+	// first occurrence of the duplicate, with content that must not survive
+	entries = append(entries, entry{name: "pkg/components/dup.bin", size: 3 << 20})
+	for i := 0; i < 40; i++ {
+		entries = append(entries, entry{name: fmt.Sprintf("pkg/components/small-%02d.txt", i), size: 1 + i*1000})
+	}
+	// last occurrence of the duplicate: this is what must be on disk
+	entries = append(entries, entry{name: "pkg/components/dup.bin", size: 2 << 20})
+	entries = append(entries, entry{name: "pkg/medium.bin", size: 1 << 20})
+
+	archive := filepath.Join(t.TempDir(), "elastic-agent-9.9.9-windows-x86_64.zip")
+	writeRandomZip(t, archive, entries)
+	out := t.TempDir()
+	require.NoError(t, unzip(archive, out))
+	assertZipExtracted(t, archive, out)
 }
 
 func sameFile(t *testing.T, a, b string) bool {

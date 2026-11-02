@@ -273,7 +273,13 @@ func unzip(archivePath string, extractDir string) error {
 
 	// Directories first and sequentially, so that the parallel file extraction
 	// below never races on creating a parent directory with a specific mode.
+	//
+	// An archive can list the same name more than once (the agent tar.gz does,
+	// for endpoint-security-resources.zip). Sequential extraction let the last
+	// entry win; two workers writing the same file concurrently would produce
+	// garbage, so keep only the last entry per name.
 	var files []*zip.File
+	lastByName := make(map[string]int)
 	for _, f := range r.File {
 		if f.FileInfo().Mode().IsDir() {
 			if err := unpackFile(f); err != nil {
@@ -281,6 +287,11 @@ func unzip(archivePath string, extractDir string) error {
 			}
 			continue
 		}
+		if i, seen := lastByName[f.Name]; seen {
+			files[i] = f
+			continue
+		}
+		lastByName[f.Name] = len(files)
 		files = append(files, f)
 	}
 
