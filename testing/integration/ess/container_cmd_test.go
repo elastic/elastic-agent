@@ -763,7 +763,7 @@ func TestContainerCMDAgentMonitoringRuntimeExperimentalPolicy(t *testing.T) {
 	}
 }
 
-func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath string) {
+func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath string, tags ...string) {
 	agentPolicyBuilder := strings.Builder{}
 	tmpl, err := template.New(t.Name() + "custom-log-policy").Parse(integration.PolicyJSON)
 	if err != nil {
@@ -776,6 +776,7 @@ func addLogIntegration(t *testing.T, info *define.Info, policyID, logFilePath st
 		LogFilePath: logFilePath,
 		Dataset:     "logs",
 		Namespace:   info.Namespace,
+		Tags:        tags,
 	})
 	if err != nil {
 		t.Fatalf("could not render template: %s", err)

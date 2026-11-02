@@ -73,28 +73,35 @@ func TestCheckinExpected(t *testing.T) {
 	pair, err := ca.GeneratePair()
 	require.NoError(t, err, "could not create certificate pair from CA")
 	test := runtimeComm{
-		listenAddr: "localhost",
-		ca:         ca,
-		name:       "a_name",
-		token:      "a_token",
-		cert:       pair,
-		agentInfo: agentInfoMock{
-			agentID:      "testagent",
-			snapshot:     true,
-			version:      "8.13.0+build1966-09-6",
-			unprivileged: true,
-		},
+		listenAddr:            "localhost",
+		ca:                    ca,
+		name:                  "a_name",
+		token:                 "a_token",
+		cert:                  pair,
 		checkinExpected:       make(chan *proto.CheckinExpected, 1),
 		checkinObserved:       make(chan *proto.CheckinObserved),
 		initCheckinObservedMx: sync.Mutex{},
 	}
 
-	expected := &proto.CheckinExpected{}
+	expected := &proto.CheckinExpected{
+		AgentInfo: &proto.AgentInfo{
+			Id:           "testagent",
+			Snapshot:     true,
+			Version:      "8.13.0+build1966-09-6",
+			Unprivileged: true,
+			Tags:         []string{"production"},
+		},
+	}
 	observed := &proto.CheckinObserved{}
 	test.CheckinExpected(expected, observed)
 
 	got := <-test.checkinExpected
-	require.True(t, got.AgentInfo.Unprivileged)
+	gotAgentInfo := got.GetAgentInfo()
+	require.Equal(t, "testagent", gotAgentInfo.GetId())
+	require.True(t, gotAgentInfo.GetSnapshot())
+	require.Equal(t, "8.13.0+build1966-09-6", gotAgentInfo.GetVersion())
+	require.True(t, gotAgentInfo.GetUnprivileged())
+	require.Equal(t, []string{"production"}, gotAgentInfo.GetTags())
 	t.Logf("got : %#v", got)
 
 }

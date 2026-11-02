@@ -23,8 +23,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [xcode-27]
-    name: macos-unit-tests (${{ matrix.os }})
+        os: [macos-15-intel, xcode-27]
+        mage_target: ["test:unit", "test:unitEdot"]
+    name: macos-unit-tests (${{ matrix.os }}, ${{ matrix.mage_target }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -46,7 +47,5 @@ jobs:
       - name: Install mage
         run: make mage
 
-      # test:all runs the unit tests of the root module and of the
-      # internal/edot module.
-      - name: mage test:all
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage test:all
+      - name: mage ${{ matrix.mage_target }}
+        run: RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}

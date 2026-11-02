@@ -15,7 +15,7 @@ of the root Go module; configuration is loaded through
 mage env settings. Root mage targets call package functions directly.
 
 **Workflows supported:**
-1. **Major/Minor Release (feature-freeze)** — Creates release branch + 3 grouped PRs
+1. **Major/Minor Release (feature-freeze)** — Creates release branch + 2 grouped PRs (next-patch bumps belong to the patch workflow)
 2. **Patch Release** — Creates 2 grouped PRs on the release branch (docs before build; next-patch version + Helm/K8s manifests after release)
 
 Release notes are handled separately via `.github/workflows/release-notes.yml`.
@@ -29,7 +29,7 @@ Release notes are handled separately via `.github/workflows/release-notes.yml`.
 
 ## Quick Start
 
-### Feature freeze (`runMajorMinor`) — 3 PRs
+### Feature freeze (`runMajorMinor`) — 2 PRs
 
 ```bash
 export CURRENT_RELEASE="9.5.0"

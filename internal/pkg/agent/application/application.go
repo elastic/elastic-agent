@@ -111,6 +111,9 @@ func New(
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
+	if err := upgrade.CleanupDiskSpaceReservations(cfg.Settings.DownloadConfig.TargetDirectory); err != nil {
+		log.Warnf("Error cleaning upgrade disk space reservations: %s", err)
+	}
 	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), availableRollbacksSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)

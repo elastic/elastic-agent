@@ -145,6 +145,11 @@ exporters:
       logs: Beta
       metrics: Stable
       traces: Stable
+  - name: prometheus_remote_write
+    stability:
+      logs: Undefined
+      metrics: Beta
+      traces: Undefined
 connectors:
   - name: routing
     stability:

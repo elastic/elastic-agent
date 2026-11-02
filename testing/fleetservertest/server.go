@@ -90,6 +90,11 @@ type Handlers struct {
 		h *Handlers,
 		uploadID string,
 		uploadCompleteRequest UploadCompleteRequest) *HTTPError
+
+	PGPKeyFn func(
+		ctx context.Context,
+		h *Handlers,
+		version string) ([]byte, *HTTPError)
 }
 
 type Route struct {
@@ -199,6 +204,32 @@ func (h *Handlers) Routes() []Route {
 			AuthKey: h.APIKey,
 			Handler: http.HandlerFunc(h.UploadComplete),
 		},
+		{
+			Name:    "PGPKey",
+			Method:  http.MethodGet,
+			Pattern: PathPGPKey,
+			Handler: http.HandlerFunc(h.PGPKey),
+		},
+	}
+}
+
+func (h *Handlers) PGPKey(w http.ResponseWriter, r *http.Request) {
+	if h.PGPKeyFn == nil {
+		err := &HTTPError{StatusCode: http.StatusNotImplemented,
+			Message: "pgp key Handlers not implemented"}
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
+
+	key, err := h.PGPKeyFn(r.Context(), h, mux.Vars(r)["version"])
+	if err != nil {
+		respondAsJSON(err.StatusCode, err, w)
+		return
+	}
+
+	if _, werr := w.Write(key); werr != nil {
+		//nolint:forbidigo // it's to be used in tests
+		fmt.Printf("could not write response body: %v\n", werr)
 	}
 }
 

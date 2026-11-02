@@ -5,28 +5,28 @@
 package translate
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/require"
-
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 
@@ -34,6 +34,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -228,7 +229,7 @@ func TestGetSignalForComponent(t *testing.T) {
 }
 
 func TestGetOtelConfig(t *testing.T) {
-	agentInfo := &info.AgentInfo{}
+	agentInfo := &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}}
 	auditbeatInputConfig := map[string]any{
 		"id":         "test",
 		"use_output": "default",
@@ -408,7 +409,12 @@ func TestGetOtelConfig(t *testing.T) {
 
 	expectedExtensionConfig := func(extra ...extraParams) map[string]any {
 		finalOutput := map[string]any{
+			"auth": map[string]any{
+				"password": "password",
+				"username": "elastic",
+			},
 			"continue_on_error":       true,
+			"endpoints":               []string{"http://localhost:9200"},
 			"idle_connection_timeout": "3s",
 			"proxy_disable":           false,
 			"proxy_url":               "https://example.com",
@@ -448,6 +454,7 @@ func TestGetOtelConfig(t *testing.T) {
 	expectedESConfig := func(outputName string) map[string]any {
 		return map[string]any{
 			"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
+			"version_detection":         map[string]any{"enabled": false},
 			"compression":               "gzip",
 			"compression_params": map[string]any{
 				"level": 1,
@@ -502,12 +509,13 @@ func TestGetOtelConfig(t *testing.T) {
 						"type":      namespace,
 					},
 					"elastic_agent": mapstr.M{
-						"id":       agentInfo.AgentID(),
-						"snapshot": agentInfo.Snapshot(),
-						"version":  agentInfo.Version(),
+						"id":       agentInfo.GetId(),
+						"snapshot": agentInfo.GetSnapshot(),
+						"version":  agentInfo.GetVersion(),
 					},
 					"input_id":  "test",
 					"stream_id": streamId,
+					"tags":      agentInfo.GetTags(),
 				},
 			},
 		}
@@ -592,6 +600,9 @@ func TestGetOtelConfig(t *testing.T) {
 	// expects component id
 	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
 		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
+		cfg["monitor_state"] = map[string]any{
+			"elasticsearch": "beatsauth/_agent-component/default",
+		}
 		cfg["heartbeat"] = map[string]any{
 			"monitors": []map[string]any{
 				{
@@ -816,6 +827,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -873,6 +885,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -927,6 +940,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -986,6 +1000,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "logstash",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1109,6 +1124,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "kafka",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1219,6 +1235,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "kafka",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1328,6 +1345,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "kafka",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1435,6 +1453,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "kafka",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1474,6 +1493,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "kafka",
 						OutputName: "monitoring",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1676,6 +1696,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1702,6 +1723,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1765,6 +1787,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "beat/metrics",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1865,6 +1888,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "system/metrics",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -1976,6 +2000,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "audit/auditd",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -2031,6 +2056,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "synthetics/http",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -2065,7 +2091,9 @@ func TestGetOtelConfig(t *testing.T) {
 					"heartbeatreceiver/_agent-component/heartbeat-default/heartbeat-unit-test-1": expectedHeartbeatReceiverConfig("heartbeat-default"),
 				},
 				"service": map[string]any{
-					"extensions": []any{"beatsauth/_agent-component/default"},
+					"extensions": []any{
+						"beatsauth/_agent-component/default",
+					},
 					"pipelines": map[string]any{
 						"logs/_agent-component/heartbeat-default": map[string][]string{
 							"exporters": {"elasticsearch/_agent-component/default"},
@@ -2084,6 +2112,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "osquery",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -2139,6 +2168,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "osquery",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -2196,6 +2226,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "packet",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -2251,6 +2282,7 @@ func TestGetOtelConfig(t *testing.T) {
 						InputType:  "filestream",
 						OutputType: "elasticsearch",
 						OutputName: "default",
+						AgentInfo:  agentInfo,
 						InputSpec: &component.InputRuntimeSpec{
 							BinaryName: "elastic-otel-collector",
 							Spec: component.InputSpec{
@@ -2333,7 +2365,7 @@ func TestGetOtelConfig(t *testing.T) {
 				}))
 				require.NoError(t, err)
 			}
-			actualConf, actualError := GetOtelConfig(tt.model, agentInfo, logp.NewNopLogger())
+			actualConf, actualError := GetOtelConfig(tt.model, logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -2823,10 +2855,45 @@ func applyDefaultProcessorFlags(t *testing.T, f features.DefaultProcessors) {
 	})))
 }
 
-func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
-	agentInfo, err := info.NewAgentInfo(context.Background(), false)
+func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
+	t.Cleanup(fbfeatures.ReinitForTest)
+	t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "filestream")
+	fbfeatures.ReinitForTest()
+
+	const outputName = "state"
+	model := &component.Model{
+		Components: []component.Component{
+			testFilebeatComp("filestream-state", outputName),
+		},
+	}
+
+	conf, err := GetOtelConfig(model, logp.NewNopLogger())
 	require.NoError(t, err)
 
+	configMap := conf.ToStringMap()
+	extensions := configMap["extensions"].(map[string]any)
+	beatsAuth := extensions["beatsauth/_agent-component/state"].(map[string]any)
+	assert.Equal(t, []string{"http://localhost:9200"}, beatsAuth["endpoints"])
+	assert.Equal(t, map[string]any{
+		"auth": map[string]any{
+			"authenticator": "beatsauth/_agent-component/state",
+		},
+	}, extensions[elasticsearchStateStoreExtensionName])
+
+	service := configMap["service"].(map[string]any)
+	assert.Equal(t, []any{
+		"beatsauth/_agent-component/state",
+		elasticsearchStateStoreExtensionName,
+	}, service["extensions"])
+
+	receivers := configMap["receivers"].(map[string]any)
+	for _, receiver := range receivers {
+		receiverConfig := receiver.(map[string]any)
+		assert.Equal(t, elasticsearchStateStoreExtensionName, receiverConfig["storage"])
+	}
+}
+
+func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 	filebeatComp := testFilebeatComp("filestream-default", "default")
 
 	t.Run("global add_cloud_metadata disabled", func(t *testing.T) {
@@ -2836,7 +2903,7 @@ func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 		})
 
 		model := &component.Model{Components: []component.Component{filebeatComp}}
-		conf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, logp.NewNopLogger())
 		require.NoError(t, err)
 
 		names := processorNamesFromOtelConfig(t, conf, "filestream-default")
@@ -2854,7 +2921,7 @@ func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 		})
 
 		model := &component.Model{Components: []component.Component{filebeatComp}}
-		conf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, logp.NewNopLogger())
 		require.NoError(t, err)
 
 		m := conf.ToStringMap()
@@ -2871,15 +2938,12 @@ func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 }
 
 func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
-	agentInfo, err := info.NewAgentInfo(context.Background(), false)
-	require.NoError(t, err)
-
 	t.Run("per-output enabled:false disables all processors for that output", func(t *testing.T) {
 		comp := testFilebeatComp("filestream-default", "default", map[string]any{
 			"default_processors": map[string]any{"enabled": false},
 		})
 		model := &component.Model{Components: []component.Component{comp}}
-		conf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, logp.NewNopLogger())
 		require.NoError(t, err)
 
 		m := conf.ToStringMap()
@@ -2899,7 +2963,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 			},
 		})
 		model := &component.Model{Components: []component.Component{comp}}
-		conf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, logp.NewNopLogger())
 		require.NoError(t, err)
 
 		names := processorNamesFromOtelConfig(t, conf, "filestream-default")
@@ -2918,7 +2982,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 		compB := testFilebeatComp("filestream-outputB", "outputB")
 
 		model := &component.Model{Components: []component.Component{compA, compB}}
-		conf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, logp.NewNopLogger())
 		require.NoError(t, err)
 
 		namesA := processorNamesFromOtelConfig(t, conf, "filestream-outputA")
@@ -2942,7 +3006,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 			},
 		})
 		model := &component.Model{Components: []component.Component{comp}}
-		conf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, logp.NewNopLogger())
 		require.NoError(t, err)
 
 		names := processorNamesFromOtelConfig(t, conf, "filestream-default")
@@ -2953,8 +3017,6 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 }
 
 func TestGetReceiversConfigForComponent(t *testing.T) {
-	testAgentInfo := &info.AgentInfo{}
-
 	// Create proper component configurations that match existing test patterns
 	filebeatComponent := &component.Component{
 		ID:        "filebeat-test-id",
@@ -3330,7 +3392,7 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		component          *component.Component
 		outputQueueConfig  map[string]any
 		expectedError      string
-		expectedReceiverID string // full receiver ID, empty for no-inputs case
+		expectedReceiverID string // full receiver ID; must be non-empty unless expectedError is set
 		expectedBeatName   string
 		verifyBeatConfig   func(t *testing.T, beatConfig map[string]any)
 	}{
@@ -3468,65 +3530,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			expectedBeatName:   "packetbeat",
 		},
 		{
-			name: "component with no input units",
-			component: &component.Component{
-				ID:        "no-inputs-test-id",
-				InputType: "filestream",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "elastic-otel-collector",
-					Spec: component.InputSpec{
-						Name: "filestream",
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:   "output-unit",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-			outputQueueConfig: nil,
-			// No expectedReceiverID - no inputs means no receivers
-		},
-		{
-			name: "input unit with nil config is skipped without panic",
-			component: &component.Component{
-				ID:        "nil-config-test-id",
-				InputType: "filestream",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "elastic-otel-collector",
-					Spec: component.InputSpec{
-						Name: "filestream",
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:     "input-unit",
-						Type:   client.UnitTypeInput,
-						Config: nil,
-					},
-					{
-						ID:   "output-unit",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type": "elasticsearch",
-						}),
-					},
-				},
-			},
-			outputQueueConfig: nil,
-			// No expectedReceiverID - nil config input is skipped
-		},
-		{
 			name: "unsupported component type",
 			component: &component.Component{
 				ID:        "unsupported-test-id",
@@ -3541,7 +3544,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := getReceiversConfigForComponent(
 				tt.component,
-				testAgentInfo,
 				tt.outputQueueConfig,
 				GetDefaultProcessors(tt.component.BeatName()),
 			)
@@ -3555,12 +3557,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.NotNil(t, result)
-
-			// Component with no inputs produces no receivers
-			if tt.expectedReceiverID == "" {
-				assert.Empty(t, result)
-				return
-			}
 
 			// Verify the receiver ID is present
 			assert.Contains(t, result, tt.expectedReceiverID)
@@ -3596,6 +3592,209 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 	}
 }
 
+func TestGetReceiversConfigForComponentHeartbeatElasticsearchAuth(t *testing.T) {
+	newHeartbeatComponent := func(outputType string, singleReceiver bool) *component.Component {
+		return &component.Component{
+			ID:         "heartbeat-auth-test-id",
+			InputType:  "synthetics/http",
+			OutputType: outputType,
+			OutputName: "default",
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "elastic-otel-collector",
+				Spec: component.InputSpec{
+					Name: "synthetics/http",
+					Command: &component.CommandSpec{
+						Args: []string{"heartbeat"},
+					},
+					SingleReceiver: singleReceiver,
+				},
+			},
+			Units: []component.Unit{
+				{
+					ID:   "heartbeat-auth-test-id-unit",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]any{
+						"id":         "test",
+						"use_output": "default",
+						"type":       "synthetics/http",
+						"streams": []any{
+							map[string]any{
+								"id": "http-1",
+								"data_stream": map[string]any{
+									"dataset": "synthetics.http",
+								},
+								"urls":     []any{"https://example.com/one"},
+								"schedule": "@every 5s",
+							},
+							map[string]any{
+								"id": "http-2",
+								"data_stream": map[string]any{
+									"dataset": "synthetics.http",
+								},
+								"urls":     []any{"https://example.com/two"},
+								"schedule": "@every 10s",
+							},
+						},
+					}),
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name                string
+		outputType          string
+		singleReceiver      bool
+		expectedReceiverIDs []string
+		expectedAuth        string
+	}{
+		{
+			name:           "elasticsearch per-stream receivers",
+			outputType:     "elasticsearch",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+			expectedAuth: "beatsauth/_agent-component/default",
+		},
+		{
+			name:           "elasticsearch single receiver",
+			outputType:     "elasticsearch",
+			singleReceiver: true,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/single",
+			},
+			expectedAuth: "beatsauth/_agent-component/default",
+		},
+		{
+			name:           "logstash",
+			outputType:     "logstash",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+		},
+		{
+			name:           "kafka",
+			outputType:     "kafka",
+			singleReceiver: false,
+			expectedReceiverIDs: []string{
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-1",
+				"heartbeatreceiver/_agent-component/heartbeat-auth-test-id/unit-http-2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(
+				newHeartbeatComponent(tt.outputType, tt.singleReceiver),
+				nil,
+				nil,
+			)
+			require.NoError(t, err, "heartbeat receiver translation must succeed")
+			require.Len(t, result, len(tt.expectedReceiverIDs), "translation must generate the expected receiver count")
+
+			for _, receiverID := range tt.expectedReceiverIDs {
+				require.Contains(t, result, receiverID, "translation must generate receiver %q", receiverID)
+			}
+
+			for receiverID, rawConfig := range result {
+				receiverConfig, ok := rawConfig.(map[string]any)
+				require.True(t, ok, "receiver %q config must be a map", receiverID)
+				if tt.expectedAuth == "" {
+					assert.NotContains(t, receiverConfig, "monitor_state", "receiver %q must omit monitor state for %s output", receiverID, tt.outputType)
+					continue
+				}
+				monitorState, ok := receiverConfig["monitor_state"].(map[string]any)
+				require.True(t, ok, "receiver %q monitor state config must be a map", receiverID)
+				assert.Equal(t, tt.expectedAuth, monitorState["elasticsearch"], "receiver %q must reference the output-scoped Elasticsearch auth extension", receiverID)
+			}
+		})
+	}
+}
+
+// TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
+// enabled streams (either no input units, or input units with nil config) falls back to
+// a no-op receiver instead of an error, so the pipeline stays valid and the component
+// remains OTel-managed and healthy. The receiver is named after the component.
+func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
+	nopType := otelcomponent.MustNewType(NoEnabledStreamsReceiverType)
+	tests := []struct {
+		name               string
+		component          *component.Component
+		expectedReceiverID otelcomponent.ID
+	}{
+		{
+			name: "component with no input units",
+			component: &component.Component{
+				ID:        "no-inputs-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			expectedReceiverID: GetReceiverID(nopType, "no-inputs-test-id"),
+		},
+		{
+			name: "input unit with nil config",
+			component: &component.Component{
+				ID:        "nil-config-test-id",
+				InputType: "filestream",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Name: "filestream",
+						Command: &component.CommandSpec{
+							Args: []string{"filebeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "nil-config-test-id-input-unit",
+						Type:   client.UnitTypeInput,
+						Config: nil,
+					},
+					{
+						ID:   "output-unit",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type": "elasticsearch",
+						}),
+					},
+				},
+			},
+			expectedReceiverID: GetReceiverID(nopType, "nil-config-test-id"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := getReceiversConfigForComponent(tt.component, nil, nil)
+			require.NoError(t, err)
+			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
+		})
+	}
+}
+
 // TestGetReceiversConfigForComponentBrowserMonitor verifies that a Synthetics browser
 // monitor, which compiles into a single synthetics/browser input with a scheduled
 // "browser" stream plus schedule-less "browser.network" and "browser.screenshot"
@@ -3603,8 +3802,6 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 // must be dropped so the heartbeatreceiver does not reject them for missing a schedule.
 // Regression test for https://github.com/elastic/elastic-agent/issues/15968.
 func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
-	testAgentInfo := &info.AgentInfo{}
-
 	browserComponent := &component.Component{
 		ID:        "heartbeat-browser-test-id",
 		InputType: "synthetics/browser",
@@ -3655,7 +3852,7 @@ func TestGetReceiversConfigForComponentBrowserMonitor(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(browserComponent, testAgentInfo, nil, nil)
+	result, err := getReceiversConfigForComponent(browserComponent, nil, nil)
 	require.NoError(t, err)
 
 	// Only the scheduled "browser" stream must become a receiver/monitor; the
@@ -3699,7 +3896,7 @@ func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
 	}
 	comp := &component.Component{InputType: "synthetics/api"}
 
-	inputs, err := getInputsForUnit(unit, &info.AgentInfo{}, "logs", comp, nil)
+	inputs, err := getInputsForUnit(unit, "logs", comp, nil)
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.Equal(t, "api", inputs[0].config["type"])
@@ -3761,21 +3958,135 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 		Units: []component.Unit{newUnit("pod-a", "https://10.0.0.1:9200"), newUnit("pod-b", "https://10.0.0.2:9200")},
 	}
 
-	receivers, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
+	receivers, err := getReceiversConfigForComponent(comp, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, receivers, 2)
 	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-a-same-stream")
 	require.Contains(t, receivers, "metricbeatreceiver/_agent-component/metricbeat-default/pod-b-same-stream")
 
 	// status must be attributed to the right unit even though the stream IDs match
-	statuses := map[string]*status.AggregateStatus{
+	statuses := newReceiverStatuses(map[string]*status.AggregateStatus{
 		receiverStreamSuffix(comp.ID, comp.Units[0].ID, "same-stream"): {Event: componentstatus.NewEvent(componentstatus.StatusOK)},
 		receiverStreamSuffix(comp.ID, comp.Units[1].ID, "same-stream"): {Event: componentstatus.NewEvent(componentstatus.StatusPermanentError)},
-	}
+	})
 	for i, unit := range comp.Units {
 		got := receiversForUnit(statuses, unit, comp)
 		require.Len(t, got, 1)
 		assert.Same(t, statuses[receiverStreamSuffix(comp.ID, comp.Units[i].ID, "same-stream")], got["same-stream"])
+	}
+}
+
+func TestEncodeNameSegment(t *testing.T) {
+	tests := map[string]struct {
+		in   string
+		want string
+	}{
+		"clean":                            {in: "tcp-cisco_ise.log-abc", want: "tcp-cisco_ise.log-abc"},
+		"slash":                            {in: "system/metrics-system.cpu-1", want: "system/metrics-system.cpu-1"},
+		"non-ASCII letter":                 {in: "café", want: "café"},
+		"space":                            {in: "tcp-Cisco ISE-abc", want: "tcp-Cisco%20ISE-abc"},
+		"tab and newline":                  {in: "a\tb\nc", want: "a%09b%0Ac"},
+		"no-break space":                   {in: "a\u00a0b", want: "a%C2%A0b"},
+		"ASCII symbols":                    {in: "a+b=c$d|e", want: "a%2Bb%3Dc%24d%7Ce"},
+		"non-ASCII symbol":                 {in: "€", want: "%E2%82%AC"},
+		"percent":                          {in: "100%", want: "100%25"},
+		"invalid UTF-8":                    {in: "a\xffb", want: "a%FFb"},
+		"replacement char":                 {in: "a\ufffdb", want: "a%EF%BF%BDb"},
+		"already escaped text":             {in: "a%20b", want: "a%2520b"},
+		"colons (config keys split on ::)": {in: "a:b::c:", want: "a%3Ab%3A%3Ac%3A"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := EncodeNameSegment(tc.in)
+			assert.Equal(t, tc.want, got)
+			var id otelcomponent.ID
+			assert.NoError(t, id.UnmarshalText([]byte("filebeatreceiver/"+OtelNamePrefix+got)))
+			decoded, err := DecodeNameSegment(got)
+			require.NoError(t, err)
+			assert.Equal(t, tc.in, decoded)
+		})
+	}
+}
+
+func TestOutputNameDerivedIDsAreEncoded(t *testing.T) {
+	ids := func(outputName string) []otelcomponent.ID {
+		return []otelcomponent.ID{
+			GetExporterID(otelcomponent.MustNewType("elasticsearch"), outputName),
+			GetProcessorID(outputName),
+			getBeatsAuthExtensionID(outputName),
+			getOauth2ClientExtensionID(outputName),
+			getTransformProcessorID(outputName),
+			getKafkaPartitionerExtensionID(outputName),
+		}
+	}
+	for _, id := range ids("default") {
+		assert.Equal(t, OtelNamePrefix+"default", id.Name())
+	}
+	for _, id := range ids("my output+1") {
+		assert.Equal(t, OtelNamePrefix+"my%20output%2B1", id.Name())
+		var parsed otelcomponent.ID
+		assert.NoError(t, parsed.UnmarshalText([]byte(id.String())))
+	}
+}
+
+func TestSpacesInOutputNameAndInputID(t *testing.T) {
+	comp := testFilebeatComp("filestream-my output", "my output")
+	comp.RuntimeManager = component.OtelRuntimeManager
+	comp.Units[0].ID = "filestream-my output-filestream-Cisco ISE-c3a2b1"
+
+	conf, err := GetOtelConfig(&component.Model{Components: []component.Component{comp}}, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.Contains(t, conf.Get("receivers"), "filebeatreceiver/_agent-component/filestream-my%20output/filestream-Cisco%20ISE-c3a2b1-test-1")
+
+	pipelineStatus := &status.AggregateStatus{
+		Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{},
+	}
+	statusKinds := map[string]string{"receivers": "receiver:", "exporters": "exporter:", "processors": "", "extensions": ""}
+	for kind, statusPrefix := range statusKinds {
+		names, _ := conf.Get(kind).(map[string]any)
+		for name := range names {
+			var id otelcomponent.ID
+			require.NoError(t, id.UnmarshalText([]byte(name)))
+			if statusPrefix != "" {
+				pipelineStatus.ComponentStatusMap[statusPrefix+name] = &status.AggregateStatus{Event: componentstatus.NewEvent(componentstatus.StatusOK)}
+			}
+		}
+	}
+
+	pipelineName := "logs/_agent-component/filestream-my%20output"
+	require.Equal(t, []string{pipelineName}, slices.Collect(maps.Keys(conf.Get("service::pipelines").(map[string]any))))
+	var pipelineID pipeline.ID
+	require.NoError(t, pipelineID.UnmarshalText([]byte(pipelineName)))
+
+	otelStatus := &status.AggregateStatus{
+		Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{"pipeline:" + pipelineName: pipelineStatus},
+	}
+	states, err := GetAllComponentStates(otelStatus, []component.Component{comp})
+	require.NoError(t, err)
+	require.Len(t, states, 1)
+	assert.Equal(t, client.UnitStateHealthy, states[0].State.State)
+	inputUnit := states[0].State.Units[runtime.ComponentUnitKey{UnitID: comp.Units[0].ID, UnitType: client.UnitTypeInput}]
+	assert.Equal(t, client.UnitStateHealthy, inputUnit.State)
+}
+
+func TestComponentIDFromReceiverName(t *testing.T) {
+	tests := map[string]struct {
+		name   string
+		want   string
+		wantOK bool
+	}{
+		"plain":     {name: "osquerybeatreceiver/_agent-component/osquery-default/stream", want: "osquery-default", wantOK: true},
+		"encoded":   {name: "filebeatreceiver/_agent-component/filestream-my%20output/input-test-1", want: "filestream-my output", wantOK: true},
+		"no prefix": {name: "filebeatreceiver/other", want: "", wantOK: false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := ComponentIDFromReceiverName(tc.name)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.want, got)
+		})
 	}
 }
 
@@ -3836,7 +4147,7 @@ func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
 	// not override the value preserved in agent.features.
 	comp.Features.Fqdn.Enabled = true
 
-	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, GetDefaultProcessors(comp.BeatName()))
+	result, err := getReceiversConfigForComponent(comp, nil, GetDefaultProcessors(comp.BeatName()))
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 
@@ -3888,7 +4199,7 @@ func TestGetReceiversConfigForComponentWithoutFeatures(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, GetDefaultProcessors(comp.BeatName()))
+	result, err := getReceiversConfigForComponent(comp, nil, GetDefaultProcessors(comp.BeatName()))
 	require.NoError(t, err)
 	require.Len(t, result, 1)
 	for _, value := range result {
@@ -3990,7 +4301,9 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
 		},
 		{
-			name: "input unit with nil config does not panic",
+			// A unit with nil Config contributes no inputs. The component falls back to
+			// the no-op receiver and remains supported.
+			name: "input unit with nil config is supported",
 			component: &component.Component{
 				ID:         "nil-config-comp",
 				InputType:  "filestream",
@@ -4021,6 +4334,45 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Fleet can compile streams: [] when the input is enabled but all its streams
+			// are disabled. The component falls back to the no-op receiver and remains supported.
+			name: "all streams disabled produces no inputs - supported via no-op receiver",
+			component: &component.Component{
+				ID:         "linux-metrics-default",
+				InputType:  "linux/metrics",
+				OutputType: "elasticsearch",
+				OutputName: "default",
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"metricbeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						// Empty streams list: all streams are disabled.
+						ID:   "linux-metrics-unit",
+						Type: client.UnitTypeInput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"id":      "linux/metrics-linux-metrics-default",
+							"type":    "linux/metrics",
+							"streams": []any{},
+						}),
+					},
+					{
+						ID:   "linux-metrics-output",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":  "elasticsearch",
+							"hosts": []any{"localhost:9200"},
+						}),
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -4028,7 +4380,7 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			err := VerifyComponentIsOtelSupported(tt.component)
 			if tt.expectedError != "" {
 				require.Error(t, err)
-				assert.Equal(t, err.Error(), tt.expectedError)
+				assert.Equal(t, tt.expectedError, err.Error())
 			} else {
 				require.NoError(t, err)
 			}
@@ -4150,6 +4502,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 		expectedQueueSettings map[string]any
 		expectedExtensionCfg  map[string]any
 		expectedError         string
+		stateStoreEnabled     bool
 	}{
 		{
 			name:          "error on input unit type",
@@ -4200,9 +4553,43 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
+				},
+			},
+		},
+		{
+			name: "Elasticsearch state store uses Beats authenticator",
+			unit: component.Unit{
+				ID:     "filestream-default",
+				Type:   client.UnitTypeOutput,
+				Config: component.MustExpectedConfig(map[string]any{"hosts": []any{"es:9200"}}),
+			},
+			exporterType:      esExporterType,
+			outputName:        "default",
+			stateStoreEnabled: true,
+			expectedExporterCfg: map[string]any{
+				"hosts":      []interface{}{"es:9200"},
+				"translated": true,
+				"auth": map[string]any{
+					"authenticator": "beatsauth/_agent-component/default",
+				},
+			},
+			expectedQueueSettings: nil,
+			expectedExtensionCfg: map[string]any{
+				"beatsauth/_agent-component/default": map[string]any{
+					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
+					"idle_connection_timeout": "3s",
+					"proxy_disable":           false,
+					"timeout":                 "1m30s",
+				},
+				"elasticsearch_storage": map[string]any{
+					"auth": map[string]any{
+						"authenticator": "beatsauth/_agent-component/default",
+					},
 				},
 			},
 		},
@@ -4239,6 +4626,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -4270,6 +4658,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "1m30s",
@@ -4305,6 +4694,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 			expectedExtensionCfg: map[string]any{
 				"beatsauth/_agent-component/default": map[string]any{
 					"continue_on_error":       true,
+					"endpoints":               []string{"http://es:9200"},
 					"idle_connection_timeout": "3s",
 					"proxy_disable":           false,
 					"timeout":                 "5m",
@@ -4506,6 +4896,12 @@ func TestUnitToExporterConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.stateStoreEnabled {
+				t.Cleanup(fbfeatures.ReinitForTest)
+				t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "filestream")
+				fbfeatures.ReinitForTest()
+			}
+
 			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
@@ -4924,7 +5320,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	t.Run("env_set", func(t *testing.T) {
 		t.Setenv(util.EnvHostName, "override-node")
 
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
+		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
 
@@ -4939,7 +5335,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
 		t.Setenv(util.EnvHostName, "  override-node  ")
 
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
+		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
 
@@ -4953,7 +5349,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 
 	t.Run("env_unset", func(t *testing.T) {
 		t.Setenv(util.EnvHostName, "")
-		result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, nil)
+		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
 

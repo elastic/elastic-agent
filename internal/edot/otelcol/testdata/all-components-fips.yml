@@ -9,6 +9,8 @@ exporters:
     endpoint: localhots:4317
   otlp_http:
     endpoint: https://localhost.com:4318
+  prometheus_remote_write:
+    endpoint: http://localhost:9090/api/v1/write
 
 extensions:
   health_check:
@@ -132,6 +134,7 @@ service:
       exporters:
         - debug
         - otlp_grpc
+        - prometheus_remote_write
       processors:
         - attributes
         - batch

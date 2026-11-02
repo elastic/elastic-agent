@@ -17,11 +17,11 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -84,7 +84,7 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 }
 
 func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
-	agentInfo := &info.AgentInfo{}
+	agentInfo := &proto.AgentInfo{Id: "agent-1"}
 	beatProcessorID := "beat/_agent-component/beat-metrics-monitoring"
 	beatMetricsConfig := map[string]any{
 		"id":         "test",
@@ -122,9 +122,9 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 									"type":      "metrics",
 								},
 								"elastic_agent": mapstr.M{
-									"id":       agentInfo.AgentID(),
-									"snapshot": agentInfo.Snapshot(),
-									"version":  agentInfo.Version(),
+									"id":       agentInfo.GetId(),
+									"snapshot": agentInfo.GetSnapshot(),
+									"version":  agentInfo.GetVersion(),
 								},
 								"input_id":  "test",
 								"stream_id": "test-1",
@@ -174,6 +174,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 				InputType:  "beat/metrics",
 				OutputType: "kafka",
 				OutputName: "default",
+				AgentInfo:  agentInfo,
 				InputSpec: &component.InputRuntimeSpec{
 					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
@@ -298,7 +299,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		},
 	})
 
-	actualConf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+	actualConf, err := GetOtelConfig(model, logp.NewNopLogger())
 	require.NoError(t, err)
 	assert.Equal(t, expectedConfig.ToStringMap(), actualConf.ToStringMap())
 }
