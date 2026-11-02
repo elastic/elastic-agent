@@ -134,9 +134,7 @@ func TestHeartbeatBrowserTrustsMountedCA(t *testing.T) {
 			agents = append(agents, a)
 		}
 	}
-	for _, a := range agents {
-		waitBrowserCAAgentEnrolled(ctx, t, a)
-	}
+	waitBrowserCAAgentsEnrolled(ctx, t, agents)
 
 	// Kibana only sends browser monitors to agents reporting the complete image.
 	location, err := createSyntheticsPrivateLocation(ctx, info.KibanaClient, "browser-ca-location-"+testID, policy.ID)
@@ -150,35 +148,49 @@ func TestHeartbeatBrowserTrustsMountedCA(t *testing.T) {
 		"inline_script":     fmt.Sprintf(`step("load", async () => { await page.goto("https://%s:8443"); });`, server),
 	}), "creating browser monitor")
 
-	since := time.Now()
-	for _, a := range agents {
-		t.Run(a.name+"/rejects the server without the CA", func(t *testing.T) {
-			waitBrowserCAMonitor(ctx, t, info, a, since, "down")
-		})
+	// Each phase depends on the previous one, so the first that fails stops the test.
+	phases := []struct {
+		name   string
+		status string
+		change func() error
+	}{
+		{name: "rejects the server without the CA", status: "down"},
+		{name: "trusts the server once the CA is added", status: "up", change: func() error {
+			return os.WriteFile(filepath.Join(caDir, "ca.crt"), caPEM, 0o644)
+		}},
+		{name: "rejects the server once the CA is removed", status: "down", change: func() error {
+			return os.Remove(filepath.Join(caDir, "ca.crt"))
+		}},
 	}
-
-	since = time.Now()
-	require.NoError(t, os.WriteFile(filepath.Join(caDir, "ca.crt"), caPEM, 0o644), "adding the CA")
-	for _, a := range agents {
-		t.Run(a.name+"/trusts the server once the CA is added", func(t *testing.T) {
-			waitBrowserCAMonitor(ctx, t, info, a, since, "up")
-			if a.root {
-				// Heartbeat runs the browser as BEAT_SETUID_AS, which must read the store.
-				out, err := dockerOutput(ctx, "exec", a.runner.containerName,
-					"stat", "-c", "%U", "/usr/share/elastic-agent/.pki/nssdb/cert9.db")
-				require.NoError(t, err, "checking the browser trust store owner: %s", out)
-				assert.Equal(t, "elastic-agent", strings.TrimSpace(string(out)), "trust store owner")
+	for _, phase := range phases {
+		since := time.Now()
+		if phase.change != nil {
+			require.NoError(t, phase.change(), "%s: changing the CA directory", phase.name)
+		}
+		waitBrowserCAMonitors(ctx, t, info, agents, since, phase.status, phase.name)
+		if phase.status != "up" {
+			continue
+		}
+		for _, a := range agents {
+			if !a.root {
+				continue
 			}
-		})
+			// Heartbeat runs the browser as BEAT_SETUID_AS, which must read the store.
+			out, err := dockerOutput(ctx, "exec", a.runner.containerName,
+				"stat", "-c", "%U", "/usr/share/elastic-agent/.pki/nssdb/cert9.db")
+			require.NoError(t, err, "checking the %s agent's browser trust store owner: %s", a.name, out)
+			require.Equal(t, "elastic-agent", strings.TrimSpace(string(out)), "%s agent's trust store owner", a.name)
+		}
 	}
+}
 
-	since = time.Now()
-	require.NoError(t, os.Remove(filepath.Join(caDir, "ca.crt")), "removing the CA")
-	for _, a := range agents {
-		t.Run(a.name+"/rejects the server once the CA is removed", func(t *testing.T) {
-			waitBrowserCAMonitor(ctx, t, info, a, since, "down")
-		})
+// budget returns d, or what is left of ctx when that is less, so that waits end
+// with the test's deadline.
+func budget(ctx context.Context, d time.Duration) time.Duration {
+	if deadline, ok := ctx.Deadline(); ok {
+		return max(min(d, time.Until(deadline)), 0)
 	}
+	return d
 }
 
 // startBrowserCAServer starts an HTTPS server on port 8443 of the network, named
@@ -299,36 +311,67 @@ func startBrowserCAAgent(ctx context.Context, t *testing.T, a *browserCAAgent, i
 	require.NoError(t, err, "starting %s agent container: %s", a.name, out)
 }
 
-// waitBrowserCAAgentEnrolled waits until the agent is healthy, enrolled, and seen by
-// Fleet as running the complete image.
-func waitBrowserCAAgentEnrolled(ctx context.Context, t *testing.T, a *browserCAAgent) {
+// waitBrowserCAAgentsEnrolled waits until the agents are healthy, enrolled, and seen
+// by Fleet as running the complete image, with one time budget for all of them.
+func waitBrowserCAAgentsEnrolled(ctx context.Context, t *testing.T, agents []*browserCAAgent) {
 	t.Helper()
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		status, err := a.runner.execStatus(ctx)
-		require.NoError(collect, err, "getting %s agent status", a.name)
-		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(status.FleetState), //nolint:gosec // G115 always under 32-bit
-			"expected Fleet state to be HEALTHY, got %s (message=%q)", cproto.State(status.FleetState), status.FleetMessage) //nolint:gosec // G115 always under 32-bit
-		assert.Equal(collect, cproto.State_HEALTHY, cproto.State(status.State), //nolint:gosec // G115 always under 32-bit
-			"expected agent state to be HEALTHY, got %s (message=%q)", cproto.State(status.State), status.Message) //nolint:gosec // G115 always under 32-bit
-		assert.NotEmpty(collect, status.Info.ID, "expected enrolled agent ID to be non-empty")
-		a.runner.agentID = status.Info.ID
-	}, 5*time.Minute, 5*time.Second, "timed out waiting for the %s agent to enroll and become healthy", a.name)
+		for _, a := range agents {
+			if a.runner.agentID != "" {
+				continue
+			}
+			status, err := a.runner.execStatus(ctx)
+			if !assert.NoError(collect, err, "getting %s agent status", a.name) {
+				continue
+			}
+			if !assert.Equal(collect, cproto.State_HEALTHY, cproto.State(status.FleetState), //nolint:gosec // G115 always under 32-bit
+				"expected the %s agent's Fleet state to be HEALTHY, got %s (message=%q)", a.name, cproto.State(status.FleetState), status.FleetMessage) || //nolint:gosec // G115 always under 32-bit
+				!assert.Equal(collect, cproto.State_HEALTHY, cproto.State(status.State), //nolint:gosec // G115 always under 32-bit
+					"expected the %s agent's state to be HEALTHY, got %s (message=%q)", a.name, cproto.State(status.State), status.Message) || //nolint:gosec // G115 always under 32-bit
+				!assert.NotEmpty(collect, status.Info.ID, "expected the %s agent's ID to be non-empty", a.name) {
+				continue
+			}
+			a.runner.agentID = status.Info.ID
+		}
+	}, budget(ctx, 6*time.Minute), 5*time.Second, "timed out waiting for the agents to enroll and become healthy")
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		agent, err := getFleetAgent(ctx, a.runner.info.KibanaClient, a.runner.agentID)
-		require.NoError(collect, err, "getting %s agent from Fleet", a.name)
-		assert.True(collect, agent.Active, "expected Fleet agent to be active")
-		assert.True(collect, agent.LocalMetadata.Elastic.Agent.Complete,
-			"expected Fleet agent local_metadata.elastic.agent.complete to be true")
-	}, 6*time.Minute, 5*time.Second, "Fleet did not observe complete metadata for the %s agent", a.name)
-	t.Logf("%s agent %s enrolled (container %s)", a.name, a.runner.agentID, a.runner.containerName)
+		for _, a := range agents {
+			agent, err := getFleetAgent(ctx, a.runner.info.KibanaClient, a.runner.agentID)
+			if !assert.NoError(collect, err, "getting %s agent from Fleet", a.name) {
+				continue
+			}
+			assert.True(collect, agent.Active, "expected the %s agent to be active in Fleet", a.name)
+			assert.True(collect, agent.LocalMetadata.Elastic.Agent.Complete,
+				"expected the %s agent's local_metadata.elastic.agent.complete to be true", a.name)
+		}
+	}, budget(ctx, 6*time.Minute), 5*time.Second, "Fleet did not observe complete metadata for every agent")
+	for _, a := range agents {
+		t.Logf("%s agent %s enrolled (container %s)", a.name, a.runner.agentID, a.runner.containerName)
+	}
 }
 
-// waitBrowserCAMonitor waits for a browser monitor result of the agent, after since,
-// with the given status. A "down" result must come from the browser rejecting the
-// server's certificate, so that a server that isn't up yet can't pass for it.
-func waitBrowserCAMonitor(ctx context.Context, t *testing.T, info *define.Info, a *browserCAAgent, since time.Time, status string) {
+// waitBrowserCAMonitors waits until every agent's browser monitor reported status
+// after since, with one time budget for all of them.
+func waitBrowserCAMonitors(ctx context.Context, t *testing.T, info *define.Info, agents []*browserCAAgent, since time.Time, status, phase string) {
 	t.Helper()
+	pending := agents
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var still []*browserCAAgent
+		for _, a := range pending {
+			if err := browserCAMonitorResult(ctx, info, a, since, status); err != nil {
+				assert.NoError(collect, err, "%s agent", a.name)
+				still = append(still, a)
+			}
+		}
+		pending = still
+	}, budget(ctx, 10*time.Minute), 10*time.Second, "%s: not every agent's browser monitor reported %s", phase, status)
+}
+
+// browserCAMonitorResult checks for a browser monitor result of the agent, after
+// since, with the given status. A "down" result must come from the browser rejecting
+// the server's certificate, so that a server that isn't up yet can't pass for it.
+func browserCAMonitorResult(ctx context.Context, info *define.Info, a *browserCAAgent, since time.Time, status string) error {
 	after := map[string]any{"range": map[string]any{
 		"@timestamp": map[string]any{"gte": since.UTC().Format("2006-01-02T15:04:05.000Z")},
 	}}
@@ -343,28 +386,34 @@ func waitBrowserCAMonitor(ctx context.Context, t *testing.T, info *define.Info, 
 		}
 	}
 
-	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		res, err := estools.PerformQueryForRawQuery(ctx, query(
-			map[string]any{"exists": map[string]any{"field": "summary"}},
-			map[string]any{"term": map[string]any{"monitor.status": status}},
-		), "synthetics-browser-*", info.ESClient)
-		require.NoError(collect, err, "querying browser monitor results")
-		require.NotEmpty(collect, res.Hits.Hits, "no %s browser monitor result yet", status)
-		if status != "down" {
-			return
-		}
+	res, err := estools.PerformQueryForRawQuery(ctx, query(
+		map[string]any{"exists": map[string]any{"field": "summary"}},
+		map[string]any{"term": map[string]any{"monitor.status": status}},
+	), "synthetics-browser-*", info.ESClient)
+	if err != nil {
+		return fmt.Errorf("querying browser monitor results: %w", err)
+	}
+	if len(res.Hits.Hits) == 0 {
+		return fmt.Errorf("no %s browser monitor result yet", status)
+	}
+	if status != "down" {
+		return nil
+	}
 
-		res, err = estools.PerformQueryForRawQuery(ctx, query(
-			map[string]any{"exists": map[string]any{"field": "error.message"}},
-		), "synthetics-browser-*", info.ESClient)
-		require.NoError(collect, err, "querying browser monitor errors")
-		var messages []string
-		for _, hit := range res.Hits.Hits {
-			if msg, err := mapstr.M(hit.Source).GetValue("error.message"); err == nil {
-				messages = append(messages, fmt.Sprint(msg))
-			}
+	res, err = estools.PerformQueryForRawQuery(ctx, query(
+		map[string]any{"exists": map[string]any{"field": "error.message"}},
+	), "synthetics-browser-*", info.ESClient)
+	if err != nil {
+		return fmt.Errorf("querying browser monitor errors: %w", err)
+	}
+	var messages []string
+	for _, hit := range res.Hits.Hits {
+		if msg, err := mapstr.M(hit.Source).GetValue("error.message"); err == nil {
+			messages = append(messages, fmt.Sprint(msg))
 		}
-		assert.True(collect, strings.Contains(strings.Join(messages, "\n"), browserCAErr),
-			"expected the browser to reject the certificate with %s, got errors: %q", browserCAErr, messages)
-	}, 8*time.Minute, 10*time.Second, "the %s agent's browser monitor never reported %s", a.name, status)
+	}
+	if !strings.Contains(strings.Join(messages, "\n"), browserCAErr) {
+		return fmt.Errorf("expected the browser to reject the certificate with %s, got errors: %q", browserCAErr, messages)
+	}
+	return nil
 }

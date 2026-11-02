@@ -33,6 +33,9 @@ const (
 	browserCASecret   = "browser-ca"
 	browserAgentHome  = "/usr/share/elastic-agent"
 	browserCAPodLabel = "name=agent-clusterwide-helm-agent"
+	// browserCAExecTimeout bounds each command run in the agent pod, so that a stalled
+	// exec stream can't outlive its attempt.
+	browserCAExecTimeout = 30 * time.Second
 )
 
 // TestKubernetesAgentBrowserCASecret installs the chart with a CA Secret on the complete
@@ -172,7 +175,9 @@ func k8sStepBrowserCAStoreCount(want int, msg string) k8sTestStep {
 			"db=%s/.pki/nssdb; [ -f $db/cert9.db ] || exit 0; certutil -L -d sql:$db", browserAgentHome)}
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			var stdout, stderr bytes.Buffer
-			err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod, "agent", cmd, &stdout, &stderr)
+			execCtx, cancel := context.WithTimeout(ctx, browserCAExecTimeout)
+			defer cancel()
+			err := kCtx.client.Resources().ExecInPod(execCtx, namespace, pod, "agent", cmd, &stdout, &stderr)
 			require.NoError(c, err, "failed to list the browser trust store: %s", stderr.String())
 			got := 0
 			for _, line := range strings.Split(stdout.String(), "\n") {
@@ -192,7 +197,9 @@ func k8sStepBrowserCAStoreOwner() k8sTestStep {
 	return func(t *testing.T, ctx context.Context, kCtx k8sContext, namespace string) {
 		pod := browserCAAgentPod(t, ctx, kCtx, namespace)
 		var stdout, stderr bytes.Buffer
-		err := kCtx.client.Resources().ExecInPod(ctx, namespace, pod, "agent",
+		execCtx, cancel := context.WithTimeout(ctx, browserCAExecTimeout)
+		defer cancel()
+		err := kCtx.client.Resources().ExecInPod(execCtx, namespace, pod, "agent",
 			[]string{"stat", "-c", "%U", browserAgentHome + "/.pki/nssdb/cert9.db"}, &stdout, &stderr)
 		require.NoError(t, err, "failed to stat the browser trust store: %s", stderr.String())
 		require.Equal(t, "elastic-agent", strings.TrimSpace(stdout.String()), "as root the trust store must belong to the browser user")
