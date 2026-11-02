@@ -21,12 +21,8 @@ require (
 	github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
-<<<<<<< HEAD
-	github.com/elastic/go-elasticsearch/v8 v8.19.7
-	github.com/elastic/go-licenser v0.4.2
-=======
 	github.com/elastic/go-elasticsearch/v9 v9.5.2
->>>>>>> 994eb25 (Migrate test infrastructure to go-elasticsearch v9 (#17737))
+	github.com/elastic/go-licenser v0.4.2
 	github.com/elastic/go-sysinfo v1.15.5
 	github.com/elastic/go-ucfg v0.9.2
 	github.com/elastic/mock-es v0.0.0-20250530054253-8c3b6053f9b6
