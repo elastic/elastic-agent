@@ -160,6 +160,7 @@ require (
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
+	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.15.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.7 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
