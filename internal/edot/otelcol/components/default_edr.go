@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build securityonly
+//go:build edr
 
 package components
 
@@ -60,9 +60,9 @@ import (
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 )
 
-// Default returns the factory function for the security-only variant EDOT collector
+// Default returns the factory function for the EDR flavor EDOT collector
 // component set — a minimal registry containing only the components required
-// for endpoint security and agent self-monitoring. Pass extra extension
+// for the EDR flavor and agent self-monitoring. Pass extra extension
 // factories to register them alongside the defaults.
 func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories, error) {
 	return func() (otelcol.Factories, error) {
@@ -84,11 +84,11 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		// osquerybeat receiver is added here; packetbeat, kafka, and prometheus
-		// receivers are excluded from the security-only variant build
+		// receivers are excluded from the EDR flavor build
 		receivers = addNonFipsReceivers(receivers)
 
-		// auditbeat and heartbeat receivers are intentionally excluded; the
-		// addFullBeatReceivers hook is a no-op for the security-only variant
+		// auditbeat receiver is added here; the heartbeat receiver is excluded
+		// from the EDR flavor build
 		receivers = addFullBeatReceivers(receivers)
 
 		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
@@ -116,7 +116,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			nopexporter.NewFactory(),
 			logstashexporter.NewFactory(),
 		}
-		// kafka exporter is excluded from the security-only variant build
+		// kafka exporter is excluded from the EDR flavor build
 		exporters = addNonFipsExporters(exporters)
 		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
 		if err != nil {

@@ -5114,7 +5114,7 @@ func TestRuntimeConfig_ValidateDynamicInputs(t *testing.T) {
 	}
 }
 
-func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
+func TestEDRFlavorUnsupportedBeatError(t *testing.T) {
 	linuxAMD64Platform := PlatformDetail{
 		Platform: Platform{
 			OS:   Linux,
@@ -5133,7 +5133,7 @@ func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
 	}
 
 	// aws-cloudwatch is backed by filebeat (allowed); add a second input type
-	// backed by a beat that is NOT in securityOnlyAllowedBeats to exercise the
+	// backed by a beat that is NOT in flavorAllowedInputTypes to exercise the
 	// error path. We use the real testbeat spec which uses filebeat, so we
 	// construct a minimal in-memory spec with an auditbeat-backed input instead.
 	auditbeatSpec := RuntimeSpecs{
@@ -5170,9 +5170,9 @@ func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
 
 	setAllowed := func(t *testing.T, m map[string]struct{}) {
 		t.Helper()
-		prev := variantAllowedInputTypes
-		variantAllowedInputTypes = m
-		t.Cleanup(func() { variantAllowedInputTypes = prev })
+		prev := flavorAllowedInputTypes
+		flavorAllowedInputTypes = m
+		t.Cleanup(func() { flavorAllowedInputTypes = prev })
 	}
 
 	testAllowedTypes := map[string]struct{}{
@@ -5181,7 +5181,7 @@ func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
 		"syslog":     {},
 	}
 
-	t.Run("unsupported beat errors when variant has allowlist", func(t *testing.T) {
+	t.Run("unsupported beat errors when flavor has allowlist", func(t *testing.T) {
 		setAllowed(t, testAllowedTypes)
 
 		policy := copyMap(basePolicy)
@@ -5194,10 +5194,10 @@ func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, result, 1)
 		require.Error(t, result[0].Err)
-		assert.Contains(t, result[0].Err.Error(), `"auditd" is not supported in this variant`)
+		assert.Contains(t, result[0].Err.Error(), `"auditd" is not supported in this flavor`)
 	})
 
-	t.Run("allowed input type succeeds when variant has allowlist", func(t *testing.T) {
+	t.Run("allowed input type succeeds when flavor has allowlist", func(t *testing.T) {
 		setAllowed(t, testAllowedTypes)
 
 		policy := copyMap(basePolicy)
@@ -5213,7 +5213,7 @@ func TestSecurityOnlyVariantUnsupportedBeatError(t *testing.T) {
 		assert.Equal(t, OtelRuntimeManager, result[0].RuntimeManager)
 	})
 
-	t.Run("any input type allowed when no variant allowlist is set", func(t *testing.T) {
+	t.Run("any input type allowed when no flavor allowlist is set", func(t *testing.T) {
 		setAllowed(t, nil)
 
 		policy := copyMap(basePolicy)

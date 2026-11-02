@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !securityonly
+//go:build !edr
 
 // Package components hosts the default EDOT collector component registry. It
 // is intentionally split out of the otelcol package so that callers (such as
@@ -219,7 +219,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		// not in fips mode due to restrictions on crypto usage
 		receivers = addNonFipsReceivers(receivers)
 
-		// auditbeat and heartbeat receivers are excluded from the security-only variant build
+		// auditbeat and heartbeat receivers are excluded from the EDR flavor build
 		receivers = addFullBeatReceivers(receivers)
 		factories.Receivers, err = otelcol.MakeFactoryMap(receivers...)
 		if err != nil {

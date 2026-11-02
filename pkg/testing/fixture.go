@@ -1779,6 +1779,7 @@ type AgentBinaryVersion struct {
 	BuildTime string `yaml:"build_time"`
 	Snapshot  bool   `yaml:"snapshot"`
 	Fips      bool   `yaml:"fips"`
+	Flavor    string `yaml:"flavor,omitempty"`
 }
 
 // String returns the version string.

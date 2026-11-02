@@ -26,14 +26,14 @@ var packageArchMap = map[struct{ os, arch string }]string{
 // Artifact provides info for fetching from artifact store.
 type Artifact struct {
 	Name    string
-	Variant string // distribution variant, e.g. "security"; empty for the standard distribution
+	Flavor  string // flavor built as its own distribution, e.g. "edr"; empty for the standard distribution
 	FIPS    bool
 	OS      string
 	Arch    string
 	Version *agtversion.ParsedSemVer
 }
 
-func New(name string, variant string, fips bool, version *agtversion.ParsedSemVer, os, arch string) (Artifact, error) {
+func New(name string, flavor string, fips bool, version *agtversion.ParsedSemVer, os, arch string) (Artifact, error) {
 	_, found := packageArchMap[struct{ os, arch string }{os, arch}]
 	if !found {
 		return Artifact{}, errors.New(fmt.Sprintf("'%s/%s' is not a valid combination for a package", os, arch), errors.TypeConfig)
@@ -43,13 +43,13 @@ func New(name string, variant string, fips bool, version *agtversion.ParsedSemVe
 		return Artifact{}, errors.New("no version specified for package", errors.TypeConfig)
 	}
 
-	return Artifact{Name: name, Variant: variant, FIPS: fips, OS: os, Arch: arch, Version: version}, nil
+	return Artifact{Name: name, Flavor: flavor, FIPS: fips, OS: os, Arch: arch, Version: version}, nil
 }
 
 func (a *Artifact) FileName() string {
 	parts := []string{a.Name}
-	if a.Variant != "" {
-		parts = append(parts, a.Variant)
+	if a.Flavor != "" {
+		parts = append(parts, a.Flavor)
 	}
 	if a.FIPS {
 		parts = append(parts, "fips")

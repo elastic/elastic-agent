@@ -29,16 +29,16 @@ func LoadElasticAgentPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
 	return loadPackageSpec(beatsDir, "elastic_agent_packaging")
 }
 
-// LoadElasticAgentSecurityCorePackageSpec loads and returns the
-// elastic_agent_security_core package spec from packages.yml under beatsDir.
-func LoadElasticAgentSecurityCorePackageSpec(beatsDir string) ([]OSPackageArgs, error) {
-	return loadPackageSpec(beatsDir, "elastic_agent_security_core")
+// LoadElasticAgentEDRCorePackageSpec loads and returns the
+// elastic_agent_edr_core package spec from packages.yml under beatsDir.
+func LoadElasticAgentEDRCorePackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_edr_core")
 }
 
-// LoadElasticAgentSecurityPackageSpec loads and returns the
-// elastic_agent_security_packaging package spec from packages.yml under beatsDir.
-func LoadElasticAgentSecurityPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
-	return loadPackageSpec(beatsDir, "elastic_agent_security_packaging")
+// LoadElasticAgentEDRPackageSpec loads and returns the
+// elastic_agent_edr_packaging package spec from packages.yml under beatsDir.
+func LoadElasticAgentEDRPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_edr_packaging")
 }
 
 // loadPackageSpec loads the named spec from packages.yml under beatsDir.

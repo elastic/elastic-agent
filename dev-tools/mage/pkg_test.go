@@ -118,3 +118,19 @@ func TestLoadSpecs(t *testing.T) {
 		}
 	}
 }
+
+func TestPackageSpecRootDir(t *testing.T) {
+	spec := testPackageSpec(t)
+	spec.Name = "elastic-agent-edr"
+	spec.ExtraVars = map[string]string{}
+
+	t.Run("root directory omits the spec name suffix by default", func(t *testing.T) {
+		assert.Equal(t, "elastic-agent-7.0.0-SNAPSHOT-windows-x86_64", spec.rootDir())
+	})
+
+	t.Run("root directory includes the spec name when requested", func(t *testing.T) {
+		spec := spec
+		spec.RootDirIncludesName = true
+		assert.Equal(t, "elastic-agent-edr-7.0.0-SNAPSHOT-windows-x86_64", spec.rootDir())
+	})
+}

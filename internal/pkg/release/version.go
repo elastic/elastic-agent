@@ -23,9 +23,10 @@ var snapshot = ""
 // fips is a flag for marking a FIPS-capable build.
 var fips = "false"
 
-// variant identifies the distribution variant (e.g. "security"). Empty for
-// the standard distribution. Stamped at build time via -ldflags.
-var variant = ""
+// flavor identifies a flavor that is built as its own distribution (e.g. "edr").
+// Empty for the standard distribution, where the flavor is selected at install time.
+// Stamped at build time via -ldflags.
+var flavor = ""
 
 // complete is an environment variable marking the image as complete.
 var complete = "ELASTIC_AGENT_COMPLETE"
@@ -89,19 +90,19 @@ func FIPSDistribution() bool {
 	return err == nil && f
 }
 
-// VariantSecurityOnly is the variant string stamped into security-only builds.
-const VariantSecurityOnly = "security"
+// FlavorEDR is the flavor stamped into EDR builds.
+const FlavorEDR = "edr"
 
-// Variant returns the distribution variant stamped at build time.
-// Returns an empty string for the standard distribution.
-func Variant() string {
-	return variant
+// Flavor returns the flavor stamped at build time. It is empty for the standard
+// distribution, where the flavor is chosen when the agent is installed.
+func Flavor() string {
+	return flavor
 }
 
-// IsSecurityOnlyVariant reports whether this binary was built as the
-// security-only distribution variant.
-func IsSecurityOnlyVariant() bool {
-	return variant == VariantSecurityOnly
+// IsEDRFlavor reports whether this binary was built as the EDR
+// distribution.
+func IsEDRFlavor() bool {
+	return flavor == FlavorEDR
 }
 
 // VersionInfo is structure used by `version --yaml`.
@@ -111,7 +112,7 @@ type VersionInfo struct {
 	BuildTime        time.Time `yaml:"build_time"`
 	Snapshot         bool      `yaml:"snapshot"`
 	FIPSDistribution bool      `yaml:"fips"`
-	Variant          string    `yaml:"variant,omitempty"`
+	Flavor           string    `yaml:"flavor,omitempty"`
 }
 
 // Info returns current version information.
@@ -122,7 +123,7 @@ func Info() VersionInfo {
 		BuildTime:        BuildTime(),
 		Snapshot:         Snapshot(),
 		FIPSDistribution: FIPSDistribution(),
-		Variant:          Variant(),
+		Flavor:           Flavor(),
 	}
 }
 
@@ -139,9 +140,9 @@ func (v VersionInfo) String() string {
 	if v.FIPSDistribution {
 		sb.WriteString(" fips-distribution: true")
 	}
-	if v.Variant != "" {
-		sb.WriteString(" variant: ")
-		sb.WriteString(v.Variant)
+	if v.Flavor != "" {
+		sb.WriteString(" flavor: ")
+		sb.WriteString(v.Flavor)
 	}
 	sb.WriteString(" at ")
 	sb.WriteString(v.BuildTime.Format("2006-01-02 15:04:05 -0700 MST"))

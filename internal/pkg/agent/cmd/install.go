@@ -280,9 +280,11 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 			customPass, _ = cmd.Flags().GetString(flagInstallCustomPass)
 		}
 
-		flavor := install.DefaultFlavor
-		if installServers, _ := cmd.Flags().GetBool(flagInstallServers); installServers {
-			flavor = install.FlavorServers
+		installServers, _ := cmd.Flags().GetBool(flagInstallServers)
+		var flavor string
+		flavor, err = install.FlavorForInstall(installServers)
+		if err != nil {
+			return err
 		}
 
 		// Registered before install.Install so partial-install failures are also rolled back.

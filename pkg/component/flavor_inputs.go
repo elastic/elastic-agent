@@ -2,10 +2,10 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !securityonly
+//go:build !edr
 
 package component
 
-// variantAllowedInputTypes is empty for standard builds, meaning no
+// flavorAllowedInputTypes is empty for standard builds, meaning no
 // input-type restriction is applied.
-var variantAllowedInputTypes map[string]struct{}
+var flavorAllowedInputTypes map[string]struct{}

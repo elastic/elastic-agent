@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build securityonly
+//go:build edr
 
 // Package include registers all the composable providers with the composable
 // registry. It exists as a single place that explicitly wires up every
@@ -25,8 +25,8 @@ import (
 
 var once sync.Once
 
-// Providers registers the composable providers available in the security-only variant.
-// Docker and Kubernetes providers are excluded — the security-only variant does not
+// Providers registers the composable providers available in the EDR flavor.
+// Docker and Kubernetes providers are excluded — the EDR flavor does not
 // run in container orchestration environments and their dependencies are unnecessary.
 func Providers() {
 	once.Do(func() {

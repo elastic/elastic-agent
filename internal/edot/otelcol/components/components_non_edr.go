@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !securityonly
+//go:build !edr
 
 package components
 
@@ -16,7 +16,7 @@ import (
 )
 
 // addFullBeatReceivers registers the auditbeat and heartbeat receivers, which
-// are present in all non-security-only EDOT builds.
+// are present in all non-EDR EDOT builds.
 func addFullBeatReceivers(receivers []receiver.Factory) []receiver.Factory {
 	return append(receivers,
 		abreceiver.NewFactoryWithSettings(abreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),

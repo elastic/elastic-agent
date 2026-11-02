@@ -5,6 +5,8 @@
 package info
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -69,4 +71,28 @@ func TestECSMetadata(t *testing.T) {
 	assert.Equal(t, info.OS.Version, metadata.OS.Version)
 	assert.Equal(t, info.OS.Name, metadata.OS.Name)
 	assert.Equal(t, getFullOSName(info), metadata.OS.FullName)
+}
+
+func TestInstalledFlavor(t *testing.T) {
+	prevTop := paths.Top()
+	t.Cleanup(func() { paths.SetTop(prevTop) })
+
+	t.Run("flavor recorded at install time", func(t *testing.T) {
+		top := t.TempDir()
+		paths.SetTop(top)
+		require.NoError(t, os.WriteFile(filepath.Join(top, paths.FlavorFileName), []byte("servers\n"), 0o600))
+		assert.Equal(t, "servers", installedFlavor())
+	})
+
+	t.Run("no flavor recorded defaults to basic", func(t *testing.T) {
+		paths.SetTop(t.TempDir())
+		assert.Equal(t, "basic", installedFlavor())
+	})
+
+	t.Run("empty flavor file defaults to basic", func(t *testing.T) {
+		top := t.TempDir()
+		paths.SetTop(top)
+		require.NoError(t, os.WriteFile(filepath.Join(top, paths.FlavorFileName), []byte("\n"), 0o600))
+		assert.Equal(t, "basic", installedFlavor())
+	})
 }

@@ -403,7 +403,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("error parsing version %q: %w", version, err)
 	}
 
-	target, err := artifact.New(AgentName, release.Variant(), release.FIPSDistribution(), parsedVersion, runtime.GOOS, runtime.GOARCH)
+	target, err := newAgentArtifact(parsedVersion)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
 	}
@@ -891,4 +891,11 @@ func isSameReleaseVersion(log *logger.Logger, current agentVersion, upgradeVersi
 		return false
 	}
 	return current.version == targetVersion
+}
+
+// newAgentArtifact returns the artifact to upgrade to. The flavor always comes from this
+// build, never from the upgrade request, so an installation of a dedicated flavor (such as
+// edr) only upgrades to artifacts of that same flavor.
+func newAgentArtifact(version *agtversion.ParsedSemVer) (artifact.Artifact, error) {
+	return artifact.New(AgentName, release.Flavor(), release.FIPSDistribution(), version, runtime.GOOS, runtime.GOARCH)
 }

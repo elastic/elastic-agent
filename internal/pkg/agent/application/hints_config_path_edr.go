@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build securityonly
+//go:build edr
 
 package application
 
@@ -10,7 +10,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-// hintsInputConfigPath returns an empty string in the security-only variant; Kubernetes
+// hintsInputConfigPath returns an empty string in the EDR flavor; Kubernetes
 // hints-based config discovery is not available in this build.
 func hintsInputConfigPath(_ *logger.Logger, _ map[string]interface{}) string {
 	return ""

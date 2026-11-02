@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-//go:build !requirefips && securityonly
+//go:build !requirefips && edr
 
 package components
 
@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 )
 
-// addNonFipsReceivers adds the osquerybeat receiver for the security-only variant
+// addNonFipsReceivers adds the osquerybeat receiver for the EDR flavor
 // build. Kafka, Prometheus, and packetbeat receivers are intentionally excluded.
 func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	return append(receivers,
@@ -23,8 +23,8 @@ func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 	)
 }
 
-// addNonFipsExporters is a no-op for the security-only variant: the kafka exporter
-// is not included in the security-only variant build.
+// addNonFipsExporters is a no-op for the EDR flavor: the kafka exporter
+// is not included in the EDR flavor build.
 func addNonFipsExporters(exporters []exporter.Factory) []exporter.Factory {
 	return exporters
 }
