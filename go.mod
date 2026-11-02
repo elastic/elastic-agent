@@ -23,7 +23,7 @@ require (
 	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
-	github.com/elastic/go-elasticsearch/v8 v8.19.7
+	github.com/elastic/go-elasticsearch/v9 v9.5.2
 	github.com/elastic/go-sysinfo v1.15.5
 	github.com/elastic/go-ucfg v0.9.2
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
@@ -162,6 +162,7 @@ require (
 	github.com/ebitengine/purego v0.11.1 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.15.0 // indirect
+	github.com/elastic/go-elasticsearch/v8 v8.19.7 // indirect
 	github.com/elastic/go-freelru v0.16.0 // indirect
 	github.com/elastic/go-licenser v0.4.2 // indirect
 	github.com/elastic/go-lumber v0.2.0 // indirect
