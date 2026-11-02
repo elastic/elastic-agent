@@ -334,6 +334,7 @@ func TestAWSVerifier_UsesTLS13Client(t *testing.T) {
 // TLS 1.3.  Uses the identity-federation path with a fake token file because
 // NewClientAssertionCredential does not make network calls during construction.
 func TestAzureVerifier_UsesTLS13ForCredentials(t *testing.T) {
+	skipIfAzureIdentityFederationUnsupported(t)
 	v, err := NewAzureVerifier(context.Background(), zap.NewNop(), AzureAuthConfig{
 		IDTokenFile: writeFakeTokenFile(t),
 		TenantID:    "fake-tenant-id",
@@ -355,6 +356,7 @@ func TestAzureVerifier_UsesTLS13ForCredentials(t *testing.T) {
 // and only FIPS-approved cipher suites, because TLS 1.3 support for that
 // endpoint is not yet officially documented by Microsoft.
 func TestAzureVerifier_UsesTLS12WithFIPSCiphersForARM(t *testing.T) {
+	skipIfAzureIdentityFederationUnsupported(t)
 	v, err := NewAzureVerifier(context.Background(), zap.NewNop(), AzureAuthConfig{
 		IDTokenFile: writeFakeTokenFile(t),
 		TenantID:    "fake-tenant-id",
@@ -379,6 +381,7 @@ func TestAzureVerifier_UsesTLS12WithFIPSCiphersForARM(t *testing.T) {
 // two HTTP clients are distinct objects with different TLS configurations,
 // proving that Entra ID and ARM requests are independently secured.
 func TestAzureVerifier_CredentialsAndARMClientsAreIndependent(t *testing.T) {
+	skipIfAzureIdentityFederationUnsupported(t)
 	v, err := NewAzureVerifier(context.Background(), zap.NewNop(), AzureAuthConfig{
 		IDTokenFile: writeFakeTokenFile(t),
 		TenantID:    "fake-tenant-id",
@@ -415,4 +418,13 @@ func TestGCPVerifier_UsesTLS13Client(t *testing.T) {
 	tr := extractTransport(t, v.httpClient)
 	assert.Equal(t, uint16(tls.VersionTLS13), tr.TLSClientConfig.MinVersion)
 	assert.Empty(t, tr.TLSClientConfig.CipherSuites)
+}
+
+// skipIfAzureIdentityFederationUnsupported skips tests that build an Azure
+// verifier through the identity federation path, which FIPS builds exclude.
+func skipIfAzureIdentityFederationUnsupported(t *testing.T) {
+	t.Helper()
+	if !azureIdentityFederationSupported {
+		t.Skip("Azure identity federation is not supported in FIPS builds")
+	}
 }
