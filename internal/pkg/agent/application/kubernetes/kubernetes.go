@@ -12,9 +12,13 @@
 // input per container (registry entries are per file, not per input), and
 // re-renders the whole component model on every pod event.
 //
-// This package strips those variable references before AST rendering so the
-// input renders exactly once, and adds an add_kubernetes_metadata processor to
-// restore the kubernetes.* fields the dynamic provider used to inject.
+// The integration marks its filestream input with the input-level setting
+// single_input. When it is true, this package strips those variable references
+// before AST rendering so the input renders exactly once, and adds an
+// add_kubernetes_metadata processor to restore the kubernetes.* fields the
+// dynamic provider used to inject. A dynamic provider variable anywhere other
+// than the places the integration puts one by default keeps one input per
+// container instead.
 package kubernetes
 
 import (
@@ -28,63 +32,31 @@ import (
 )
 
 const (
-	// containerLogsDataset is the canonical data_stream.dataset value for the
-	// Kubernetes container-logs integration.
-	containerLogsDataset = "kubernetes.container_logs"
+	// singleInputKey is the input-level setting the Kubernetes integration sets on
+	// its filestream input to choose between one input for every container (true)
+	// and one input per container (false).
+	singleInputKey = "single_input"
 
-	// containerLogsSuffix is the suffix shared by renamed datasets
-	// (e.g. "myteam.container_logs").
-	containerLogsSuffix = ".container_logs"
-
-	// fleetPackageName is the value of meta.package.name set by Fleet for every
-	// input coming from the Kubernetes integration. It cannot be changed by the
-	// user through the Fleet UI, so its presence is treated as certain.
-	fleetPackageName = "kubernetes"
-)
-
-// containerLogConfidence is a score in the range [0, 100] expressing how
-// certain we are that a stream belongs to the Kubernetes container-logs
-// integration.
-type containerLogConfidence int
-
-const (
-	// highConfidence is the minimum score required to rewrite an input without
-	// any user-visible log message. Combinations of a kubelet log path and a
-	// per-container kubernetes variable in the path each contribute enough to
-	// reach this threshold independently.
-	highConfidence containerLogConfidence = 70
-
-	// suspectedConfidence is the minimum score at which the input is still
-	// rewritten, but a warning is emitted so operators can verify the decision.
-	suspectedConfidence containerLogConfidence = 40
-
-	// packageSignalScore is added when meta.package.name == "kubernetes" is
-	// present. It is a strong signal but not sufficient on its own: an
-	// audit-log stream (score 0 from path/dataset/id signals) still falls
-	// below suspectedConfidence (0 + 30 < 40), while a canonical container-log
-	// stream (kubelet path + container var = 70) is pushed well past
-	// highConfidence (70 + 30 = 100).
-	packageSignalScore containerLogConfidence = 30
+	// filestreamInputType is the type of the input the integration collects
+	// container logs with.
+	filestreamInputType = "filestream"
 )
 
 // k8sVarPattern matches elastic-agent variable references scoped to the
 // kubernetes provider, e.g. ${kubernetes.container.id}.
 var k8sVarPattern = regexp.MustCompile(`\$\{kubernetes\.[^}]*\}`)
 
-// k8sAnnotationVarPattern captures the annotation key out of a reference such as
-// ${kubernetes.annotations.elastic.co/dataset|""}. Group 1 is the raw (not
-// dedotted) annotation key as it appears on the pod.
-var k8sAnnotationVarPattern = regexp.MustCompile(`\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|[^}]*)?\}`)
+// dynamicVarPattern matches a variable expression that refers to any dynamic
+// provider, including through a fallback such as ${env.X|kubernetes.pod.name}.
+// The context providers (host, env, agent, ...) are resolved once for the whole
+// agent and are deliberately not matched.
+var dynamicVarPattern = regexp.MustCompile(`\$\{[^}]*\b(?:kubernetes|docker|local_dynamic)\.[^}]*\}`)
 
 // k8sExactAnnotationVarPattern matches a value that is nothing but a single
-// annotation reference, optionally with an empty-string fallback. Group 1 is the
-// raw annotation key.
+// annotation reference, optionally with an empty-string fallback, such as
+// ${kubernetes.annotations.elastic.co/dataset|""}. Group 1 is the raw (not
+// dedotted) annotation key as it appears on the pod.
 var k8sExactAnnotationVarPattern = regexp.MustCompile(`^\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|\s*(?:""|\'\'))?\}$`)
-
-// k8sExactVarPattern matches a value that is nothing but a single
-// ${kubernetes.*} reference with no fallback. Group 1 is the event field the
-// reference resolves from once add_kubernetes_metadata has run.
-var k8sExactVarPattern = regexp.MustCompile(`^\$\{(kubernetes\.[^}|\s]+)\}$`)
 
 // k8sStarAdjacentVarPattern is like starAdjacentVarPattern but only matches
 // ${kubernetes.*} references. Used in path translation so that context-provider
@@ -96,8 +68,8 @@ var k8sStarAdjacentVarPattern = regexp.MustCompile(`\**(\$\{kubernetes\.[^}]+\})
 var separatorRunPattern = regexp.MustCompile(`[-_.]{2,}`)
 
 // hintsVarPrefix is the variable prefix used by the hints-based autodiscovery
-// templates. Inputs referencing it are genuinely per-container and must not be
-// collapsed into a single glob input.
+// templates. Those are genuinely per-container and must never be collapsed into
+// a single glob input.
 const hintsVarPrefix = "${kubernetes.hints."
 
 // translateVarPathToGlob replaces ${kubernetes.*} variable references with *
@@ -110,28 +82,30 @@ func translateVarPathToGlob(path string) string {
 	return k8sStarAdjacentVarPattern.ReplaceAllString(path, "*")
 }
 
-// RewriteContainerLogInputs rewrites every eligible kubernetes.container_logs
-// input in the raw config map produced by cfg.ToMapStr(), in place, before the
-// coordinator passes it to generateAST. Each eligible input is turned into a
-// static input by:
+// RewriteContainerLogInputs rewrites every filestream input carrying the
+// integration's single_input setting in the raw config map produced from
+// the policy, in place, before the coordinator passes it to generateAST.
+// The setting is consumed: it is removed from every input it is found on.
+//
+// An input with single_input true is turned into a static input by:
 //
 //   - translating ${kubernetes.*} references in stream paths into glob wildcards
 //   - stripping ${kubernetes.*} references from input and stream ids
-//   - dropping stream processors that reference ${kubernetes.*} (they can only
-//     be resolved per-container) and replacing them with a single
-//     add_kubernetes_metadata processor
+//   - dropping the add_fields processors that copy pod annotations into
+//     kubernetes.annotations.* (add_kubernetes_metadata publishes those through
+//     include_annotations) and prepending a single add_kubernetes_metadata
+//     processor
 //
-// Inputs that are genuinely per-container — hints-based autodiscovery templates,
-// or anything carrying a condition — are left untouched. Streams that do not
-// appear to belong to the container-logs integration (low confidence score) are
-// left untouched, and an input is only rewritten when all of its streams clear
-// the suspectedConfidence threshold.
+// This only happens when the input can be made static without changing what it
+// collects. A dynamic provider variable anywhere except the input and stream ids,
+// the stream paths and the annotation processors above keeps one input per
+// container, as do paths outside the kubelet log directories, where there is no
+// way to look up the Kubernetes metadata.
 //
-// globInput false leaves the per-container inputs in place, but still annotates
-// them so the setting can be toggled without losing read positions: see
-// markContainerLogTakeOver. Eligibility is evaluated identically either way, so
-// an input that would not be collapsed is also never annotated.
-func RewriteContainerLogInputs(m map[string]interface{}, globInput bool, log *logp.Logger) {
+// An input with single_input false, or one that cannot be made static, keeps one
+// input per container. It is still annotated so the setting can be toggled
+// without losing read positions: see markContainerLogTakeOver.
+func RewriteContainerLogInputs(m map[string]interface{}, log *logp.Logger) {
 	inputList, ok := m["inputs"].([]interface{})
 	if !ok {
 		return
@@ -141,281 +115,249 @@ func RewriteContainerLogInputs(m map[string]interface{}, globInput bool, log *lo
 		if !ok {
 			continue
 		}
-		if !isRewritableContainerLogInput(inputMap, log) {
+		singleInput, found := singleInputSetting(inputMap)
+		if !found {
 			continue
 		}
-		if globInput {
-			rewriteContainerLogInput(inputMap)
-			inputID, _ := inputMap["id"].(string)
-			log.Infof(
-				"Automatically collapsed kubernetes container-log input %q into a single "+
-					"glob filestream input. To suppress this message, update your Fleet "+
-					"integration to the latest version or update your standalone manifest "+
-					"to use the recommended Kubernetes container-logs configuration.",
-				inputID,
+		delete(inputMap, singleInputKey)
+
+		inputID, _ := inputMap["id"].(string)
+		if singleInput {
+			blocker := containerLogConversionBlocker(inputMap)
+			if blocker == "" {
+				rewriteContainerLogInput(inputMap)
+				log.Infof("Collapsed kubernetes container-log input %q into a single glob filestream input", inputID)
+				continue
+			}
+			log.Warnf(
+				"Keeping one input per container for kubernetes container-log input %q although %s is enabled: %s",
+				inputID, singleInputKey, blocker,
 			)
-			continue
 		}
 		markContainerLogTakeOver(inputMap)
 	}
 }
 
-// containerLogStreamConfidence returns a confidence score for how likely a
-// stream is to be a kubernetes container-logs stream, along with a human-readable
-// list of the signals that contributed to the score.
-//
-// The input map is passed alongside the stream so the Fleet meta.package signal
-// (which lives at the input level, not the stream level) can be checked once.
-//
-// Score thresholds:
-//   - highConfidence      (70): multiple strong path/id signals; apply silently
-//   - suspectedConfidence (40): some signals; apply but emit a warning
-//   - below suspectedConfidence: do not apply
-func containerLogStreamConfidence(input, stream map[string]interface{}) (containerLogConfidence, []string) {
-	var signals []string
-	score := containerLogConfidence(0)
-
-	// Fleet signal: meta.package.name is set by Fleet and is immutable, but it
-	// identifies the package, not the stream type. An input in the kubernetes
-	// package can carry non-container streams (e.g. audit logs), so this signal
-	// contributes a bonus rather than short-circuiting to certainty.
-	if pkg, ok := nestedString(input, "meta", "package", "name"); ok && pkg == fleetPackageName {
-		score += packageSignalScore
-		signals = append(signals, "meta.package.name=kubernetes")
+// singleInputSetting reports the value of the single_input setting of a filestream
+// input. found is false for any other input type, and when the setting is absent
+// or not a boolean.
+func singleInputSetting(input map[string]interface{}) (value, found bool) {
+	if inputType, _ := input["type"].(string); inputType != filestreamInputType {
+		return false, false
 	}
-
-	// Path signals — check every path in the stream.
-	kubeletPathSeen := false
-	containerVarSeen := false
-	podUIDSeen := false
-	podVarSeen := false
-	if pathList, ok := stream["paths"].([]interface{}); ok {
-		for _, p := range pathList {
-			path, ok := p.(string)
-			if !ok {
-				continue
-			}
-			if !kubeletPathSeen && isKubeletLogPath(path) {
-				kubeletPathSeen = true
-				signals = append(signals, fmt.Sprintf("path under kubelet log dir: %s", path))
-				score += 40
-			}
-			if !containerVarSeen && containsAny(path, "${kubernetes.container.id}", "${kubernetes.container.name}") {
-				containerVarSeen = true
-				signals = append(signals, "path contains ${kubernetes.container.*} variable")
-				score += 30
-			}
-			if !podUIDSeen && strings.Contains(path, "${kubernetes.pod.uid}") {
-				podUIDSeen = true
-				signals = append(signals, "path contains ${kubernetes.pod.uid}")
-				score += 20
-			}
-			if !podVarSeen && containsAny(path, "${kubernetes.pod.name}", "${kubernetes.namespace}") {
-				podVarSeen = true
-				signals = append(signals, "path contains kubernetes pod/namespace variable")
-				score += 10
-			}
-		}
-	}
-
-	// Dataset signals.
-	if ds, ok := stream["data_stream"].(map[string]interface{}); ok {
-		if dataset, ok := ds["dataset"].(string); ok {
-			if dataset == containerLogsDataset {
-				signals = append(signals, fmt.Sprintf("data_stream.dataset=%s (exact match)", dataset))
-				score += 30
-			} else if strings.HasSuffix(dataset, containerLogsSuffix) {
-				signals = append(signals, fmt.Sprintf("data_stream.dataset=%s (suffix match)", dataset))
-				score += 15
-			}
-		}
-	}
-
-	// Stream ID signals.
-	if id, ok := stream["id"].(string); ok {
-		if containsAny(id, "container-log", "container_log") {
-			signals = append(signals, fmt.Sprintf("stream id contains container-log pattern: %s", id))
-			score += 15
-		}
-		if k8sVarPattern.MatchString(id) {
-			signals = append(signals, "stream id contains ${kubernetes.*} variable")
-			score += 10
-		}
-	}
-
-	return score, signals
+	value, found = input[singleInputKey].(bool)
+	return value, found
 }
 
-// isKubeletLogPath reports whether path is rooted at one of the three kubelet-
-// managed log directories. These directories are exclusive to container runtimes
-// and are a strong signal that the stream is a container-log stream.
-func isKubeletLogPath(path string) bool {
-	return strings.HasPrefix(path, containerLogsPath) ||
-		strings.HasPrefix(path, podLogsPath) ||
-		strings.HasPrefix(path, kubeletPodLogsPath)
-}
-
-// containsAny reports whether s contains any of the provided substrings.
-func containsAny(s string, subs ...string) bool {
-	for _, sub := range subs {
-		if strings.Contains(s, sub) {
-			return true
-		}
-	}
-	return false
-}
-
-// nestedString walks a map tree following the given keys and returns the string
-// value at the leaf, or ("", false) if any step is missing or not a string.
-func nestedString(m map[string]interface{}, keys ...string) (string, bool) {
-	var cur interface{} = m
-	for _, k := range keys {
-		curMap, ok := cur.(map[string]interface{})
-		if !ok {
-			return "", false
-		}
-		cur = curMap[k]
-	}
-	s, ok := cur.(string)
-	return s, ok
-}
-
-// isRewritableContainerLogInput reports whether the input can be collapsed into
-// a single static filestream. Hard disqualifiers (conditions, hints provider)
-// are checked first. Then every stream must score at or above suspectedConfidence.
-// A warning is logged for streams that score below highConfidence so that
-// operators can verify the heuristic decision.
-func isRewritableContainerLogInput(input map[string]interface{}, log *logp.Logger) bool {
-	streams, ok := input["streams"].([]interface{})
-	if !ok || len(streams) == 0 {
-		return false
-	}
-	if _, hasCondition := input["condition"]; hasCondition {
-		return false
-	}
-	if referencesHintsProvider(input) {
-		return false
+// containerLogConversionBlocker returns why the input cannot be collapsed into a
+// single static filestream, or "" when it can.
+func containerLogConversionBlocker(input map[string]interface{}) string {
+	streams, _ := input["streams"].([]interface{})
+	if len(streams) == 0 {
+		return "the input has no streams"
 	}
 
-	inputID, _ := input["id"].(string)
-
-	if hasUnsupportedKubernetesVarRef(input, "id", "name", "streams") {
-		return false
+	if location := firstDynamicVarOutside(input, "id", "streams"); location != "" {
+		return location
+	}
+	if blocker := idBlocker(input["id"], "id"); blocker != "" {
+		return blocker
 	}
 
-	// The rewrite collapses per-container dynamic inputs — those whose paths or
-	// ids contain ${kubernetes.*} variable references injected by the kubernetes
-	// provider. A fully static input (no such references) was never templated by
-	// the provider and must not be rewritten: its paths are already fixed globs,
-	// and rewriting it would only add unnecessary processing.
-	hasKubernetesVarRef := k8sVarPattern.MatchString(inputID)
-	if !hasKubernetesVarRef {
-		for _, stream := range streams {
-			streamMap, ok := stream.(map[string]interface{})
-			if !ok {
-				continue
-			}
-			if id, _ := streamMap["id"].(string); k8sVarPattern.MatchString(id) {
-				hasKubernetesVarRef = true
-				break
-			}
-			if pathList, ok := streamMap["paths"].([]interface{}); ok {
-				for _, p := range pathList {
-					if pathStr, ok := p.(string); ok && k8sVarPattern.MatchString(pathStr) {
-						hasKubernetesVarRef = true
-						break
-					}
-				}
-			}
-			if hasKubernetesVarRef {
-				break
-			}
-		}
-	}
-	if !hasKubernetesVarRef {
-		return false
-	}
-
-	for _, stream := range streams {
+	for i, stream := range streams {
 		streamMap, ok := stream.(map[string]interface{})
 		if !ok {
-			return false
+			return fmt.Sprintf("streams[%d] is not a map", i)
 		}
-		if _, hasCondition := streamMap["condition"]; hasCondition {
-			return false
-		}
-		if hasUnsupportedKubernetesVarRef(streamMap, "id", "paths", "processors") {
-			return false
-		}
-		procs, _ := streamMap["processors"].([]interface{})
-		for _, proc := range procs {
-			if processorHasUntransformableKubernetesVarRef(proc) {
-				return false
-			}
-		}
+		prefix := fmt.Sprintf("streams[%d]", i)
 
-		score, signals := containerLogStreamConfidence(input, streamMap)
-		streamID, _ := streamMap["id"].(string)
-
-		if score < suspectedConfidence {
-			return false
+		if location := firstDynamicVarOutside(streamMap, "id", "paths", "processors"); location != "" {
+			return prefix + "." + location
 		}
-		if score < highConfidence {
-			log.Warnf(
-				"applying kubernetes container-log glob rewrite to stream %q in input %q "+
-					"with low confidence (score %d/%d); verify this is the container-logs integration. "+
-					"Detected signals: %s",
-				streamID, inputID, score, highConfidence, strings.Join(signals, "; "),
-			)
+		if blocker := idBlocker(streamMap["id"], prefix+".id"); blocker != "" {
+			return blocker
+		}
+		if blocker := pathsBlocker(streamMap["paths"], prefix+".paths"); blocker != "" {
+			return blocker
+		}
+		if blocker := processorsBlocker(streamMap["processors"], prefix+".processors"); blocker != "" {
+			return blocker
 		}
 	}
-	return true
+	return ""
 }
 
-// hasUnsupportedKubernetesVarRef reports whether the map references a
-// ${kubernetes.*} variable anywhere the rewrite cannot make static. The keys in
-// handled are the ones the rewrite rewrites itself; an id-like key only counts
-// as handled when stripping its references leaves a usable id. A reference left
-// anywhere else would keep the kubernetes provider rendering the input once per
-// pod, even though its ids and paths no longer differ.
-func hasUnsupportedKubernetesVarRef(m map[string]interface{}, handled ...string) bool {
-	for key, value := range m {
-		if !walkHasKubernetesVarRef(value) {
+// firstDynamicVarOutside describes the first dynamic provider variable found in
+// m under a key that is not in skip, or returns "".
+func firstDynamicVarOutside(m map[string]interface{}, skip ...string) string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		if !slices.Contains(skip, key) {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if ref, found := firstDynamicVar(m[key]); found {
+			return fmt.Sprintf("%s references the dynamic provider variable %s", key, ref)
+		}
+	}
+	return ""
+}
+
+// firstDynamicVar returns the first dynamic provider variable expression found
+// anywhere in the value tree. Maps are walked in key order so the result is
+// stable.
+func firstDynamicVar(value interface{}) (string, bool) {
+	switch v := value.(type) {
+	case string:
+		if ref := dynamicVarPattern.FindString(v); ref != "" {
+			return ref, true
+		}
+	case map[string]interface{}:
+		keys := make([]string, 0, len(v))
+		for key := range v {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			if ref, found := firstDynamicVar(v[key]); found {
+				return ref, true
+			}
+		}
+	case []interface{}:
+		for _, item := range v {
+			if ref, found := firstDynamicVar(item); found {
+				return ref, true
+			}
+		}
+	}
+	return "", false
+}
+
+// templatedValueBlocker checks a string that is allowed to reference the
+// kubernetes provider (an id or a path). It may only contain ${kubernetes.*}
+// references that are not hints, because those are the ones the rewrite replaces;
+// any other dynamic provider variable would keep the input rendering per mapping.
+func templatedValueBlocker(value, location string) string {
+	if strings.Contains(value, hintsVarPrefix) {
+		return fmt.Sprintf("%s references the kubernetes hints provider", location)
+	}
+	if ref := dynamicVarPattern.FindString(k8sVarPattern.ReplaceAllString(value, "")); ref != "" {
+		return fmt.Sprintf("%s references the dynamic provider variable %s", location, ref)
+	}
+	return ""
+}
+
+// idBlocker checks an id-like value. An id made only of variables cannot be
+// reduced to a distinct static id.
+func idBlocker(value interface{}, location string) string {
+	if value == nil {
+		return ""
+	}
+	id, isString := value.(string)
+	if !isString {
+		if ref, found := firstDynamicVar(value); found {
+			return fmt.Sprintf("%s references the dynamic provider variable %s", location, ref)
+		}
+		return ""
+	}
+	if blocker := templatedValueBlocker(id, location); blocker != "" {
+		return blocker
+	}
+	if k8sVarPattern.MatchString(id) {
+		if _, ok := containerLogGlobID(id); !ok {
+			return fmt.Sprintf("%s has no static part once its variables are removed", location)
+		}
+	}
+	return ""
+}
+
+// pathsBlocker checks the stream paths: each may only reference the kubernetes
+// provider, and at least one must be under a kubelet log directory so the
+// Kubernetes metadata can be looked up from the file path.
+func pathsBlocker(value interface{}, location string) string {
+	pathList, _ := value.([]interface{})
+	var paths []string
+	for i, item := range pathList {
+		path, isString := item.(string)
+		if !isString {
 			continue
 		}
-		if !slices.Contains(handled, key) {
-			return true
+		if blocker := templatedValueBlocker(path, fmt.Sprintf("%s[%d]", location, i)); blocker != "" {
+			return blocker
 		}
-		if key == "id" || key == "name" {
-			str, isString := value.(string)
-			if !isString {
-				return true
+		paths = append(paths, translateVarPathToGlob(path))
+	}
+	for _, lookup := range resourceLookups {
+		if anyPathUnder(paths, lookup.logsPath) {
+			return ""
+		}
+	}
+	return fmt.Sprintf("%s has no path under a kubelet log directory to look up Kubernetes metadata from", location)
+}
+
+// processorsBlocker checks the stream processors. The only dynamic provider
+// variables the rewrite can reproduce are the annotation mappings the integration
+// adds by default; anything else would be silently dropped or kept dynamic.
+func processorsBlocker(value interface{}, location string) string {
+	processors, _ := value.([]interface{})
+	for i, processor := range processors {
+		ref, found := firstDynamicVar(processor)
+		if !found {
+			continue
+		}
+		processorLocation := fmt.Sprintf("%s[%d]", location, i)
+		processorMap, _ := processor.(map[string]interface{})
+		addFields, _ := processorMap["add_fields"].(map[string]interface{})
+		if addFields == nil {
+			return fmt.Sprintf("%s references the dynamic provider variable %s", processorLocation, ref)
+		}
+		if outside := firstDynamicVarOutside(processorMap, "add_fields"); outside != "" {
+			return processorLocation + "." + outside
+		}
+		if outside := firstDynamicVarOutside(addFields, "fields"); outside != "" {
+			return processorLocation + ".add_fields." + outside
+		}
+		target, hasTarget := addFields["target"].(string)
+		fields, _ := addFields["fields"].(map[string]interface{})
+		for key, val := range fields {
+			if _, found := firstDynamicVar(val); !found {
+				continue
 			}
-			if _, ok := containerLogGlobID(str); !ok {
-				return true
+			if _, ok := annotationMapping(target, hasTarget, key, val); !ok {
+				return fmt.Sprintf("%s.add_fields.fields.%s references the dynamic provider variable %s",
+					processorLocation, key, ref)
 			}
 		}
 	}
-	return false
+	return ""
 }
 
-// referencesHintsProvider reports whether any string anywhere in the input tree
-// references the kubernetes hints provider.
-func referencesHintsProvider(input map[string]interface{}) bool {
-	found := false
-	walkStrings(input, func(s string) {
-		if strings.Contains(s, hintsVarPrefix) {
-			found = true
-		}
-	})
-	return found
+// annotationMapping reports whether an add_fields entry is exactly the mapping
+// that add_kubernetes_metadata's include_annotations publishes on its own: the
+// annotation "a.b/c" under kubernetes.annotations.a_b/c. It returns the raw
+// annotation key. Any other destination, such as a custom target, is not
+// reproducible and must not be treated as one.
+func annotationMapping(target string, hasTarget bool, key string, val interface{}) (string, bool) {
+	str, isString := val.(string)
+	if !isString || !hasTarget || target != "kubernetes" {
+		return "", false
+	}
+	match := k8sExactAnnotationVarPattern.FindStringSubmatch(str)
+	if match == nil {
+		return "", false
+	}
+	if key != "annotations."+strings.ReplaceAll(match[1], ".", "_") {
+		return "", false
+	}
+	return match[1], true
 }
 
 // rewriteContainerLogInput performs the in-place rewrite described on
 // RewriteContainerLogInputs for a single, already validated, input.
 func rewriteContainerLogInput(input map[string]interface{}) {
 	stripVarsFromIDField(input, "id")
-	stripVarsFromIDField(input, "name")
 
 	streams, _ := input["streams"].([]interface{})
 	for _, stream := range streams {
@@ -425,7 +367,7 @@ func rewriteContainerLogInput(input map[string]interface{}) {
 		enableTakeOverFromAnyID(streamMap)
 		stripVarsFromIDField(streamMap, "id")
 		paths := rewriteStreamPaths(streamMap)
-		processors, annotations := filterVarProcessors(streamMap["processors"])
+		processors, annotations := dropAnnotationProcessors(streamMap["processors"])
 		streamMap["processors"] = append(
 			[]interface{}{buildAddKubernetesMetadataProcessor(paths, annotations)},
 			processors...,
@@ -479,12 +421,12 @@ func rewriteStreamPaths(stream map[string]interface{}) []string {
 	return globs
 }
 
-// filterVarProcessors splits a stream's processor list into the processors that
-// survive the rewrite and the kubernetes annotation keys referenced by the ones
-// that don't. A processor referencing ${kubernetes.*} can only be resolved for a
-// specific container, so it cannot survive on a static input; the annotation
-// keys it looked up are handed to add_kubernetes_metadata's include_annotations
-// instead, which publishes them under the same dedotted field names.
+// dropAnnotationProcessors removes the processors the rewrite makes redundant and
+// returns the rest, along with the pod annotation keys they looked up. The
+// annotation mappings the integration adds to every event are handed to
+// add_kubernetes_metadata's include_annotations instead, which publishes them
+// under the same dedotted field names; an add_fields left with other fields keeps
+// them.
 //
 // Any add_kubernetes_metadata already present is dropped too, so that rewriting
 // an already rewritten config is a no-op rather than stacking a second copy of
@@ -493,54 +435,77 @@ func rewriteStreamPaths(stream map[string]interface{}) []string {
 // The returned annotation keys are sorted: they are collected by walking maps,
 // and an unstable order here would change the rendered config hash on every
 // policy change and trigger needless component restarts.
-func filterVarProcessors(raw interface{}) (kept []interface{}, annotations []string) {
+func dropAnnotationProcessors(raw interface{}) (kept []interface{}, annotations []string) {
 	processors, ok := raw.([]interface{})
 	if !ok {
 		return nil, nil
 	}
 	seen := make(map[string]struct{})
+	addAnnotation := func(annotation string) {
+		if _, exists := seen[annotation]; !exists {
+			seen[annotation] = struct{}{}
+			annotations = append(annotations, annotation)
+		}
+	}
 	kept = make([]interface{}, 0, len(processors))
 	for _, processor := range processors {
-		referencesVar := false
-		walkStrings(processor, func(s string) {
-			for _, match := range k8sAnnotationVarPattern.FindAllStringSubmatch(s, -1) {
-				if _, exists := seen[match[1]]; !exists {
-					seen[match[1]] = struct{}{}
-					annotations = append(annotations, match[1])
-				}
-			}
-			if k8sVarPattern.MatchString(s) {
-				referencesVar = true
-			}
-		})
 		if existing, isMetadata := addKubernetesMetadataConfig(processor); isMetadata {
 			// Carry the annotation list of a processor we added on an earlier pass
 			// across, so rewriting an already rewritten config keeps publishing the
 			// same annotations.
 			for _, annotation := range includedAnnotations(existing) {
-				if _, exists := seen[annotation]; !exists {
-					seen[annotation] = struct{}{}
-					annotations = append(annotations, annotation)
-				}
+				addAnnotation(annotation)
 			}
 			continue
 		}
-		if referencesVar {
-			if transformed, ok := transformAddFieldsToFieldCopies(processor); ok {
-				kept = append(kept, transformed...)
-			}
-			// Processors whose only kubernetes references are annotation refs are
-			// dropped here; add_kubernetes_metadata publishes those annotations via
-			// include_annotations so dropping the original processor is correct.
-			// Processors with non-annotation kubernetes vars in untransformable
-			// locations are never reached here: isRewritableContainerLogInput
-			// rejects those inputs before rewriteContainerLogInput is called.
-			continue
+		remaining, extracted := extractAnnotationMappings(processor)
+		for _, annotation := range extracted {
+			addAnnotation(annotation)
 		}
-		kept = append(kept, processor)
+		if remaining != nil {
+			kept = append(kept, remaining)
+		}
 	}
 	slices.Sort(annotations)
 	return kept, annotations
+}
+
+// extractAnnotationMappings removes the annotation mappings from an add_fields
+// processor. It returns the processor to keep, which is nil when nothing is left
+// of it, and the annotation keys that were removed. Any other processor is
+// returned as is.
+func extractAnnotationMappings(processor interface{}) (interface{}, []string) {
+	processorMap, ok := processor.(map[string]interface{})
+	if !ok {
+		return processor, nil
+	}
+	addFields, ok := processorMap["add_fields"].(map[string]interface{})
+	if !ok {
+		return processor, nil
+	}
+	fields, ok := addFields["fields"].(map[string]interface{})
+	if !ok {
+		return processor, nil
+	}
+	target, hasTarget := addFields["target"].(string)
+
+	var annotations []string
+	remaining := make(map[string]interface{}, len(fields))
+	for key, val := range fields {
+		if annotation, isMapping := annotationMapping(target, hasTarget, key, val); isMapping {
+			annotations = append(annotations, annotation)
+			continue
+		}
+		remaining[key] = val
+	}
+	if len(annotations) == 0 {
+		return processor, nil
+	}
+	if len(remaining) == 0 {
+		return nil, annotations
+	}
+	addFields["fields"] = remaining
+	return processor, annotations
 }
 
 // addKubernetesMetadataConfig returns the configuration of the processor entry
@@ -642,216 +607,4 @@ func enableTakeOverFromAnyID(stream map[string]interface{}) {
 	takeOver := ensureTakeOver(stream)
 	takeOver[takeOverFromAnyID] = true
 	delete(takeOver, takeOverFromIDs)
-}
-
-// processorHasNonAnnotationKubernetesVarRef reports whether any string value in
-// the processor contains a ${kubernetes.*} reference that is NOT an annotation
-// reference. Annotation references are handled separately via include_annotations
-// and do not need to survive in the processor itself.
-func processorHasNonAnnotationKubernetesVarRef(processor interface{}) bool {
-	found := false
-	walkStrings(processor, func(s string) {
-		stripped := k8sAnnotationVarPattern.ReplaceAllString(s, "")
-		if k8sVarPattern.MatchString(stripped) {
-			found = true
-		}
-	})
-	return found
-}
-
-// processorHasUntransformableKubernetesVarRef reports whether the processor
-// has a ${kubernetes.*} reference the rewrite cannot reproduce on a static
-// input. For add_fields processors the fields values are classified by
-// classifyAddFieldsValue; everything else (the outer processor map, when:, and
-// any non-fields config inside add_fields) must not reference kubernetes
-// variables. For all other processor types the entire processor is checked.
-func processorHasUntransformableKubernetesVarRef(processor interface{}) bool {
-	processorMap, ok := processor.(map[string]interface{})
-	if !ok {
-		return false
-	}
-	addFieldsCfg, ok := processorMap["add_fields"].(map[string]interface{})
-	if !ok {
-		return processorHasNonAnnotationKubernetesVarRef(processor)
-	}
-	for k, v := range processorMap {
-		if k != "add_fields" && walkHasKubernetesVarRef(v) {
-			return true
-		}
-	}
-	for k, v := range addFieldsCfg {
-		if k != "fields" && walkHasKubernetesVarRef(v) {
-			return true
-		}
-	}
-	fields, _ := addFieldsCfg["fields"].(map[string]interface{})
-	target, hasTarget := addFieldsCfg["target"].(string)
-	for key, val := range fields {
-		if kind, _ := classifyAddFieldsValue(target, hasTarget, key, val); kind == addFieldsUnsupported {
-			return true
-		}
-	}
-	return false
-}
-
-// walkHasKubernetesVarRef reports whether any string in the value tree contains
-// a ${kubernetes.*} reference, annotation references included.
-func walkHasKubernetesVarRef(value interface{}) bool {
-	found := false
-	walkStrings(value, func(s string) {
-		if k8sVarPattern.MatchString(s) {
-			found = true
-		}
-	})
-	return found
-}
-
-type addFieldsValueKind int
-
-const (
-	// addFieldsStatic is a value with no kubernetes reference.
-	addFieldsStatic addFieldsValueKind = iota
-	// addFieldsCopy is exactly one ${kubernetes.*} reference, reproducible with
-	// copy_fields from the fields add_kubernetes_metadata sets.
-	addFieldsCopy
-	// addFieldsAnnotation is the annotation mapping that include_annotations
-	// publishes on its own, so the original field can be dropped.
-	addFieldsAnnotation
-	// addFieldsUnsupported references kubernetes in a form the rewrite cannot
-	// reproduce: mixed with other text, with a fallback, or mapped somewhere
-	// other than where include_annotations puts it.
-	addFieldsUnsupported
-)
-
-// addFieldsDestination returns the event field an add_fields entry writes.
-// A missing target defaults to "fields"; an empty target is the event root.
-func addFieldsDestination(target string, hasTarget bool, key string) string {
-	switch {
-	case !hasTarget:
-		return "fields." + key
-	case target == "":
-		return key
-	default:
-		return target + "." + key
-	}
-}
-
-// classifyAddFieldsValue decides how the rewrite treats a single add_fields
-// entry. For addFieldsCopy it also returns the source event field.
-func classifyAddFieldsValue(target string, hasTarget bool, key string, val interface{}) (addFieldsValueKind, string) {
-	str, isString := val.(string)
-	if !isString {
-		if walkHasKubernetesVarRef(val) {
-			return addFieldsUnsupported, ""
-		}
-		return addFieldsStatic, ""
-	}
-	if !k8sVarPattern.MatchString(str) {
-		return addFieldsStatic, ""
-	}
-	if m := k8sExactAnnotationVarPattern.FindStringSubmatch(str); m != nil {
-		// include_annotations publishes annotation "a.b/c" as
-		// kubernetes.annotations.a_b/c.
-		published := "kubernetes.annotations." + strings.ReplaceAll(m[1], ".", "_")
-		if addFieldsDestination(target, hasTarget, key) == published {
-			return addFieldsAnnotation, ""
-		}
-		return addFieldsUnsupported, ""
-	}
-	if m := k8sExactVarPattern.FindStringSubmatch(str); m != nil {
-		return addFieldsCopy, m[1]
-	}
-	return addFieldsUnsupported, ""
-}
-
-// transformAddFieldsToFieldCopies converts an add_fields processor that
-// references ${kubernetes.*} into processors that work on a static input:
-// exact references become copy_fields from the fields add_kubernetes_metadata
-// sets, annotation mappings are dropped (include_annotations publishes them),
-// and static fields stay in a residual add_fields. A when: condition, which
-// lives inside the processor configuration, is carried onto each generated
-// processor.
-//
-// Returns false for any other processor type, or an add_fields without fields.
-// Callers must already have rejected unsupported values through
-// processorHasUntransformableKubernetesVarRef.
-func transformAddFieldsToFieldCopies(processor interface{}) ([]interface{}, bool) {
-	processorMap, ok := processor.(map[string]interface{})
-	if !ok {
-		return nil, false
-	}
-	addFieldsCfg, ok := processorMap["add_fields"].(map[string]interface{})
-	if !ok {
-		return nil, false
-	}
-	fields, ok := addFieldsCfg["fields"].(map[string]interface{})
-	if !ok || len(fields) == 0 {
-		return nil, false
-	}
-	rawTarget, hasTarget := addFieldsCfg["target"]
-	target, _ := rawTarget.(string)
-	when := addFieldsCfg["when"]
-
-	// Iterate in sorted key order for a stable config hash.
-	keys := make([]string, 0, len(fields))
-	for k := range fields {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-
-	var copySpecs []interface{}
-	staticFields := make(map[string]interface{})
-	for _, key := range keys {
-		kind, from := classifyAddFieldsValue(target, hasTarget, key, fields[key])
-		switch kind {
-		case addFieldsStatic:
-			staticFields[key] = fields[key]
-		case addFieldsCopy:
-			copySpecs = append(copySpecs, map[string]interface{}{
-				"from": from,
-				"to":   addFieldsDestination(target, hasTarget, key),
-			})
-		}
-	}
-
-	var result []interface{}
-	if len(staticFields) > 0 {
-		body := map[string]interface{}{"fields": staticFields}
-		if hasTarget {
-			body["target"] = rawTarget
-		}
-		if when != nil {
-			body["when"] = when
-		}
-		result = append(result, map[string]interface{}{"add_fields": body})
-	}
-	if len(copySpecs) > 0 {
-		body := map[string]interface{}{
-			"fields":         copySpecs,
-			"fail_on_error":  false,
-			"ignore_missing": true,
-		}
-		if when != nil {
-			body["when"] = when
-		}
-		result = append(result, map[string]interface{}{"copy_fields": body})
-	}
-	return result, true
-}
-
-// walkStrings calls fn for every string found in the value tree, descending into
-// maps and slices.
-func walkStrings(value interface{}, fn func(string)) {
-	switch v := value.(type) {
-	case string:
-		fn(v)
-	case map[string]interface{}:
-		for _, item := range v {
-			walkStrings(item, fn)
-		}
-	case []interface{}:
-		for _, item := range v {
-			walkStrings(item, fn)
-		}
-	}
 }

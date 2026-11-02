@@ -1832,26 +1832,12 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
 
-	// Collapse the per-container kubernetes container-log inputs into a single
-	// filestream watching a glob path. This has to happen before AST rendering,
-	// because it is the ${kubernetes.*} references in the raw config that make the
-	// kubernetes provider render the input once per discovered container.
-	//
-	// This runs whether or not the glob input is enabled: when it is disabled the
-	// inputs stay per-container but are annotated so that read positions survive
-	// the setting being toggled back off.
-	//
-	// The setting is read off the config being processed rather than c.currentCfg,
-	// which is only assigned further down. That assignment reuses this unpack, so a
-	// policy change costs one parse; reporting its error stays where it was, to
-	// keep the ordering of everything in between unchanged.
-	currentCfg, currentCfgErr := configuration.NewFromConfig(cfg)
-	if currentCfgErr != nil {
-		err = fmt.Errorf("invalid configuration: %w", currentCfgErr)
-		c.setConfigError(err)
-		return err
-	}
-	k8sutil.RewriteContainerLogInputs(m, currentCfg.Settings.Internal.Kubernetes.ContainerLogsGlobInput, c.logger)
+	// Collapse the per-container kubernetes container-log input, which the
+	// Kubernetes integration marks with single_input, into a single filestream
+	// watching a glob path. This has to happen before AST rendering, because it is
+	// the ${kubernetes.*} references in the raw config that make the kubernetes
+	// provider render the input once per discovered container.
+	k8sutil.RewriteContainerLogInputs(m, c.logger)
 
 	err = c.generateAST(cfg, m)
 	c.setConfigError(err)
@@ -1872,6 +1858,10 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	}
 	c.setProtection(protectionConfig)
 
+	currentCfg, err := configuration.NewFromConfig(cfg)
+	if err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
 	// Only Settings is read later; holding UCfg would retain a full copy of the policy tree.
 	currentCfg.UCfg = nil
 	c.currentCfg = currentCfg
