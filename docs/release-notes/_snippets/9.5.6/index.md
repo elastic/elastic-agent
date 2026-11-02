@@ -22,6 +22,7 @@
 * Fix Elastic Agent configured as an OTel Collector hanging on shutdown when a component fails to start. [#17027](https://github.com/elastic/elastic-agent/pull/17027)
 * Fix Elastic Agent retaining component states that no broadcaster subscriber can receive. [#17107](https://github.com/elastic/elastic-agent/pull/17107)
 * Fix the Ironbank Dockerfile to restore the `elastic-otel-collector` execute permission (`0755`) after a broad `chmod 0666`. [#17118](https://github.com/elastic/elastic-agent/pull/17118)
+* Keep streams with identical IDs from different inputs separate in the OTel runtime. [#17148](https://github.com/elastic/elastic-agent/pull/17148)
 * Fix multi-valued `component.id` in Elastic Agent self-monitoring metrics. [#17233](https://github.com/elastic/elastic-agent/pull/17233) 
 * Fix the artifact downloader not using the Fleet Server URI for the PGP fallback. [#17256](https://github.com/elastic/elastic-agent/pull/17256)
 * Fix the OTel Collector rejecting its configuration when an input ID contains whitespace or symbols. [#17604](https://github.com/elastic/elastic-agent/pull/17604) [#17590](https://github.com/elastic/elastic-agent/issues/17590)
