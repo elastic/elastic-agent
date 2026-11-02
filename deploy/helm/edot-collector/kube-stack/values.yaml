@@ -39,6 +39,9 @@ collectors:
   cluster:
     enabled: true
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
+    resources:
+      limits:
+        memory: 256Mi
     env:
       - name: ELASTIC_AGENT_OTEL
         value: "true"
@@ -499,7 +502,7 @@ collectors:
       service:
         extensions: [cgroup_runtime, health_check]
         pipelines:
-          # Disable default non used kube-stack Helm Chart pipelines
+          # Disable default unused kube-stack Helm Chart pipelines
           logs: null
           metrics: null
           traces: null
@@ -691,7 +694,7 @@ instrumentation:
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.20.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.0
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.1
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.18.0
   go:

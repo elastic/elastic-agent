@@ -5,7 +5,8 @@ git config core.autocrlf input
 git rm --quiet --cached -r .
 git reset --quiet --hard
 
-$env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH"
+$env:GOTMPDIR = "$env:BUILDKITE_BUILD_CHECKOUT_PATH\_gotmp"
+New-Item -ItemType Directory -Force -Path $env:GOTMPDIR | Out-Null
 
 $goModuleDir = if ($env:GO_MODULE_DIR) { $env:GO_MODULE_DIR } else { "." }
 switch ($goModuleDir) {

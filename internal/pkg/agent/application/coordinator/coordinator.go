@@ -85,8 +85,8 @@ var ErrNotUpgradable = errors.New(
 // because the agent is not running in an environment where a re-execution
 // would be recovered.
 var ErrNotRestartable = errors.New(
-	"cannot be restarted; must be installed with install sub-command and " +
-		"running under control of the systems supervisor")
+	"cannot be restarted; must be running under the control of the system " +
+		"supervisor (an installed, DEB or RPM agent running as a service)")
 
 // ErrUpgradeInProgress error is returned if two or more upgrades are
 // attempted at the same time.
@@ -346,11 +346,12 @@ type Coordinator struct {
 	upgradeMgr UpgradeManager
 	monitorMgr MonitorManager
 
-	// canReExec reports whether a re-execution of the process will be recovered
-	// (installed and running under a system supervisor). It is a field so tests
-	// can override it; it defaults to reexec.CanReExec. Both the upgrade path
-	// (via UpgradeManager.Upgradeable) and the restart path rely on this check.
-	canReExec func() bool
+	// canRestart reports whether a RESTART action can be performed (the process
+	// is running under a system supervisor, so the re-execution is recovered). It
+	// is a field so tests can override it; it defaults to reexec.CanRestart.
+	// Unlike the upgrade path it does not require the installed layout, so DEB/RPM
+	// agents can be restarted as well.
+	canRestart func() bool
 
 	monitoringServerReloader configReloader
 
@@ -612,7 +613,7 @@ func New(
 
 		fleetAcker:       fleetAcker,
 		secretMarkerFunc: diagnostics.AddSecretMarkers,
-		canReExec:        reexec.CanReExec,
+		canRestart:       reexec.CanRestart,
 
 		renderCache:         transpiler.NewRenderCache(),
 		expectedConfigCache: component.NewExpectedConfigCache(),
@@ -728,13 +729,21 @@ func (c *Coordinator) ReExec(callback reexec.ShutdownCallbackFn, argOverrides ..
 
 // Restart re-executes the agent to fulfil a RESTART action. It reuses the same
 // re-exec machinery as an upgrade, but performs no upgrade steps (no download,
-// marker, or version change). Unlike an upgrade it does not consider the
-// release-level upgrade flag; it only requires that a re-execution will be
-// recovered (canReExec). The action is not acknowledged here; it is
-// acknowledged on the next startup by the managed config manager.
+// marker, or version change). Unlike an upgrade it does not require the
+// installed layout: it only requires that a re-execution will be recovered
+// (canRestart), so DEB/RPM agents running under a supervisor can be restarted.
+// The action is not acknowledged here; it is acknowledged on the next startup
+// by the managed config manager.
 // Called from external goroutines.
 func (c *Coordinator) Restart(_ context.Context, _ *fleetapi.ActionRestart) error {
-	if !c.canReExec() {
+	// Containers are excluded even though canRestart would otherwise be satisfied:
+	// the agent runs under an init process (for example tini) so it appears to be
+	// under a supervisor, but a container's lifecycle is owned by its orchestrator,
+	// not a Fleet RESTART action. This mirrors the Uninstall/Migrate handling.
+	if c.isContainerizedEnvironment() {
+		return ErrContainerNotSupported
+	}
+	if !c.canRestart() {
 		return ErrNotRestartable
 	}
 
@@ -1006,11 +1015,11 @@ func (c *Coordinator) Upgrade(ctx context.Context, version string, sources []str
 		}
 
 		c.logger.Errorw("upgrade failed", "error", logp.Error(err))
-		// If ErrInsufficientDiskSpace is in the error chain, we want to set the
-		// the error to ErrInsufficientDiskSpace so that the error message is
-		// more concise and clear.
-		if errors.Is(err, upgradeErrors.ErrInsufficientDiskSpace) {
-			err = upgradeErrors.ErrInsufficientDiskSpace
+		// If DiskSpaceLowError is in the error chain, we want to set the error
+		// to it so that the error message is clear.
+		var diskSpaceLowErr upgradeErrors.DiskSpaceLowError
+		if errors.As(err, &diskSpaceLowErr) {
+			err = diskSpaceLowErr
 		}
 
 		// MarkUpgradeFailed updates det in-memory and, when an upgrade marker
@@ -1816,8 +1825,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 		c.otelCfg = cfg.OTel
 	}
 
-	// perform and verify ast translation
-	m, err := cfg.ToMapStr()
+	// perform and verify ast translation; nothing reads the inputs from cfg after this
+	m, err := cfg.ToMapStrReleasing("inputs")
 	if err != nil {
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
@@ -1845,6 +1854,8 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	if err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
+	// Only Settings is read later; holding UCfg would retain a full copy of the policy tree.
+	currentCfg.UCfg = nil
 	c.currentCfg = currentCfg
 
 	// Standalone mode has no dedicated notification channel unlike managed mode,
