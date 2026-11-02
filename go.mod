@@ -50,7 +50,7 @@ require (
 	github.com/moby/moby/client v0.6.2
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.164.1
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.163.0
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.164.1
 	github.com/otiai10/copy v1.14.1
 	github.com/rednafi/link-patrol v0.0.0-20260907155300-f0a8d661d033
 	github.com/rs/zerolog v1.35.1
