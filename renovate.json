@@ -35,7 +35,10 @@
   },
   "packageRules": [
     {
-      "description": "Major updates: only on main and the last branch of the previous major (baseBranchPatterns are maintained by the update-renovate-branches workflow, which also rewrites this rule)",
+      "description": [
+        "Major updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
       "matchUpdateTypes": [
         "major"
       ],
@@ -155,6 +158,60 @@
         "/^github\\.com/elastic/elastic-agent/"
       ],
       "enabled": false
+    },
+    {
+      "description": "fleet-server: block every non-digest update type. The nested github.com/elastic/fleet-server/pkg/api module declares no major suffix and publishes no tagged versions, so Renovate misreads the fleet-server repository tags (v9.x) and proposes a nonexistent /v9 module path. Pseudo-versions (digest) are the only valid updates.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "bump",
+        "rollback",
+        "replacement",
+        "lockFileMaintenance",
+        "lockfileUpdate"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "fleet-server: digest updates only on main; release branches keep the pseudo-version they shipped with",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "matchBaseBranches": [
+        "!/^main$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "fleet-server: digest updates at most once a month, in their own group so the schedule is not merged into the weekly elastic group branch",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "fleet-server",
+      "schedule": [
+        "before 3am on the first day of the month"
+      ]
     },
     {
       "description": "GitHub Actions: weekly Sunday updates",
