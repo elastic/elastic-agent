@@ -745,9 +745,12 @@ func (m *Manager) Actions(server proto.ElasticAgent_ActionsServer) error {
 }
 
 // update updates the current state of the running components.
-// It is only called by the main runtime manager goroutine in Manager.Run.
+// It runs in a goroutine started by runLoop, and from shutdown once runLoop
+// has returned, so calls never overlap. It still runs concurrently with
+// stateChanged, which also removes stopped components from m.current.
 //
-// This returns as soon as possible, work is performed in the background.
+// It waits for removed components to stop, but starts new components in the
+// background.
 func (m *Manager) update(model component.Model, teardown bool) error {
 	touched := make(map[string]bool)
 	newComponents := make([]component.Component, 0, len(model.Components))
