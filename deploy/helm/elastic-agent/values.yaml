@@ -349,7 +349,6 @@ kubernetes:
       vars: {}
 autoOps:
   enabled: false
-  autoops_token: ""
   autoops_otel_url: ""
   es_api_key: ""
   es_username: ""

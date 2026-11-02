@@ -9,6 +9,7 @@ package otelcol
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,6 +28,9 @@ func TestStartCollectorFIPS(t *testing.T) {
 
 	wg := startCollector(context.Background(), t, collector, "")
 
+	assert.Eventually(t, func() bool {
+		return otelcol.StateRunning == collector.GetState()
+	}, 10*time.Second, 200*time.Millisecond)
 	collector.Shutdown()
 	wg.Wait()
 	assert.Equal(t, otelcol.StateClosed, collector.GetState())

@@ -33,8 +33,16 @@ func (RhelRunner) Prepare(ctx context.Context, sshClient ssh.SSHClient, logger c
 	// during tests. The dnf-makecache timer periodically refreshes package
 	// metadata and holds the RPM database lock while doing so, which causes
 	// "Resource temporarily unavailable" errors when tests run rpm commands.
+	// dnf-automatic.timer is persistent and fires at boot on some images, and
+	// disabling a timer doesn't stop a service it already started, so the
+	// timers are disabled first and the services stopped explicitly.
 	logger.Logf("Disabling background package managers to prevent RPM lock contention")
-	for _, unit := range []string{"dnf-makecache.timer", "dnf-makecache.service", "packagekit.service"} {
+	for _, unit := range []string{
+		"dnf-automatic.timer", "dnf-automatic-download.timer", "dnf-automatic-install.timer", "dnf-automatic-notifyonly.timer",
+		"dnf-makecache.timer",
+		"dnf-automatic.service", "dnf-automatic-download.service", "dnf-automatic-install.service", "dnf-automatic-notifyonly.service",
+		"dnf-makecache.service", "packagekit.service",
+	} {
 		_, _, _ = sshClient.Exec(ctx, "sudo", []string{"systemctl", "disable", "--now", unit}, nil)
 	}
 

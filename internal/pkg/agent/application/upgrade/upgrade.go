@@ -232,6 +232,7 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 	u.upgradeSettings = cfg.Settings.Upgrade
 
 	u.artifactDownloader = newArtifactDownloader(u.settings, u.log)
+	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
 
 	return nil
 }

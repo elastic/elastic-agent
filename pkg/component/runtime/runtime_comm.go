@@ -227,7 +227,7 @@ func (c *runtimeComm) checkin(server proto.ElasticAgent_CheckinV2Server, init *p
 		// being destroyed cannot reconnect; close connection
 		c.checkinLock.Unlock()
 		c.logger.Debug("check-in stream being destroyed connection not allowed; closing connection")
-		return status.Error(codes.Unavailable, "component cannot connect being destroyed")
+		return status.Error(codes.Unavailable, "component cannot connect while being destroyed")
 	}
 
 	checkinDone := make(chan bool)
@@ -342,7 +342,7 @@ func (c *runtimeComm) actions(server proto.ElasticAgent_ActionsServer) error {
 		// being destroyed cannot reconnect; close connection
 		c.actionsLock.Unlock()
 		c.logger.Debug("check-in stream being destroyed connection not allowed; closing connection")
-		return status.Error(codes.Unavailable, "application cannot connect being destroyed")
+		return status.Error(codes.Unavailable, "application cannot connect while being destroyed")
 	}
 
 	actionsDone := make(chan bool)

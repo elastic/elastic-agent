@@ -33,10 +33,6 @@ type Config struct {
 	// defined in this list.
 	Packages []string
 
-	// BinaryName is the name of the binary package under test, i.e, elastic-agent, metricbeat, etc
-	// this is used to copy the .tar.gz to the remote host
-	BinaryName string
-
 	// Groups filters the tests to only run tests that are part of
 	// the groups defined in this list.
 	Groups []string
@@ -118,11 +114,12 @@ func parsePlatform(platform string) (define.OS, error) {
 			os = define.OS{Type: separated[0], Arch: separated[1], Version: separated[2]}
 		}
 	case 4:
-		if separated[0] == define.Linux {
+		switch separated[0] {
+		case define.Linux:
 			os = define.OS{Type: separated[0], Arch: separated[1], Distro: separated[2], Version: separated[3]}
-		} else if separated[0] == define.Kubernetes {
+		case define.Kubernetes:
 			os = define.OS{Type: separated[0], Arch: separated[1], Version: separated[2], DockerVariant: separated[3]}
-		} else {
+		default:
 			return define.OS{}, fmt.Errorf("failed to parse platform string %q: more than 2 separators", platform)
 		}
 	default:

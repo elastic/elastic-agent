@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source .buildkite/scripts/retry.sh
+
+# Default cluster.max_shards_per_node for the CI stack. Elasticsearch's default is
+# 1000 per data node, which the oblt-cli stack (3 data nodes) exhausts when
+# many integration test jobs, each creating data streams in its own namespace,
+# share one stack. This matches test_infra/ess/deployment.tf.
+ESS_MAX_SHARDS_PER_NODE="${ESS_MAX_SHARDS_PER_NODE:-2000}"
+
 function ess_up() {
   : "${1:?Error: Specify stack version: ess_up [stack_version] [stack_build_id]}"
 
@@ -55,6 +63,7 @@ function ess_up() {
   fi
 
   ess_load_secrets
+  ess_raise_shard_limit
 }
 
 function ess_down() {
@@ -123,4 +132,39 @@ function ess_load_secrets() {
 
   # Print loaded variable names for debugging (not values)
   env | grep -E '^(ELASTICSEARCH|KIBANA|FLEET_SERVER|INTEGRATIONS_SERVER)' | cut -d= -f1 || true
+}
+
+# The oblt-cli template can't set Elasticsearch settings, so raise the shard limit
+# through the cluster settings API once the stack is up. Needs the variables set
+# by ess_load_secrets. A failure is only a warning: the stack is still usable,
+# tests just have less shard headroom.
+function ess_raise_shard_limit() {
+  echo "~~~ Setting cluster.max_shards_per_node to ${ESS_MAX_SHARDS_PER_NODE}"
+
+  if [ -z "${ELASTICSEARCH_HOST:-}" ] || [ -z "${ELASTICSEARCH_USERNAME:-}" ] || [ -z "${ELASTICSEARCH_PASSWORD:-}" ]; then
+    echo "Warning: Elasticsearch credentials are not loaded, leaving cluster.max_shards_per_node at its default" >&2
+    return 0
+  fi
+
+  if ! retry 3 ess_put_max_shards_per_node "${ESS_MAX_SHARDS_PER_NODE}"; then
+    echo "Warning: failed to set cluster.max_shards_per_node, tests may hit the default shard limit" >&2
+  fi
+}
+
+function ess_put_max_shards_per_node() {
+  local es_url="${ELASTICSEARCH_HOST}"
+  if [[ "${es_url}" != http* ]]; then
+    es_url="https://${es_url}"
+  fi
+
+  # Credentials go through a curl config on stdin so they don't show up in the process list.
+  # Backslashes and quotes must be escaped inside a curl config string.
+  local credentials="${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}"
+  credentials="${credentials//\\/\\\\}"
+  credentials="${credentials//\"/\\\"}"
+  printf 'user = "%s"\n' "${credentials}" |
+    curl --silent --show-error --fail --max-time 30 --config - \
+      --request PUT "${es_url}/_cluster/settings" \
+      --header "Content-Type: application/json" \
+      --data "{\"persistent\":{\"cluster.max_shards_per_node\":$1}}" >/dev/null
 }

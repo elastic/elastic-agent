@@ -286,7 +286,6 @@ func (r *Runner) runK8sInstances(ctx context.Context, instances []StateInstance)
 		// set the go test flags
 		env["GOTEST_FLAGS"] = r.cfg.TestFlags
 		env["KUBECONFIG"] = instance.Internal["config"].(string)
-		env["TEST_BINARY_NAME"] = r.cfg.BinaryName
 		env["K8S_VERSION"] = instance.Internal["version"].(string)
 		env["AGENT_IMAGE"] = instance.Internal["agent_image"].(string)
 
@@ -411,7 +410,6 @@ func (r *Runner) runInstance(ctx context.Context, sshAuth ssh.AuthMethod, logger
 
 	// set the go test flags
 	env["GOTEST_FLAGS"] = r.cfg.TestFlags
-	env["TEST_BINARY_NAME"] = r.cfg.BinaryName
 
 	// run the actual tests on the host
 	result, err := batch.OS.Runner.Run(ctx, r.cfg.VerboseMode, client, logger, r.cfg.AgentVersion, batch.ID, batch.Batch, env)
@@ -467,7 +465,6 @@ func (r *Runner) validate() error {
 func (r *Runner) getBuilds(b common.OSBatch) []common.Build {
 	var builds []common.Build
 	formats := []string{"targz", "zip", "rpm", "deb"}
-	binaryName := "elastic-agent"
 
 	var packages []string
 	for _, p := range r.cfg.Packages {
@@ -477,21 +474,6 @@ func (r *Runner) getBuilds(b common.OSBatch) []common.Build {
 	}
 	if len(packages) == 0 {
 		packages = formats
-	}
-
-	// This is for testing beats in serverless environment
-	if strings.HasSuffix(r.cfg.BinaryName, "beat") {
-		var serverlessPackages []string
-		for _, p := range packages {
-			if slices.Contains([]string{"targz", "zip"}, p) {
-				serverlessPackages = append(serverlessPackages, p)
-			}
-		}
-		packages = serverlessPackages
-	}
-
-	if r.cfg.BinaryName != "" {
-		binaryName = r.cfg.BinaryName
 	}
 
 	for _, f := range packages {
@@ -504,7 +486,7 @@ func (r *Runner) getBuilds(b common.OSBatch) []common.Build {
 			// Means that OS type & Arch doesn't support that package format
 			continue
 		}
-		packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("%s-%s-%s", binaryName, r.cfg.AgentVersion, suffix))
+		packageName := filepath.Join(r.cfg.BuildDir, fmt.Sprintf("elastic-agent-%s-%s", r.cfg.AgentVersion, suffix))
 		build := common.Build{
 			Version:    r.cfg.ReleaseVersion,
 			Type:       b.OS.Type,

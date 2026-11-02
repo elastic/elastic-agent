@@ -294,6 +294,22 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		receiverStatus = slices.Collect(maps.Values(receiverStatuses))[0]
 	}
 
+	// A pipeline built with the no-op receiver means the component's policy has no
+	// enabled streams: it collects no data. Only override the message when the pipeline
+	// is otherwise healthy (e.g. not when the exporter side is degraded/failed), so the
+	// message never contradicts the state.
+	noEnabledStreams := false
+	if pipelineState == client.UnitStateHealthy {
+		for receiverOtelID := range receiverStatuses {
+			if receiverOtelID.Type().String() == NoEnabledStreamsReceiverType {
+				noEnabledStreams = true
+				compState.State = client.UnitStateDegraded
+				compState.Message = noEnabledStreamsMessage
+				break
+			}
+		}
+	}
+
 	if len(exporterStatuses) > 1 {
 		return runtime.ComponentComponentState{}, fmt.Errorf("expected at most one exporter for component %s, found %d", comp.ID, len(exporterStatuses))
 	} else if len(exporterStatuses) == 1 {
@@ -307,7 +323,15 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 		}
 		switch unit.Type {
 		case client.UnitTypeInput:
-			if receiverStatus != nil {
+			if noEnabledStreams {
+				// The no-op receiver is not tied to any one unit, so report every input unit
+				// directly. Fleet shows unit statuses but not the component message, so the
+				// message is repeated here to make the reason visible.
+				compState.Units[unitKey] = runtime.ComponentUnitState{
+					State:   client.UnitStateDegraded,
+					Message: noEnabledStreamsMessage,
+				}
+			} else if receiverStatus != nil {
 				compState.Units[unitKey] = getComponentUnitState(receiverStatus, unit, &comp)
 			}
 		case client.UnitTypeOutput:

@@ -10,7 +10,7 @@ The goal of this document is to assist users to Kubernetes Observability of Auto
 - [Elastic Agent](https://www.elastic.co/elastic-agent)
 - [Elastic Cloud](https://www.elastic.co/guide/en/cloud/current/ec-create-deployment.html)
 
-**Prerequisities:**
+**Prerequisites:**
 
 - Active Google Cloud Subscription and enrollment to specific project
 - [Gcloud Cli](https://cloud.google.com/sdk/gcloud) tool installed
@@ -19,7 +19,7 @@ The goal of this document is to assist users to Kubernetes Observability of Auto
   On the deployment overview page of your cloud setup, copy down the Elasticsearch Endpoint(ES_HOST).
   Username and password (ES_USERNAME, ES_PASSWORD) will be provided upon Elastic Cloud creation.
 
-## Folow below steps to configure GKE with Elastic Agent
+## Follow the steps below to configure GKE with Elastic Agent
 
 1. **Step 1: Initialise and login to your Google project**
 
@@ -236,7 +236,7 @@ Choose `Metrics-* Dataview` to view metrics:
 
 ![Metrics](./images/4.png)
 
-Because kubernetes integration is already installed, dashboards are availbale for users to observe kubernetes cluster status.
+Because kubernetes integration is already installed, dashboards are available for users to observe kubernetes cluster status.
 
 Navigate to **Analytics>Dashboards**
 
