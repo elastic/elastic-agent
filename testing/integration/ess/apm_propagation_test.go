@@ -22,7 +22,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -56,6 +56,11 @@ func TestAPMConfig(t *testing.T) {
 		Group: integration.Default,
 		Stack: &define.Stack{},
 	})
+	// define.Require has to be the first statement in a test (see
+	// define.ValidateDir), so the skip can only come after it. Under the
+	// "define" build tag define.Require never returns, which makes staticcheck
+	// read the assignment above as dead (SA4006); keep it alive.
+	_ = info
 	t.Skip("Flaky test: https://github.com/elastic/elastic-agent/issues/5890")
 
 	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
