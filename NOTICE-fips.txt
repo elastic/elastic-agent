@@ -1254,11 +1254,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/elastic-agent-l
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/fleet-server/pkg/api
-Version: v0.0.0-20260515154942-99dc973fd52e
+Version: v0.0.0-20261020073204-8d70d3eb77f3
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/fleet-server/pkg/api@v0.0.0-20260515154942-99dc973fd52e/LICENSE.txt:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/fleet-server/pkg/api@v0.0.0-20261020073204-8d70d3eb77f3/LICENSE.txt:
 
 Elastic License 2.0
 

@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -31,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -105,10 +107,15 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return errors.New("coord must be set before calling Run")
 	}
 
-	// Un-enrolled so we will not do anything.
+	// A persisted UNENROLL means the agent was unenrolled as the first step of a
+	// remote uninstall (Endpoint removed) and is awaiting the follow-up UNINSTALL.
+	// Keep Fleet communication open so it can still receive the UNINSTALL action
+	// (and its grace-period CANCEL) across restarts. The policy is deliberately
+	// not restored (see the wasUnenrolled() guard below), so the agent stays
+	// component-less until it is uninstalled. An agent-detected unenroll (invalid
+	// API key) persists no action, so it is unaffected.
 	if m.wasUnenrolled() {
-		m.log.Warnf("Elastic Agent was previously unenrolled. To reactivate please reconfigure or enroll again.")
-		return nil
+		m.log.Info("Elastic Agent was unenrolled and is awaiting a Fleet UNINSTALL action; keeping Fleet communication open without restoring the policy")
 	}
 
 	// Reload ID because of win7 sync issue
@@ -238,6 +245,46 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 			defer stateWatch.Stop()
 		}
 		return gateway.Run(ctx)
+	})
+
+	// Surface a visible "Uninstall pending" state while an UNINSTALL action waits
+	// out its grace period in the queue, and clear it once the action executes,
+	// is cancelled, or expires. Runs on the single dispatcher goroutine, so the
+	// uninstallPendingSet flag needs no synchronization.
+	uninstallPendingSet := false
+	m.dispatcher.SetUninstallPendingObserver(func(pending *fleetapi.ActionUninstall) {
+		if pending != nil {
+			msg := "Uninstall pending"
+			if st, err := pending.StartTime(); err == nil {
+				msg = fmt.Sprintf("Uninstall pending, executes at %s", st.UTC().Format(time.RFC3339))
+			}
+			m.coord.SetOverrideState(agentclient.Stopping, msg)
+			uninstallPendingSet = true
+			return
+		}
+		// Only clear if we set it, so we don't clobber another override state
+		// (e.g. an in-progress upgrade or the uninstaller's own "Uninstalling").
+		if uninstallPendingSet {
+			m.coord.ClearOverrideState()
+			uninstallPendingSet = false
+		}
+	})
+
+	// Reject an UNINSTALL action with a missing/invalid signature on receipt so it
+	// is never scheduled into the grace-period queue. On success, overwrite the
+	// outer expiration with the verified signed one so the dispatcher's
+	// expiration checks operate on signed data (the signature covers the signed
+	// payload, not the action's mutable outer JSON). When the action is unsigned
+	// (no key configured) verified is nil and the outer expiration is left as-is.
+	m.dispatcher.SetUninstallSignatureVerifier(func(a *fleetapi.ActionUninstall) error {
+		verified, err := protection.VerifyActionSignature(a, m.coord.Protection().SignatureValidationKey, m.agentInfo.AgentID())
+		if err != nil {
+			return err
+		}
+		if verified != nil {
+			a.ActionExpiration = verified.Expiration
+		}
+		return nil
 	})
 
 	go runDispatcher(ctx, m.dispatcher, gateway, m.coord.SetUpgradeDetails, m.actionAcker, dispatchFlushInterval)
@@ -511,6 +558,11 @@ func (m *managedConfigManager) initDispatcher(canceller context.CancelFunc) *han
 	m.dispatcher.MustRegister(
 		&fleetapi.ActionRestart{},
 		handlers.NewRestart(m.log, m.agentInfo, m.coord, m.stateStore),
+	)
+
+	m.dispatcher.MustRegister(
+		&fleetapi.ActionUninstall{},
+		handlers.NewUninstall(m.log, m.agentInfo, m.coord),
 	)
 
 	m.dispatcher.MustRegister(

@@ -15,6 +15,7 @@ type ActionTmpl struct {
 	ActionID   string
 	Data       string
 	Type       string
+	CreatedAt  string
 	StartTime  string
 	Expiration string
 }

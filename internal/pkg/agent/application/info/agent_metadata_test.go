@@ -46,6 +46,7 @@ func TestECSMetadata(t *testing.T) {
 	assert.Equal(t, release.Complete(), metadata.Elastic.Agent.Complete)
 	assert.Equal(t, release.Info().String(), metadata.Elastic.Agent.BuildOriginal)
 	assert.Equal(t, release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()), metadata.Elastic.Agent.Upgradeable)
+	assert.Equal(t, release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()), metadata.Elastic.Agent.Uninstallable)
 	assert.Equal(t, agentInfo.logLevelPolicy, metadata.Elastic.Agent.LogLevel)
 	assert.Equal(t, agentInfo.unprivileged, metadata.Elastic.Agent.Unprivileged)
 	assert.Equal(t, release.FIPSDistribution(), metadata.Elastic.Agent.FIPS)

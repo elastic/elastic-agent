@@ -23,6 +23,12 @@ type AgentECSMeta struct {
 	Snapshot      bool   `json:"snapshot"`
 	BuildOriginal string `json:"build.original"`
 	Upgradeable   bool   `json:"upgradeable"`
+	// Uninstallable reports whether this agent supports the Fleet remote
+	// UNINSTALL action. Fleet Server reads it on UNENROLL to decide whether to
+	// keep the agent's credentials (new behavior, so the follow-up UNINSTALL can
+	// reach the agent) or invalidate them immediately (legacy behavior for agents
+	// that don't advertise support).
+	Uninstallable bool   `json:"uninstallable"`
 	LogLevel      string `json:"log_level"`
 	Complete      bool   `json:"complete"`
 	Unprivileged  bool   `json:"unprivileged"`
