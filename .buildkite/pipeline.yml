@@ -281,6 +281,7 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+<<<<<<< HEAD
       # Runs only on main and release branches, like "Unit tests - macOS 13".
       # Skipped like "Unit tests - macOS 13" due to Orka provider slowness,
       # see https://github.com/elastic/elastic-agent/pull/17290
@@ -289,6 +290,36 @@ steps:
         skip: "Orka slowness, see github.com/elastic/elastic-agent/pull/17290"
         command: ".buildkite/scripts/steps/unit-tests.sh"
         branches: "main 8.* 9.*"
+=======
+      - label: "EDOT unit tests - fips140=only Windows 2022"
+        key: "edot-unit-tests-win2022-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      - label: "EDOT unit tests - Windows 11 arm64"
+        key: "edot-unit-tests-win11-arm64"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+>>>>>>> 2b5c2e8 (ci: re-enable EDOT unit tests on Windows 11 arm64 (#17788))
         env:
           GO_MODULE_DIR: "internal/edot"
         artifact_paths:
