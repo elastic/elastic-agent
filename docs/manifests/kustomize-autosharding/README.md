@@ -32,7 +32,7 @@ drwxr-xr-x 9    288 Jun  6 14:00 elastic-agent-kustomize
 The new `kustomization.yaml` should include:
 
 ```yaml
-[outut truncated ...]
+[output truncated ...]
 resources:
   - cluster-role-binding.yaml
   - cluster-role.yaml

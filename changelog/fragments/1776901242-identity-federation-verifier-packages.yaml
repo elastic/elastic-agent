@@ -1,0 +1,11 @@
+kind: enhancement
+
+summary: Update verifier receivers to use shared Identity Federation packages from beats
+
+description: >
+  Updates the AWS, GCP, and Azure verifier receivers to import from the new
+  shared x-pack/libbeat/common/identityfederation/{aws,gcp,azure} packages
+  in beats, replacing direct references to x-pack/libbeat/common/aws and
+  x-pack/libbeat/common/cloudconnectors/{gcp,azure}. No behaviour change.
+
+component: elastic-agent

@@ -255,6 +255,63 @@ func TestSyncExpected(t *testing.T) {
 		}
 	})
 
+	t.Run("TestAgentInfo", func(t *testing.T) {
+		testcases := []struct {
+			name             string
+			initialAgentInfo *proto.AgentInfo
+			updatedAgentInfo *proto.AgentInfo
+			syncExpected     bool
+		}{
+			{
+				name:             "No agent info (both nil)",
+				initialAgentInfo: nil,
+				updatedAgentInfo: nil,
+				syncExpected:     false,
+			},
+			{
+				name:             "Agent info added",
+				initialAgentInfo: nil,
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				syncExpected:     true,
+			},
+			{
+				name:             "Same agent info",
+				initialAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				syncExpected:     false,
+			},
+			{
+				name:             "Added tag",
+				initialAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production", "team-payments"}},
+				syncExpected:     true,
+			},
+			{
+				name:             "Removed tags",
+				initialAgentInfo: &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}},
+				updatedAgentInfo: &proto.AgentInfo{Id: "agent-1"},
+				syncExpected:     true,
+			},
+		}
+
+		for _, tt := range testcases {
+			t.Run(tt.name, func(t *testing.T) {
+				compState := ComponentState{
+					expectedAgentInfo: tt.initialAgentInfo,
+				}
+
+				actualSyncExpected := compState.syncExpected(&component.Component{
+					ID:        "fakecomponent",
+					AgentInfo: tt.updatedAgentInfo,
+				})
+
+				assert.Equal(t, tt.syncExpected, actualSyncExpected)
+				gotAgentInfo := compState.toCheckinExpected().GetAgentInfo()
+				assert.Equal(t, tt.updatedAgentInfo.GetId(), gotAgentInfo.GetId())
+				assert.Equal(t, tt.updatedAgentInfo.GetTags(), gotAgentInfo.GetTags())
+			})
+		}
+	})
 }
 
 // TestProcessCheckinIgnoredAfterStop verifies that a late observed check-in is

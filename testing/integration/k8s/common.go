@@ -51,8 +51,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
 
 var noSpecialCharsRegexp = regexp.MustCompile("[^a-zA-Z0-9]+")
@@ -700,6 +700,10 @@ type ESResponse struct {
 		Hits     []any `json:"hits"`
 	} `json:"hits"`
 	Aggregations struct {
+		// MaxTimestamp is the max @timestamp (epoch millis), 0 when there are no documents.
+		MaxTimestamp struct {
+			Value float64 `json:"value"`
+		} `json:"max_timestamp"`
 		FilesCount struct {
 			DocCountErrorUpperBound int `json:"doc_count_error_upper_bound"`
 			SumOtherDocCount        int `json:"sum_other_doc_count"`
