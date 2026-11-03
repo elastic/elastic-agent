@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -33,6 +34,7 @@ import (
 	"go.opentelemetry.io/collector/pipeline"
 
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
@@ -1159,6 +1161,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"brokers":              []string{"127.0.0.1:9022"},
 						"topic_from_attribute": "topic",
 						"client_id":            "beats",
+						"dial_timeout":         30 * time.Second,
 						"metadata": map[string]any{
 							"refresh_interval": 10 * time.Minute,
 						},
@@ -1273,8 +1276,9 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers":   []string{"127.0.0.1:9022"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9022"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "static-topic",
 							"encoding": "raw",
@@ -1382,8 +1386,9 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers":   []string{"127.0.0.1:9022"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9022"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "static-topic",
 							"encoding": "raw",
@@ -1530,8 +1535,9 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers":   []string{"127.0.0.1:9022"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9022"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "static-topic",
 							"encoding": "raw",
@@ -1567,8 +1573,9 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 					"kafka/_agent-component/monitoring": map[string]any{
-						"brokers":   []string{"127.0.0.1:9023"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9023"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "monitoring-topic",
 							"encoding": "raw",
@@ -3974,6 +3981,120 @@ func TestGetReceiversConfigForComponentDuplicateStreamIDs(t *testing.T) {
 	}
 }
 
+func TestEncodeNameSegment(t *testing.T) {
+	tests := map[string]struct {
+		in   string
+		want string
+	}{
+		"clean":                            {in: "tcp-cisco_ise.log-abc", want: "tcp-cisco_ise.log-abc"},
+		"slash":                            {in: "system/metrics-system.cpu-1", want: "system/metrics-system.cpu-1"},
+		"non-ASCII letter":                 {in: "café", want: "café"},
+		"space":                            {in: "tcp-Cisco ISE-abc", want: "tcp-Cisco%20ISE-abc"},
+		"tab and newline":                  {in: "a\tb\nc", want: "a%09b%0Ac"},
+		"no-break space":                   {in: "a\u00a0b", want: "a%C2%A0b"},
+		"ASCII symbols":                    {in: "a+b=c$d|e", want: "a%2Bb%3Dc%24d%7Ce"},
+		"non-ASCII symbol":                 {in: "€", want: "%E2%82%AC"},
+		"percent":                          {in: "100%", want: "100%25"},
+		"invalid UTF-8":                    {in: "a\xffb", want: "a%FFb"},
+		"replacement char":                 {in: "a\ufffdb", want: "a%EF%BF%BDb"},
+		"already escaped text":             {in: "a%20b", want: "a%2520b"},
+		"colons (config keys split on ::)": {in: "a:b::c:", want: "a%3Ab%3A%3Ac%3A"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := EncodeNameSegment(tc.in)
+			assert.Equal(t, tc.want, got)
+			var id otelcomponent.ID
+			assert.NoError(t, id.UnmarshalText([]byte("filebeatreceiver/"+OtelNamePrefix+got)))
+			decoded, err := DecodeNameSegment(got)
+			require.NoError(t, err)
+			assert.Equal(t, tc.in, decoded)
+		})
+	}
+}
+
+func TestOutputNameDerivedIDsAreEncoded(t *testing.T) {
+	ids := func(outputName string) []otelcomponent.ID {
+		return []otelcomponent.ID{
+			GetExporterID(otelcomponent.MustNewType("elasticsearch"), outputName),
+			GetProcessorID(outputName),
+			getBeatsAuthExtensionID(outputName),
+			getOauth2ClientExtensionID(outputName),
+			getTransformProcessorID(outputName),
+			getKafkaPartitionerExtensionID(outputName),
+		}
+	}
+	for _, id := range ids("default") {
+		assert.Equal(t, OtelNamePrefix+"default", id.Name())
+	}
+	for _, id := range ids("my output+1") {
+		assert.Equal(t, OtelNamePrefix+"my%20output%2B1", id.Name())
+		var parsed otelcomponent.ID
+		assert.NoError(t, parsed.UnmarshalText([]byte(id.String())))
+	}
+}
+
+func TestSpacesInOutputNameAndInputID(t *testing.T) {
+	comp := testFilebeatComp("filestream-my output", "my output")
+	comp.RuntimeManager = component.OtelRuntimeManager
+	comp.Units[0].ID = "filestream-my output-filestream-Cisco ISE-c3a2b1"
+
+	conf, err := GetOtelConfig(&component.Model{Components: []component.Component{comp}}, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.Contains(t, conf.Get("receivers"), "filebeatreceiver/_agent-component/filestream-my%20output/filestream-Cisco%20ISE-c3a2b1-test-1")
+
+	pipelineStatus := &status.AggregateStatus{
+		Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{},
+	}
+	statusKinds := map[string]string{"receivers": "receiver:", "exporters": "exporter:", "processors": "", "extensions": ""}
+	for kind, statusPrefix := range statusKinds {
+		names, _ := conf.Get(kind).(map[string]any)
+		for name := range names {
+			var id otelcomponent.ID
+			require.NoError(t, id.UnmarshalText([]byte(name)))
+			if statusPrefix != "" {
+				pipelineStatus.ComponentStatusMap[statusPrefix+name] = &status.AggregateStatus{Event: componentstatus.NewEvent(componentstatus.StatusOK)}
+			}
+		}
+	}
+
+	pipelineName := "logs/_agent-component/filestream-my%20output"
+	require.Equal(t, []string{pipelineName}, slices.Collect(maps.Keys(conf.Get("service::pipelines").(map[string]any))))
+	var pipelineID pipeline.ID
+	require.NoError(t, pipelineID.UnmarshalText([]byte(pipelineName)))
+
+	otelStatus := &status.AggregateStatus{
+		Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+		ComponentStatusMap: map[string]*status.AggregateStatus{"pipeline:" + pipelineName: pipelineStatus},
+	}
+	states, err := GetAllComponentStates(otelStatus, []component.Component{comp})
+	require.NoError(t, err)
+	require.Len(t, states, 1)
+	assert.Equal(t, client.UnitStateHealthy, states[0].State.State)
+	inputUnit := states[0].State.Units[runtime.ComponentUnitKey{UnitID: comp.Units[0].ID, UnitType: client.UnitTypeInput}]
+	assert.Equal(t, client.UnitStateHealthy, inputUnit.State)
+}
+
+func TestComponentIDFromReceiverName(t *testing.T) {
+	tests := map[string]struct {
+		name   string
+		want   string
+		wantOK bool
+	}{
+		"plain":     {name: "osquerybeatreceiver/_agent-component/osquery-default/stream", want: "osquery-default", wantOK: true},
+		"encoded":   {name: "filebeatreceiver/_agent-component/filestream-my%20output/input-test-1", want: "filestream-my output", wantOK: true},
+		"no prefix": {name: "filebeatreceiver/other", want: "", wantOK: false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := ComponentIDFromReceiverName(tc.name)
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestGetReceiversConfigForComponentFeatures(t *testing.T) {
 	comp := &component.Component{
 		ID:        "filestream-features",
@@ -4604,8 +4725,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			exporterType: kafkaExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"brokers":   []string{"127.0.0.1:9092"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9092"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "my-topic",
 					"encoding": "raw",
@@ -4668,8 +4790,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			exporterType: kafkaExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"brokers":   []string{"127.0.0.1:9092"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9092"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "my-topic",
 					"encoding": "raw",
@@ -4731,8 +4854,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			exporterType: kafkaExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"brokers":   []string{"127.0.0.1:9092"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9092"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "my-topic",
 					"encoding": "raw",

@@ -59,7 +59,8 @@ auth:
 			},
 			"queue_size": 3200,
 		},
-		"timeout": 10 * time.Second,
+		"timeout":      10 * time.Second,
+		"dial_timeout": 30 * time.Second,
 		"auth": map[string]any{
 			"sasl": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 				"mechanism":                "OAUTHBEARER",
