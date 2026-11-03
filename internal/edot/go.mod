@@ -9,7 +9,7 @@ replace github.com/elastic/beats/v7 => ../../beats
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions v1.3.0
+	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions/v2 v2.0.0
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261102213659-2913021ee048
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
@@ -101,7 +101,6 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v8 v8.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/network/armnetwork/v8 v8.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources/v4 v4.0.0 // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions/v2 v2.0.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/internal v0.1.0 // indirect
 	github.com/DeRuina/timberjack v1.4.8 // indirect
 	github.com/KimMachineGun/automemlimit v1.0.0 // indirect
