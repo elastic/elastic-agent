@@ -244,8 +244,11 @@ func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
 }
 
 func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
+	if status == nil || status.ComponentStatusMap == nil {
+		return
+	}
 	extensions, exists := status.ComponentStatusMap["extensions"]
-	if !exists {
+	if !exists || extensions == nil || extensions.ComponentStatusMap == nil {
 		return
 	}
 

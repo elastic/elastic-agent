@@ -9,6 +9,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -576,27 +577,61 @@ func TestNotifyEndpointOfUpgrade(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			mockCoord := newMockUpgradeCoordinator(t)
+			synctest.Test(t, func(t *testing.T) {
+				mockCoord := newMockUpgradeCoordinator(t)
 
-			callIdx := 0
-			mockCoord.EXPECT().State().RunAndReturn(func() coordinator.State {
-				idx := callIdx
-				if idx >= len(tc.stateSequence) {
-					idx = len(tc.stateSequence) - 1
+				callIdx := 0
+				mockCoord.EXPECT().State().RunAndReturn(func() coordinator.State {
+					idx := callIdx
+					if idx >= len(tc.stateSequence) {
+						idx = len(tc.stateSequence) - 1
+					}
+					callIdx++
+					return tc.stateSequence[idx]
+				}).Times(len(tc.stateSequence))
+
+				if tc.wantNotified {
+					mockCoord.EXPECT().PerformAction(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+						Return(nil, nil).Maybe()
 				}
-				callIdx++
-				return tc.stateSequence[idx]
-			}).Times(len(tc.stateSequence))
 
-			if tc.wantNotified {
-				mockCoord.EXPECT().PerformAction(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, nil).Maybe()
-			}
+				log, _ := logger.New("", false)
+				u := NewUpgrade(log, mockCoord)
+				u.endpointWaitTimeout = 5 * time.Second
+				u.endpointPollInterval = 1 * time.Millisecond
+
+				notified := atomic.Bool{}
+				u.notifyUnitsOfProxiedActionFn = func(_ context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
+					notified.Store(true)
+					return nil
+				}
+
+				action := &fleetapi.ActionUpgrade{
+					ActionType: fleetapi.ActionTypeUpgrade,
+					Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
+				}
+
+				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+				defer cancel()
+
+				err := u.notifyEndpointOfUpgrade(ctx, log, action)
+				require.NoError(t, err)
+				assert.Equal(t, tc.wantNotified, notified.Load())
+			})
+		})
+	}
+
+	t.Run("parent context cancelled — error propagated, no dispatch", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			mockCoord := newMockUpgradeCoordinator(t)
+			// State() is called once before the select fires on the cancelled context.
+			// Poll interval is set to 1h so the ticker never competes with timeoutCtx.Done().
+			mockCoord.EXPECT().State().Return(coordinator.State{}).Times(1)
 
 			log, _ := logger.New("", false)
 			u := NewUpgrade(log, mockCoord)
 			u.endpointWaitTimeout = 5 * time.Second
-			u.endpointPollInterval = 1 * time.Millisecond
+			u.endpointPollInterval = 1 * time.Hour
 
 			notified := atomic.Bool{}
 			u.notifyUnitsOfProxiedActionFn = func(_ context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
@@ -609,43 +644,13 @@ func TestNotifyEndpointOfUpgrade(t *testing.T) {
 				Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
 			}
 
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel() // cancel before calling — timeoutCtx inherits the cancellation
 
 			err := u.notifyEndpointOfUpgrade(ctx, log, action)
-			require.NoError(t, err)
-			assert.Equal(t, tc.wantNotified, notified.Load())
+			require.ErrorIs(t, err, context.Canceled)
+			assert.False(t, notified.Load())
 		})
-	}
-
-	t.Run("parent context cancelled — error propagated, no dispatch", func(t *testing.T) {
-		mockCoord := newMockUpgradeCoordinator(t)
-		// State() is called once before the select fires on the cancelled context.
-		// Poll interval is set to 1h so the ticker never competes with timeoutCtx.Done().
-		mockCoord.EXPECT().State().Return(coordinator.State{}).Times(1)
-
-		log, _ := logger.New("", false)
-		u := NewUpgrade(log, mockCoord)
-		u.endpointWaitTimeout = 5 * time.Second
-		u.endpointPollInterval = 1 * time.Hour
-
-		notified := atomic.Bool{}
-		u.notifyUnitsOfProxiedActionFn = func(_ context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
-			notified.Store(true)
-			return nil
-		}
-
-		action := &fleetapi.ActionUpgrade{
-			ActionType: fleetapi.ActionTypeUpgrade,
-			Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
-		}
-
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel() // cancel before calling — timeoutCtx inherits the cancellation
-
-		err := u.notifyEndpointOfUpgrade(ctx, log, action)
-		require.ErrorIs(t, err, context.Canceled)
-		assert.False(t, notified.Load())
 	})
 
 	t.Run("notification gets the parent ctx, not the poll-bounded timeout ctx", func(t *testing.T) {
@@ -653,45 +658,56 @@ func TestNotifyEndpointOfUpgrade(t *testing.T) {
 		// expires. The notification call must still get the full retry budget
 		// (i.e. the parent ctx, which here has no deadline), not whatever is
 		// left of the polling timeout.
-		mockCoord := newMockUpgradeCoordinator(t)
-		callIdx := 0
-		stateSequence := []coordinator.State{
-			policyAppliedNoUnits,
-			policyAppliedNoUnits,
-			endpointState,
-		}
-		mockCoord.EXPECT().State().RunAndReturn(func() coordinator.State {
-			idx := callIdx
-			if idx >= len(stateSequence) {
-				idx = len(stateSequence) - 1
+		// The synctest bubble runs the ticker and timeout on a fake clock, so the
+		// polls land at exactly 0, 9 and 18ms however slow the runner is.
+		synctest.Test(t, func(t *testing.T) {
+			mockCoord := newMockUpgradeCoordinator(t)
+			callIdx := 0
+			stateSequence := []coordinator.State{
+				policyAppliedNoUnits,
+				policyAppliedNoUnits,
+				endpointState,
 			}
-			callIdx++
-			return stateSequence[idx]
-		}).Times(len(stateSequence))
+			mockCoord.EXPECT().State().RunAndReturn(func() coordinator.State {
+				idx := callIdx
+				if idx >= len(stateSequence) {
+					idx = len(stateSequence) - 1
+				}
+				callIdx++
+				return stateSequence[idx]
+			}).Times(len(stateSequence))
 
-		log, _ := logger.New("", false)
-		u := NewUpgrade(log, mockCoord)
-		u.endpointWaitTimeout = 20 * time.Millisecond
-		u.endpointPollInterval = 1 * time.Millisecond
+			log, _ := logger.New("", false)
+			u := NewUpgrade(log, mockCoord)
+			u.endpointWaitTimeout = 20 * time.Millisecond
+			u.endpointPollInterval = 9 * time.Millisecond
 
-		var gotCtx context.Context
-		u.notifyUnitsOfProxiedActionFn = func(ctx context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
-			gotCtx = ctx
-			return nil
-		}
+			start := time.Now()
+			var gotCtx context.Context
+			var notifiedAfter time.Duration
+			u.notifyUnitsOfProxiedActionFn = func(ctx context.Context, _ *logp.Logger, _ dispatchableAction, _ []unitWithComponent, _ performActionFunc) error {
+				gotCtx = ctx
+				notifiedAfter = time.Since(start)
+				return nil
+			}
 
-		action := &fleetapi.ActionUpgrade{
-			ActionType: fleetapi.ActionTypeUpgrade,
-			Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
-		}
+			action := &fleetapi.ActionUpgrade{
+				ActionType: fleetapi.ActionTypeUpgrade,
+				Data:       fleetapi.ActionUpgradeData{Version: "9.0.0"},
+			}
 
-		// Parent ctx has no deadline — if notifyEndpointOfUpgrade passed the
-		// internal timeoutCtx instead, gotCtx would have one.
-		err := u.notifyEndpointOfUpgrade(t.Context(), log, action)
-		require.NoError(t, err)
-		require.NotNil(t, gotCtx)
-		_, hasDeadline := gotCtx.Deadline()
-		assert.False(t, hasDeadline, "notification must receive the parent ctx, not the endpointWaitTimeout-bounded ctx")
+			// Parent ctx has no deadline — if notifyEndpointOfUpgrade passed the
+			// internal timeoutCtx instead, gotCtx would have one.
+			err := u.notifyEndpointOfUpgrade(t.Context(), log, action)
+			require.NoError(t, err)
+			require.NotNil(t, gotCtx)
+			assert.Equal(t, 18*time.Millisecond, notifiedAfter, "notification should happen on the last poll before the timeout")
+			_, hasDeadline := gotCtx.Deadline()
+			assert.False(t, hasDeadline, "notification must receive the parent ctx, not the endpointWaitTimeout-bounded ctx")
+			// The internal timeoutCtx is cancelled when notifyEndpointOfUpgrade
+			// returns; the parent ctx must still be live.
+			assert.NoError(t, gotCtx.Err(), "notification must receive the parent ctx, not the endpointWaitTimeout-bounded ctx")
+		})
 	})
 }
 

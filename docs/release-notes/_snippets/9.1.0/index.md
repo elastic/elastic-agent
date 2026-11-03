@@ -42,7 +42,7 @@ _This release also includes: [Deprecations](/release-notes/deprecations.md#elast
   negative value disables the timeout.
   
 * Remove deprecated otel elasticsearch exporter config `*_dynamic_index` from code and samples. [#8592](https://github.com/elastic/elastic-agent/pull/8592) 
-* Include the forwardconnector as an EDOT collector commponent. [#8753](https://github.com/elastic/elastic-agent/pull/8753) 
+* Include the forwardconnector as an EDOT collector component. [#8753](https://github.com/elastic/elastic-agent/pull/8753) 
 
   https://github.com/open-telemetry/opentelemetry-collector/tree/main/connector/forwardconnector
 * Update OTel components to v0.129.0.  

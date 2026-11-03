@@ -181,3 +181,53 @@ func TestExecuteCommand(t *testing.T) {
 	}
 
 }
+
+func TestExecuteCommandErrorLine(t *testing.T) {
+	log := logp.NewLogger("test_service")
+
+	tests := []struct {
+		name     string
+		output   string
+		want     string
+		wantLast string
+	}{
+		{
+			name:     "last error line is preferred over later lines",
+			output:   `2026-01-02 03:04:05: info: A.cpp:1 started\n2026-01-02 03:04:06: error: B.cpp:2 something broke\n2026-01-02 03:04:07: debug: C.cpp:3 cleaning up\n`,
+			want:     "2026-01-02 03:04:06: error: B.cpp:2 something broke",
+			wantLast: "2026-01-02 03:04:07: debug: C.cpp:3 cleaning up",
+		},
+		{
+			name:     "last line is used without an error line",
+			output:   `2026-01-02 03:04:05: info: A.cpp:1 started\n2026-01-02 03:04:07: debug: C.cpp:3 cleaning up\n`,
+			want:     "2026-01-02 03:04:07: debug: C.cpp:3 cleaning up",
+			wantLast: "2026-01-02 03:04:07: debug: C.cpp:3 cleaning up",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cn := context.WithCancel(context.Background())
+			defer cn()
+
+			exePath, err := prepareTestProg(ctx, log, t.TempDir(), progConfig{ErrMessage: tc.output, ExitCode: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = executeCommand(ctx, log, exePath, nil, nil, 0)
+
+			var cmdErr *commandError
+			if !errors.As(err, &cmdErr) {
+				t.Fatalf("want *commandError, got %T", err)
+			}
+			if diff := cmp.Diff(tc.want, cmdErr.summary()); diff != "" {
+				t.Fatal(diff)
+			}
+			// The text of the error is still based on the last line of the output.
+			if !strings.HasPrefix(err.Error(), tc.wantLast+": ") {
+				t.Fatalf("error %q does not start with the last line %q", err.Error(), tc.wantLast)
+			}
+		})
+	}
+}

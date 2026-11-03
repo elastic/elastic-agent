@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.uber.org/zap"
 
+	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 )
 
@@ -105,13 +106,48 @@ func TestConsumeMetrics_ExporterEventFields(t *testing.T) {
 	require.Equal(t, 1, sink.LogRecordCount())
 	body := sink.AllLogs()[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Map()
 
-	compID, ok := body.Get("component.id")
-	require.True(t, ok)
-	assert.Equal(t, "my-output", compID.Str())
+	compID, err := mapstr.M(body.AsRaw()).GetValue("component.id")
+	require.NoError(t, err)
+	assert.Equal(t, "my-output", compID)
 
 	queueMax, ok := body.Get("beat.stats.libbeat.pipeline.queue.max_events")
 	require.True(t, ok)
 	assert.Equal(t, int64(1000), queueMax.Int())
+}
+
+// TestConsumeMetrics_ComponentIDReplacesTemplateValue verifies that the event's
+// component.id overrides the template's nested one instead of adding a second value.
+func TestConsumeMetrics_ComponentIDReplacesTemplateValue(t *testing.T) {
+	for _, eventType := range []string{
+		internaltelemetry.EventTypeExporter,
+		internaltelemetry.EventTypeReceiver,
+		internaltelemetry.EventTypeInput,
+	} {
+		t.Run(eventType, func(t *testing.T) {
+			template := map[string]any{
+				"component": map[string]any{
+					"binary": "elastic-otel-collector",
+					"id":     "elastic-otel-collector",
+				},
+			}
+			sink := &consumertest.LogsSink{}
+			c := newTestConnector(sink)
+			c.config.EventTemplate.Fields = template
+			c.config.InputEventTemplate.Fields = template
+			require.NoError(t, c.ConsumeMetrics(t.Context(), newProcessorOutputEvent(eventType, "filestream-default")))
+
+			require.Equal(t, 1, sink.LogRecordCount())
+			body := sink.AllLogs()[0].ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).Body().Map()
+			assert.Equal(t, mapstr.M{
+				"binary": "elastic-otel-collector",
+				"id":     "filestream-default",
+			}, mapstr.M(body.AsRaw()["component"].(map[string]any)))
+			_, flat := body.Get("component.id")
+			assert.False(t, flat, "component.id must not also be set as a flat key")
+			assert.Equal(t, "elastic-otel-collector", template["component"].(map[string]any)["id"],
+				"the configured template must not be modified")
+		})
+	}
 }
 
 // TestConsumeMetrics_InputEventFields verifies that an input event sets the

@@ -330,32 +330,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-      # Runs only on main and release branches, like "Unit tests - macOS 13".
-      # Skipped like "Unit tests - macOS 13" due to Orka provider slowness,
-      # see https://github.com/elastic/elastic-agent/pull/17290
-      - label: "EDOT unit tests - macOS 13"
-        key: "edot-unit-tests-macos13"
-        skip: "Orka slowness, see github.com/elastic/elastic-agent/pull/17290"
-        command: ".buildkite/scripts/steps/unit-tests.sh"
-        branches: "main 8.* 9.*"
-        env:
-          GO_MODULE_DIR: "internal/edot"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-          - "coverage-*.out"
-        agents:
-          provider: orka
-          imagePrefix: generic-13-ventura-x64
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
       # The EDOT module does not compile on the Windows arm64 Buildkite agents.
       # Remove `skip` once https://github.com/elastic/elastic-agent/issues/17227 is resolved.
       - label: "EDOT unit tests - Windows 11 arm64"

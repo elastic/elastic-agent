@@ -15,7 +15,7 @@ entries:
         checksum: 58035340e8d1722d9846474f8795d559a68aaa65
     - kind: security
       summary: Redact secrets in slices
-      description: Redact secrets in conifg and component files found in the diagnostics archive that occur within slices.
+      description: Redact secrets in config and component files found in the diagnostics archive that occur within slices.
       component: elastic-agent
       pr:
         - https://github.com/elastic/elastic-agent/pull/11271

@@ -291,6 +291,95 @@ func (suite *FakeInputSuite) TestManager_Features() {
 	}
 }
 
+// A component removed and re-added while its stop is in flight must run again.
+func (suite *FakeInputSuite) TestManager_ComponentReaddedAfterRemoval() {
+	t := suite.T()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	m, err := NewManager(
+		newDebugLogger(t),
+		newDebugLogger(t),
+		&info.AgentInfo{},
+		apmtest.DiscardTracer,
+		newTestMonitoringMgr(),
+		testGrpcConfig())
+	require.NoError(t, err)
+	go func() { _ = m.Run(ctx) }()
+
+	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer waitCancel()
+	require.NoError(t, waitForReady(waitCtx, m))
+
+	// Slow subscriber, like the coordinator, delays stateChanged after Stopped.
+	subAll := m.SubscribeAll(ctx)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-subAll.Ch():
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}()
+
+	const compID = "fake-default"
+	comp := component.Component{
+		ID: compID,
+		InputSpec: &component.InputRuntimeSpec{
+			InputType:  "fake",
+			BinaryPath: testBinary(t, "component"),
+			Spec:       fakeInputSpec,
+		},
+		Units: []component.Unit{
+			{
+				ID:       "fake-input",
+				Type:     client.UnitTypeInput,
+				LogLevel: client.UnitLogLevelInfo,
+				Config: component.MustExpectedConfig(map[string]interface{}{
+					"type":    "fake",
+					"state":   int(client.UnitStateHealthy),
+					"message": "Fake Healthy",
+				}),
+			},
+		},
+	}
+	runPath := paths.Run()
+	require.NoError(t, comp.PrepareWorkDir(runPath))
+	defer func() { _ = comp.RemoveWorkDir(runPath) }()
+
+	componentState := func() (client.UnitState, bool) {
+		m.currentMx.RLock()
+		defer m.currentMx.RUnlock()
+		state, ok := m.current[compID]
+		if !ok {
+			return client.UnitStateStopped, false
+		}
+		return state.getLatest().State, true
+	}
+	requireHealthy := func(msg string) {
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			state, ok := componentState()
+			assert.True(c, ok, "component not in manager")
+			assert.Equal(c, client.UnitStateHealthy, state)
+		}, 15*time.Second, 50*time.Millisecond, msg)
+	}
+
+	m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, <-m.errCh)
+	requireHealthy("component never became healthy")
+
+	// Queue the re-add while the removal is still stopping the component.
+	m.Update(component.Model{})
+	time.Sleep(50 * time.Millisecond)
+	m.Update(component.Model{Components: []component.Component{comp}})
+	require.NoError(t, <-m.errCh)
+	require.NoError(t, <-m.errCh)
+	requireHealthy("component not running after re-add")
+}
+
 func (suite *FakeInputSuite) TestManager_APM() {
 	t := suite.T()
 
@@ -2889,8 +2978,12 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 		errCh <- err
 	}()
 
-	// build the units to ensure that there is more than double the units required for the GRPC configuration
+	// build the units to ensure that the expected message is larger than the GRPC configuration allows,
+	// so it has to be chunked. Each unit carries a large payload to keep the number of units low: the
+	// test cost scales with the unit count, and tens of thousands of small units make the component miss
+	// check-ins on slow CI runners.
 	minimumMsgSize := int(float64(grpcConfig.MaxMsgSize) * 1.2) // increase by 20%
+	unitPadding := strings.Repeat("x", 64*1024)
 	var units []component.Unit
 	var unitsSize int
 	var nextUnitID int
@@ -2905,7 +2998,7 @@ func (suite *FakeInputSuite) TestManager_Chunk() {
 				"message": fmt.Sprintf("Fake Healthy %d", nextUnitID),
 				"payload": map[string]interface{}{
 					"fake-id":    nextUnitID,
-					"extra-data": fmt.Sprintf("extra data for the unit %d to make it some what larger", nextUnitID),
+					"extra-data": unitPadding,
 				},
 			}),
 		}

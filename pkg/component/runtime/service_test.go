@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -13,8 +14,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
 	"github.com/google/go-cmp/cmp"
@@ -274,6 +278,27 @@ func TestGetConnInfoServerAddress(t *testing.T) {
 	}
 }
 
+// dialConnInfoServer attempts a single connection to the connection-info server at
+// cisAddr. The caller is responsible for closing a non-nil returned connection.
+func dialConnInfoServer(ctx context.Context, cisAddr string) (net.Conn, error) {
+	if runtime.GOOS != "windows" {
+		parsedCISAddr, err := url.Parse(cisAddr)
+		if err != nil {
+			return nil, err
+		}
+		dialCtx, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		return (&net.Dialer{}).DialContext(dialCtx, "unix", parsedCISAddr.Host+parsedCISAddr.Path)
+	}
+
+	pipeAddr := cisAddr
+	if strings.HasPrefix(pipeAddr, "npipe:///") {
+		path := strings.TrimPrefix(pipeAddr, "npipe:///")
+		pipeAddr = `\\.\pipe\` + path
+	}
+	return npipe.Dial(pipeAddr)("", "")
+}
+
 // TestCISKeepsRunningOnNonFatalExitCodeFromStart tests that the connection info
 // server keeps running when starting a service component results in a non-fatal
 // exit code.
@@ -325,10 +350,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	}()
 
 	// Run the service
-	go func() {
-		err := service.Run(ctx, comm)
-		require.EqualError(t, err, context.Canceled.Error())
-	}()
+	startServiceRuntime(t, ctx, cancel, service, comm)
 
 	service.actionCh <- actionModeSigned{
 		actionMode: actionStart,
@@ -338,9 +360,6 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	// warning log message about Endpoint's install operation failing with a non-fatal exit
 	// code but the service runtime continuing to run.
 	cisAddr, err := getConnInfoServerAddress(runtime.GOOS, true, cisPort, cisSocket)
-	require.NoError(t, err)
-
-	parsedCISAddr, err := url.Parse(cisAddr)
 	require.NoError(t, err)
 
 	// First, wait for the warning log message indicating the runtime continued
@@ -357,19 +376,7 @@ func TestCISKeepsRunningOnNonFatalExitCodeFromStart(t *testing.T) {
 	// return ERROR_PIPE_BUSY between Accept calls; the conn is closed each
 	// attempt to avoid leaking client-side pipe handles.
 	require.Eventuallyf(t, func() bool {
-		var conn net.Conn
-		if runtime.GOOS != "windows" {
-			dialCtx, cancelDial := context.WithTimeout(ctx, time.Second)
-			conn, err = (&net.Dialer{}).DialContext(dialCtx, "unix", parsedCISAddr.Host+parsedCISAddr.Path)
-			cancelDial()
-		} else {
-			if strings.HasPrefix(cisAddr, "npipe:///") {
-				path := strings.TrimPrefix(cisAddr, "npipe:///")
-				cisAddr = `\\.\pipe\` + path
-			}
-			conn, err = npipe.Dial(cisAddr)("", "")
-		}
-
+		conn, err := dialConnInfoServer(ctx, cisAddr)
 		if err != nil {
 			t.Logf("Connection info server is not running: %v", err)
 			return false
@@ -429,10 +436,7 @@ func TestServiceStartRetry(t *testing.T) {
 	}()
 
 	// Run the service runtime
-	go func() {
-		err := service.Run(ctx, comm)
-		require.EqualError(t, err, context.Canceled.Error())
-	}()
+	startServiceRuntime(t, ctx, cancel, service, comm)
 
 	// Start the service
 	service.actionCh <- actionModeSigned{
@@ -453,6 +457,235 @@ func TestServiceStartRetry(t *testing.T) {
 		}
 		return false
 	}, service.serviceRestartDelay+1*time.Second, 500*time.Millisecond)
+}
+
+// TestServiceStartFailureReportedAcrossRetries tests that a failed service start
+// is reported as DEGRADED, and that it stays DEGRADED while the start is retried.
+func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
+	log, logObs := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".sfrteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var mu sync.Mutex
+	var states []client.UnitState
+	var degradedMsg string
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case st := <-service.ch:
+				mu.Lock()
+				states = append(states, st.State)
+				if st.State == client.UnitStateDegraded && degradedMsg == "" {
+					degradedMsg = st.Message
+				}
+				mu.Unlock()
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	// Wait for the start to be retried after failing.
+	require.Eventually(t, func() bool {
+		return logObs.FilterMessageSnippet("failed to start endpoint service").Len() >= 2
+	}, 30*time.Second, 100*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	degradedAt := slices.Index(states, client.UnitStateDegraded)
+	require.GreaterOrEqual(t, degradedAt, 0, "DEGRADED was not reported")
+	for _, st := range states[degradedAt:] {
+		require.Equal(t, client.UnitStateDegraded, st, "the retry must not reset the state from DEGRADED")
+	}
+	require.Contains(t, degradedMsg, "install exited with code 99")
+}
+
+// TestServiceStartFailureBecomesFailedAfterBudget tests that failed starts are reported
+// as DEGRADED at first and as FAILED once they have kept failing for long enough.
+func TestServiceStartFailureBecomesFailedAfterBudget(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".ssfabteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+		Timeouts: component.ServiceTimeoutSpec{StartFailedAfter: 300 * time.Millisecond},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var mu sync.Mutex
+	var states []client.UnitState
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case st := <-service.ch:
+				mu.Lock()
+				states = append(states, st.State)
+				mu.Unlock()
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	observed := func() []client.UnitState {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(states)
+	}
+	require.Eventually(t, func() bool {
+		return slices.Contains(observed(), client.UnitStateFailed)
+	}, 30*time.Second, 50*time.Millisecond)
+
+	// The failure is first reported as degraded, and the retries never reset it to starting.
+	got := observed()
+	degradedAt := slices.Index(got, client.UnitStateDegraded)
+	failedAt := slices.Index(got, client.UnitStateFailed)
+	require.GreaterOrEqual(t, degradedAt, 0, "DEGRADED was not reported")
+	require.Less(t, degradedAt, failedAt)
+	require.NotContains(t, got[degradedAt:], client.UnitStateStarting)
+
+	// Once failed, the state is kept by the following attempts.
+	require.Never(t, func() bool {
+		return slices.ContainsFunc(observed()[failedAt+1:], func(st client.UnitState) bool { return st != client.UnitStateFailed })
+	}, 2*service.serviceRestartDelay, 50*time.Millisecond)
+}
+
+func TestDescribeStartFailure(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "timeout with output",
+			err:  &commandError{line: "2026-01-02 03:04:05: error: A.cpp:1 something broke", err: context.DeadlineExceeded},
+			want: "install timed out: A.cpp:1 something broke",
+		},
+		{
+			name: "no output",
+			err:  errors.New("boom"),
+			want: "install failed",
+		},
+		{
+			name: "long line is shortened",
+			err:  &commandError{line: strings.Repeat("x", 300), err: errors.New("boom")},
+			want: "install failed: " + strings.Repeat("x", maxStartFailureLineLength) + "...",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, describeStartFailure(tc.err))
+		})
+	}
+}
+
+// TestServiceStartRetryDiscardedAfterStop tests that a stopped service is not started
+// by a retry of a failed start that was scheduled before the stop.
+func TestServiceStartRetryDiscardedAfterStop(t *testing.T) {
+	log, logObs := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".ssrcteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	failedStarts := func() int {
+		return logObs.FilterMessageSnippet("failed to start endpoint service").Len()
+	}
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+	require.Eventually(t, func() bool { return failedStarts() == 1 }, 30*time.Second, 50*time.Millisecond)
+
+	require.NoError(t, service.Stop())
+	require.Never(t, func() bool { return failedStarts() > 1 }, 3*service.serviceRestartDelay, 50*time.Millisecond,
+		"the service was started again after it was stopped")
+}
+
+// startServiceRuntime runs service.Run in the background and registers a cleanup
+// that cancels ctx and waits for Run to return. Cancelling the context alone does not
+// wait for the connection-info server to close, and tests share socket names across
+// runs; Run's deferred cleanup closes the server before it returns, so waiting for it
+// guarantees no server outlives the test.
+func startServiceRuntime(t *testing.T, ctx context.Context, cancel context.CancelFunc, service *serviceRuntime, comm Communicator) {
+	t.Helper()
+	runDone := make(chan error, 1)
+	go func() { runDone <- service.Run(ctx, comm) }()
+	t.Cleanup(func() {
+		cancel()
+		// No local timeout: a fixed deadline could fail spuriously on a loaded CI
+		// runner, and a real hang is already caught by the go test timeout.
+		//
+		// Keep draining the unbuffered state channel while waiting: the tests'
+		// observer goroutines exit on ctx.Done(), and Run may still publish a final
+		// state while shutting down, which would otherwise block it forever.
+		for {
+			select {
+			case <-service.ch:
+			case err := <-runDone:
+				require.ErrorIs(t, err, context.Canceled)
+				return
+			}
+		}
+	})
 }
 
 func makeServiceForCheckStatus(t *testing.T, installTimeout, uninstallTimeout, checkTimeout time.Duration) *serviceRuntime {
@@ -604,4 +837,199 @@ func mockEndpointBinary(t *testing.T, exitCode int) string {
 	require.NoError(t, err)
 
 	return outPath
+}
+
+// TestConnInfoServerClosedDuringInstall verifies that the connection-info server (CIS)
+// does not accept connections while the installer for a service component is running,
+// and becomes reachable only once the installer completes successfully.
+//
+// Regression: PR #9313 opened the CIS before running the installer. A still-running old
+// service (e.g. the previous Endpoint version) could dial in while the new version was
+// still installing, be adopted as HEALTHY, and receive a policy update that interfered
+// with the upgrade (SDH-854). This test exercises the real connInfoServer and address,
+// not a mock, so it directly verifies the open/close ordering rather than the drain
+// logic (see TestStaleCheckinDrainedOnInstallRetry for that).
+func TestConnInfoServerClosedDuringInstall(t *testing.T) {
+	log, _ := loggertest.New("test")
+	const cisPort = 9995
+	const cisSocket = ".tciclosed.sock"
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   cisPort,
+		CSocket: cisSocket,
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+
+	var startOnce sync.Once
+	installStarted := make(chan struct{})
+	releaseInstall := make(chan struct{})
+	firstCall := true // first call is always check; subsequent calls are install
+
+	service.executeServiceCommandImpl = func(ctx context.Context, _ *logger.Logger, _ string, _ *component.ServiceOperationsCommandSpec) error {
+		if firstCall {
+			firstCall = false
+			return errors.New("service not installed") // check fails → install is triggered
+		}
+		startOnce.Do(func() { close(installStarted) })
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-releaseInstall:
+		}
+		return nil // install succeeds
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	comm := newMockCommunicator("")
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, comm)
+
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	select {
+	case <-installStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not start within timeout")
+	}
+
+	cisAddr, err := getConnInfoServerAddress(runtime.GOOS, true, cisPort, cisSocket)
+	require.NoError(t, err)
+
+	// While the installer is still running, the CIS must not exist yet: this is the
+	// core guarantee of the ordering fix, and the reason the old service can no
+	// longer be adopted mid-install.
+	_, dialErr := dialConnInfoServer(ctx, cisAddr)
+	require.Error(t, dialErr, "connection-info server must not accept connections while the installer is running")
+
+	close(releaseInstall)
+
+	// Once the installer completes successfully, the CIS should come up and accept
+	// connections.
+	require.Eventually(t, func() bool {
+		conn, err := dialConnInfoServer(ctx, cisAddr)
+		if err != nil {
+			return false
+		}
+		_ = conn.Close()
+		return true
+	}, 30*time.Second, 100*time.Millisecond, "connection info server did not accept a connection after install completed")
+}
+
+// TestStaleCheckinDrainedOnInstallRetry verifies that a checkin left over from a
+// previous connection-info server (CIS) instance is drained and discarded rather
+// than adopted, before a failed install is retried.
+//
+// This does not exercise the CIS open/close ordering itself (see
+// TestConnInfoServerClosedDuringInstall for that): it injects the stale checkin
+// directly into the communicator channel to isolate the drain logic, which matters
+// on a retry where a previous CIS instance had already accepted a connection and
+// queued a checkin before this attempt's cisStop() tore it down.
+func TestStaleCheckinDrainedOnInstallRetry(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9996,
+		CSocket: ".testraceinstall.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	// Long retry delay so the automatic retry doesn't interfere with the assertion window.
+	service.serviceRestartDelay = 30 * time.Second
+
+	var startOnce, doneOnce sync.Once
+	installStarted := make(chan struct{})
+	installDone := make(chan struct{})
+	firstCall := true // first call is always check; subsequent calls are install
+
+	service.executeServiceCommandImpl = func(ctx context.Context, _ *logger.Logger, _ string, _ *component.ServiceOperationsCommandSpec) error {
+		if firstCall {
+			firstCall = false
+			return errors.New("service not installed") // check fails → install is triggered
+		}
+		startOnce.Do(func() { close(installStarted) })
+		defer doneOnce.Do(func() { close(installDone) })
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		return errors.New("install failed") // simulate exit 284
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	comm := newMockCommunicator("")
+
+	statesCh := make(chan ComponentState, 50)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case s := <-service.ch:
+				select {
+				case statesCh <- s:
+				default:
+				}
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, comm)
+
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	select {
+	case <-installStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not start within timeout")
+	}
+
+	// Simulate the old service reconnecting to the CIS mid-install.
+	// In production this happens because the old service is still running as a
+	// system service and reconnects when the new agent opens the named pipe.
+	comm.ch <- &proto.CheckinObserved{}
+
+	select {
+	case <-installDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install did not complete within timeout")
+	}
+
+	// The old service's checkin must be drained and discarded, never processed.
+	// If the runtime adopts it as HEALTHY the fix is not in effect.
+	require.Never(t, func() bool {
+		select {
+		case s := <-statesCh:
+			return s.State == client.UnitStateHealthy
+		default:
+			return false
+		}
+	}, 500*time.Millisecond, 10*time.Millisecond,
+		"old service was incorrectly adopted as HEALTHY while the installer was running")
 }

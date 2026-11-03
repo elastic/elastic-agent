@@ -7,10 +7,13 @@ package translate
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
@@ -49,6 +52,14 @@ const (
 	// components with single_receiver: true, so that all receiver names uniformly have
 	// the form "<comp.ID>/<streamID>" regardless of how many receivers a component has.
 	SingleReceiverStreamID = "single"
+	// NoEnabledStreamsReceiverType is the receiver type used in place of a component's
+	// normal receivers when it has no enabled streams. The OTel collector rejects a
+	// pipeline with zero receivers, so a no-op receiver keeps the pipeline valid
+	// (and the component healthy, collecting no data) instead of crashing the collector.
+	NoEnabledStreamsReceiverType = "nop"
+	// noEnabledStreamsMessage is the status message reported for a component, and its input
+	// units, whose policy has no enabled streams.
+	noEnabledStreamsMessage = "Component has no enabled streams, no data will be collected"
 )
 
 // ComponentIDFromReceiverName extracts the elastic-agent component ID from an
@@ -69,6 +80,9 @@ func ComponentIDFromReceiverName(name string) (string, bool) {
 		return "", false
 	}
 	compID, _, _ := strings.Cut(parts[1], "/")
+	if decoded, err := DecodeNameSegment(compID); err == nil {
+		return decoded, true
+	}
 	return compID, true
 }
 
@@ -239,7 +253,7 @@ func getPipelineID(comp *component.Component) (pipeline.ID, error) {
 	if err != nil {
 		return pipeline.ID{}, err
 	}
-	pipelineName := fmt.Sprintf("%s%s", OtelNamePrefix, comp.ID)
+	pipelineName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(comp.ID))
 	return pipeline.NewIDWithName(signal, pipelineName), nil
 }
 
@@ -256,12 +270,41 @@ func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent
 // Both receiver naming and status lookup must use this function to stay in sync.
 func receiverStreamSuffix(compID, unitID, streamID string) string {
 	inputID := strings.TrimPrefix(unitID, compID+"-")
-	return inputID + "-" + streamID
+	return EncodeNameSegment(inputID) + "-" + EncodeNameSegment(streamID)
+}
+
+// EncodeNameSegment percent-encodes "%", ":" and the characters of s that are not valid in OTel component names.
+func EncodeNameSegment(s string) string {
+	if !strings.ContainsFunc(s, needsEncoding) {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if needsEncoding(r) {
+			for _, c := range []byte(s[i : i+size]) {
+				fmt.Fprintf(&b, "%%%02X", c)
+			}
+		} else {
+			b.WriteString(s[i : i+size])
+		}
+		i += size
+	}
+	return b.String()
+}
+
+func needsEncoding(r rune) bool {
+	return r == '%' || r == ':' || unicode.In(r, unicode.Z, unicode.C, unicode.S)
+}
+
+// DecodeNameSegment reverses EncodeNameSegment.
+func DecodeNameSegment(s string) (string, error) {
+	return url.PathUnescape(s)
 }
 
 // GetExporterID returns the exporter id for the given exporter type and output name.
 func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcomponent.ID {
-	exporterName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	exporterName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
@@ -270,21 +313,21 @@ func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 // beatsprocessor implementation shares state internally between instances that
 // end up with identical configuration.
 func GetProcessorID(name string) otelcomponent.ID {
-	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, name)
+	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(name))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), processorName)
 }
 
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
 // getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
@@ -434,6 +477,16 @@ func getReceiversConfigForComponent(
 		}
 	}
 
+	// A component whose policy has all streams disabled produces zero inputs. An empty
+	// receivers list would cause the OTel collector to reject the pipeline and crash, so
+	// fall back to a no-op receiver: the component stays OTel-managed and healthy, just
+	// collecting no data. The receiver is named after the component so it is unique, and
+	// getComponentState reports the status of every input unit itself.
+	if len(inputs) == 0 {
+		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), EncodeNameSegment(comp.ID))
+		return map[string]any{receiverID.String(): map[string]any{}}, nil
+	}
+
 	// Beat config inside a beat receiver is nested under an additional key. Not sure if this simple translation is
 	// always safe. We should either ensure this is always the case, or have an explicit mapping.
 	beatName := strings.TrimSuffix(receiverType.String(), "receiver")
@@ -506,7 +559,7 @@ func getReceiversConfigForComponent(
 		for _, ri := range inputs {
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+SingleReceiverStreamID)
+		receiverID := GetReceiverID(receiverType, EncodeNameSegment(comp.ID)+"/"+SingleReceiverStreamID)
 		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,
@@ -520,7 +573,7 @@ func getReceiversConfigForComponent(
 		if ri.streamID == "" {
 			return nil, fmt.Errorf("input missing stream ID in component %s", comp.ID)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+receiverStreamSuffix(comp.ID, ri.unitID, ri.streamID))
+		receiverID := GetReceiverID(receiverType, EncodeNameSegment(comp.ID)+"/"+receiverStreamSuffix(comp.ID, ri.unitID, ri.streamID))
 
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared

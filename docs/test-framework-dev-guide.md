@@ -329,12 +329,12 @@ between, and it can be very specific or not very specific.
 #### Selecting specific group
 
 By default, the runner will run all test groups. Each group runs on a dedicated machine instance. When working on groups of tests it's better to limit to a specific
-group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default upgrade-standalone"`
+group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default standalone-upgrade"`
 environment variable. This variable can take multiple groups with a space between.
 
 - `TEST_GROUPS="default" mage integration:test` to execute only tests in the "default" group.
-- `TEST_GROUPS="default upgrade-standalone" mage integration:test` to execute only tests in the "default" or
-"upgrade-standalone" group.
+- `TEST_GROUPS="default standalone-upgrade" mage integration:test` to execute only tests in the "default" or
+"standalone-upgrade" group.
 
 #### Passing additional go test flags
 
@@ -421,6 +421,10 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 `TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically. Defaults to `false` (no automatic cleanup) for local runs; CI sets this to `true` explicitly.
 
 ### Debugging tests
+
+For CI failures and diagnostics bundles, the repository ships agent skills (in [.agents/skills/](../.agents/skills/)):
+`elastic-agent-it-failure-rca` for root-causing integration test failures from CI and `elastic-agent-diagnostics` for
+analyzing diagnostics bundles.
 
 #### Connecting to VMs
 All VMs (including Windows) support connections via SSH, the framework
@@ -539,6 +543,10 @@ When an integration test fails the testing fixture will try its best to automati
 information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
 automatically transfer any collected diagnostics from the instance back to the running host. The results of the
 diagnostic collection are placed in `build/diagnostics`.
+Each bundle is named `<TestName>-<timestamp>-diagnostics.zip`, with `/` in subtest names replaced by `-`. The test name is
+the one the fixture was created with (`Fixture.FileNamePrefix`), which for suite-style tests can be the parent test.
+A test that runs several agents, for example Fleet Server and the agent under test, produces one bundle per agent.
+See [diagnostics.md](./diagnostics.md) for what is in a bundle.
 
 #### Gather diagnostics manually
 In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
@@ -595,51 +603,76 @@ the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
 
+### Writing stable tests
+
+The tests run on real VMs against a stack shared by all CI jobs, on hosts that differ in speed, distro and load. A test
+that passes locally can flake weeks later, so keep these in mind:
+
+- **Poll what you assert.** Wait for the value the assertion needs, not a weaker proxy: a file existing is not it having
+  content, and a successful Kibana policy update is not the agent having applied it (wait for the applied revision
+  with `tools.IsMinPolicyRevision`, using the revision returned by the update and comparing with `>=`).
+- **Read agent-local state locally.** The agent's document in Fleet only advances on check-in, which a test can't
+  force. If the value is in `elastic-agent status` (`Fixture.ExecStatus`), poll that.
+- **Budgets need headroom over the intervals that bound them.** Fleet Server's check-in long poll is 5 minutes by
+  default, so a wait for a Fleet-reported change must be longer than that. An outer context must exceed the sum of
+  the serial waits inside it.
+- **Assert on the `*assert.CollectT` inside `EventuallyWithT`**, not on the outer `t`, otherwise the first transient
+  error fails the test instead of being retried. Don't call `require` or `assert` on `t` from a goroutine that can
+  outlive the test, and use `t.Context()` rather than `context.Background()` so waits respect the test deadline.
+- **Produce your own data and filter on it.** Don't wait for ambient events (audit, network traffic) the test did not
+  cause, and filter Elasticsearch queries on values the test controls (namespace, tag, a generated message). Capture
+  a `@timestamp` lower bound *before* the action that produces the document.
+- **Don't assert exact counts of live data** (documents, components). Retries, restarts and runtime switches change
+  them. Use thresholds or poll until stable.
+- **Don't assume the runtime.** Beats may run as processes or as receivers in the collector. Set the runtime explicitly
+  when the test depends on it, see [hybrid-agent-beats-receivers.md](./hybrid-agent-beats-receivers.md).
+- **Don't assert a healthy agent when the config breaks something on purpose.** An unreachable output makes the agent
+  degraded at a nondeterministic moment. Use `integration.StartMockES` for a placeholder output, or
+  `Fixture.IsHealthyOrDegradedFromOutput`.
+- **Isolate from other tests.** Use `info.Namespace` for data, give cluster-global Elasticsearch objects test-specific
+  names, avoid fixed ports, and don't modify shared Fleet objects such as `fleet-default-output` on the shared stack.
+  Register cleanup with `t.Cleanup` so it also runs on failure, so a failed test doesn't leave an installed agent behind.
+- **Use the fixture.** Install and manage the agent with `Fixture` (`Install`, `Configure`, `Exec`) instead of
+  starting the binary by hand, so diagnostics are collected on failure.
+- **Skips** link an issue, come after `define.Require`, and are limited to the affected platform or version.
+
 ### Test group
 
-Every `define.Require` must define a `Group` that it belongs too. Each group is executed on a separate instance with all tests with in the same group executed
-on the same instance. Placing similar tests in the same group allows those tests to run on its own instance
-as well as provides a way for a developer to select a specific group of tests with `TEST_GROUP="{group-name}"`.
+Every `define.Require` must define a `Group` that it belongs to. Each group is executed on a separate instance with all tests within the same group executed
+on the same instance. Placing similar tests in the same group allows those tests to run on their own instance
+as well as provides a way for a developer to select a specific group of tests with `TEST_GROUPS="{group-name}"`.
 
 Grouping tests is another way of spreading out the testing load across multiple instances. The more groups that
 are defined the more instances will be provisioned to complete all tests. A balance between a small good set of
 groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
-out weight the benefits of creating another group.
+outweigh the benefits of creating another group.
 
 #### Creating a new test group and Buildkite integration tests
 
-  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+  When creating a new test group, it is important to add the new group to the variant lists at the top of the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
 
-  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  The groups are defined as YAML anchors (`windows_variants`, `linux_deb_variants`, `linux_rpm_variants`, `linux_arm_variants`),
+  which the tiered steps reference as the `variant` axis of their `matrix`. Add the new group to every list for a platform it should run on.
+  Some steps (for example the non-sudo ones) list only the `default` variant instead of an anchor, so check which tiers and steps should run the new group.
   Example:
 
   ```yaml
-  - label: "x86_64:sudo: {{matrix}}"
-        command: |
-          ...
-        artifact_paths:
-          - build/**
-        agents:
-          provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
-        plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
-              field: "token"
-              env_var: "BUILDKITE_ANALYTICS_TOKEN"
-          - test-collector#v1.11.0:
-              files: "build/TEST-*.xml"
-              format: "junit"
-              debug: true
-              annotation-link: true
-        matrix:
-          - default
-          - container
-          - fleet-upgrade-to-pr-build
-          - upgrade
-          - fleet
+  - linux_deb_variants: &linux_deb_variants
+    - container
+    - deb
+    - default
+    - your-new-group
+    # ...
+
+  - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
+    # ...
+    matrix:
+      setup:
+        variant: *linux_deb_variants
   ```
+
+  Test results are not collected in each of these steps: they upload `build/*` (including the JUnit `.xml` reports) as artifacts, and the single
+  `Aggregate test reports` step downloads them and runs the Buildkite `test-collector` plugin over `build/*.xml`.
 
   This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
 
