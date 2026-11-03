@@ -1419,7 +1419,7 @@ func TestPolicyChangeHandler_handlePolicyChange_TagsAreAppliedAndPersisted(t *te
 	require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
 	var got map[string]any
 	require.NoError(t, yaml.Unmarshal(capture.saved, &got))
-	agentSection, ok := got["agent"].(map[any]any)
+	agentSection, ok := got["agent"].(map[string]any)
 	require.True(t, ok, "saved yaml must contain agent section")
 
 	tags, ok := agentSection["tags"].([]interface{})
