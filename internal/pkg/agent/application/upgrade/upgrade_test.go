@@ -2007,7 +2007,9 @@ func TestSetClientURISurvivesReload(t *testing.T) {
 		artifactDownloader: &mockArtifactDownloader{},
 	}
 
-	upgrader.SetClient(&mockSender{})
+	sender := &mockSender{}
+	upgrader.SetClient(sender)
 	require.NoError(t, upgrader.Reload(config.MustNewConfigFrom("")))
-	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
+	require.Equal(t, sender.URI(), upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
+	require.Equal(t, sender.Transport(), upgrader.artifactDownloader.(*artifactDownloader).fleetTransport)
 }

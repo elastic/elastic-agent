@@ -118,6 +118,7 @@ type Upgrader struct {
 	agentInfo                info.Agent
 	upgradeable              bool
 	fleetServerURI           string
+	fleetTransport           httpcommon.HTTPTransportSettings
 	markerWatcher            MarkerWatcher
 	watcherHelper            WatcherHelper
 	availableRollbacksSource ttl.Source
@@ -177,6 +178,7 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 
 	u.fleetServerURI = c.URI()
 	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
+	u.fleetTransport = c.Transport()
 	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
 	u.artifactDownloader.withFleetTransport(c.Transport())
 }
@@ -222,6 +224,7 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 
 	u.artifactDownloader = newArtifactDownloader(u.settings, u.log)
 	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
+	u.artifactDownloader.withFleetTransport(u.fleetTransport)
 
 	return nil
 }
