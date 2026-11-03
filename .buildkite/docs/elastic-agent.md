@@ -33,7 +33,7 @@ flowchart TD
 | --- | --- | --- | --- |
 | `check-ci` | Main pipeline build | None declared | Runs `make check-ci` via [`check-ci.sh`](../scripts/steps/check-ci.sh). |
 | Unit tests | Main pipeline build | None declared | Runs root-module Mage unit tests on Linux, Windows, and Windows ARM64 using [`unit-tests.sh`](../scripts/steps/unit-tests.sh) and [`unit-tests.ps1`](../scripts/steps/unit-tests.ps1); FIPS-tag variants are configured. |
-| EDOT unit tests | Main pipeline build | None declared | Tests `internal/edot` separately with the same scripts. Some platforms are explicitly skipped. |
+| EDOT unit tests | Main pipeline build | None declared | Tests `internal/edot` separately with the same scripts. |
 | JUnit annotation | Main pipeline build | Test jobs; failures allowed | Annotates available XML reports. |
 | Kubernetes tests | Main pipeline build | None declared | Runs a version matrix through [`k8s-tests.sh`](../scripts/steps/k8s-tests.sh). |
 | K8s sync | `main` with matching Kubernetes/version-doc changes | None declared | Generates manifests and opens the Kibana templates PR via [`sync-k8s.sh`](../scripts/steps/sync-k8s.sh). |
