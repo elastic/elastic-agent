@@ -25,7 +25,7 @@ func newPrivilegedCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Com
 		Short: "Switch installed Elastic Agent to run as privileged",
 		Long: `This command converts the installed Elastic Agent from running unprivileged to running as privileged.
 
-By default this command will ask or a confirmation before making this change. You can bypass the confirmation request
+By default this command will ask for confirmation before making this change. You can bypass the confirmation request
 using the -f flag. This is not a zero downtime operation and will always stop the running Elastic Agent (if running).
 It is possible that loss of metrics, logs, or data could occur during this window of time. The Elastic Agent
 daemon will always be started (even if it was off to start). In the case that the Elastic Agent is already running
@@ -64,7 +64,7 @@ func privilegedCmd(streams *cli.IOStreams, cmd *cobra.Command) (err error) {
 			return fmt.Errorf("problem reading prompt response")
 		}
 		if !confirm {
-			return fmt.Errorf("unprivileged switch was cancelled by the user")
+			return fmt.Errorf("privileged switch was cancelled by the user")
 		}
 	}
 

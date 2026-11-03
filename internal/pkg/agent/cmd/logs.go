@@ -167,7 +167,7 @@ func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "logs",
 		Short: "Output Elastic Agent logs",
-		Long:  "This command allows to output, watch and filter Elastic Agent logs.",
+		Long:  "This command allows you to output, watch, and filter Elastic Agent logs.",
 		Run: func(c *cobra.Command, _ []string) {
 			if err := logsCmd(streams, c, logsDir, eventLogsDir); err != nil {
 				fmt.Fprintf(streams.Err, "Error: %v\n%s\n", err, troubleshootMessage)
