@@ -27,7 +27,10 @@ type renderKey struct {
 }
 
 type renderEntry struct {
-	// rendered is nil when the input was removed by an unresolved variable or a false condition.
+	// removed is true when the input was removed by an unresolved variable or a false condition.
+	removed bool
+	// rendered holds the Dict tree form of the input. It is nilled when the entry is stored in
+	// the cache; use mapped instead. It is only valid on entries that are not yet cached.
 	rendered *Dict
 	// mapped is the native form of rendered, computed on first use. It is shared with every
 	// caller and must be treated as read-only.
@@ -85,6 +88,8 @@ func (c *RenderCache) put(key renderKey, entry *renderEntry) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	entry.used = true
+	// Drop the Dict tree now that mapped holds the same data in a flatter form.
+	entry.rendered = nil
 	c.entries[key] = entry
 }
 

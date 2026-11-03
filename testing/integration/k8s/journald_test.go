@@ -20,7 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/testing/integration"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 )
 
 func TestKubernetesJournaldInput(t *testing.T) {
@@ -79,7 +79,7 @@ func TestKubernetesJournaldInput(t *testing.T) {
 						Name: "journald-mount",
 						VolumeSource: corev1.VolumeSource{
 							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/run/log/journal",
+								Path: journaldHostPath(kCtx),
 								Type: &hostPathType,
 							},
 						},
@@ -162,7 +162,7 @@ func TestKubernetesJournaldInputOtel(t *testing.T) {
 						Name: "journald-mount",
 						VolumeSource: corev1.VolumeSource{
 							HostPath: &corev1.HostPathVolumeSource{
-								Path: "/run/log/journal",
+								Path: journaldHostPath(kCtx),
 								Type: &hostPathType,
 							},
 						},
@@ -229,4 +229,12 @@ func journaldTest(
 		)
 	})
 	require.NotEmpty(t, docs, "expected logs to be found in Elasticsearch")
+}
+
+// journaldHostPath returns the host directory that holds the systemd journal.
+func journaldHostPath(kCtx k8sContext) string {
+	if kCtx.openshift {
+		return "/var/log/journal"
+	}
+	return "/run/log/journal"
 }

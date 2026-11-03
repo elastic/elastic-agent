@@ -332,6 +332,40 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		assert.Equal(t, want, store.state.ActionSerializer.Action)
 	})
 
+	t.Run("SaveAction persists an action with the same ID and different content", func(t *testing.T) {
+		newActionPolicyChange := func(tags ...interface{}) *fleetapi.ActionPolicyChange {
+			return &fleetapi.ActionPolicyChange{
+				ActionID:   "policy:abc123:3",
+				ActionType: "POLICY_CHANGE",
+				Data: fleetapi.ActionPolicyChangeData{
+					Policy: map[string]interface{}{
+						"agent": map[string]interface{}{
+							"tags": tags,
+						},
+					}},
+			}
+		}
+
+		storePath := filepath.Join(t.TempDir(), "state.json")
+		s, err := storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+
+		require.NoError(t, store.SaveAction(newActionPolicyChange("tag-a", "tag-b")))
+		want := newActionPolicyChange("tag-c")
+		require.NoError(t, store.SaveAction(want))
+		require.Equal(t, want, store.Action(), "in-memory action should be the last saved action")
+
+		s, err = storage.NewDiskStore(storePath)
+		require.NoError(t, err, "failed creating DiskStore")
+
+		store1, err := NewStateStore(log, s)
+		require.NoError(t, err)
+		require.Equal(t, want, store1.Action(), "action loaded from disk should be the last saved action")
+	})
+
 	t.Run("can save a queue with one upgrade action", func(t *testing.T) {
 		ts := time.Now().UTC().Round(time.Second)
 		queue := []fleetapi.ScheduledAction{&fleetapi.ActionUpgrade{

@@ -20,6 +20,7 @@ const (
 
 	PathArtifact = "/api/fleet/artifacts/{id}/{sha2}"
 	PathStatus   = "/api/status"
+	PathPGPKey   = "/api/agents/upgrades/{version}/pgp-public-key"
 
 	PathUploadBegin    = "/api/fleet/uploads"
 	PathUploadChunk    = "/api/fleet/uploads/{id}/{chunkNum}"

@@ -10,6 +10,7 @@ import (
 	goerrors "errors"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 
 	"gopkg.in/yaml.v2"
@@ -266,7 +267,7 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 		return fmt.Errorf("failed to parse policy configuration: %w", err)
 	}
 
-	// Step 3: Set the policy log level, the runtime step below reads it back.
+	// Step 3: Read policy values and apply them to the agent info.
 	policyLogLevel := logger.DefaultLogLevel.String()
 	if loggingConfig != nil {
 		policyLogLevel = loggingConfig.Level.String()
@@ -351,6 +352,7 @@ type configPatch struct {
 	fleetClient     remote.Config
 	monitoringHTTP  *monitoringCfg.MonitoringHTTPConfig
 	monitoringPprof *monitoringCfg.PprofConfig
+	tags            []string
 }
 
 // buildConfigPatch computes the pending config values from the incoming policy.
@@ -367,6 +369,7 @@ func (h *PolicyChangeHandler) buildConfigPatch(
 		fleetClient:     h.config.Fleet.Client,
 		monitoringHTTP:  h.config.Settings.MonitoringConfig.HTTP,
 		monitoringPprof: h.config.Settings.MonitoringConfig.Pprof,
+		tags:            h.config.Settings.Tags,
 	}
 	needsReExec := false
 
@@ -404,6 +407,11 @@ func (h *PolicyChangeHandler) buildConfigPatch(
 		patch.logging.Level = loggingConfig.Level
 	}
 
+	// Tags changes.
+	if cfg != nil && cfg.Settings != nil {
+		patch.tags = info.NormalizeTags(cfg.Settings.Tags)
+	}
+
 	// Fleet client.
 	if validatedFleetConfig != nil {
 		patch.fleetClient = *validatedFleetConfig
@@ -438,6 +446,8 @@ func (h *PolicyChangeHandler) configWithPatch(patch configPatch) *configuration.
 	loggingCopy := patch.logging
 	settingsCopy.LoggingConfig = &loggingCopy
 
+	settingsCopy.Tags = slices.Clone(patch.tags)
+
 	// Fleet is a shared pointer after the shallow copy; isolate before modifying Client.
 	fleetCopy := *h.config.Fleet
 	cfgCopy.Fleet = &fleetCopy
@@ -459,6 +469,7 @@ func (h *PolicyChangeHandler) commitConfig(patch configPatch) {
 	h.config.Fleet.Client = patch.fleetClient
 	h.config.Settings.MonitoringConfig.HTTP = patch.monitoringHTTP
 	h.config.Settings.MonitoringConfig.Pprof = patch.monitoringPprof
+	h.config.Settings.Tags = patch.tags
 }
 
 func validateLoggingConfig(cfg *configuration.Configuration) (*logger.Config, error) {
@@ -514,6 +525,9 @@ func saveConfig(agentInfo info.Agent, validatedConfig *configuration.Configurati
 	return nil
 }
 
+// clientEqual reports whether the Fleet client settings in the policy (k2) would change
+// the agent's current ones (k1). The argument order matters: TLS settings that the
+// policy omits are not a difference.
 func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 	if k1.Protocol != k2.Protocol {
 		return false
@@ -559,6 +573,50 @@ func clientEqual(k1 remote.Config, k2 remote.Config) bool {
 		return false
 	}
 
+	// different TLS settings (certificate/key or CAs) in the policy, e.g. a Fleet Server CA rotation
+	if !tlsClientEqual(k1.Transport.TLS, k2.Transport.TLS) {
+		return false
+	}
+
+	return true
+}
+
+// tlsClientEqual reports whether applying the policy's TLS settings to the current ones
+// would change anything. A certificate or CA list that is empty in the policy is not a
+// difference, even when the agent has its own value, for example one set at enrollment.
+func tlsClientEqual(current, policy *tlscommon.Config) bool {
+	if policy == nil {
+		return true
+	}
+	if current == nil {
+		// Applying the policy creates the agent's TLS settings. Afterwards they are
+		// not nil, so this is only a change the first time.
+		return false
+	}
+
+	if policy.Certificate != emptyCertificateConfig() && current.Certificate != policy.Certificate {
+		return false
+	}
+
+	if len(policy.CAs) == 0 {
+		return true
+	}
+	if len(current.CAs) != len(policy.CAs) {
+		return false
+	}
+
+	// Compare as a set: the order of the CAs is not meaningful. Sort copies to avoid
+	// mutating the caller's slices.
+	currentCAs := append([]string(nil), current.CAs...)
+	policyCAs := append([]string(nil), policy.CAs...)
+	sort.Strings(currentCAs)
+	sort.Strings(policyCAs)
+	for i, v := range currentCAs {
+		if v != policyCAs[i] {
+			return false
+		}
+	}
+
 	return true
 }
 
@@ -566,6 +624,7 @@ func fleetToReader(agentID string, headers map[string]string, logLevelOverride s
 	agentConfig := map[string]interface{}{
 		"id":                           agentID,
 		"headers":                      headers,
+		"tags":                         cfg.Settings.Tags,
 		"logging.level":                cfg.Settings.LoggingConfig.Level,
 		"logging.to_files":             cfg.Settings.LoggingConfig.ToFiles,
 		"logging.to_stderr":            cfg.Settings.LoggingConfig.ToStderr,

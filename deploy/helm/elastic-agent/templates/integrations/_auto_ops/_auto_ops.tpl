@@ -32,11 +32,6 @@ receivers:
             - cat_template
             - component_template
             - index_template
-    processors:
-      - add_fields:
-          target: autoops_es
-          fields:
-            token: ${env:AUTOOPS_TOKEN}
     output:
       otelconsumer:
     telemetry_types: ["logs"]
@@ -44,8 +39,17 @@ receivers:
 exporters:
   otlphttp:
     headers:
-      Authorization: "AutoOpsToken ${env:AUTOOPS_TOKEN}"
+      Authorization: "ApiKey ${env:ELASTIC_CLOUD_CONNECTED_MODE_API_KEY}"
     endpoint: ${env:AUTOOPS_OTEL_URL}
+    sending_queue:
+      batch:
+        flush_timeout: 11s
+        min_size: 1048576 # 1 MiB uncompressed
+        max_size: 4194304 # 4 MiB uncompressed
+        sizer: bytes
+      block_on_overflow: true
+      enabled: true
+      queue_size: 52428800 # 50 MiB uncompressed
 
 service:
   pipelines:
@@ -62,11 +66,11 @@ service:
 {{- $agentName := include "elasticagent.preset.fullname" (list $ $presetName) -}}
 extraEnvs:
   # Always present
-  - name: AUTOOPS_TOKEN
+  - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
     valueFrom:
       secretKeyRef:
         name: {{ $agentName }}-autoops
-        key: autoops-token
+        key: cloud-connected-mode-api-key
 
   - name: AUTOOPS_OTEL_URL
     valueFrom:
@@ -104,14 +108,6 @@ extraEnvs:
         name: {{ $agentName }}-autoops
         key: es-password
   {{- end }}
-
-{{- if $.Values.autoOps.elastic_cloud_connected_mode_api_key }}
-  - name: ELASTIC_CLOUD_CONNECTED_MODE_API_KEY
-    valueFrom:
-      secretKeyRef:
-        name: {{ $agentName }}-autoops
-        key: cloud-connected-mode-api-key
-{{- end }}
 
 {{- if $.Values.autoOps.elastic_cloud_connected_mode_api_url }}
   - name: ELASTIC_CLOUD_CONNECTED_MODE_API_URL

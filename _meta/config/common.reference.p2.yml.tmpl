@@ -133,6 +133,10 @@ inputs:
 #   # retry_sleep_init_duration is the duration to sleep for before the first retry attempt. This
 #   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
 #   retry_sleep_init_duration: 30s
+#   # if reserve_diskspace is enabled, upgrade will check for available diskspace and attempt to
+#   # reserve the required amount upfront, failing the upgrade if there is insufficient diskspace.
+#   reserve_diskspace:
+#     enabled: true
 
 # agent.upgrade
 #   # rollback settings
@@ -254,6 +258,13 @@ inputs:
 #  # ignored by Fleet managed agents, which always use encrypted config.
 #  encrypted_config:
 #    enabled: false
+#  # attach agent tags to every event collected by beats-based inputs.
+#  include_tags_in_events:
+#    enabled: false
+
+# Agent tags are attached to every event when include_tags_in_events is enabled.
+# In managed mode, Fleet sets this list from the policy.
+#agent.tags: []
 
 # Logging
 

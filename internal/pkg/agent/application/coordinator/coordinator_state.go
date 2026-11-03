@@ -40,6 +40,7 @@ type State struct {
 
 	Components []runtime.ComponentComponentState `yaml:"components"`
 	LogLevel   logp.Level                        `yaml:"log_level"`
+	Tags       []string                          `yaml:"tags,omitempty"`
 
 	Collector *status.AggregateStatus
 
@@ -227,6 +228,7 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.FleetState = c.state.FleetState
 	s.FleetMessage = c.state.FleetMessage
 	s.LogLevel = c.state.LogLevel
+	s.Tags = slices.Clone(c.state.Tags)
 	s.UpgradeDetails = c.state.UpgradeDetails
 	s.PolicyApplied = c.state.PolicyApplied
 	if len(c.state.PolicyConfiguredActionTypes) > 0 {
@@ -312,6 +314,14 @@ func (c *Coordinator) setFleetState(state agentclient.State, message string) {
 // Must be called on the main Coordinator goroutine.
 func (c *Coordinator) setLogLevel(logLevel logp.Level) {
 	c.state.LogLevel = logLevel
+	c.stateNeedsRefresh = true
+}
+
+// setTags updates the agent tags and broadcasts the change.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setTags(tags []string) {
+	c.agentInfo.SetTags(tags)
+	c.state.Tags = tags
 	c.stateNeedsRefresh = true
 }
 

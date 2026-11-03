@@ -140,6 +140,10 @@ type Broadcaster[T any] struct {
 	// value once we account for wrapping around at the end of the array).
 	index int
 
+	// Values in buffer before this index can't be sent to any subscriber
+	// anymore and have been cleared.
+	released int
+
 	// shuttingDown indicates that InputChan has been closed. When this is true,
 	// subscribers who finish reading all pending values have their listener
 	// channels closed and are removed from the subscriber list, and when all
@@ -494,6 +498,23 @@ func (b *Broadcaster[T]) removeSubscriber(subscriberIndex int) {
 	// plus two cases for each subscriber.
 	caseIndex := indexFirstSubscriberCase + 2*subscriberIndex
 	b.selectCases = append(b.selectCases[:caseIndex], b.selectCases[caseIndex+2:]...)
+	b.releaseUnreachable()
+}
+
+// releaseUnreachable clears the buffered values no subscriber can still
+// receive. Otherwise the buffer keeps the last len(buffer) values alive even
+// when every subscriber has read them, which for a large T is most of the
+// memory the Broadcaster holds.
+func (b *Broadcaster[T]) releaseUnreachable() {
+	oldest := b.index
+	for _, s := range b.subscribers {
+		oldest = min(oldest, max(s.index, b.index-s.bufferLen))
+	}
+	var zero T
+	for i := max(b.released, b.index-len(b.buffer)+1); i < oldest; i++ {
+		b.buffer[i%len(b.buffer)] = zero
+	}
+	b.released = max(b.released, oldest)
 }
 
 // advanceSubscriber is called when a subscriber reads a value, to advance
@@ -510,11 +531,14 @@ func (b *Broadcaster[T]) advanceSubscriber(subscriberIndex int) {
 			b.removeSubscriber(subscriberIndex)
 		} else {
 			b.selectCases[selectCaseIndex].Chan = reflect.ValueOf(nil)
+			// the case is ignored while Chan is nil; don't keep the sent value alive
+			b.selectCases[selectCaseIndex].Send = reflect.Value{}
 		}
 	} else {
 		// Load the send channel with the buffer value at s.index
 		b.selectCases[selectCaseIndex].Send = reflect.ValueOf(b.buffer[s.index%len(b.buffer)])
 	}
+	b.releaseUnreachable()
 }
 
 // updateListeners is called after new input comes in to advance subscriber
@@ -540,6 +564,7 @@ func (b *Broadcaster[T]) updateListeners() {
 	}
 	// Update getChan, used for standalone reads from non-subscribers.
 	b.selectCases[indexGetCase].Send = reflect.ValueOf(b.currentValue())
+	b.releaseUnreachable()
 }
 
 // shutdown sets the shuttingDown flag and closes all subscribers, so the

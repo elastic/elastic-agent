@@ -25,7 +25,7 @@ For more information, check [#6461]({{agent-pull}}6461) and [#2489]({{agent-pull
 ::::
 
 ::::{dropdown} Changed the default {{agent}} installation and upgrade
-The default {{agent}} installation and ugprade have been changed to include only the `agentbeat`, `endpoint-security` and `pf-host-agent` components.
+The default {{agent}} installation and upgrade have been changed to include only the `agentbeat`, `endpoint-security` and `pf-host-agent` components.
 
 Additional components such as `apm` or `fleet` require passing the `--install-servers` flag or setting the `ELASTIC_AGENT_FLAVOR=servers` environment variable.
 

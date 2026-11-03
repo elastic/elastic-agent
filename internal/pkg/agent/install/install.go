@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jaypipes/ghw"
 	"github.com/kardianos/service"
 	"github.com/otiai10/copy"
 
@@ -40,6 +39,10 @@ const (
 	DefaultStopTimeout = 30 * time.Second
 	// DefaultStopInterval is the check interval to determine if the service has stopped.
 	DefaultStopInterval = 250 * time.Millisecond
+
+	// CopyConcurrency is the number of concurrent workers used when copying files
+	// during install and upgrade.
+	CopyConcurrency = 4
 )
 
 // Install installs Elastic Agent persistently on the system including creating and starting its service.
@@ -77,8 +80,6 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 	pathMappings := manifest.Package.PathMappings
 
 	pt.Describe("Copying install files")
-	copyConcurrency := calculateCopyConcurrency(streams)
-
 	skipFn := func(relPath string) bool { return false }
 	if flavor != "" {
 		flavorDefinition, err := Flavor(flavor, "", manifest.Package.Flavors)
@@ -91,7 +92,7 @@ func Install(cfgFile, topPath string, unprivileged bool, log *logp.Logger, pt Pr
 		}
 	}
 
-	err = copyFiles(copyConcurrency, pathMappings, dir, topPath, skipFn)
+	err = copyFiles(CopyConcurrency, pathMappings, dir, topPath, skipFn)
 	if err != nil {
 		pt.Describe("Error copying files")
 		return utils.FileOwner{}, err
@@ -230,7 +231,7 @@ func setupInstallPath(topPath string, ownership utils.FileOwner) error {
 
 func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error) {
 	manifestFilePath := filepath.Join(extractedPackageDir, v1.ManifestFileName)
-	manifestFile, err := os.Open(manifestFilePath)
+	manifestFile, err := os.Open(manifestFilePath) //nolint:gosec // G703: manifestFilePath is joined from the agent package directory, which is resolved by findDirectory() or supplied by a trusted test operator — not external user input.
 	if err != nil {
 		return nil, fmt.Errorf("failed to open package manifest file (%s): %w", manifestFilePath, err)
 	}
@@ -241,21 +242,6 @@ func readPackageManifest(extractedPackageDir string) (*v1.PackageManifest, error
 	}
 
 	return manifest, nil
-}
-
-func calculateCopyConcurrency(streams *cli.IOStreams) int {
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := HasAllSSDs()
-	if detectHWErr != nil {
-		fmt.Fprintf(streams.Out, "Could not determine block hardware type, disabling copy concurrency: %s\n", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
-
-	return copyConcurrency
 }
 
 func copyFiles(copyConcurrency int, pathMappings []map[string]string, srcDir string, topPath string, skipFn func(string) bool) error {
@@ -500,42 +486,6 @@ func verifyDirectory(dir string) error {
 		return fmt.Errorf("missing %s", paths.BinaryName)
 	}
 	return nil
-}
-
-// HasAllSSDs returns true if the host we are on uses SSDs for
-// all its persistent storage; false otherwise. Returns any error
-// encountered detecting the hardware type for informational purposes.
-// Errors from this function are not fatal. Note that errors may be
-// returned on some Mac hardware configurations as the ghw package
-// does not fully support MacOS.
-func HasAllSSDs() (bool, error) {
-	block, err := ghw.Block()
-	if err != nil {
-		return false, err
-	}
-
-	return hasAllSSDs(*block), nil
-}
-
-// Internal version of HasAllSSDs for testing.
-func hasAllSSDs(block ghw.BlockInfo) bool {
-	for _, disk := range block.Disks {
-		switch disk.DriveType {
-		case ghw.DRIVE_TYPE_FDD, ghw.DRIVE_TYPE_ODD:
-			// Floppy or optical drive; we don't care about these
-			continue
-		case ghw.DRIVE_TYPE_SSD:
-			// SSDs
-			continue
-		case ghw.DRIVE_TYPE_HDD:
-			// HDD (spinning hard disk)
-			return false
-		default:
-			return false
-		}
-	}
-
-	return true
 }
 
 // CreateInstallMarker creates a `.installed` file at the given install path,

@@ -82,7 +82,7 @@
               "zone_count": 1,
               "size": {
                 "resource": "memory",
-                "value": {{ if .request.KibanaMemoryMB }}{{ .request.KibanaMemoryMB }}{{ else }}1024{{ end }}
+                "value": {{ if .request.KibanaMemoryMB }}{{ .request.KibanaMemoryMB }}{{ else }}2048{{ end }}
               }
             }
           ],

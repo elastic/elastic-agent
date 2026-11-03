@@ -31,10 +31,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
 	"github.com/elastic/elastic-agent-libs/logp"
 	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
 	"github.com/elastic/elastic-agent-libs/service"
-	"github.com/elastic/elastic-agent-system-metrics/report"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
@@ -516,6 +516,7 @@ func runElasticAgent(
 	wg := new(sync.WaitGroup)
 	additionalGoroutinesContext, cancelAdditionalGoroutines := context.WithCancel(ctx)
 	defer cancelAdditionalGoroutines()
+
 	// Spawn the rollbacks cleanup goroutine
 	relativeHomePath, homePathErr := filepath.Rel(paths.Top(), paths.Home())
 	if homePathErr == nil {

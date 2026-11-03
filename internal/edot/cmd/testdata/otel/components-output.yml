@@ -58,6 +58,11 @@ receivers:
       logs: Undefined
       metrics: Beta
       traces: Undefined
+  - name: prometheusscrape
+    stability:
+      logs: Undefined
+      metrics: Development
+      traces: Undefined
   - name: zipkin
     stability:
       logs: Undefined
@@ -150,6 +155,11 @@ exporters:
       logs: Beta
       metrics: Stable
       traces: Stable
+  - name: prometheus_remote_write
+    stability:
+      logs: Undefined
+      metrics: Beta
+      traces: Undefined
 connectors:
   - name: routing
     stability:

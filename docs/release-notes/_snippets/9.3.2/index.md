@@ -10,7 +10,7 @@
 * Default inputs using dynamic providers to the process runtime. [#12854](https://github.com/elastic/elastic-agent/pull/12854) 
 * Enrolling fleet-server uses internal port. [#12917](https://github.com/elastic/elastic-agent/pull/12917) 
 
-  The bootstraping process to enroll an agent into a local fleet-server instance
+  The bootstrapping process to enroll an agent into a local fleet-server instance
   now uses the internal port (https://localhost:8221) instead of the URL flag.
   
 * Rename AutoOps usage of deprecated `otlphttp` to `otlp_http`. [#13094](https://github.com/elastic/elastic-agent/pull/13094) 

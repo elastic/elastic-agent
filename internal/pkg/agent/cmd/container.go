@@ -167,7 +167,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(streams); err != nil && !errors.Is(err, context.Canceled) {
 				logError(streams, err)
 				os.Exit(1)
 			}

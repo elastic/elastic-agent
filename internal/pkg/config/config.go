@@ -9,6 +9,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"slices"
 
 	"go.opentelemetry.io/collector/confmap"
 	"gopkg.in/yaml.v2"
@@ -249,6 +250,17 @@ func (c *Config) Clone() (*Config, error) {
 
 // ToMapStr takes the config and transform it into a map[string]interface{}
 func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
+	return c.toMapStr(nil, opts...)
+}
+
+// ToMapStrReleasing is ToMapStr for a config that won't be read for the released skip keys
+// again: they are moved into the returned map instead of being merged back, which would
+// otherwise keep a second copy of every input of a large policy alive.
+func (c *Config) ToMapStrReleasing(release ...string) (map[string]interface{}, error) {
+	return c.toMapStr(release)
+}
+
+func (c *Config) toMapStr(release []string, opts ...interface{}) (map[string]interface{}, error) {
 	if len(opts) == 0 {
 		opts = newDefaultOptions()
 	}
@@ -289,7 +301,9 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 				return nil, fmt.Errorf("error removing skip key %s: %w", skip, err)
 			}
 			skippedKeys[skip] = subUnpacked
-			skippedKeysOrig[skip] = subCfg
+			if !slices.Contains(release, skip) {
+				skippedKeysOrig[skip] = subCfg
+			}
 		}
 	}
 
