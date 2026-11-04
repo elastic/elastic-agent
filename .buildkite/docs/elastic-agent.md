@@ -52,7 +52,7 @@ flowchart TD
 
 ## Operational notes
 
-The macOS unit-test group is disabled because of Orka slowness, and the EDOT macOS job is skipped. Windows 11 disables the race detector because the source records a platform-specific Go runtime crash. Each `if_changed` list is part of the condition and should be read with the step condition.
+macOS unit tests for both the root module and EDOT run in the [`macos-unit-tests`](../../.github/workflows/macos-unit-tests.yml) GitHub Actions workflow instead of Buildkite, because of Orka slowness. Windows 11 disables the race detector because the source records a platform-specific Go runtime crash. Each `if_changed` list is part of the condition and should be read with the step condition.
 
 ## Sources and history
 

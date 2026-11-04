@@ -1,6 +1,6 @@
 # Example Kubernetes Integration with Logstash output
 
-In this example we install the built-in `kubernetes` integration with the default built-in values and a different agent output with ssl settings that allow to connect to a Logstash cluster that is exposed with mtls using a self-signed certificate.
+In this example we install the built-in `kubernetes` integration with the default built-in values and a different agent output with ssl settings that allow connecting to a Logstash cluster that is exposed with mtls using a self-signed certificate.
 
 ## Prerequisites:
 1. Build the dependencies of the Helm chart
