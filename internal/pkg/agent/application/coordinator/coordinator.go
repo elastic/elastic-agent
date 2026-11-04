@@ -30,7 +30,7 @@ import (
 	"go.elastic.co/apm/v2"
 	"go.opentelemetry.io/collector/confmap"
 	gproto "google.golang.org/protobuf/proto"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"

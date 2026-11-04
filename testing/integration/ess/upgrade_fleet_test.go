@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -548,7 +548,7 @@ func PerformManagedUpgrade(
 	}
 
 	// wait for version
-	_, err = backoff.Retry(ctx, func() (string, error) {
+	_, _ = backoff.Retry(ctx, func() (string, error) {
 		t.Log("Getting Agent version...")
 		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
 		if err != nil {
