@@ -240,15 +240,21 @@ func SetLogs(path string) {
 	logsPath = path
 }
 
+const versionedHomePrefix = "elastic-agent-"
+
+// buildName returns <version>-<commit>, or the legacy <commit> if no home directory with the version exists.
+func buildName(base string) string {
+	name := fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+	_, err := os.Stat(filepath.Join(base, "data", versionedHomePrefix+name))
+	if errors.Is(err, os.ErrNotExist) {
+		return release.ShortCommit()
+	}
+	return name
+}
+
 // VersionedHome returns a versioned path based on a TopPath and used commit.
 func VersionedHome(base string) string {
-	versionedHomePath := filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()))
-	_, err := os.Stat(versionedHomePath)
-	if errors.Is(err, os.ErrNotExist) {
-		// fallback to the legacy elastic-agent-<commit> path
-		versionedHomePath = filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	}
-	return versionedHomePath
+	return filepath.Join(base, "data", versionedHomePrefix+buildName(base))
 }
 
 // Downloads returns the downloads directory for Agent
