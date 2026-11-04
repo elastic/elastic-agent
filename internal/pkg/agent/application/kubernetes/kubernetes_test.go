@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/logp"
 
@@ -42,32 +42,10 @@ func TestMain(m *testing.M) {
 // hands the coordinator: map[string]interface{} all the way down.
 func mustConfig(t *testing.T, doc string) map[string]interface{} {
 	t.Helper()
-	var raw map[interface{}]interface{}
+	var raw map[string]interface{}
 	require.NoError(t, yaml.Unmarshal([]byte(doc), &raw))
-	converted, ok := normalize(raw).(map[string]interface{})
-	require.True(t, ok, "top level of the document must be a map")
-	return converted
-}
-
-// normalize converts the map[interface{}]interface{} values produced by
-// gopkg.in/yaml.v2 into map[string]interface{}.
-func normalize(value interface{}) interface{} {
-	switch v := value.(type) {
-	case map[interface{}]interface{}:
-		out := make(map[string]interface{}, len(v))
-		for key, item := range v {
-			out[key.(string)] = normalize(item)
-		}
-		return out
-	case []interface{}:
-		out := make([]interface{}, len(v))
-		for i, item := range v {
-			out[i] = normalize(item)
-		}
-		return out
-	default:
-		return v
-	}
+	require.NotNil(t, raw, "top level of the document must be a map")
+	return raw
 }
 
 func TestRewriteContainerLogInputs_RotatedLogsPolicy(t *testing.T) {
