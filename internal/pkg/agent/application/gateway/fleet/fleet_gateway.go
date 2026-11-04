@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -96,6 +97,9 @@ type FleetGateway struct {
 	actionCh           chan []fleetapi.Action
 	rollbackSource     ttl.ReadOnlySource
 	compression        string
+	// hostInfo is the agent's shared host information, used for the metadata sent on check-in. If nil, the host
+	// information is fetched for every check-in.
+	hostInfo *hostinfo.Watcher
 }
 
 // New creates a new fleet gateway
@@ -108,6 +112,7 @@ func New(
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
 	source ttl.ReadOnlySource,
+	hostInfo *hostinfo.Watcher,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -127,6 +132,7 @@ func New(
 		return nil, err
 	}
 	gw.compression = cfg.GetCompression()
+	gw.hostInfo = hostInfo
 	return gw, nil
 }
 
@@ -388,7 +394,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 }
 
 func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
-	ecsMeta, err := info.Metadata(ctx, f.log)
+	ecsMeta, err := info.Metadata(ctx, f.log, f.hostInfo)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
 		return nil, 0, err

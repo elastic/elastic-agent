@@ -26,6 +26,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/fleet"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/uploader"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/internal/pkg/runner"
@@ -65,12 +66,13 @@ type managedConfigManager struct {
 	actionAcker              acker.Acker
 	retrier                  *retrier.Retrier
 	availableRollbacksSource ttl.ReadOnlySource
+	hostInfo                 *hostinfo.Watcher
 
 	ch    chan coordinator.ConfigChange
 	errCh chan error
 }
 
-func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCfg, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
+func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCfg, cfg *configuration.Configuration, storeSaver storage.Store, runtime *runtime.Manager, fleetInitTimeout time.Duration, topPath string, client *remote.Client, fleetAcker *fleet.Acker, actionAcker acker.Acker, retrier *retrier.Retrier, stateStore *store.StateStore, actionQueue *queue.ActionQueue, source ttl.ReadOnlySource, hostInfo *hostinfo.Watcher, clientSetters ...actions.ClientSetter) (*managedConfigManager, error) {
 	actionDispatcher, err := dispatcher.New(log, topPath, handlers.NewDefault(log), actionQueue)
 	if err != nil {
 		return nil, fmt.Errorf("unable to initialize action dispatcher: %w", err)
@@ -96,6 +98,7 @@ func newManagedConfigManager(log *logger.Logger, agentInfo info.Agent, startupCf
 		actionAcker:              actionAcker,
 		retrier:                  retrier,
 		availableRollbacksSource: source,
+		hostInfo:                 hostInfo,
 	}, nil
 }
 
@@ -197,6 +200,7 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		stateFetcher,
 		m.cfg.Fleet.Checkin,
 		m.availableRollbacksSource,
+		m.hostInfo,
 	)
 	if err != nil {
 		return err

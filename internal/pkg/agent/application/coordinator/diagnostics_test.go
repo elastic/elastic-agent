@@ -23,12 +23,14 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
@@ -223,6 +225,37 @@ metadata:
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expected, string(result), "agent-info diagnostic returned unexpected value")
+}
+
+func TestDiagnosticAgentInfoSharedHostInfo(t *testing.T) {
+	// With a shared host information watcher, the agent-info diagnostic takes the host information from it instead
+	// of fetching it.
+	fetches := 0
+	log, _ := loggertest.New(t.Name())
+	hostInfo := hostinfo.NewWatcherWithFetcher(log, time.Minute, func(context.Context) (hostinfo.Info, error) {
+		fetches++
+		return hostinfo.Info{Hostname: "Test-Host", Architecture: "arm64"}, nil
+	})
+	coord := &Coordinator{
+		agentInfo:        fakeAgentInfo{agentID: "agent-id"},
+		hostInfo:         hostInfo,
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+	}
+
+	hook, ok := diagnosticHooksMap(coord)["agent-info"]
+	require.True(t, ok, "diagnostic hooks should have an entry for agent-info")
+
+	for range 2 {
+		var output struct {
+			Metadata ecsmeta.ECSMeta `yaml:"metadata"`
+		}
+		require.NoError(t, yaml.Unmarshal(hook.Hook(t.Context()), &output))
+		require.NotNil(t, output.Metadata.Host)
+		assert.Equal(t, "Test-Host", output.Metadata.Host.Hostname)
+		assert.Equal(t, "test-host", output.Metadata.Host.Name)
+		assert.Equal(t, "arm64", output.Metadata.Host.Arch)
+	}
+	assert.Equal(t, 1, fetches, "the host information is fetched once and then taken from the watcher")
 }
 
 func TestDiagnosticPreConfig(t *testing.T) {

@@ -7,98 +7,55 @@ package info
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
-	"github.com/elastic/elastic-agent/pkg/features"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 
-	"github.com/elastic/go-sysinfo"
 	"github.com/elastic/go-sysinfo/types"
 )
 
-// List of variables available to be used in constraint definitions.
-const (
-	// `agent.id` is a generated (in standalone) or assigned (in fleet) agent identifier.
-	agentIDKey = "agent.id"
-	// `agent.version` specifies current version of an agent.
-	agentVersionKey = "agent.version"
-
-	// `os.family` defines a family of underlying operating system (e.g. redhat, debian, freebsd, windows).
-	osFamilyKey = "os.family"
-	// `os.kernel` specifies current version of a kernel in a semver format.
-	osKernelKey = "os.kernel"
-	// `os.platform` specifies platform agent is running on (e.g. centos, ubuntu, windows).
-	osPlatformKey = "os.platform"
-	// `os.version` specifies version of underlying operating system (e.g. 10.12.6).
-	osVersionKey = "os.version"
-	// `os.name` is a operating system name.
-	// Currently we just normalize the name (i.e. macOS, Windows, Linux). See https://www.elastic.co/guide/en/ecs/current/ecs-os.html
-	osNameKey = "os.name"
-	// `os.full` is an operating system name, including the version or code name.
-	osFullKey = "os.full"
-
-	// `host.architecture` defines architecture of a host (e.g. x86_64, arm, ppc, mips).
-	hostArchKey = "host.architecture"
-	// `host.hostname` specifies hostname of the host.
-	hostHostnameKey = "host.hostname"
-	// `host.name` specifies hostname of the host.
-	hostNameKey = "host.name"
-	// `host.id` is a Unique host id.
-	// As hostname is not always unique, use values that are meaningful in your environment.
-	hostIDKey = "host.id"
-	// `host.ip` is Host ip addresses.
-	// Note: this field should contain an array of values.
-	hostIPKey = "host.ip"
-	// `host.mac` is Host mac addresses.
-	// Note: this field should contain an array of values.
-	hostMACKey = "host.mac"
-)
-
-// Metadata loads metadata from disk.
-func Metadata(ctx context.Context, l *logger.Logger) (*ecsmeta.ECSMeta, error) {
+// Metadata loads metadata from disk. It takes the host information from hostInfo, or fetches it if hostInfo is nil.
+func Metadata(ctx context.Context, l *logger.Logger, hostInfo *hostinfo.Watcher) (*ecsmeta.ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
 	}
 
-	meta, err := agentInfo.ECSMetadata(l)
+	var host hostinfo.Info
+	if hostInfo != nil {
+		host, err = hostInfo.Get(ctx)
+	} else {
+		host, err = hostinfo.Fetch(ctx, l)
+	}
 	if err != nil {
 		return nil, errors.New(err, "failed to gather host metadata")
 	}
 
-	return meta, nil
+	return NewECSMetadata(agentInfo, host), nil
 }
 
-// ECSMetadata returns an agent ECS compliant metadata.
+// ECSMetadata returns an agent ECS compliant metadata. It fetches the host information, use NewECSMetadata with
+// the host information from a hostinfo.Watcher to avoid that.
 func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
-	sysInfo, err := sysinfo.Host()
+	host, err := hostinfo.Fetch(context.TODO(), l)
 	if err != nil {
 		return nil, err
 	}
+	return NewECSMetadata(i, host), nil
+}
 
-	info := sysInfo.Info()
-	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
-
-	// Total physical memory is best-effort: some platforms/providers don't
-	// report it, in which case we leave it at 0 (omitted in the payload).
-	var totalMemory uint64
-	if memInfo, memErr := sysInfo.Memory(); memErr != nil {
-		l.Warnf("failed to gather host memory info: %v", memErr)
-	} else if memInfo != nil {
-		totalMemory = memInfo.Total
-	}
-
+// NewECSMetadata returns the ECS compliant metadata of agent running on host.
+func NewECSMetadata(agent Agent, host hostinfo.Info) *ecsmeta.ECSMeta {
 	return &ecsmeta.ECSMeta{
 		Elastic: &ecsmeta.ElasticECSMeta{
 			Agent: &ecsmeta.AgentECSMeta{
-				ID:            i.agentID,
+				ID:            agent.AgentID(),
 				Version:       release.Version(),
 				Snapshot:      release.Snapshot(),
 				Complete:      release.Complete(),
@@ -106,78 +63,42 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
 				Upgradeable:  release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
-				LogLevel:     i.GetLogLevelRuntime(),
-				Unprivileged: i.unprivileged,
+				LogLevel:     agent.GetLogLevelRuntime(),
+				Unprivileged: agent.Unprivileged(),
 				FIPS:         release.FIPSDistribution(),
 			},
 		},
 		Host: &ecsmeta.HostECSMeta{
-			Arch:     info.Architecture,
-			Hostname: hostname,
-			Name:     strings.ToLower(hostname),
-			ID:       info.UniqueID,
-			IP:       info.IPs,
-			MAC:      info.MACs,
-			Memory:   totalMemory,
+			Arch:     host.Architecture,
+			Hostname: host.Hostname,
+			Name:     host.Name(),
+			ID:       host.ID,
+			IP:       host.IPs,
+			MAC:      host.MACs,
+			Memory:   host.MemoryTotal,
 		},
 
 		// Operating system
 		OS: &ecsmeta.SystemECSMeta{
-			Family:   info.OS.Family,
-			Kernel:   info.KernelVersion,
-			Platform: info.OS.Platform,
-			Version:  info.OS.Version,
-			Name:     info.OS.Name,
-			FullName: getFullOSName(info),
+			Family:   host.OS.Family,
+			Kernel:   host.KernelVersion,
+			Platform: host.OS.Platform,
+			Version:  host.OS.Version,
+			Name:     host.OS.Name,
+			FullName: getFullOSName(host.OS),
 		},
-	}, nil
-}
-
-// ECSMetadataFlatMap returns an agent ECS compliant metadata in a form of flattened map.
-func (i *AgentInfo) ECSMetadataFlatMap(l *logger.Logger) (map[string]interface{}, error) {
-	// TODO: remove these values when kibana migrates to ECS
-	meta := make(map[string]interface{})
-
-	sysInfo, err := sysinfo.Host()
-	if err != nil {
-		return nil, err
 	}
-
-	info := sysInfo.Info()
-	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
-
-	// Agent
-	meta[agentIDKey] = i.agentID
-	meta[agentVersionKey] = release.Version()
-
-	// Host
-	meta[hostArchKey] = info.Architecture
-	meta[hostHostnameKey] = hostname
-	meta[hostNameKey] = strings.ToLower(hostname)
-	meta[hostIDKey] = info.UniqueID
-	meta[hostIPKey] = fmt.Sprintf("[%s]", strings.Join(info.IPs, ","))
-	meta[hostMACKey] = fmt.Sprintf("[%s]", strings.Join(info.MACs, ","))
-
-	// Operating system
-	meta[osFamilyKey] = runtime.GOOS
-	meta[osKernelKey] = info.KernelVersion
-	meta[osPlatformKey] = info.OS.Family
-	meta[osVersionKey] = info.OS.Version
-	meta[osNameKey] = info.OS.Name
-	meta[osFullKey] = getFullOSName(info)
-
-	return meta, nil
 }
 
-func getFullOSName(info types.HostInfo) string {
+func getFullOSName(os types.OSInfo) string {
 	var sb strings.Builder
-	sb.WriteString(info.OS.Name)
-	if codeName := info.OS.Codename; codeName != "" {
+	sb.WriteString(os.Name)
+	if codeName := os.Codename; codeName != "" {
 		sb.WriteString(" ")
 		sb.WriteString(codeName)
 	}
 
-	if version := info.OS.Version; version != "" {
+	if version := os.Version; version != "" {
 		sb.WriteString("(")
 		sb.WriteString(version)
 		sb.WriteString(")")
