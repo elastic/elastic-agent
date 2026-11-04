@@ -240,7 +240,8 @@ func SetLogs(path string) {
 	logsPath = path
 }
 
-const versionedHomePrefix = "elastic-agent-"
+// VersionedHomePrefix is the prefix of the names of the Agent home directories under data.
+const VersionedHomePrefix = "elastic-agent-"
 
 // versionedBuildName returns <version>-<commit>.
 func versionedBuildName() string {
@@ -250,7 +251,7 @@ func versionedBuildName() string {
 // buildName returns <version>-<commit>, or the legacy <commit> if no home directory with the version exists.
 func buildName(base string) string {
 	name := versionedBuildName()
-	_, err := os.Stat(filepath.Join(base, "data", versionedHomePrefix+name))
+	_, err := os.Stat(filepath.Join(base, "data", VersionedHomePrefix+name))
 	if errors.Is(err, os.ErrNotExist) {
 		return release.ShortCommit()
 	}
@@ -259,7 +260,7 @@ func buildName(base string) string {
 
 // VersionedHome returns a versioned path based on a TopPath and used commit.
 func VersionedHome(base string) string {
-	return filepath.Join(base, "data", versionedHomePrefix+buildName(base))
+	return filepath.Join(base, "data", VersionedHomePrefix+buildName(base))
 }
 
 // Downloads returns the downloads directory for Agent
@@ -321,15 +322,15 @@ func retrieveExecutableDir() string {
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.
 func isInsideData(exeDir string) bool {
-	expectedDirLegacy := binaryDir(filepath.Join("data", versionedHomePrefix+release.ShortCommit()))
-	expectedDirWithVersion := binaryDir(filepath.Join("data", versionedHomePrefix+versionedBuildName()))
+	expectedDirLegacy := binaryDir(filepath.Join("data", VersionedHomePrefix+release.ShortCommit()))
+	expectedDirWithVersion := binaryDir(filepath.Join("data", VersionedHomePrefix+versionedBuildName()))
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
 // isInsideComponents returns true when the exeDir is inside of the current Agent's components directory.
 func isInsideComponents(exeDir string) bool {
-	expectedDirLegacy := filepath.Join("data", versionedHomePrefix+release.ShortCommit(), "components")
-	expectedDirWithVersion := filepath.Join("data", versionedHomePrefix+versionedBuildName(), "components")
+	expectedDirLegacy := filepath.Join("data", VersionedHomePrefix+release.ShortCommit(), "components")
+	expectedDirWithVersion := filepath.Join("data", VersionedHomePrefix+versionedBuildName(), "components")
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
