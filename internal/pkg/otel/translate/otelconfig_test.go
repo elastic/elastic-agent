@@ -28,7 +28,7 @@ import (
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -5326,7 +5326,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	}
 
 	t.Run("env_set", func(t *testing.T) {
-		t.Setenv(util.EnvHostName, "override-node")
+		t.Setenv(hostinfo.EnvOverride, "override-node")
 
 		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
@@ -5341,7 +5341,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 
 	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
-		t.Setenv(util.EnvHostName, "  override-node  ")
+		t.Setenv(hostinfo.EnvOverride, "  override-node  ")
 
 		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
@@ -5356,7 +5356,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 
 	t.Run("env_unset", func(t *testing.T) {
-		t.Setenv(util.EnvHostName, "")
+		t.Setenv(hostinfo.EnvOverride, "")
 		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)

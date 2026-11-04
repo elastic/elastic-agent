@@ -52,6 +52,7 @@ import (
 	internalfleetapi "github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	fleetapiClient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -337,6 +338,9 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
+	// hostInfo is the agent's shared host information. The Coordinator runs it. Can be nil in tests.
+	hostInfo *hostinfo.Watcher
+
 	initialCfg *configuration.Configuration
 	currentCfg *configuration.Configuration
 	specs      component.RuntimeSpecs
@@ -552,6 +556,7 @@ func New(
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	initialUpgradeDetails *details.Details,
+	hostInfo *hostinfo.Watcher,
 	modifiers ...component.ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
@@ -575,6 +580,7 @@ func New(
 		initialCfg: cfg,
 		currentCfg: cfg,
 		agentInfo:  agentInfo,
+		hostInfo:   hostInfo,
 		isManaged:  isManaged,
 		specs:      specs,
 		reexecMgr:  reexecMgr,
@@ -1294,6 +1300,19 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	return err
 }
 
+// ecsMetadata returns the agent's ECS metadata, with the host information from the shared watcher if there is one.
+// Called by external goroutines.
+func (c *Coordinator) ecsMetadata(ctx context.Context) (*ecsmeta.ECSMeta, error) {
+	if c.hostInfo == nil {
+		return c.agentInfo.ECSMetadata(c.logger)
+	}
+	host, err := c.hostInfo.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return info.NewECSMetadata(c.agentInfo, host), nil
+}
+
 // DiagnosticHooks returns diagnostic hooks that can be connected to the control server to provide diagnostic
 // information about the state of the Elastic Agent.
 // Called by external goroutines.
@@ -1304,8 +1323,8 @@ func (c *Coordinator) DiagnosticHooks() diagnostics.Hooks {
 			Filename:    "agent-info.yaml",
 			Description: "current state of the agent information of the running Elastic Agent",
 			ContentType: "application/yaml",
-			Hook: func(_ context.Context) []byte {
-				meta, err := c.agentInfo.ECSMetadata(c.logger)
+			Hook: func(ctx context.Context) []byte {
+				meta, err := c.ecsMetadata(ctx)
 				if err != nil {
 					c.logger.Errorw("Error getting ECS metadata", "error.message", err)
 				}
@@ -1641,6 +1660,18 @@ func (c *Coordinator) runner(ctx context.Context) error {
 		otelErrCh <- nil
 	}
 
+	hostInfoDone := make(chan struct{})
+	if c.hostInfo != nil {
+		go func() {
+			defer close(hostInfoDone)
+			if err := c.hostInfo.Run(ctx); err != nil && ctx.Err() == nil {
+				c.logger.Errorf("Failed watching host information: %v", err)
+			}
+		}()
+	} else {
+		close(hostInfoDone)
+	}
+
 	upgradeMarkerWatcherErrCh := make(chan error, 1)
 	if c.upgradeMgr != nil && c.upgradeMgr.MarkerWatcher() != nil {
 		err := c.upgradeMgr.MarkerWatcher().Run(ctx)
@@ -1657,6 +1688,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 	for ctx.Err() == nil {
 		c.runLoopIteration(ctx)
 	}
+	<-hostInfoDone
 
 	// If we got fatal errors from any of the managers, return them.
 	// Otherwise, just return the context's closing error.

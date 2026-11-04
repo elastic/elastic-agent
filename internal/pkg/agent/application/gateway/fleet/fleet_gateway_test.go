@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/noop"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -500,6 +502,51 @@ func TestFleetGateway(t *testing.T) {
 // https://github.com/elastic/elastic-agent/issues/15397: fleet-server omits
 // the "actions" field from its checkin response when it has nothing new to
 // report, and the agent was logging an error every time that happened.
+func TestFleetGatewaySharedHostInfo(t *testing.T) {
+	settings := &fleetGatewaySettings{
+		Duration: 5 * time.Second,
+		Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 5 * time.Second},
+	}
+	withGateway(&testAgentInfo{}, settings, func(
+		t *testing.T,
+		gateway coordinator.FleetGateway,
+		client *testingClient,
+		scheduler *scheduler.Stepper,
+	) {
+		// With a shared host information watcher, check-ins take the host information from it instead of fetching
+		// it every time.
+		var fetches atomic.Int32
+		log, _ := logger.New("fleet_gateway", false)
+		gateway.(*FleetGateway).hostInfo = hostinfo.NewWatcherWithFetcher(log, time.Minute, func(context.Context) (hostinfo.Info, error) {
+			fetches.Add(1)
+			return hostinfo.Info{Hostname: "Test-Host"}, nil
+		})
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		checkin := func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+			var checkinRequest fleetapi.CheckinRequest
+			if err := json.NewDecoder(body).Decode(&checkinRequest); err != nil {
+				return nil, err
+			}
+			assert.Equal(t, "Test-Host", checkinRequest.Metadata.Host.Hostname)
+			assert.Equal(t, "test-host", checkinRequest.Metadata.Host.Name)
+			return wrapStrToResp(http.StatusOK, `{ "actions": [] }`), nil
+		}
+		waitFn := ackSeq(client.Answer(checkin), client.Answer(checkin))
+
+		errCh := runFleetGateway(ctx, gateway)
+		scheduler.Next()
+		scheduler.Next()
+		waitFn()
+
+		cancel()
+		require.NoError(t, <-errCh)
+		assert.EqualValues(t, 1, fetches.Load())
+	})(t)
+}
+
 func TestFleetGatewayCheckinResponseMissingActionsField(t *testing.T) {
 	agentInfo := &testAgentInfo{}
 	settings := &fleetGatewaySettings{
