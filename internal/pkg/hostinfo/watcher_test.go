@@ -196,6 +196,44 @@ func TestWatcherFeatureFlags(t *testing.T) {
 	})
 }
 
+func TestWatcherFeatureFlagsMultipleWatchers(t *testing.T) {
+	applyFeatures := func(t *testing.T) {
+		require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]any{
+			"agent.features.fqdn.enabled": false,
+		})))
+	}
+	applyFeatures(t)
+
+	synctest.Test(t, func(t *testing.T) {
+		// Use a long check interval, so all fetches after the first one come from applying the feature flags.
+		w1, f1 := newTestWatcher(t, time.Hour, fetchResult{info: Info{Hostname: "host"}})
+		w2, f2 := newTestWatcher(t, time.Hour, fetchResult{info: Info{Hostname: "host"}})
+		start := time.Now()
+		stop1 := runWatcher(t, w1)
+		stop2 := runWatcher(t, w2)
+		<-w1.Synced()
+		<-w2.Synced()
+		synctest.Wait()
+		require.Equal(t, 1, f1.callCount())
+		require.Equal(t, 1, f2.callCount())
+
+		// Both watchers react to the feature flags.
+		applyFeatures(t)
+		synctest.Wait()
+		assert.Equal(t, 2, f1.callCount())
+		assert.Equal(t, 2, f2.callCount())
+
+		// Stopping one watcher doesn't stop the other from reacting.
+		stop1()
+		applyFeatures(t)
+		synctest.Wait()
+		assert.Equal(t, 2, f1.callCount())
+		assert.Equal(t, 3, f2.callCount())
+		assert.Zero(t, time.Since(start))
+		stop2()
+	})
+}
+
 func TestWatcherSynced(t *testing.T) {
 	t.Run("already_synced", func(t *testing.T) {
 		w, f := newTestWatcher(t, time.Minute, fetchResult{info: Info{Hostname: "a"}})
