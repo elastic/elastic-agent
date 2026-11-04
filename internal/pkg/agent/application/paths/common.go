@@ -242,9 +242,14 @@ func SetLogs(path string) {
 
 const versionedHomePrefix = "elastic-agent-"
 
+// versionedBuildName returns <version>-<commit>.
+func versionedBuildName() string {
+	return fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+}
+
 // buildName returns <version>-<commit>, or the legacy <commit> if no home directory with the version exists.
 func buildName(base string) string {
-	name := fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+	name := versionedBuildName()
 	_, err := os.Stat(filepath.Join(base, "data", versionedHomePrefix+name))
 	if errors.Is(err, os.ErrNotExist) {
 		return release.ShortCommit()
@@ -316,15 +321,15 @@ func retrieveExecutableDir() string {
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.
 func isInsideData(exeDir string) bool {
-	expectedDirLegacy := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
-	expectedDirWithVersion := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())))
+	expectedDirLegacy := binaryDir(filepath.Join("data", versionedHomePrefix+release.ShortCommit()))
+	expectedDirWithVersion := binaryDir(filepath.Join("data", versionedHomePrefix+versionedBuildName()))
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
 // isInsideComponents returns true when the exeDir is inside of the current Agent's components directory.
 func isInsideComponents(exeDir string) bool {
-	expectedDirLegacy := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()), "components")
-	expectedDirWithVersion := filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "components")
+	expectedDirLegacy := filepath.Join("data", versionedHomePrefix+release.ShortCommit(), "components")
+	expectedDirWithVersion := filepath.Join("data", versionedHomePrefix+versionedBuildName(), "components")
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
