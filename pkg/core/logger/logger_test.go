@@ -113,7 +113,7 @@ func TestNewNamedLogger(t *testing.T) {
 	err = log.Core().Sync()
 	require.NoError(t, err)
 
-	logGlob := filepath.Join(paths.Home(), DefaultLogDirectory, name+"-*.ndjson")
+	logGlob := filepath.Join(paths.BuildLogs(), name+"-*.ndjson")
 	logMatches, err := filepath.Glob(logGlob)
 	require.NoError(t, err)
 	require.NotEmpty(t, logMatches, "normal log file should exist at %s", logGlob)
@@ -122,7 +122,7 @@ func TestNewNamedLogger(t *testing.T) {
 	assert.Contains(t, string(normalData), "normal message", "normal log file should contain normal message")
 	assert.NotContains(t, string(normalData), "event message", "event message should not leak into normal log file")
 
-	eventGlob := filepath.Join(paths.Home(), DefaultLogDirectory, "events", name+"-event-log-*.ndjson")
+	eventGlob := filepath.Join(paths.BuildLogs(), "events", name+"-event-log-*.ndjson")
 	eventMatches, err := filepath.Glob(eventGlob)
 	require.NoError(t, err)
 	require.NotEmpty(t, eventMatches, "event log file should exist at %s", eventGlob)
