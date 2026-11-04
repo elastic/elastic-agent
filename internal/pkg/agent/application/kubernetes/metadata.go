@@ -49,10 +49,10 @@ var resourceLookups = []resourceLookup{
 // used to inject per container.
 //
 // The indexers and matchers are derived from paths: which identifier can be
-// recovered from a log file depends on which kubelet directory it lives in.
-// Paths outside the known kubelet directories fall back to the processor's own
-// defaults. annotations lists the raw pod annotation keys to publish (dedotted)
-// under kubernetes.annotations.*; the processor only publishes annotations it is
+// recovered from a log file depends on which kubelet directory it lives in, and
+// the rewrite only reaches this point for streams with a path under one of them.
+// annotations lists the raw pod annotation keys to publish (dedotted) under
+// kubernetes.annotations.*; the processor only publishes annotations it is
 // explicitly asked for.
 //
 // The node to scope the Kubernetes watch to is deliberately left unset: the
@@ -94,15 +94,13 @@ func buildAddKubernetesMetadataProcessor(paths []string, annotations []string) m
 			},
 		})
 	}
-	if len(matchers) > 0 {
-		// The defaults resolve container IDs under /var/lib/docker/containers/,
-		// which never matches kubelet log paths. Disable them so a misconfigured
-		// path fails loudly instead of silently producing unenriched documents.
-		cfg["default_indexers"] = map[string]interface{}{"enabled": false}
-		cfg["default_matchers"] = map[string]interface{}{"enabled": false}
-		cfg["indexers"] = indexers
-		cfg["matchers"] = matchers
-	}
+	// The defaults resolve container IDs under /var/lib/docker/containers/, which
+	// never matches kubelet log paths. Disable them so a misconfigured path fails
+	// loudly instead of silently producing unenriched documents.
+	cfg["default_indexers"] = map[string]interface{}{"enabled": false}
+	cfg["default_matchers"] = map[string]interface{}{"enabled": false}
+	cfg["indexers"] = indexers
+	cfg["matchers"] = matchers
 
 	if len(annotations) > 0 {
 		includeAnnotations := make([]interface{}, 0, len(annotations))

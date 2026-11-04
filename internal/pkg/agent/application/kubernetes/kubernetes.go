@@ -29,6 +29,9 @@ import (
 	"strings"
 
 	"github.com/elastic/elastic-agent-libs/logp"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
+	"github.com/elastic/elastic-agent/internal/pkg/composable"
 )
 
 const (
@@ -46,17 +49,11 @@ const (
 // kubernetes provider, e.g. ${kubernetes.container.id}.
 var k8sVarPattern = regexp.MustCompile(`\$\{kubernetes\.[^}]*\}`)
 
-// dynamicVarPattern matches a variable expression that refers to any dynamic
-// provider, including through a fallback such as ${env.X|kubernetes.pod.name}.
-// The context providers (host, env, agent, ...) are resolved once for the whole
-// agent and are deliberately not matched.
-var dynamicVarPattern = regexp.MustCompile(`\$\{[^}]*\b(?:kubernetes|docker|local_dynamic)\.[^}]*\}`)
-
 // k8sExactAnnotationVarPattern matches a value that is nothing but a single
 // annotation reference, optionally with an empty-string fallback, such as
 // ${kubernetes.annotations.elastic.co/dataset|""}. Group 1 is the raw (not
 // dedotted) annotation key as it appears on the pod.
-var k8sExactAnnotationVarPattern = regexp.MustCompile(`^\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|\s*(?:""|\'\'))?\}$`)
+var k8sExactAnnotationVarPattern = regexp.MustCompile(`^\$\{kubernetes\.annotations\.([^}|\s]+)(?:\|\s*"")?\}$`)
 
 // k8sStarAdjacentVarPattern is like starAdjacentVarPattern but only matches
 // ${kubernetes.*} references. Used in path translation so that context-provider
@@ -157,11 +154,8 @@ func containerLogConversionBlocker(input map[string]interface{}) string {
 		return "the input has no streams"
 	}
 
-	if location := firstDynamicVarOutside(input, "id", "streams"); location != "" {
+	if location := firstDynamicVarOutside(input, "streams"); location != "" {
 		return location
-	}
-	if blocker := idBlocker(input["id"], "id"); blocker != "" {
-		return blocker
 	}
 
 	for i, stream := range streams {
@@ -185,6 +179,30 @@ func containerLogConversionBlocker(input map[string]interface{}) string {
 		}
 	}
 	return ""
+}
+
+// kubernetesProvider is the name of the dynamic provider this rewrite exists for.
+const kubernetesProvider = "kubernetes"
+
+// dynamicVarNames returns the names of the dynamic provider variables a string
+// references, such as "kubernetes.pod.name", in the order they appear. It reads
+// variables the way the coordinator does when it decides which providers to
+// start, so fallbacks like ${env.X|kubernetes.pod.name} are seen, and it asks
+// the provider registry which providers are dynamic instead of keeping a list.
+// The kubernetes provider always counts, so the check still holds for a registry
+// that has not been populated.
+func dynamicVarNames(value string) []string {
+	if !strings.Contains(value, "${") {
+		return nil
+	}
+	var names []string
+	for _, name := range transpiler.NewStrVal(value).Vars(nil, "") {
+		provider := composable.ProviderNameFromVarName(name)
+		if provider == kubernetesProvider || composable.IsDynamic(provider) {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // firstDynamicVarOutside describes the first dynamic provider variable found in
@@ -211,8 +229,8 @@ func firstDynamicVarOutside(m map[string]interface{}, skip ...string) string {
 func firstDynamicVar(value interface{}) (string, bool) {
 	switch v := value.(type) {
 	case string:
-		if ref := dynamicVarPattern.FindString(v); ref != "" {
-			return ref, true
+		if names := dynamicVarNames(v); len(names) > 0 {
+			return "${" + names[0] + "}", true
 		}
 	case map[string]interface{}:
 		keys := make([]string, 0, len(v))
@@ -238,13 +256,16 @@ func firstDynamicVar(value interface{}) (string, bool) {
 // templatedValueBlocker checks a string that is allowed to reference the
 // kubernetes provider (an id or a path). It may only contain ${kubernetes.*}
 // references that are not hints, because those are the ones the rewrite replaces;
-// any other dynamic provider variable would keep the input rendering per mapping.
+// a variable of any other dynamic provider would keep the input rendering per
+// mapping.
 func templatedValueBlocker(value, location string) string {
 	if strings.Contains(value, hintsVarPrefix) {
 		return fmt.Sprintf("%s references the kubernetes hints provider", location)
 	}
-	if ref := dynamicVarPattern.FindString(k8sVarPattern.ReplaceAllString(value, "")); ref != "" {
-		return fmt.Sprintf("%s references the dynamic provider variable %s", location, ref)
+	for _, name := range dynamicVarNames(value) {
+		if !strings.HasPrefix(name, kubernetesProvider+".") {
+			return fmt.Sprintf("%s references the dynamic provider variable ${%s}", location, name)
+		}
 	}
 	return ""
 }
@@ -252,14 +273,8 @@ func templatedValueBlocker(value, location string) string {
 // idBlocker checks an id-like value. An id made only of variables cannot be
 // reduced to a distinct static id.
 func idBlocker(value interface{}, location string) string {
-	if value == nil {
-		return ""
-	}
 	id, isString := value.(string)
 	if !isString {
-		if ref, found := firstDynamicVar(value); found {
-			return fmt.Sprintf("%s references the dynamic provider variable %s", location, ref)
-		}
 		return ""
 	}
 	if blocker := templatedValueBlocker(id, location); blocker != "" {
@@ -287,7 +302,7 @@ func pathsBlocker(value interface{}, location string) string {
 		if blocker := templatedValueBlocker(path, fmt.Sprintf("%s[%d]", location, i)); blocker != "" {
 			return blocker
 		}
-		paths = append(paths, translateVarPathToGlob(path))
+		paths = append(paths, path)
 	}
 	for _, lookup := range resourceLookups {
 		if anyPathUnder(paths, lookup.logsPath) {
@@ -357,8 +372,6 @@ func annotationMapping(target string, hasTarget bool, key string, val interface{
 // rewriteContainerLogInput performs the in-place rewrite described on
 // RewriteContainerLogInputs for a single, already validated, input.
 func rewriteContainerLogInput(input map[string]interface{}) {
-	stripVarsFromIDField(input, "id")
-
 	streams, _ := input["streams"].([]interface{})
 	for _, stream := range streams {
 		streamMap, _ := stream.(map[string]interface{})
@@ -428,10 +441,6 @@ func rewriteStreamPaths(stream map[string]interface{}) []string {
 // under the same dedotted field names; an add_fields left with other fields keeps
 // them.
 //
-// Any add_kubernetes_metadata already present is dropped too, so that rewriting
-// an already rewritten config is a no-op rather than stacking a second copy of
-// the processor.
-//
 // The returned annotation keys are sorted: they are collected by walking maps,
 // and an unstable order here would change the rendered config hash on every
 // policy change and trigger needless component restarts.
@@ -449,15 +458,6 @@ func dropAnnotationProcessors(raw interface{}) (kept []interface{}, annotations 
 	}
 	kept = make([]interface{}, 0, len(processors))
 	for _, processor := range processors {
-		if existing, isMetadata := addKubernetesMetadataConfig(processor); isMetadata {
-			// Carry the annotation list of a processor we added on an earlier pass
-			// across, so rewriting an already rewritten config keeps publishing the
-			// same annotations.
-			for _, annotation := range includedAnnotations(existing) {
-				addAnnotation(annotation)
-			}
-			continue
-		}
 		remaining, extracted := extractAnnotationMappings(processor)
 		for _, annotation := range extracted {
 			addAnnotation(annotation)
@@ -506,37 +506,6 @@ func extractAnnotationMappings(processor interface{}) (interface{}, []string) {
 	}
 	addFields["fields"] = remaining
 	return processor, annotations
-}
-
-// addKubernetesMetadataConfig returns the configuration of the processor entry
-// when it is an add_kubernetes_metadata processor.
-func addKubernetesMetadataConfig(processor interface{}) (map[string]interface{}, bool) {
-	processorMap, ok := processor.(map[string]interface{})
-	if !ok {
-		return nil, false
-	}
-	raw, ok := processorMap[addKubernetesMetadataProcessor]
-	if !ok {
-		return nil, false
-	}
-	cfg, _ := raw.(map[string]interface{})
-	return cfg, true
-}
-
-// includedAnnotations reads the include_annotations list off an
-// add_kubernetes_metadata configuration.
-func includedAnnotations(cfg map[string]interface{}) []string {
-	list, ok := cfg["include_annotations"].([]interface{})
-	if !ok {
-		return nil
-	}
-	annotations := make([]string, 0, len(list))
-	for _, item := range list {
-		if annotation, ok := item.(string); ok {
-			annotations = append(annotations, annotation)
-		}
-	}
-	return annotations
 }
 
 // containerLogGlobID returns the id an id-like field takes once the glob rewrite

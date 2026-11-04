@@ -6,6 +6,7 @@ package kubernetes
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -20,7 +21,22 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
+	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
+	"github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// customDynamicProvider is registered below to show that the set of dynamic
+// providers comes from the registry rather than from a list in the rewrite.
+const customDynamicProvider = "custom_dynamic_for_test"
+
+func TestMain(m *testing.M) {
+	// The agent registers its providers at startup, before any policy is processed.
+	include.Providers()
+	_ = composable.Providers.AddDynamicProvider(customDynamicProvider,
+		func(*logger.Logger, *config.Config, bool) (composable.DynamicProvider, error) { return nil, nil })
+	os.Exit(m.Run())
+}
 
 // mustConfig parses a YAML document into the same shape config.Config.ToMapStr()
 // hands the coordinator: map[string]interface{} all the way down.
@@ -146,34 +162,6 @@ func TestRewriteStreamPaths_NonStringPath(t *testing.T) {
 func TestRewriteStreamPaths_NoPaths(t *testing.T) {
 	assert.Nil(t, rewriteStreamPaths(map[string]interface{}{}))
 	assert.Nil(t, rewriteStreamPaths(map[string]interface{}{"paths": "not-a-list"}))
-}
-
-// TestAddKubernetesMetadataConfig_NonMapProcessor covers the branch where the
-// processor value is not a map[string]interface{}.
-func TestAddKubernetesMetadataConfig_NonMapProcessor(t *testing.T) {
-	cfg, ok := addKubernetesMetadataConfig("just a string")
-	assert.False(t, ok)
-	assert.Nil(t, cfg)
-}
-
-// TestIncludedAnnotations_NonList covers the branch where include_annotations
-// is not a []interface{} (e.g. a string or absent), returning nil.
-func TestIncludedAnnotations_NonList(t *testing.T) {
-	assert.Nil(t, includedAnnotations(map[string]interface{}{}))
-	assert.Nil(t, includedAnnotations(map[string]interface{}{
-		"include_annotations": "not-a-list",
-	}))
-}
-
-func TestRewriteContainerLogInputs_Idempotent(t *testing.T) {
-	once := mustConfig(t, integrationContainerLogsPolicy)
-	RewriteContainerLogInputs(once, logp.NewNopLogger())
-
-	twice := mustConfig(t, integrationContainerLogsPolicy)
-	RewriteContainerLogInputs(twice, logp.NewNopLogger())
-	RewriteContainerLogInputs(twice, logp.NewNopLogger())
-
-	assert.Equal(t, once, twice)
 }
 
 func TestTranslateVarPathToGlob(t *testing.T) {
@@ -576,8 +564,10 @@ func streamOf(m map[string]interface{}) map[string]interface{} {
 func hasAddKubernetesMetadata(stream map[string]interface{}) bool {
 	processors, _ := stream["processors"].([]interface{})
 	for _, processor := range processors {
-		if _, ok := addKubernetesMetadataConfig(processor); ok {
-			return true
+		if processorMap, ok := processor.(map[string]interface{}); ok {
+			if _, isMetadata := processorMap[addKubernetesMetadataProcessor]; isMetadata {
+				return true
+			}
 		}
 	}
 	return false
@@ -704,6 +694,7 @@ inputs:
 
 type fallbackCase struct {
 	name        string
+	inputID     string
 	inputExtra  string // lines at input level, indented four spaces
 	streamID    string
 	path        string
@@ -713,6 +704,10 @@ type fallbackCase struct {
 }
 
 func (c fallbackCase) yaml() string {
+	inputID := c.inputID
+	if inputID == "" {
+		inputID = "filestream-container-logs"
+	}
 	streamID := c.streamID
 	if streamID == "" {
 		streamID = "kubernetes-container-logs-${kubernetes.container.id}"
@@ -727,7 +722,7 @@ func (c fallbackCase) yaml() string {
 	}
 	return fmt.Sprintf(`
 inputs:
-  - id: filestream-container-logs
+  - id: %s
     type: filestream
     single_input: true
 %s
@@ -741,7 +736,7 @@ inputs:
 %s
         processors:
 %s
-`, c.inputExtra, streamID, path, c.streamExtra, processors)
+`, inputID, c.inputExtra, streamID, path, c.streamExtra, processors)
 }
 
 // TestRewriteContainerLogInputs_FallsBackOnDynamicVariable verifies the rule that
@@ -754,6 +749,11 @@ func TestRewriteContainerLogInputs_FallsBackOnDynamicVariable(t *testing.T) {
 			name:        "stream field",
 			streamExtra: "        fields:\n          source_pod: '${kubernetes.pod.name}'",
 			want:        "streams[0].fields references the dynamic provider variable ${kubernetes.pod.name}",
+		},
+		{
+			name:    "input id",
+			inputID: "filestream-${kubernetes.pod.name}",
+			want:    "id references the dynamic provider variable ${kubernetes.pod.name}",
 		},
 		{
 			name:       "input field",
@@ -774,6 +774,21 @@ func TestRewriteContainerLogInputs_FallsBackOnDynamicVariable(t *testing.T) {
 			name:       "input condition on another dynamic provider",
 			inputExtra: "    condition: ${local_dynamic.enabled} == true",
 			want:       "condition references the dynamic provider variable ${local_dynamic.enabled}",
+		},
+		{
+			name:        "dynamic provider that is only in the registry",
+			streamExtra: "        fields:\n          source: '${" + customDynamicProvider + ".name}'",
+			want:        "streams[0].fields references the dynamic provider variable ${" + customDynamicProvider + ".name}",
+		},
+		{
+			name:        "dynamic provider reached through a fallback",
+			streamExtra: "        fields:\n          source: '${env.CLUSTER_NAME|kubernetes.pod.name}'",
+			want:        "streams[0].fields references the dynamic provider variable ${kubernetes.pod.name}",
+		},
+		{
+			name: "dynamic provider in the path next to a kubernetes variable",
+			path: "/var/log/containers/${" + customDynamicProvider + ".dir}/*${kubernetes.container.id}.log",
+			want: "streams[0].paths[0] references the dynamic provider variable ${" + customDynamicProvider + ".dir}",
 		},
 		{
 			name:       "processor that is not add_fields",
