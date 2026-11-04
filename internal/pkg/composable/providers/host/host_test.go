@@ -112,61 +112,6 @@ func TestFQDNFeatureFlagToggle(t *testing.T) {
 		assert.Zero(t, time.Since(start))
 		assert.ErrorIs(t, stop(), context.Canceled)
 	})
-<<<<<<< HEAD
-	require.NoError(t, err)
-
-	builder, _ := composable.Providers.GetContextProvider("host")
-	provider, err := builder(log, c, true)
-	require.NoError(t, err)
-
-	hostProvider, ok := provider.(*contextProvider)
-	require.True(t, ok)
-	defer func() {
-		err := hostProvider.Close()
-		require.NoError(t, err)
-	}()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	comm := ctesting.NewContextComm(ctx)
-
-	calledChan := make(chan struct{})
-	const expectedCalledCount = 2
-	// Send to calledChan when called, so we can detect the number
-	// of calls below.
-	hostProvider.fetcher = func() (map[string]interface{}, error) {
-		calledChan <- struct{}{}
-		return nil, nil
-	}
-
-	// Run the provider
-	go func() {
-		err = hostProvider.Run(ctx, comm)
-	}()
-
-	// Trigger the FQDN feature flag callback by
-	// toggling the FQDN feature flag
-	err = features.Apply(config.MustNewConfigFrom(map[string]interface{}{
-		"agent.features.fqdn.enabled": true,
-	}))
-	require.NoError(t, err)
-
-	timeoutChan := time.After(100 * time.Millisecond)
-	calledCount := 0
-waitLoop:
-	// Wait until we get the expected number of calls or the timeout
-	// expires, whichever comes first.
-	for calledCount < expectedCalledCount {
-		select {
-		case <-calledChan:
-			calledCount++
-		case <-timeoutChan:
-			break waitLoop
-		}
-	}
-	require.Equal(t, expectedCalledCount, calledCount)
-=======
->>>>>>> 053c86a (Add hostinfo package and use it in host provider (#17716))
 }
 
 func TestContextProviderInitialFetchFails(t *testing.T) {
