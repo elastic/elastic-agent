@@ -2519,7 +2519,6 @@ func TestLogReloading(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
-    preset: latency
     hosts:
       - %s
     preset: balanced
