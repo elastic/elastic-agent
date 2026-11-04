@@ -75,6 +75,12 @@ func buildAddKubernetesMetadataProcessor(paths []string, annotations []string) m
 		// partially annotated event still ends up with the same fields as every
 		// other one, which is the property the per-container inputs gave for free.
 		"append_fields": true,
+
+		// Report the image exactly as written in the pod spec. The dynamic provider
+		// this replaces took container.image.name from the spec; the processor's
+		// default is the image the runtime resolved, which adds the registry and tag
+		// and so would change the value existing queries match on.
+		"image_metadata_source": "spec",
 	}
 
 	var indexers, matchers []interface{}

@@ -612,6 +612,8 @@ func TestRewriteContainerLogInputs_IntegrationPolicy(t *testing.T) {
 			"enrichment must fail loudly rather than shipping unenriched documents")
 		assert.Equal(t, true, metadata["append_fields"],
 			"an event that already carries a kubernetes field must still be filled in, not skipped")
+		assert.Equal(t, "spec", metadata["image_metadata_source"],
+			"container.image.name must keep the pod spec image the per-container inputs reported")
 	})
 
 	t.Run("every annotation the integration maps is published instead", func(t *testing.T) {
