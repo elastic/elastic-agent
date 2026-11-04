@@ -158,7 +158,7 @@ func TestEDRFlavorInstallAndUpgrade(t *testing.T) {
 		for _, suffix := range []string{"", ".sha512"} {
 			content, err := os.ReadFile(repackagedArchive + suffix)
 			require.NoError(t, err)
-			require.NoError(t, os.WriteFile(filepath.Join(otherFlavorDir, otherFlavorName+suffix), content, 0o644))
+			require.NoError(t, os.WriteFile(filepath.Join(otherFlavorDir, otherFlavorName+suffix), content, 0o644)) //nolint:gosec // G703: path in test temp dir
 		}
 
 		output, err := startFixture.Exec(ctx, []string{"upgrade", endVersionInfo.Binary.String(),

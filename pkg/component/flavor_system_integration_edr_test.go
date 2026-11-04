@@ -23,7 +23,7 @@ func TestEDRFlavorSystemIntegrationInputs(t *testing.T) {
 	specContent, err := os.ReadFile(filepath.Join("..", "..", "internal", "edot", "spec.yml"))
 	require.NoError(t, err)
 	specDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(specDir, "elastic-otel-collector.spec.yml"), specContent, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(specDir, "elastic-otel-collector.spec.yml"), specContent, 0o600)) //nolint:gosec // G703: path in test temp dir
 
 	platforms := map[string]PlatformDetail{
 		"linux/amd64":   {Platform: Platform{OS: Linux, Arch: AMD64, GOOS: Linux}},
