@@ -787,7 +787,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261102213659-2913021ee048
+Version: v7.0.0-alpha2.0.20261103215323-21d1ef668cfa
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -80318,32 +80318,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-
---------------------------------------------------------------------------------
-Dependency : github.com/elastic/ebpfevents
-Version: v0.12.0
-Licence type (autodetected): Apache-2.0
---------------------------------------------------------------------------------
-
-Contents of probable licence file $GOMODCACHE/github.com/elastic/ebpfevents@v0.12.0/LICENSE.txt:
-
-The https://github.com/elastic/ebpfevents repository contains source code under
-various licenses:
-
-- Source code in the 'headers/bpf' directory, is dual-licensed under the GNU Lesser General
-  Public License version 2.1 (LICENSES/LGPL-2.1-only.txt) OR BSD-2-Clause license
-  (LICENSES/BSD-2-Clause.txt)
-
-- Source code in the 'ebpf' submodule is licensed with multiple licenses. Read more at
-  https://github.com/elastic/ebpf/blob/main/LICENSE.txt.
-
-- The binary files 'bpf_bpfel_x86.o' and 'bpf_bpfel_amd64.o' are compiled
-  from dual-licensed GPL-2.0-only OR BSD-2-Clause licensed code, and are distributed with
-  the GPL-2.0-only License (LICENSES/GPL-2.0-only.txt).
-
-- Source code not listed in the previous points is licensed under the Apache License,
-  version 2 (LICENSES/Apache-2.0.txt).
 
 
 --------------------------------------------------------------------------------
