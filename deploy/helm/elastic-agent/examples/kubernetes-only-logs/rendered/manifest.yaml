@@ -64,6 +64,7 @@ stringData:
                 enabled: false
               default_matchers:
                 enabled: false
+              image_metadata_source: spec
               include_annotations:
               - elastic.co/dataset
               - elastic.co/namespace
@@ -220,7 +221,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: e8c671fc7fd25d4a6a9d7d734898f23256c3f2f47af03858e0df53240f239552
+        checksum/config: 7302b46536c4c76301007abccabe30364edb91136e2cabdc1d2ff4ab5deed775
     spec:
       automountServiceAccountToken: true
       containers:

@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 
+	k8sutil "github.com/elastic/elastic-agent/internal/pkg/agent/application/kubernetes"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -1830,6 +1831,13 @@ func (c *Coordinator) processConfig(ctx context.Context, cfg *config.Config) (er
 	if err != nil {
 		return fmt.Errorf("could not create the map from the configuration: %w", err)
 	}
+
+	// Collapse the per-container kubernetes container-log input, which the
+	// Kubernetes integration marks with single_input, into a single filestream
+	// watching a glob path. This has to happen before AST rendering, because it is
+	// the ${kubernetes.*} references in the raw config that make the kubernetes
+	// provider render the input once per discovered container.
+	k8sutil.RewriteContainerLogInputs(m, c.logger)
 
 	err = c.generateAST(cfg, m)
 	c.setConfigError(err)

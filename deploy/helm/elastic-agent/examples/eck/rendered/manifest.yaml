@@ -338,6 +338,7 @@ stringData:
                 enabled: false
               default_matchers:
                 enabled: false
+              image_metadata_source: spec
               include_annotations:
               - elastic.co/dataset
               - elastic.co/namespace
