@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -359,12 +360,25 @@ func gitHTTPSAuthExtraHeader(token string) string {
 	return "Authorization: Basic " + auth
 }
 
+// gitPushEnv adds a process-local http.extraHeader via GIT_CONFIG_* so the
+// token never appears in argv (keeps gosec G204 clean and out of process lists).
+func gitPushEnv(baseEnv []string, token string) []string {
+	return append(append([]string{}, baseEnv...),
+		"GIT_CONFIG_COUNT=1",
+		"GIT_CONFIG_KEY_0=http.extraHeader",
+		"GIT_CONFIG_VALUE_0="+gitHTTPSAuthExtraHeader(token),
+	)
+}
+
 // Push pushes the current branch to the remote using the given GitHub token.
 // It uses the git CLI (not go-git) so Buildkite reference clones can pack and
 // upload objects from shared mirrors; go-git Push hangs in that layout.
 func (g *GitRepo) Push(remoteName, token string) error {
 	if token == "" {
 		return fmt.Errorf("GitHub token is required for pushing")
+	}
+	if remoteName != "origin" {
+		return fmt.Errorf("unsupported remote %q; release push only supports origin", remoteName)
 	}
 
 	if err := g.ensureHTTPSRemote(remoteName); err != nil {
@@ -376,19 +390,17 @@ func (g *GitRepo) Push(remoteName, token string) error {
 		return err
 	}
 
-	refSpec := fmt.Sprintf("refs/heads/%s:refs/heads/%s", currentBranch, currentBranch)
-	fmt.Printf("Pushing branch %s to remote %s via git CLI...\n", currentBranch, remoteName)
+	fmt.Printf("Pushing branch %s to remote origin via git CLI...\n", currentBranch)
 
 	ctx, cancel := context.WithTimeout(context.Background(), pushTimeout)
 	defer cancel()
 
-	// Native git understands alternates from --reference clones; go-git does not
-	// pack them reliably. Auth via header so the token never lands in the remote URL.
-	cmd := exec.CommandContext(ctx, "git", //nolint:gosec // G204: fixed git binary; remote/refSpec from local repo state; token only in Basic auth header
-		"-c", "http.extraHeader="+gitHTTPSAuthExtraHeader(token),
-		"push", remoteName, refSpec,
-	)
+	// Literal argv only (gosec G204). Auth is injected through GIT_CONFIG_* so
+	// the token is not passed as a command-line argument. `git push origin HEAD`
+	// updates the remote branch that matches the current local branch name.
+	cmd := exec.CommandContext(ctx, "git", "push", "origin", "HEAD")
 	cmd.Dir = g.path
+	cmd.Env = gitPushEnv(os.Environ(), token)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -397,7 +409,7 @@ func (g *GitRepo) Push(remoteName, token string) error {
 		return fmt.Errorf("failed to push: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 
-	fmt.Printf("Pushed branch %s to remote: %s\n", currentBranch, remoteName)
+	fmt.Printf("Pushed branch %s to remote: origin\n", currentBranch)
 	return nil
 }
 
