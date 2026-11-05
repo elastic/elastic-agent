@@ -38,6 +38,7 @@ import (
 )
 
 const (
+<<<<<<< HEAD
 	// OtelCollectorMetricsPortEnvVarName is the name of the environment variable used to pass the collector metrics
 	// port to the managed EDOT collector. It exists because by default we use a random port for this, and we want to
 	// determine it as late as possible. However, the monitoring manager is instantiated early in the application
@@ -48,6 +49,12 @@ const (
 	logFileFormat = "%s/logs/%s"
 	// args: data path, install path, pipeline name, application name
 	logFileFormatWin = "%s\\logs\\%s"
+=======
+	// args: build logs path, application name
+	logFileFormat = "%s/%s"
+	// args: build logs path, application name
+	logFileFormatWin = "%s\\%s"
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
@@ -1309,10 +1316,10 @@ func sanitizeName(name string) string {
 func loggingPath(id, operatingSystem string) string {
 	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
 	if operatingSystem == windowsOS {
-		return fmt.Sprintf(logFileFormatWin, paths.Home(), id)
+		return fmt.Sprintf(logFileFormatWin, paths.BuildLogs(), id)
 	}
 
-	return fmt.Sprintf(logFileFormat, paths.Home(), id)
+	return fmt.Sprintf(logFileFormat, paths.BuildLogs(), id)
 }
 
 func PrefixedEndpoint(endpoint string) string {

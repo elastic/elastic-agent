@@ -36,9 +36,6 @@ type Level = logp.Level
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
 
-// DefaultLogDirectory used in agent and its processes.
-const DefaultLogDirectory = "logs"
-
 // Logger alias ecslog.Logger with Logger.
 type Logger = logp.Logger
 
@@ -193,7 +190,7 @@ func DefaultEventLoggingConfig() *Config {
 	cfg := logp.DefaultEventConfig(logp.DefaultEnvironment)
 
 	// That's the same path useb by MakeInternalFileOutput
-	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "events")
+	cfg.Files.Path = filepath.Join(paths.BuildLogs(), "events")
 	cfg.Files.Name = agentName + "-event-log"
 
 	root, _ := utils.HasRoot() // error ignored
@@ -212,9 +209,13 @@ func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
+<<<<<<< HEAD
 	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
 	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
 	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
+=======
+	filename := filepath.Join(paths.BuildLogs(), cfg.Beat)
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 	permissions := 0600        // default user only
 	root, _ := utils.HasRoot() // error ignored
 	if !root {

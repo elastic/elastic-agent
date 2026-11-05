@@ -200,3 +200,7 @@ func TestVersionedHome(t *testing.T) {
 		assert.Equal(t, filepath.Join(base, "data", "elastic-agent-"+release.ShortCommit()), VersionedHome(base))
 	})
 }
+
+func TestBuildLogs(t *testing.T) {
+	assert.Equal(t, filepath.Join(Home(), "logs"), BuildLogs())
+}
