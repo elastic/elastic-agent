@@ -384,7 +384,7 @@ func (g *GitRepo) Push(remoteName, token string) error {
 
 	// Native git understands alternates from --reference clones; go-git does not
 	// pack them reliably. Auth via header so the token never lands in the remote URL.
-	cmd := exec.CommandContext(ctx, "git",
+	cmd := exec.CommandContext(ctx, "git", //nolint:gosec // G204: fixed git binary; remote/refSpec from local repo state; token only in Basic auth header
 		"-c", "http.extraHeader="+gitHTTPSAuthExtraHeader(token),
 		"push", remoteName, refSpec,
 	)
