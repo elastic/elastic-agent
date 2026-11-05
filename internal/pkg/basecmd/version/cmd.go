@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/release"

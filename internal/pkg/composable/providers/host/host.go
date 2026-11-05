@@ -9,46 +9,45 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
-	"strings"
+	"sync"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	corecomp "github.com/elastic/elastic-agent/internal/pkg/core/composable"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/features"
-	"github.com/elastic/go-sysinfo"
 )
-
-const (
-	// DefaultCheckInterval is the default timeout used to check if any host information has changed.
-	DefaultCheckInterval = 5 * time.Minute
-
-	fqdnFeatureFlagCallbackID = "host_provider"
-)
-
-type infoFetcher func() (map[string]interface{}, error)
 
 type contextProvider struct {
 	logger *logger.Logger
 
 	CheckInterval time.Duration `config:"check_interval"`
 
-	// fqdnFFChangeCh is used to signal when the FQDN
-	// feature flag has changed
-	fqdnFFChangeCh chan struct{}
-
 	// used by testing
-	fetcher infoFetcher
+	fetcher hostinfo.FetchFunc
 }
 
 // Run runs the environment context provider.
 func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
-	current, err := c.fetcher()
+	// The check interval is configurable, so the provider has its own watcher instead of sharing the agent's.
+	watcher := hostinfo.NewWatcherWithFetcher(c.logger, c.CheckInterval, c.fetcher)
+	watchCtx, cancel := context.WithCancel(comm)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer cancel()
+	wg.Go(func() {
+		if err := watcher.Run(watchCtx); err != nil && watchCtx.Err() == nil {
+			c.logger.Errorf("Failed watching host information: %s", err)
+		}
+	})
+
+	changed := watcher.Changed()
+	info, err := watcher.Get(comm)
 	if err != nil {
 		return err
 	}
+	current := hostMapping(info)
 	err = comm.Set(current)
 	if err != nil {
 		return errors.New(err, "failed to set mapping", errors.TypeUnexpected)
@@ -56,20 +55,19 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 
 	// Update context when any host information changes.
 	for {
-		t := time.NewTimer(c.CheckInterval)
 		select {
 		case <-comm.Done():
-			t.Stop()
 			return comm.Err()
-		case <-c.fqdnFFChangeCh:
-		case <-t.C:
+		case <-changed:
 		}
 
-		updated, err := c.fetcher()
+		changed = watcher.Changed()
+		info, err := watcher.Get(comm)
 		if err != nil {
 			c.logger.Warnf("Failed fetching latest host information: %s", err)
 			continue
 		}
+		updated := hostMapping(info)
 		if reflect.DeepEqual(current, updated) {
 			// nothing to do
 			continue
@@ -82,26 +80,17 @@ func (c *contextProvider) Run(ctx context.Context, comm corecomp.ContextProvider
 	}
 }
 
-func (c *contextProvider) onFQDNFeatureFlagChange(new, old bool) {
-	// FQDN feature flag was toggled, so notify on channel
-	select {
-	case c.fqdnFFChangeCh <- struct{}{}:
-	default:
-	}
-}
-
 func (c *contextProvider) Close() error {
-	features.RemoveFQDNOnChangeCallback(fqdnFeatureFlagCallbackID)
-	close(c.fqdnFFChangeCh)
-
 	return nil
 }
 
 // ContextProviderBuilder builds the context provider.
 func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
-		logger:  log,
-		fetcher: getHostInfo(log),
+		logger: log,
+		fetcher: func(context.Context) (hostinfo.Info, error) {
+			return hostinfo.Fetch(log)
+		},
 	}
 	if c != nil {
 		err := c.UnpackTo(p)
@@ -110,41 +99,24 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 		}
 	}
 	if p.CheckInterval <= 0 {
-		p.CheckInterval = DefaultCheckInterval
-	}
-
-	p.fqdnFFChangeCh = make(chan struct{}, 1)
-	err := features.AddFQDNOnChangeCallback(
-		p.onFQDNFeatureFlagChange,
-		fqdnFeatureFlagCallbackID,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("unable to add FQDN onChange callback in host provider: %w", err)
+		p.CheckInterval = hostinfo.DefaultCheckInterval
 	}
 
 	return p, nil
 }
 
-func getHostInfo(log *logger.Logger) func() (map[string]interface{}, error) {
-	return func() (map[string]interface{}, error) {
-		sysInfo, err := sysinfo.Host()
-		if err != nil {
-			return nil, err
-		}
-
-		info := sysInfo.Info()
-		name := util.GetHostName(features.FQDN(), info, sysInfo, log)
-
-		return map[string]interface{}{
-			"id":           info.UniqueID,
-			"name":         strings.ToLower(name),
-			"platform":     runtime.GOOS,
-			"architecture": info.Architecture,
-			"ip":           info.IPs,
-			"mac":          info.MACs,
-			"os_family":    info.OS.Family,
-			"os_platform":  info.OS.Platform,
-			"os_version":   info.OS.Version,
-		}, nil
+func hostMapping(info hostinfo.Info) map[string]interface{} {
+	return map[string]interface{}{
+		"id": info.ID,
+		// Lowercased even if it comes from ELASTIC_AGENT_HOSTNAME, unlike host.name in Beats events, see the
+		// hostinfo package documentation.
+		"name":         info.Name(),
+		"platform":     runtime.GOOS,
+		"architecture": info.Architecture,
+		"ip":           info.IPs,
+		"mac":          info.MACs,
+		"os_family":    info.OS.Family,
+		"os_platform":  info.OS.Platform,
+		"os_version":   info.OS.Version,
 	}
 }

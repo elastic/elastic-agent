@@ -16,7 +16,7 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
