@@ -47,7 +47,8 @@ for variant in "${docker_variants[@]}"; do
   fi
   image_archive_path="${DOCKER_IMAGE_ARCHIVES_DIR}/${image_archive}"
 
-  # Download only the needed archive, artifact paths are relative to the repo root
+  # Download only the needed archive, artifact paths are relative to the repo root.
+  # With a custom DOCKER_IMAGE_ARCHIVES_DIR the download is skipped and the archive must already be there.
   if [[ ! -f "${image_archive_path}" && "${DOCKER_IMAGE_ARCHIVES_DIR}" == "build/distributions" ]]; then
     echo "Downloading ${image_archive} from step ${DOCKER_IMAGES_STEP}"
     if ! buildkite-agent artifact download "build/distributions/${image_archive}" . --step "${DOCKER_IMAGES_STEP}"; then
