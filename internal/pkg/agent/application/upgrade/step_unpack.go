@@ -588,18 +588,5 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 // createVersionedHomeFromHash returns a versioned home path relative to topPath in the legacy format `elastic-agent-<hash>`
 // formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
-<<<<<<< HEAD
-	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:hashLen]))
-=======
-	return filepath.Join("data", paths.VersionedHomePrefix+hash[:HashLen])
-}
-
-// predictVersionedHomeFromMetadata derives the versioned home path from package metadata without unpacking the archive.
-func predictVersionedHomeFromMetadata(metadata packageMetadata) string {
-	if metadata.manifest != nil {
-		pm := pathMapper{mappings: metadata.manifest.Package.PathMappings}
-		return filepath.FromSlash(pm.Map(metadata.manifest.Package.VersionedHome))
-	}
-	return createVersionedHomeFromHash(metadata.hash)
->>>>>>> 28697f7 (Extract the build name from paths.VersionedHome (#17814))
+	return filepath.Join("data", paths.VersionedHomePrefix+hash[:hashLen])
 }

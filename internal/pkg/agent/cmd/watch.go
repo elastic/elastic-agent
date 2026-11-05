@@ -136,18 +136,7 @@ func watchCmd(log *logp.Logger, cfg *configuration.Configuration) error {
 	// Why is this being skipped on Windows? The comment above is not clear.
 	// issue: https://github.com/elastic/elastic-agent/issues/3027
 	removeMarker := !isWindows()
-<<<<<<< HEAD
 	err = upgrade.Cleanup(log, paths.Top(), marker.VersionedHome, marker.Hash, removeMarker, false)
-=======
-	newVersionedHome := marker.VersionedHome
-	if newVersionedHome == "" {
-		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
-		newVersionedHome = filepath.Join("data", paths.VersionedHomePrefix+marker.Hash[:6])
-	}
-	// Only newVersionedHome is explicitly kept here; rollback candidates are preserved by
-	// cleanupAgentDirectories reading the TTL registry and retaining unexpired entries.
-	err = installModifier.Cleanup(log, topDir, removeMarker, false /* keepLogs */, newVersionedHome)
->>>>>>> 28697f7 (Extract the build name from paths.VersionedHome (#17814))
 	if err != nil {
 		log.Error("cleanup after successful watch failed", err)
 	}

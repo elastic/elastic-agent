@@ -323,16 +323,6 @@ func isInsideData(exeDir string) bool {
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
-<<<<<<< HEAD
-=======
-// isInsideComponents returns true when the exeDir is inside of the current Agent's components directory.
-func isInsideComponents(exeDir string) bool {
-	expectedDirLegacy := filepath.Join("data", VersionedHomePrefix+release.ShortCommit(), "components")
-	expectedDirWithVersion := filepath.Join("data", VersionedHomePrefix+versionedBuildName(), "components")
-	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
-}
-
->>>>>>> 28697f7 (Extract the build name from paths.VersionedHome (#17814))
 // ExecDir returns the "executable" directory which is:
 // 1. The same if the execDir is not inside of the data path
 // 2. Two levels up if the execDir inside of the data path on non-macOS platforms
