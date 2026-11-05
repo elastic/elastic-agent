@@ -6,6 +6,7 @@ set -euo pipefail
 : "${TARGET_ARCH:?Error: Specify target architecture via TARGET_ARCH env variable}"
 : "${DOCKER_VARIANTS:?Error: Specify the Docker variants via DOCKER_VARIANTS env variable}"
 : "${DOCKER_IMAGE_ARCHIVES_DIR:=build/distributions}"
+: "${DOCKER_IMAGES_STEP:=packaging-containers-amd64}"
 
 if [[ -z "${AGENT_VERSION:-}" ]]; then
   if [[ -f "${WORKSPACE}/.package-version" ]]; then
@@ -45,6 +46,15 @@ for variant in "${docker_variants[@]}"; do
     image_archive="elastic-otel-collector-wolfi-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   fi
   image_archive_path="${DOCKER_IMAGE_ARCHIVES_DIR}/${image_archive}"
+
+  # Download only the needed archive, artifact paths are relative to the repo root
+  if [[ ! -f "${image_archive_path}" && "${DOCKER_IMAGE_ARCHIVES_DIR}" == "build/distributions" ]]; then
+    echo "Downloading ${image_archive} from step ${DOCKER_IMAGES_STEP}"
+    if ! buildkite-agent artifact download "build/distributions/${image_archive}" . --step "${DOCKER_IMAGES_STEP}"; then
+      echo "Error: Failed to download ${image_archive} from step ${DOCKER_IMAGES_STEP}" >&2
+      exit 1
+    fi
+  fi
 
   # Check that manifest.json is present in image archive
   # NOTE: Do not use --wildcards option because it is not supported on MacOS
