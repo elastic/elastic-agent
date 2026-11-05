@@ -9,6 +9,6 @@ source .buildkite/scripts/common.sh
 #
 # Making a change here can affect the released images to agentless, so be cautious.
 
-export WINDOWS_NPCAP="true" # build Windows/amd64 with npcap bundled
+export WINDOWS_NPCAP="true" # bundle npcap in the Windows (amd64 and arm64) packages
 
 mage package
