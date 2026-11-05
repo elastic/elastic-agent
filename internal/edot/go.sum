@@ -545,8 +545,8 @@ github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab h1:p33sNyLrsWoI
 github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab/go.mod h1:t8v3y03G3KubyWgYqe+Jcxj/jDddnkp70743iSYrQiU=
 github.com/elastic/lunes v0.2.2 h1:dZFEaebNg9l+mzvOQN6Nd/c9y6y8rUe3tBWsTgvM08U=
 github.com/elastic/lunes v0.2.2/go.mod h1:u3W/BdONWTrh0JjNZ21C907dDc+cUZttZrGa625nf2k=
-github.com/elastic/mito v1.27.0 h1:FM01Ql1OMx6uL3ogW0LoI8Ruc0O6gzmwLNBV8Zk13Yw=
-github.com/elastic/mito v1.27.0/go.mod h1:zFVE48AlN/iW7fryFDDPBh3yp1A4KWnkNuwxZt6HQ6A=
+github.com/elastic/mito v1.27.1 h1:H/kt9pMU+Q1+OIi9hSvuVCNfS66OrXAGMuJZOnFfzh8=
+github.com/elastic/mito v1.27.1/go.mod h1:zFVE48AlN/iW7fryFDDPBh3yp1A4KWnkNuwxZt6HQ6A=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb h1:/c+ogW0DBBDchutsS6+GZBpCIwtVdJvr2l7tvI9CHdU=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
 github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.78.0 h1:etlEPkyYp9MFV8jn3Cd98LnKyKbmE80Y8U3vlIPniMY=
