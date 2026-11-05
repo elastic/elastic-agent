@@ -236,15 +236,27 @@ func SetLogs(path string) {
 	logsPath = path
 }
 
+// VersionedHomePrefix is the prefix of the names of the Agent home directories under data.
+const VersionedHomePrefix = "elastic-agent-"
+
+// versionedBuildName returns <version>-<commit>.
+func versionedBuildName() string {
+	return fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+}
+
+// buildName returns <version>-<commit>, or the legacy <commit> if no home directory with the version exists.
+func buildName(base string) string {
+	name := versionedBuildName()
+	_, err := os.Stat(filepath.Join(base, "data", VersionedHomePrefix+name))
+	if errors.Is(err, os.ErrNotExist) {
+		return release.ShortCommit()
+	}
+	return name
+}
+
 // VersionedHome returns a versioned path based on a TopPath and used commit.
 func VersionedHome(base string) string {
-	versionedHomePath := filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()))
-	_, err := os.Stat(versionedHomePath)
-	if errors.Is(err, os.ErrNotExist) {
-		// fallback to the legacy elastic-agent-<commit> path
-		versionedHomePath = filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	}
-	return versionedHomePath
+	return filepath.Join(base, "data", VersionedHomePrefix+buildName(base))
 }
 
 // Downloads returns the downloads directory for Agent
@@ -306,11 +318,21 @@ func retrieveExecutableDir() string {
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.
 func isInsideData(exeDir string) bool {
-	expectedDirLegacy := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
-	expectedDirWithVersion := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())))
+	expectedDirLegacy := binaryDir(filepath.Join("data", VersionedHomePrefix+release.ShortCommit()))
+	expectedDirWithVersion := binaryDir(filepath.Join("data", VersionedHomePrefix+versionedBuildName()))
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
+<<<<<<< HEAD
+=======
+// isInsideComponents returns true when the exeDir is inside of the current Agent's components directory.
+func isInsideComponents(exeDir string) bool {
+	expectedDirLegacy := filepath.Join("data", VersionedHomePrefix+release.ShortCommit(), "components")
+	expectedDirWithVersion := filepath.Join("data", VersionedHomePrefix+versionedBuildName(), "components")
+	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
+}
+
+>>>>>>> 28697f7 (Extract the build name from paths.VersionedHome (#17814))
 // ExecDir returns the "executable" directory which is:
 // 1. The same if the execDir is not inside of the data path
 // 2. Two levels up if the execDir inside of the data path on non-macOS platforms
