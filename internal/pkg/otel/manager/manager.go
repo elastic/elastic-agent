@@ -637,7 +637,7 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 }
 
 // internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
-// It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
+// It is written to paths.BuildLogs() so that it sits alongside the
 // other elastic-agent log files and is automatically included in diagnostics bundles.
 // The file contains uncompressed OTLP JSON records (one per line). Plain NDJSON is
 // used here deliberately: the diagnostics collector packages files into a zip archive
@@ -693,7 +693,7 @@ func injectMonitoringReceiver(
 	// Records are written as plain OTLP JSON (one record per line). No compression.
 	// This data format compresses very well, so impact on diagnostics is minimal.
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
-	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+	diagFilePath := filepath.Join(paths.BuildLogs(), internalTelemetryDiagnosticsFileName)
 
 	// The metrics pipeline always writes to the file exporter (for diagnostics in
 	// proper OTel metrics format). When OTel-based monitoring is also configured,
