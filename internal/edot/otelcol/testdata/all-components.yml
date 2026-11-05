@@ -250,6 +250,10 @@ connectors:
       - telemetry.sdk.name
   elasticapm:
   forward:
+  failover:
+    priority_levels:
+      - [logs/failover_primary]
+      - [logs/failover_secondary]
 
 service:
   extensions:
@@ -297,6 +301,24 @@ service:
     logs/forward_export:
       receivers:
         - forward
+      exporters:
+        - nop
+
+    logs/failover_receive:
+      receivers:
+        - nop
+      exporters:
+        - failover
+
+    logs/failover_primary:
+      receivers:
+        - failover
+      exporters:
+        - nop
+
+    logs/failover_secondary:
+      receivers:
+        - failover
       exporters:
         - nop
 

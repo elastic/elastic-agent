@@ -133,6 +133,7 @@ import (
 	"github.com/elastic/opentelemetry-collector-components/extension/awscredentialsproviderextension"
 
 	// Connectors
+	failoverconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector"
 	otlpjsonconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector"
 	routingconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector"
 	spanmetricsconnector "github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector"
@@ -273,6 +274,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		factories.Connectors, err = otelcol.MakeFactoryMap[connector.Factory](
+			failoverconnector.NewFactory(),
 			otlpjsonconnector.NewFactory(),
 			routingconnector.NewFactory(),
 			spanmetricsconnector.NewFactory(),
