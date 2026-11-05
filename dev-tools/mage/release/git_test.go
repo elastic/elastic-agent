@@ -6,6 +6,7 @@ package release
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -494,6 +495,24 @@ func TestGetCurrentBranch(t *testing.T) {
 	}
 	if branch != testBranch {
 		t.Errorf("GetCurrentBranch() = %s, want %s", branch, testBranch)
+	}
+}
+
+func TestGitHTTPSAuthExtraHeader(t *testing.T) {
+	got := gitHTTPSAuthExtraHeader("test-token")
+	wantPrefix := "Authorization: Basic "
+	if !strings.HasPrefix(got, wantPrefix) {
+		t.Fatalf("gitHTTPSAuthExtraHeader() = %q, want prefix %q", got, wantPrefix)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got, wantPrefix))
+	if err != nil {
+		t.Fatalf("decode auth payload: %v", err)
+	}
+	if string(decoded) != "x-access-token:test-token" {
+		t.Fatalf("auth payload = %q, want %q", decoded, "x-access-token:test-token")
+	}
+	if strings.Contains(got, "Bearer") {
+		t.Fatalf("gitHTTPSAuthExtraHeader() must not use Bearer: %q", got)
 	}
 }
 

@@ -6,6 +6,7 @@ package release
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -347,6 +348,17 @@ func isTokenPushRemoteURL(u string) bool {
 		strings.HasPrefix(u, "file://")
 }
 
+// gitHTTPSAuthExtraHeader returns a git http.extraHeader value for GitHub
+// HTTPS pushes. Git-over-HTTPS rejects Bearer for App/Vault tokens; use Basic
+// with x-access-token (same scheme as observability-robots ingest-release-smoke).
+//
+// Caught by ingest-release-smoke build 8:
+// https://buildkite.com/elastic/observability-robots-ingest-release-smoke/builds/8
+func gitHTTPSAuthExtraHeader(token string) string {
+	auth := base64.StdEncoding.EncodeToString([]byte("x-access-token:" + token))
+	return "Authorization: Basic " + auth
+}
+
 // Push pushes the current branch to the remote using the given GitHub token.
 // It uses the git CLI (not go-git) so Buildkite reference clones can pack and
 // upload objects from shared mirrors; go-git Push hangs in that layout.
@@ -373,7 +385,7 @@ func (g *GitRepo) Push(remoteName, token string) error {
 	// Native git understands alternates from --reference clones; go-git does not
 	// pack them reliably. Auth via header so the token never lands in the remote URL.
 	cmd := exec.CommandContext(ctx, "git",
-		"-c", "http.extraHeader=Authorization: Bearer "+token,
+		"-c", "http.extraHeader="+gitHTTPSAuthExtraHeader(token),
 		"push", remoteName, refSpec,
 	)
 	cmd.Dir = g.path

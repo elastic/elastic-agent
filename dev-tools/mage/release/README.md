@@ -110,18 +110,19 @@ creation, and GitHub API calls (except validation that needs a token when not in
 dry-run).
 
 `DRY_RUN` does **not** exercise Buildkite reference clones or a real token push.
-Before merging changes under `dev-tools/mage/release/`, run the playground
+Before merging changes under `dev-tools/mage/release/`, run the ingest
 **release smoke** (below).
 
-## Buildkite release smoke (pre-merge)
+## Buildkite ingest release smoke (pre-merge)
 
-Pipeline: [observability-robots-release-smoke](https://buildkite.com/elastic/observability-robots-release-smoke)
-on [`elastic/observability-robots-playground`](https://github.com/elastic/observability-robots-playground).
+Pipeline: [observability-robots-ingest-release-smoke](https://buildkite.com/elastic/observability-robots-ingest-release-smoke)
+on [`elastic/observability-robots`](https://github.com/elastic/observability-robots)
+([tools/ingest-release-smoke](https://github.com/elastic/observability-robots/tree/main/tools/ingest-release-smoke)).
 
-It clones this repo at a candidate SHA, points `PROJECT_OWNER` /
-`PROJECT_REPO` at the playground, seeds `release-smoke/base` (never playground
-`main`), runs `mage release:runMajorMinor` then `mage release:runPatch` with a
-Vault-minted `GITHUB_TOKEN`, then deletes smoke branches/PRs/issues.
+It clones this repo at a candidate SHA, seeds `release-smoke/base` on
+`elastic/observability-robots` (never `main`), runs `mage release:runMajorMinor`
+then `mage release:runPatch` with a Vault-minted `GITHUB_TOKEN`, then deletes
+smoke branches/PRs/issues.
 
 Create a build with:
 
@@ -133,7 +134,11 @@ SOURCE_SHA=<pr-head-sha>
 Optional: `SOURCE_OWNER` (default `elastic`), `WORKFLOWS` (default
 `major-minor,patch`).
 
-Details: playground [README — Release smoke](https://github.com/elastic/observability-robots-playground#release-smoke-mage).
+Details: [ingest-release-smoke README](https://github.com/elastic/observability-robots/blob/main/tools/ingest-release-smoke/README.md).
+
+Example failure that caught Bearer auth on git HTTPS (fixed to Basic
+`x-access-token`):
+[build 8](https://buildkite.com/elastic/observability-robots-ingest-release-smoke/builds/8).
 
 ## Testing
 
