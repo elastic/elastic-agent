@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
@@ -768,5 +769,5 @@ func getFilesContentFromTar(archivePath string, files ...string) (map[string]io.
 // createVersionedHomeFromHash returns a versioned home path relative to topPath in the legacy format `elastic-agent-<hash>`
 // formatted using OS-dependent path separators
 func createVersionedHomeFromHash(hash string) string {
-	return filepath.Join("data", fmt.Sprintf("elastic-agent-%s", hash[:HashLen]))
+	return filepath.Join("data", paths.VersionedHomePrefix+hash[:HashLen])
 }
