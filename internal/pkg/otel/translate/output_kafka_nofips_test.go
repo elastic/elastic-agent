@@ -73,7 +73,7 @@ auth:
 
 	cfg, err := config.NewConfigFrom(input)
 	require.NoError(t, err, "error creating kafka config")
-	gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+	gotMap, processorCfg, extensionCfg, err := translateExporterConfig(KafkaToOTelConfig, "kafka", cfg, "default", logp.NewNopLogger())
 	require.NoError(t, err, "error translating kafka to kafka exporter")
 	require.Equal(t, expectedMap, gotMap)
 	require.Nil(t, processorCfg)
@@ -139,7 +139,7 @@ auth:
 		t.Run(tc.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(tc.input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+			gotMap, processorCfg, extensionCfg, err := translateExporterConfig(KafkaToOTelConfig, "kafka", cfg, "default", logp.NewNopLogger())
 			require.Error(t, err)
 			require.ErrorContains(t, err, tc.wantErr)
 			require.Nil(t, gotMap)
@@ -232,7 +232,7 @@ kerberos:
 			cfg, err := config.NewConfigFrom(tc.input)
 			require.NoError(t, err, "error creating kafka config")
 
-			gotMap, _, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			gotMap, _, _, err := translateExporterConfig(KafkaToOTelConfig, "kafka", cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
 			gotKerberos, ok := gotMap["auth"]

@@ -127,7 +127,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -197,7 +197,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -268,7 +268,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -280,7 +280,7 @@ logs_dynamic_pipeline:
 			"parameters": map[string]any{"somekey": "somevalue"},
 		})
 
-		esExporterCfg, _, extensions, err := ESToOTelConfig(cfg, "", logger)
+		esExporterCfg, _, extensions, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		assert.Equal(
 			t,
@@ -373,7 +373,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -579,7 +579,7 @@ timeout: 1m30s
 		for _, test := range tests {
 			t.Run("config translation w/"+test.presetName, func(t *testing.T) {
 				cfg := config.MustNewConfigFrom(fmt.Sprintf(commonBeatCfg, test.presetName))
-				got, _, _, err := ESToOTelConfig(cfg, "", logger)
+				got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 				require.NoError(t, err, "error translating elasticsearch output to OTel ES exporter type")
 				expOutput := newFromYamlString(t, test.output)
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -667,7 +667,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -735,7 +735,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -819,7 +819,7 @@ logs_dynamic_pipeline:
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
 			cfg := config.MustNewConfigFrom(fmt.Sprintf(compressionConfig, level))
-			got, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+			got, _, _, err := translateExporterConfig(ESToOTelConfig, "elasticsearch", cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 			var otelBuffer bytes.Buffer
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
@@ -849,7 +849,7 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 			cfg, err := config.NewConfigFrom(c.cfg)
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 
-			_, _, _, err = ESToOTelConfig(cfg, "", logger)
+			_, err = ESToOTelConfig(cfg, "", logger)
 			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}
@@ -860,7 +860,7 @@ func TestESToOTelConfigRejectsHostURLCredentials(t *testing.T) {
 		"hosts": []any{"https://user:secret@es.example:9200"},
 	})
 
-	_, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+	_, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
 	require.ErrorContains(
 		t,
 		err,
@@ -1060,7 +1060,9 @@ func TestESToOTelConfigCloudID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			exporter, _, extensions, err := ESToOTelConfig(
+			exporter, _, extensions, err := translateExporterConfig(
+				ESToOTelConfig,
+				"elasticsearch",
 				config.MustNewConfigFrom(test.output),
 				"default",
 				logp.NewNopLogger(),
@@ -1118,7 +1120,7 @@ func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
 		}},
 	}
 
-	_, _, extensions, _, err := getExporterConfigForComponent(
+	translated, _, err := getExporterConfigForComponent(
 		comp,
 		otelcomponent.MustNewType("elasticsearch"),
 		logp.NewNopLogger(),
@@ -1126,7 +1128,7 @@ func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
 	require.NoError(t, err, "Heartbeat translation must accept transport and TLS settings")
 
 	beatsAuthID := getBeatsAuthExtensionID(outputName).String()
-	beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
+	beatsAuth, ok := translated.Extensions[beatsAuthID].(map[string]any)
 	require.True(t, ok, "Heartbeat translation must generate the output-scoped beatsauth extension")
 	assert.Equal(t, []string{"http://localhost:9200"}, beatsAuth["endpoints"], "beatsauth must contain output endpoints")
 	assert.Equal(t, "15s", beatsAuth["idle_connection_timeout"], "beatsauth must retain the effective throughput-preset idle timeout")

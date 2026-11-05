@@ -4452,6 +4452,24 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 	}
 }
 
+// translateExporterConfig runs the given exporter translation function and returns
+// the exporter config stored under the expected exporter ID.
+func translateExporterConfig(
+	translate exporterConfigTranslationFunc,
+	exporterType string,
+	cfg *config.C,
+	outputName string,
+	logger *logp.Logger,
+) (map[string]any, map[string]any, map[string]any, error) {
+	translated, err := translate(cfg, outputName, logger)
+	if err != nil {
+		return nil, translated.Processors, translated.Extensions, err
+	}
+	exporterID := GetExporterID(otelcomponent.MustNewType(exporterType), outputName).String()
+	exporterCfg, _ := translated.Exporters[exporterID].(map[string]any)
+	return exporterCfg, translated.Processors, translated.Extensions, nil
+}
+
 func TestUnitToExporterConfig(t *testing.T) {
 	logger := logp.NewNopLogger()
 	esExporterType := otelcomponent.MustNewType("elasticsearch")
@@ -4462,14 +4480,14 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, map[string]any, error) {
+		esExporterType: func(c *config.C, outputName string, l *logp.Logger) (TranslatedOutput, error) {
 			if c.HasField("unsupported") {
-				return nil, nil, nil, errors.New("unsupported config")
+				return TranslatedOutput{}, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, nil, nil, err
+				return TranslatedOutput{}, err
 			}
 
 			cfgMap["translated"] = true
@@ -4482,13 +4500,16 @@ func TestUnitToExporterConfig(t *testing.T) {
 			// return extension config
 			beatsAuthCfg, err := getBeatsAuthExtensionConfig(c)
 			if err != nil {
-				return nil, nil, nil, err
+				return TranslatedOutput{}, err
 			}
 
 			extensionConfig := make(map[string]any)
 			extensionConfig[getBeatsAuthExtensionID("default").String()] = beatsAuthCfg
 
-			return cfgMap, nil, extensionConfig, nil
+			exporterCfg := map[string]any{
+				GetExporterID(esExporterType, outputName).String(): cfgMap,
+			}
+			return TranslatedOutput{Exporters: exporterCfg, Extensions: extensionConfig}, nil
 		},
 		kafkaExporterType: KafkaToOTelConfig,
 	}
@@ -4902,7 +4923,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				fbfeatures.ReinitForTest()
 			}
 
-			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
+			translated, queueSettings, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -4911,11 +4932,13 @@ func TestUnitToExporterConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
+			exporterID := GetExporterID(tt.exporterType, tt.outputName).String()
+			require.Len(t, translated.Exporters, 1, "expected a single exporter config")
+			assert.Equal(t, tt.expectedExporterCfg, translated.Exporters[exporterID], "exporter config should be keyed by %s", exporterID)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
-			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
-			if processorConfig != nil {
-				assert.Equal(t, 1, len(processorConfig))
+			assert.Equal(t, tt.expectedExtensionCfg, translated.Extensions)
+			if translated.Processors != nil {
+				assert.Equal(t, 1, len(translated.Processors))
 			}
 		})
 	}

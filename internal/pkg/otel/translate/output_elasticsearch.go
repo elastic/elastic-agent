@@ -136,21 +136,21 @@ var defaultOptions = esToOTelOptions{
 
 // ESToOTelConfig converts a Beat config into OTel elasticsearch exporter config
 // Note: This method may override output queue settings defined by user.
-func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
+func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (TranslatedOutput, error) {
 	escfg := defaultOptions
 
 	// Cloud resolution returns a copy, but effective queue settings must be
 	// written back for unitToExporterConfig.
 	originalOutput := output
-	output, err = resolveElasticsearchOutputCloudConfig(output)
+	output, err := resolveElasticsearchOutputCloudConfig(output)
 	if err != nil {
-		return nil, nil, nil, err
+		return TranslatedOutput{}, err
 	}
 
 	// check for unsupported config
 	err = checkUnsupportedConfig(output)
 	if err != nil {
-		return nil, nil, nil, err
+		return TranslatedOutput{}, err
 	}
 
 	// Preset must be applied before unpacking the config because it can override output fields.
@@ -168,7 +168,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 
 		overriddenFields, presetConfig, applyErr := elasticsearch.ApplyPreset(preset, output)
 		if applyErr != nil {
-			return nil, nil, nil, applyErr
+			return TranslatedOutput{}, applyErr
 		}
 		// output now has all preset values applied (including worker count), so
 		// getTotalNumConnections reads the correct connection count for sizing.
@@ -200,7 +200,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		// Write the OTel-adjusted queue size back into output so the subsequent
 		// decode picks up the correct value.
 		if err := output.SetInt("queue.mem.events", -1, int64(queueSize)); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed setting queue.mem.events: %w", err)
+			return TranslatedOutput{}, fmt.Errorf("failed setting queue.mem.events: %w", err)
 		}
 
 		// Build a log copy with the OTel-effective queue.mem.events. storedPresetConfig
@@ -229,17 +229,17 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 	if output.HasField("queue") {
 		queueConfig, err := output.Child("queue", -1)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed reading effective output queue config: %w", err)
+			return TranslatedOutput{}, fmt.Errorf("failed reading effective output queue config: %w", err)
 		}
 		if err := originalOutput.SetChild("queue", -1, queueConfig); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed updating effective output queue config: %w", err)
+			return TranslatedOutput{}, fmt.Errorf("failed updating effective output queue config: %w", err)
 		}
 	}
 
 	unpackedMap := make(map[string]any)
 	// unpack and validate ES config
 	if err := output.Unpack(&unpackedMap); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed unpacking config. %w", err)
+		return TranslatedOutput{}, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
@@ -249,21 +249,21 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		DecodeHook:      cfgDecodeHookFunc(),
 	})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed creating decoder. %w", err)
+		return TranslatedOutput{}, fmt.Errorf("failed creating decoder. %w", err)
 	}
 
 	err = decoder.Decode(&unpackedMap)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed decoding config. %w", err)
+		return TranslatedOutput{}, fmt.Errorf("failed decoding config. %w", err)
 	}
 
 	if err := escfg.Validate(); err != nil {
-		return nil, nil, nil, err
+		return TranslatedOutput{}, err
 	}
 
 	hosts, err := getURL(escfg.ElasticsearchConfig, output)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error creating hosts:%w", err)
+		return TranslatedOutput{}, fmt.Errorf("error creating hosts:%w", err)
 	}
 
 	otelYAMLCfg := map[string]any{
@@ -343,11 +343,10 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 	extensionID := getBeatsAuthExtensionID(outputName)
 	extensionConfig, err := getBeatsAuthExtensionConfig(output)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error supporting http parameters for output: %s, error: %w", outputName, err)
+		return TranslatedOutput{}, fmt.Errorf("error supporting http parameters for output: %s, error: %w", outputName, err)
 	}
 
-	// sets extensionCfg
-	extensionCfg = map[string]any{
+	extensionCfg := map[string]any{
 		extensionID.String(): extensionConfig,
 	}
 
@@ -356,7 +355,11 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		"authenticator": extensionID.String(),
 	}
 
-	return otelYAMLCfg, nil, extensionCfg, nil
+	exporterCfg := map[string]any{
+		GetExporterID(otelcomponent.MustNewType("elasticsearch"), outputName).String(): otelYAMLCfg,
+	}
+
+	return TranslatedOutput{Exporters: exporterCfg, Extensions: extensionCfg}, nil
 }
 
 // calcNamedPresetSizing computes the OTel queue size and consumer count for a
