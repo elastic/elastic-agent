@@ -676,7 +676,15 @@ instrumentation:
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.20.0
   dotnet:
+<<<<<<< HEAD
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.0
+=======
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.7.0
+    env:
+      # The operator does not load the EDOT .NET plugin by default; without it only upstream OpenTelemetry .NET behaviour applies.
+      - name: OTEL_DOTNET_AUTO_PLUGINS
+        value: "Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation"
+>>>>>>> 9badd67 (Load EDOT .NET plugin in kube-stack auto-instrumentation (#17451))
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.18.0
   go:
