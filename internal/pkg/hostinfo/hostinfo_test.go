@@ -12,12 +12,10 @@ import (
 
 	"github.com/elastic/go-sysinfo/types"
 
-	"github.com/elastic/elastic-agent/internal/pkg/util"
 	testlogger "github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
 func TestFromHost(t *testing.T) {
-	t.Setenv(util.EnvHostName, "")
 	log, _ := testlogger.New(t.Name())
 	host := &mockHost{
 		info: types.HostInfo{

@@ -20,22 +20,10 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
-<<<<<<< HEAD
-const (
-	// DefaultCheckInterval is the default timeout used to check if any host information has changed.
-	DefaultCheckInterval = 5 * time.Minute
-
-	fqdnFeatureFlagCallbackID = "host_provider"
-)
-
 func init() {
 	composable.Providers.MustAddContextProvider("host", ContextProviderBuilder)
 }
 
-type infoFetcher func() (map[string]interface{}, error)
-
-=======
->>>>>>> 053c86a (Add hostinfo package and use it in host provider (#17716))
 type contextProvider struct {
 	logger *logger.Logger
 
@@ -124,9 +112,7 @@ func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corec
 
 func hostMapping(info hostinfo.Info) map[string]interface{} {
 	return map[string]interface{}{
-		"id": info.ID,
-		// Lowercased even if it comes from ELASTIC_AGENT_HOSTNAME, unlike host.name in Beats events, see the
-		// hostinfo package documentation.
+		"id":           info.ID,
 		"name":         info.Name(),
 		"platform":     runtime.GOOS,
 		"architecture": info.Architecture,
