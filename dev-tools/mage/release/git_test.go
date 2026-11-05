@@ -516,12 +516,49 @@ func TestGitHTTPSAuthExtraHeader(t *testing.T) {
 	}
 }
 
+func TestGitPushEnv(t *testing.T) {
+	env := gitPushEnv([]string{"PATH=/usr/bin"}, "test-token")
+	wantHeader := gitHTTPSAuthExtraHeader("test-token")
+	got := map[string]string{}
+	for _, entry := range env {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok {
+			t.Fatalf("malformed env entry %q", entry)
+		}
+		got[key] = value
+	}
+	if got["PATH"] != "/usr/bin" {
+		t.Fatalf("PATH = %q, want /usr/bin", got["PATH"])
+	}
+	if got["GIT_CONFIG_COUNT"] != "1" {
+		t.Fatalf("GIT_CONFIG_COUNT = %q, want 1", got["GIT_CONFIG_COUNT"])
+	}
+	if got["GIT_CONFIG_KEY_0"] != "http.extraHeader" {
+		t.Fatalf("GIT_CONFIG_KEY_0 = %q, want http.extraHeader", got["GIT_CONFIG_KEY_0"])
+	}
+	if got["GIT_CONFIG_VALUE_0"] != wantHeader {
+		t.Fatalf("GIT_CONFIG_VALUE_0 = %q, want %q", got["GIT_CONFIG_VALUE_0"], wantHeader)
+	}
+}
+
 func TestPushRequiresToken(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
 	err := gitRepo.Push("origin", "")
 	if err == nil {
 		t.Error("Push() should fail without a token, got nil error")
+	}
+}
+
+func TestPushRequiresOriginRemote(t *testing.T) {
+	gitRepo, _ := createTestRepo(t)
+
+	err := gitRepo.Push("upstream", "test-token")
+	if err == nil {
+		t.Fatal("Push() should reject non-origin remotes")
+	}
+	if !strings.Contains(err.Error(), "only supports origin") {
+		t.Fatalf("Push() error = %v, want origin restriction", err)
 	}
 }
 
