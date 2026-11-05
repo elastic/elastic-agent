@@ -37,9 +37,6 @@ type Level = logp.Level
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
 
-// DefaultLogDirectory used in agent and its processes.
-const DefaultLogDirectory = "logs"
-
 // Logger alias ecslog.Logger with Logger.
 type Logger = logp.Logger
 

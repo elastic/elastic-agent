@@ -96,7 +96,7 @@ func TestNewNamedLogger(t *testing.T) {
 	tmp := t.TempDir()
 	topPath, logsPath := paths.Top(), paths.Logs()
 	paths.SetTop(tmp)
-	paths.SetLogs(filepath.Join(tmp, DefaultLogDirectory))
+	paths.SetLogs(filepath.Join(tmp, "logs"))
 	t.Cleanup(func() {
 		paths.SetTop(topPath)
 		paths.SetLogs(logsPath)
