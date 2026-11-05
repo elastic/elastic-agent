@@ -72,7 +72,7 @@ func TestCreatePRIdempotent(t *testing.T) {
 	opts := PROptions{
 		Owner: "elastic",
 		Repo:  "elastic-agent",
-		Title: "[Release 9.5.0] Prepare release branch",
+		Title: "[Release][9.5.0] Prepare release branch",
 		Head:  "9.5",
 		Base:  "main",
 		Body:  "Release PR body",
@@ -186,7 +186,7 @@ func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
 	_, err := ghClient.CreatePR(PROptions{
 		Owner:  "elastic",
 		Repo:   "elastic-agent",
-		Title:  "[Release 9.5.0] Prepare main",
+		Title:  "[Release][9.5.0] Prepare main",
 		Head:   "ff-prep-main-9.5.0",
 		Base:   "main",
 		Body:   "body",
