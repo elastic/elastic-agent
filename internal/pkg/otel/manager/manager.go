@@ -607,6 +607,23 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 	return lookup, nil
 }
 
+<<<<<<< HEAD
+=======
+// internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
+// It is written to paths.BuildLogs() so that it sits alongside the
+// other elastic-agent log files and is automatically included in diagnostics bundles.
+// The file contains uncompressed OTLP JSON records (one per line). Plain NDJSON is
+// used here deliberately: the diagnostics collector packages files into a zip archive
+// using deflate, and repetitive JSON compresses to roughly 4% of its original size —
+// far better than the ~94% stored size of a pre-zstd file. Keeping the file
+// uncompressed also makes individual records immediately readable with standard tools.
+const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
+
+// defaultDiagnosticsFileSizeMB is the max size in megabytes for the internal telemetry
+// diagnostics file.
+const defaultDiagnosticsFileSizeMB = 10
+
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
@@ -638,11 +655,37 @@ func injectMonitoringReceiver(
 	receiverType := otelcomponent.MustNewType(elasticMonitoringReceiverName)
 	receiverName := "internal-telemetry-monitoring"
 	receiverID := translate.GetReceiverID(receiverType, receiverName).String()
+<<<<<<< HEAD
 	processorID := translate.GetProcessorID().String()
 	pipelineID := "logs/" + translate.OtelNamePrefix + receiverName
 	pipelineCfg := map[string]any{
 		"receivers": []string{receiverID},
 		"exporters": []string{exporterID},
+=======
+	processorID := translate.GetProcessorID(receiverName).String()
+
+	diagName := translate.OtelNamePrefix + receiverName
+	connectorID := otelcomponent.NewIDWithName(connectorType, diagName).String()
+	monitoringProcessorType := otelcomponent.MustNewType(elasticMonitoringProcessorName)
+	monitoringProcessorID := otelcomponent.NewIDWithName(monitoringProcessorType, diagName).String()
+	metricsPipelineID := "metrics/" + translate.OtelNamePrefix + receiverName
+	logsPipelineID := "logs/" + translate.OtelNamePrefix + receiverName
+
+	// Build a file exporter for writing internal telemetry to disk as a diagnostics
+	// artifact. The file is written to the default logs directory.
+	// Records are written as plain OTLP JSON (one record per line). No compression.
+	// This data format compresses very well, so impact on diagnostics is minimal.
+	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
+	diagFilePath := filepath.Join(paths.BuildLogs(), internalTelemetryDiagnosticsFileName)
+
+	// The metrics pipeline always writes to the file exporter (for diagnostics in
+	// proper OTel metrics format). When OTel-based monitoring is also configured,
+	// the connector is included as an additional exporter so that metrics are
+	// converted to Beats-format logs and forwarded to Elasticsearch.
+	metricsPipelineExporters := []string{fileExporterID}
+	if monitoringExporterFound {
+		metricsPipelineExporters = append(metricsPipelineExporters, connectorID)
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 	}
 	collectorCfg := map[string]any{
 		"receivers": map[string]any{

@@ -893,6 +893,98 @@ func TestOTelManager_Logging(t *testing.T) {
 	defer cancel()
 	const waitTimeForStop = 30 * time.Second
 
+<<<<<<< HEAD
+=======
+	tmp := t.TempDir()
+	topPath, logsPath := paths.Top(), paths.Logs()
+	paths.SetTop(tmp)
+	paths.SetLogs(filepath.Join(tmp, "logs"))
+	t.Cleanup(func() {
+		paths.SetTop(topPath)
+		paths.SetLogs(logsPath)
+	})
+
+	l, _ := loggertest.New("otel-manager")
+
+	t.Setenv("TEST_SUPERVISED_COLLECTOR_EMIT_EVENT_LOG", "1")
+
+	factory, _ := testExecutionFactory(testBinary, nil)
+
+	collectorLogger, err := logger.NewNamedLogger(CollectorLogFileName, logger.DefaultLoggingConfig(), logger.DefaultEventLoggingConfig())
+	require.NoError(t, err, "could not create collector logger")
+
+	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
+	require.NoError(t, err, "could not create otel manager")
+
+	var wg sync.WaitGroup
+	wg.Go(func() {
+		err := m.Run(ctx)
+		assert.ErrorIs(t, err, context.Canceled, "otel manager should be cancelled")
+	})
+
+	// watch is synchronous, so we need to read from it to avoid blocking the manager
+	wg.Go(func() {
+		for {
+			select {
+			case <-m.WatchCollector():
+			case <-ctx.Done():
+				return
+			}
+		}
+	})
+
+	cfg := confmap.NewFromStringMap(testConfigDebugLogLevel)
+	m.Update(cfg, nil, logp.InfoLevel, nil)
+
+	// Normal collector logs must appear in the dedicated log file, not in the agent's own log.
+	logFileGlob := filepath.Join(paths.BuildLogs(), CollectorLogFileName+"-*.ndjson")
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		matches, globErr := filepath.Glob(logFileGlob)
+		require.NoError(collect, globErr)
+		require.NotEmpty(collect, matches, "collector log file should exist at %s", logFileGlob)
+
+		data, readErr := os.ReadFile(matches[0])
+		require.NoError(collect, readErr)
+		assert.Contains(collect, string(data), "Internal metrics telemetry disabled",
+			"expected log message not found in collector log file")
+		assert.NotContains(collect, string(data), `"log.type":"event"`,
+			"event line should not leak into the collector's normal log file")
+	}, time.Second*10, time.Second)
+
+	// Event-tagged lines must be routed to the collector's own events log file.
+	eventLogFileGlob := filepath.Join(paths.BuildLogs(), "events", CollectorLogFileName+"-event-log-*.ndjson")
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+		matches, globErr := filepath.Glob(eventLogFileGlob)
+		require.NoError(collect, globErr)
+		require.NotEmpty(collect, matches, "collector event log file should exist at %s", eventLogFileGlob)
+
+		data, readErr := os.ReadFile(matches[0])
+		require.NoError(collect, readErr)
+		assert.Contains(collect, string(data), "Publish event: test event log",
+			"event line should be routed to the collector's events log file")
+	}, time.Second*10, time.Second)
+
+	cancel()
+	wg.Wait()
+}
+
+// TestOTelManager_PartialReceiverReload drives the real supervised collector
+// subprocess through the manager and verifies that adding a receiver to an
+// existing pipeline results in a partial receiver reload (feature gates
+// service.partialReload / service.partialReloadReceivers, passed by
+// newSubprocessExecution) rather than a full service restart.
+func TestOTelManager_PartialReceiverReload(t *testing.T) {
+	wd, erWd := os.Getwd()
+	require.NoError(t, erWd, "cannot get working directory")
+
+	testBinary := filepath.Join(wd, "..", "..", "..", "..", "internal", "edot", "testing", "testing")
+	require.FileExists(t, testBinary, "testing binary not found")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	const waitTimeForStop = 30 * time.Second
+
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 	base, obs := loggertest.New("otel")
 	l, _ := loggertest.New("otel-manager")
 
@@ -2561,10 +2653,267 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 		assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
 	}
 
+<<<<<<< HEAD
 	expectedPipelineProcessors := []string{procName}
 	actualPipelineProcessors := result["service.pipelines."+pipelineName+".processors"]
 	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring receiver pipeline should not be nil")
 	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring receiver pipeline processors should match default")
+=======
+	// monitoringOutputComp builds a component routed to the monitoring output,
+	// optionally merging extra fields into the output unit config.
+	monitoringOutputComp := func(outputExtra ...map[string]any) component.Component {
+		outputCfg := map[string]any{
+			"type":  "elasticsearch",
+			"hosts": []any{"localhost:9200"},
+		}
+		for _, extra := range outputExtra {
+			maps.Copy(outputCfg, extra)
+		}
+		return component.Component{
+			ID:         "filestream-monitoring",
+			OutputType: "elasticsearch",
+			OutputName: componentmonitoring.MonitoringOutput,
+			Units: []component.Unit{
+				{
+					ID:     "filestream-monitoring-output",
+					Type:   client.UnitTypeOutput,
+					Config: component.MustExpectedConfig(outputCfg),
+				},
+			},
+		}
+	}
+
+	// monitoringProcessorNames extracts the processor names from the monitoring
+	// beatprocessor config, returning nil if no beatprocessor was injected.
+	monitoringProcessorNames := func(t *testing.T, cfg *confmap.Conf) []string {
+		t.Helper()
+		m := cfg.ToStringMap()
+		procsAny, ok := m["processors"]
+		if !ok {
+			return nil
+		}
+		procs, ok := procsAny.(map[string]any)
+		if !ok {
+			return nil
+		}
+		beatProcAny, ok := procs[procName]
+		if !ok {
+			return nil
+		}
+		beatProc, ok := beatProcAny.(map[string]any)
+		if !ok {
+			return nil
+		}
+		listAny, ok := beatProc["processors"]
+		if !ok {
+			return nil
+		}
+		list, ok := listAny.([]map[string]any)
+		if !ok {
+			return nil
+		}
+		names := make([]string, 0, len(list))
+		for _, p := range list {
+			for k := range p {
+				names = append(names, k)
+			}
+		}
+		return names
+	}
+
+	// applyGlobalFlags applies default processor flags via features.Apply and
+	// registers a cleanup to restore the original state when the sub-test ends.
+	applyGlobalFlags := func(t *testing.T, f features.DefaultProcessors) {
+		t.Helper()
+		orig := features.GetDefaultProcessors()
+		t.Cleanup(func() {
+			_ = features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+				"agent.features.default_processors.add_host_metadata":       orig.AddHostMetadata,
+				"agent.features.default_processors.add_cloud_metadata":      orig.AddCloudMetadata,
+				"agent.features.default_processors.add_docker_metadata":     orig.AddDockerMetadata,
+				"agent.features.default_processors.add_kubernetes_metadata": orig.AddKubernetesMetadata,
+			}))
+		})
+		require.NoError(t, features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+			"agent.features.default_processors.add_host_metadata":       f.AddHostMetadata,
+			"agent.features.default_processors.add_cloud_metadata":      f.AddCloudMetadata,
+			"agent.features.default_processors.add_docker_metadata":     f.AddDockerMetadata,
+			"agent.features.default_processors.add_kubernetes_metadata": f.AddKubernetesMetadata,
+		})))
+	}
+
+	t.Run("default processors applied", func(t *testing.T) {
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		assert.ElementsMatch(t,
+			[]string{"add_host_metadata", "add_cloud_metadata", "add_docker_metadata", "add_kubernetes_metadata"},
+			names,
+			"all four default processors should be present",
+		)
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.ElementsMatch(t, []string{procName}, result["service.pipelines."+logsPipelineName+".processors"])
+	})
+
+	t.Run("globally disabled processor omitted from monitoring pipeline", func(t *testing.T) {
+		applyGlobalFlags(t, features.DefaultProcessors{
+			AddHostMetadata: true, AddCloudMetadata: false,
+			AddDockerMetadata: true, AddKubernetesMetadata: true,
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		require.NotNil(t, names)
+		assert.NotContains(t, names, "add_cloud_metadata")
+		assert.Contains(t, names, "add_host_metadata")
+		assert.Contains(t, names, "add_docker_metadata")
+		assert.Contains(t, names, "add_kubernetes_metadata")
+	})
+
+	t.Run("all processors disabled globally leaves no beatprocessor", func(t *testing.T) {
+		applyGlobalFlags(t, features.DefaultProcessors{
+			AddHostMetadata: false, AddCloudMetadata: false,
+			AddDockerMetadata: false, AddKubernetesMetadata: false,
+		})
+
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		assert.Nil(t, monitoringProcessorNames(t, cfg), "no beatprocessor should be injected when all processors disabled")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.Nil(t, result["service.pipelines."+logsPipelineName+".processors"], "logs pipeline should have no processors")
+	})
+
+	t.Run("per-output monitoring config disables a processor", func(t *testing.T) {
+		comp := monitoringOutputComp(map[string]any{
+			"default_processors": map[string]any{"add_host_metadata": false},
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{comp}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		require.NotNil(t, names)
+		assert.NotContains(t, names, "add_host_metadata")
+		assert.Contains(t, names, "add_cloud_metadata")
+		assert.Contains(t, names, "add_docker_metadata")
+		assert.Contains(t, names, "add_kubernetes_metadata")
+	})
+
+	t.Run("per-output monitoring enabled:false leaves no beatprocessor", func(t *testing.T) {
+		comp := monitoringOutputComp(map[string]any{
+			"default_processors": map[string]any{"enabled": false},
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{comp}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		assert.Nil(t, monitoringProcessorNames(t, cfg), "no beatprocessor should be injected when all processors disabled per-output")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.Nil(t, result["service.pipelines."+logsPipelineName+".processors"], "logs pipeline should have no processors")
+	})
+}
+
+func TestMonitoringReceiverFileExporter(t *testing.T) {
+	receiverName := "internal-telemetry-monitoring"
+	// The file exporter is on the metrics pipeline, which always exists.
+	metricsPipelineName := "metrics/" + translate.OtelNamePrefix + receiverName
+	// The logs pipeline (connector → ES) only exists when ES monitoring is configured.
+	logsPipelineName := "logs/" + translate.OtelNamePrefix + receiverName
+	fileExporterName := "file/" + translate.OtelNamePrefix + receiverName
+	connectorName := elasticMonitoringConnectorName + "/" + translate.OtelNamePrefix + receiverName
+
+	t.Run("with OTel monitoring exporter", func(t *testing.T) {
+		// When an OTel-based monitoring exporter is present:
+		// - metrics pipeline: receiver → [file exporter, connector]
+		// - logs pipeline:    connector → ES monitoring exporter
+		exporterName := "elasticsearch/" + translate.OtelNamePrefix + "monitoring"
+		baseConfig := map[string]any{
+			"exporters": map[string]any{
+				exporterName: nil,
+			},
+		}
+		cfg := confmap.NewFromStringMap(baseConfig)
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err, "injectMonitoringReceiver should succeed")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		// Metrics pipeline exports to file and to the connector.
+		metricsExporters := result["service.pipelines."+metricsPipelineName+".exporters"]
+		require.NotNil(t, metricsExporters, "metrics pipeline exporters should not be nil")
+		assert.ElementsMatch(t,
+			[]string{fileExporterName, connectorName},
+			metricsExporters,
+			"metrics pipeline should export to the file exporter and the connector",
+		)
+
+		// Logs pipeline (connector output) exports to ES.
+		logsExporters := result["service.pipelines."+logsPipelineName+".exporters"]
+		require.NotNil(t, logsExporters, "logs pipeline exporters should not be nil")
+		assert.ElementsMatch(t,
+			[]string{exporterName},
+			logsExporters,
+			"logs pipeline should export to the elasticsearch monitoring exporter",
+		)
+	})
+
+	t.Run("without OTel monitoring exporter", func(t *testing.T) {
+		// When no OTel-based monitoring exporter exists (e.g. classic HTTP-based
+		// monitoring is in use), the metrics pipeline is still injected so that
+		// internal telemetry is captured in the diagnostics file. No connector or
+		// logs pipeline is added since there is no ES output to send logs to.
+		cfg := confmap.NewFromStringMap(map[string]any{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err, "injectMonitoringReceiver should succeed without monitoring exporter")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		metricsExporters := result["service.pipelines."+metricsPipelineName+".exporters"]
+		require.NotNil(t, metricsExporters, "metrics pipeline should still be created with file-only exporters")
+		assert.ElementsMatch(t,
+			[]string{fileExporterName},
+			metricsExporters,
+			"metrics pipeline should export only to the diagnostics file exporter when no OTel monitoring exporter is present",
+		)
+
+		// No connector, no logs pipeline.
+		assert.Nil(t, result["connectors."+connectorName],
+			"connector should not be injected when no OTel monitoring exporter is present")
+		assert.Nil(t, result["service.pipelines."+logsPipelineName],
+			"logs pipeline should not be created when no OTel monitoring exporter is present")
+	})
+
+	t.Run("file exporter config", func(t *testing.T) {
+		cfg := confmap.NewFromStringMap(map[string]any{})
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err, "injectMonitoringReceiver should succeed")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		// The file exporter path must be in paths.BuildLogs() — the same directory
+		// that MakeInternalFileOutput writes to and that the diagnostics collector walks.
+		expectedPath := filepath.Join(paths.BuildLogs(), internalTelemetryDiagnosticsFileName)
+		assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
+			"file exporter path should be in paths.BuildLogs()")
+
+		// Records are written as OTLP JSON metrics — format: json uses the same metrics
+		// marshaler as the otlp_encoding extension, without needing a separate extension component.
+		assert.Equal(t, "json", result["exporters."+fileExporterName+".format"])
+
+		// Rotation settings: 10 MB cap with one backup.
+		assert.Equal(t, defaultDiagnosticsFileSizeMB, result["exporters."+fileExporterName+".rotation.max_megabytes"])
+		assert.Equal(t, 1, result["exporters."+fileExporterName+".rotation.max_backups"])
+
+		// No on-disk compression: the diagnostics collector packages files into a zip using
+		// deflate, and repetitive JSON compresses to ~4% of its original size in that
+		// context — far better than the ~94% stored ratio of a pre-compressed zstd file.
+		assert.Nil(t, result["exporters."+fileExporterName+".compression"],
+			"compression should not be set; plain NDJSON deflates better inside the diagnostics zip")
+	})
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 }
 
 // fakeCloseListener is a wrapper around a net.Listener that ignores the Close() method. This is used in a very particular

@@ -25,6 +25,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -1019,3 +1020,82 @@ func TestMonitoringConfigParameterParsing(t *testing.T) {
 		})
 	}
 }
+<<<<<<< HEAD
+=======
+
+func TestLogsGlobs(t *testing.T) {
+	tests := []struct {
+		glob       string
+		matches    []string
+		nonMatches []string
+	}{
+		{
+			glob: agentLogsGlob,
+			matches: []string{
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+				"elastic-agent-metrics.ndjson",
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+		},
+		{
+			glob: watcherLogsGlob,
+			matches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+				"elastic-agent-metrics.ndjson",
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+		},
+		{
+			glob: collectorLogsGlob,
+			matches: []string{
+				"elastic-otel-collector-20261222.ndjson",
+				"elastic-otel-collector-20261222-2.ndjson",
+			},
+			nonMatches: []string{
+				"elastic-agent-watcher-20260122.ndjson",
+				"elastic-agent-watcher-20260122-2.ndjson",
+				"elastic-agent-20260804.ndjson",
+				"elastic-agent-20260804-1.ndjson",
+				"elastic-agent-metrics.ndjson",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		for _, name := range tc.matches {
+			matched, err := filepath.Match(tc.glob, name)
+			require.NoError(t, err)
+			assert.Truef(t, matched, "expected %q to match glob %q", name, tc.glob)
+		}
+		for _, name := range tc.nonMatches {
+			matched, err := filepath.Match(tc.glob, name)
+			require.NoError(t, err)
+			assert.Falsef(t, matched, "expected %q to NOT match glob %q", name, tc.glob)
+		}
+	}
+}
+
+func TestLoggingPath(t *testing.T) {
+	for _, operatingSystem := range []string{"", windowsOS} {
+		t.Run("os "+operatingSystem, func(t *testing.T) {
+			logsPath := loggingPath("unit"+string(filepath.Separator)+"1", operatingSystem)
+
+			// the log file of a unit sits in the logs directory of the running build, with the separators of its id replaced
+			assert.True(t, strings.HasPrefix(logsPath, paths.BuildLogs()), "%q must be in %q", logsPath, paths.BuildLogs())
+			assert.True(t, strings.HasSuffix(logsPath, "unit-1"), "%q must end with the sanitized unit id", logsPath)
+		})
+	}
+}
+>>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
