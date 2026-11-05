@@ -292,7 +292,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
-		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
+		newVersionedHome = filepath.Join("data", paths.VersionedHomePrefix+marker.Hash[:6])
 	}
 	versionedHomesToKeep := make([]string, 0, len(marker.RollbacksAvailable)+1)
 	versionedHomesToKeep = append(versionedHomesToKeep, newVersionedHome)
