@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -810,4 +811,12 @@ func TestSupportsUpgradeSourceOnPlatform(t *testing.T) {
 			assert.Equal(t, tc.want, SupportsUpgradeSourceOnPlatform(v, tc.goos, tc.goarch))
 		})
 	}
+}
+
+func TestBuildLogsDirName(t *testing.T) {
+	binary := atesting.AgentBinaryVersion{Version: "9.7.0", Commit: "ff76092f1dd1d8e0a1b3c4d5e6f708192a3b4c5d", Snapshot: true}
+
+	assert.Equal(t, "9.7.0-SNAPSHOT-ff7609", BuildLogsDirName("9.7.0-SNAPSHOT", binary))
+	// a repackaged build has its own version, with the build metadata, and the commit of the build it is made from
+	assert.Equal(t, "9.7.0+build202611061200-SNAPSHOT-ff7609", BuildLogsDirName("9.7.0+build202611061200-SNAPSHOT", binary))
 }

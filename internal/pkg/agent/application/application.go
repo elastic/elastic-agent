@@ -111,6 +111,8 @@ func New(
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
+	// independent of the installation cleanup above, which does not run for every installed Agent, e.g. DEB and RPM
+	cleanupBuildLogs(log, paths.Top(), paths.BuildLogsDirName())
 	if err := upgrade.CleanupDiskSpaceReservations(cfg.Settings.DownloadConfig.TargetDirectory); err != nil {
 		log.Warnf("Error cleaning upgrade disk space reservations: %s", err)
 	}
@@ -331,6 +333,18 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
+	}
+}
+
+// cleanupBuildLogs removes the logs of old builds, keeping the running build (currentBuild) and the latest inactive one.
+// Containers (unversioned home) keep their existing layout and are skipped.
+// Errors are non-fatal and retried on the next startup.
+func cleanupBuildLogs(log *logger.Logger, topDir, currentBuild string) {
+	if !paths.IsVersionHome() {
+		return
+	}
+	if err := upgrade.CleanupBuildLogs(log, paths.BuildLogsRoot(topDir), currentBuild); err != nil {
+		log.Warnf("Error cleaning build logs: %s", err)
 	}
 }
 

@@ -43,7 +43,7 @@ agent.logging.to_stderr: true
 // elastic-agent run causes the agent to write logs to the user-specified
 // directory, even when the config has agent.logging.to_stderr: true.
 // It also verifies that the internal log (consumed by diagnostics) is still
-// written to path.home.
+// written to the build logs directory under data/logs.
 // See https://github.com/elastic/elastic-agent/issues/13320
 func TestRunWithCustomLogsPath(t *testing.T) {
 	_ = define.Require(t, define.Requirements{
@@ -99,12 +99,12 @@ func TestRunWithCustomLogsPath(t *testing.T) {
 	// The user-facing log must appear in the custom --path.logs directory.
 	requireLogFileInDir(t, customLogsDir, "user log under --path.logs")
 
-	// The internal log (for diagnostics) must still be written to
-	// path.home regardless of --path.logs.
+	// The internal log (for diagnostics) must still be written to the
+	// build logs directory regardless of --path.logs.
 	internalLogsGlob := filepath.Join(
 		agentFixture.WorkDir(),
-		"data", "elastic-agent-*", "logs", "elastic-agent*")
-	requireLogFileInDir(t, internalLogsGlob, "internal log under path.home")
+		"data", "logs", "*", "elastic-agent*")
+	requireLogFileInDir(t, internalLogsGlob, "internal log under data/logs/<build>")
 }
 
 // requireLogFileInDir polls until at least one non-empty log file is found

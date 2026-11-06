@@ -13,9 +13,11 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
+	"slices"
 	"strings"
 	"time"
 
@@ -417,7 +419,6 @@ func writeRedacted(errOut, resultWriter io.Writer, fullFilePath string, fileResu
 func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string, excludeEvents bool, errOut io.Writer) error {
 	homePath := paths.HomeFrom(topPath)
 	dataPath := paths.DataFrom(topPath)
-	currentDir := filepath.Base(homePath)
 
 	_, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/",
@@ -435,7 +436,7 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string
 	if !paths.IsVersionHome() {
 		// running in a container with custom top path set
 		// logs are directly under top path
-		if err := zipLogsWithPath(homePath, currentDir, excludeEvents, zw, ts, errOut); err != nil {
+		if err := zipLogsWithPath(homePath, "", excludeEvents, zw, ts, errOut); err != nil {
 			return err
 		}
 		// Components run from the install tree, which is a different directory than topPath
@@ -444,7 +445,7 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string
 		if installHome == homePath {
 			return nil
 		}
-		return zipLogsWithPath(installHome, filepath.Base(installHome), excludeEvents, zw, ts, errOut)
+		return zipLogsWithPath(installHome, "", excludeEvents, zw, ts, errOut)
 	}
 
 	dataDir, err := os.Open(dataPath)
@@ -458,13 +459,28 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string
 		return err
 	}
 
+	// A build has an installation directory and, for builds that keep their logs outside of it,
+	// a build logs directory. Both are collected under the same group.
 	dirPrefix := fmt.Sprintf("%s-", agentName)
+	builds := make(map[string]struct{})
 	for _, dir := range subdirs {
-		if !strings.HasPrefix(dir, dirPrefix) {
-			continue
+		if build, ok := strings.CutPrefix(dir, dirPrefix); ok {
+			builds[build] = struct{}{}
 		}
-		path := filepath.Join(dataPath, dir)
-		if err := zipLogsWithPath(path, dir, excludeEvents, zw, ts, errOut); err != nil {
+	}
+	logsRoot := paths.BuildLogsRoot(topPath)
+	buildLogsDirs, err := os.ReadDir(logsRoot)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		fmt.Fprintf(errOut, "[WARNING] unable to list the build log directories in %s: %s\n", logsRoot, err)
+	}
+	for _, d := range buildLogsDirs {
+		if d.IsDir() {
+			builds[d.Name()] = struct{}{}
+		}
+	}
+
+	for _, build := range slices.Sorted(maps.Keys(builds)) {
+		if err := zipLogsWithPath(filepath.Join(dataPath, dirPrefix+build), filepath.Join(logsRoot, build), excludeEvents, zw, ts, errOut); err != nil {
 			return err
 		}
 	}
@@ -472,19 +488,18 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string
 	return nil
 }
 
-// zipLogsWithPath walks {pathsHome}/logs and {pathsHome}/components/logs and copies them into zw
-// under "logs/<commitName>/" and "logs/<commitName>/components/" respectively.
-func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
+// zipLogsWithPath copies the logs of one build into zw under "logs/<commitName>/", where commitName is
+// the name of the pathsHome directory. {pathsHome}/logs and the build logs directory buildLogs (if set)
+// go directly into it, {pathsHome}/components/logs and {buildLogs}/components/logs go into its components/ directory.
+func zipLogsWithPath(pathsHome, buildLogs string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
+	commitName := filepath.Base(pathsHome)
+
 	if _, err := zw.CreateHeader(&zip.FileHeader{
 		Name:     "logs/" + commitName + "/",
 		Method:   zip.Deflate,
 		Modified: ts,
 	}); err != nil {
 		return fmt.Errorf("failed to create logs dir entry for %s: %w", commitName, err)
-	}
-
-	if err := walkLogPath(filepath.Join(pathsHome, "logs"), commitName, excludeEvents, zw, ts, errOut); err != nil {
-		return fmt.Errorf("failed to collect logs from %s: %w", pathsHome, err)
 	}
 
 	if _, err := zw.CreateHeader(&zip.FileHeader{
@@ -495,23 +510,39 @@ func zipLogsWithPath(pathsHome, commitName string, excludeEvents bool, zw *zip.W
 		return fmt.Errorf("failed to create components logs dir entry for %s: %w", commitName, err)
 	}
 
-	// Components may write logs under {pathsHome}/components/logs.
+	if err := walkLogPath(filepath.Join(pathsHome, "logs"), commitName, excludeEvents, zw, ts, errOut); err != nil {
+		return fmt.Errorf("failed to collect logs from %s: %w", pathsHome, err)
+	}
+
+	if buildLogs != "" {
+		if err := walkLogPath(buildLogs, commitName, excludeEvents, zw, ts, errOut, "components"); err != nil {
+			return fmt.Errorf("failed to collect logs from %s: %w", buildLogs, err)
+		}
+	}
+
+	// Components write logs under {pathsHome}/components/logs, or under {buildLogs}/components/logs.
 	// Mirror that structure under logs/<commitName>/components/ to reflect the source layout.
-	if err := walkLogPath(filepath.Join(pathsHome, "components", "logs"), filepath.Join(commitName, "components"), excludeEvents, zw, ts, errOut); err != nil {
-		return fmt.Errorf("failed to collect component logs from %s: %w", pathsHome, err)
+	componentLogs := []string{filepath.Join(pathsHome, "components", "logs")}
+	if buildLogs != "" {
+		componentLogs = append(componentLogs, filepath.Join(buildLogs, "components", "logs"))
+	}
+	for _, dir := range componentLogs {
+		if err := walkLogPath(dir, filepath.Join(commitName, "components"), excludeEvents, zw, ts, errOut); err != nil {
+			return fmt.Errorf("failed to collect component logs from %s: %w", dir, err)
+		}
 	}
 
 	return nil
 }
 
-func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) error {
+func walkLogPath(logRoot, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer, skipDirs ...string) error {
 	// Trailing separator is required: zipLogWalkFunc uses logPath as a TrimPrefix argument,
 	// so it must end with a separator to avoid a leading slash on relative names.
 	logPath := logRoot + string(filepath.Separator)
-	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts, errOut))
+	return filepath.WalkDir(logPath, zipLogWalkFunc(logPath, commitName, excludeEvents, zw, ts, errOut, skipDirs...))
 }
 
-func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer) func(path string, d fs.DirEntry, fErr error) error {
+func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writer, ts time.Time, errOut io.Writer, skipDirs ...string) func(path string, d fs.DirEntry, fErr error) error {
 	return func(path string, d fs.DirEntry, fErr error) error {
 		if errors.Is(fErr, fs.ErrNotExist) {
 			return nil
@@ -534,6 +565,11 @@ func zipLogWalkFunc(logPath, commitName string, excludeEvents bool, zw *zip.Writ
 		// we need to skip both.
 		if excludeEvents && strings.HasPrefix(name, "events") {
 			return nil
+		}
+
+		// the caller collects these directories itself
+		if d.IsDir() && slices.Contains(skipDirs, name) {
+			return fs.SkipDir
 		}
 
 		name = filepath.Join(commitName, name)

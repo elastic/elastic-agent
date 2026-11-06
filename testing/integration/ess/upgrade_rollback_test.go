@@ -199,6 +199,11 @@ inputs:
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
 	assert.NoError(t, err)
+
+	// the logs of the build that was rolled back from are kept
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	requireBuildLogs(t, startFixture.WorkDir(), upgradetest.BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary))
 }
 
 // TestStandaloneUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
@@ -690,6 +695,11 @@ func TestCleanupRollbacks(t *testing.T) {
 					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
 					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
 				}, 2*time.Minute, 10*time.Second)
+
+				// the logs of the old build outlive its installation directory
+				oldVersionInfo, err := upgrades[upgradeIndex].from.ExecVersion(t.Context())
+				require.NoError(t, err)
+				requireBuildLogs(t, installedFixture.WorkDir(), upgradetest.BuildLogsDirName(upgrades[upgradeIndex].from.Version(), oldVersionInfo.Binary))
 			},
 		},
 		{
@@ -838,6 +848,11 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 	err = upgradetest.CheckHealthyAndVersion(ctx, from, startVersionInfo.Binary)
 	assert.NoError(t, err)
 
+	// the logs of the build that was rolled back from are kept
+	// (an older release keeps its logs in its installation directory, so there is nothing to keep)
+	if upgradetest.WritesBuildLogs(to) {
+		requireBuildLogs(t, from.WorkDir(), upgradetest.BuildLogsDirName(to.Version(), endVersionInfo.Binary))
+	}
 }
 
 func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
@@ -928,6 +943,18 @@ func standaloneRollbackTest(ctx context.Context, t *testing.T, startFixture *ate
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
 	assert.NoError(t, err)
+
+	// the logs of the build that was rolled back from are kept
+	// (an older release keeps its logs in its installation directory, so there is nothing to keep)
+	if upgradetest.WritesBuildLogs(endFixture) {
+		requireBuildLogs(t, startFixture.WorkDir(), upgradetest.BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary))
+	}
+
+	// when both builds have this feature, the diagnostics of the restored Agent include the logs of the build
+	// that was rolled back from
+	if upgradetest.WritesBuildLogs(startFixture) && upgradetest.WritesBuildLogs(endFixture) {
+		requireDiagnosticsBuildLogs(ctx, t, startFixture, upgradetest.BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary))
+	}
 }
 
 func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations time.Duration) {

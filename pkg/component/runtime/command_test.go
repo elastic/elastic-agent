@@ -7,6 +7,8 @@ package runtime
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -21,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -537,4 +540,89 @@ func TestCreateLogWriterJSONEncoder(t *testing.T) {
 			require.Equal(t, tc.componentID, logged["log.source"])
 		})
 	}
+}
+
+func TestPathArgs(t *testing.T) {
+	t.Cleanup(func() { paths.SetVersionHome(true) })
+	workDir := filepath.Join("run", "comp")
+
+	// setting returns the value of the -E setting with the given key, and whether it is set
+	setting := func(args []string, key string) (string, bool) {
+		for i := 0; i+1 < len(args); i++ {
+			if value, ok := strings.CutPrefix(args[i+1], key+"="); args[i] == "-E" && ok {
+				return value, true
+			}
+		}
+		return "", false
+	}
+
+	t.Run("a beat in a versioned home logs next to the build logs", func(t *testing.T) {
+		paths.SetVersionHome(true)
+
+		args := pathArgs(workDir, "filebeat")
+
+		data, ok := setting(args, "path.data")
+		assert.True(t, ok)
+		assert.Equal(t, workDir, data)
+		logsPath, ok := setting(args, "path.logs")
+		require.True(t, ok)
+		// the component logs live in the build logs directory, outside of the versioned home
+		assert.Equal(t, paths.BuildComponentsLogs(), logsPath)
+		// Fleet integrations resolve "../../logs/<input>/" from the logs path of the input
+		assert.Equal(t, "logs", filepath.Base(logsPath))
+		assert.Equal(t, paths.BuildLogsRoot(paths.Top()), filepath.Dir(filepath.Dir(filepath.Dir(logsPath))))
+	})
+
+	t.Run("a component that is not a beat keeps the default logs path", func(t *testing.T) {
+		paths.SetVersionHome(true)
+
+		args := pathArgs(workDir, "")
+
+		_, ok := setting(args, "path.data")
+		assert.True(t, ok)
+		_, ok = setting(args, "path.logs")
+		assert.False(t, ok)
+	})
+
+	t.Run("unversioned home keeps the default logs path", func(t *testing.T) {
+		paths.SetVersionHome(false)
+
+		args := pathArgs(workDir, "filebeat")
+
+		_, ok := setting(args, "path.data")
+		assert.True(t, ok)
+		_, ok = setting(args, "path.logs")
+		assert.False(t, ok)
+	})
+
+	// only beats get the logs path: the other components, such as fleet-server and the profiling collectors,
+	// are not known to accept it
+	t.Run("only the beats of the specs get the logs path", func(t *testing.T) {
+		paths.SetVersionHome(true)
+
+		withoutLogsPath := map[string]struct{}{}
+		for _, platform := range component.GlobalPlatforms {
+			specs, err := component.LoadRuntimeSpecs(filepath.Join("..", "..", "..", "specs"), component.PlatformDetail{Platform: platform}, component.SkipBinaryCheck())
+			require.NoError(t, err)
+
+			for _, input := range specs.Inputs() {
+				// a spec that is prevented on this machine, such as pf-host-agent for a user that is not root,
+				// is returned together with the error
+				spec, err := specs.GetInput(input)
+				if errors.Is(err, component.ErrInputNotSupportedOnPlatform) {
+					continue
+				}
+
+				_, hasLogsPath := setting(pathArgs(workDir, spec.BeatName()), "path.logs")
+				assert.Equalf(t, spec.BeatName() != "", hasLogsPath, "input %s", input)
+				if !hasLogsPath {
+					withoutLogsPath[input] = struct{}{}
+				}
+			}
+		}
+
+		for _, input := range []string{"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent", "fleet-server"} {
+			assert.Containsf(t, withoutLogsPath, input, "input %s must not get the logs path", input)
+		}
+	})
 }
