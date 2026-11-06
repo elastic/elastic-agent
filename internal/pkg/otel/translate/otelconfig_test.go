@@ -2930,3 +2930,48 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 		})
 	}
 }
+
+// TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
+// Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
+func TestGetReceiversConfigPathsContract(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-paths-contract-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-paths-contract-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, result)
+
+	for id, raw := range result {
+		cfg, ok := raw.(map[string]any)
+		require.True(t, ok, "receiver %s: config is not a map", id)
+		assert.Equal(t, map[string]any{
+			"home": paths.Components(),
+			"data": BeatDataPath(comp.ID),
+		}, cfg["path"], "receiver %s: unexpected paths", id)
+	}
+}
