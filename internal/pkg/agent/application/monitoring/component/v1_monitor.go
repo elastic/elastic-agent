@@ -44,10 +44,10 @@ const (
 	// startup process, so instead we rely on this variable. The OTel manager is required to set it whenever it starts
 	// a collector.
 	OtelCollectorMetricsPortEnvVarName = "EDOT_COLLECTOR_METRICS_PORT"
-	// args: data path, pipeline name, application name
-	logFileFormat = "%s/logs/%s"
-	// args: data path, install path, pipeline name, application name
-	logFileFormatWin = "%s\\logs\\%s"
+	// args: build logs path, application name
+	logFileFormat = "%s/%s"
+	// args: build logs path, application name
+	logFileFormatWin = "%s\\%s"
 
 	// args: pipeline name, application name
 	agentMbEndpointFileFormatWin = `npipe:///elastic-agent`
@@ -1309,10 +1309,10 @@ func sanitizeName(name string) string {
 func loggingPath(id, operatingSystem string) string {
 	id = strings.ReplaceAll(id, string(filepath.Separator), "-")
 	if operatingSystem == windowsOS {
-		return fmt.Sprintf(logFileFormatWin, paths.Home(), id)
+		return fmt.Sprintf(logFileFormatWin, paths.BuildLogs(), id)
 	}
 
-	return fmt.Sprintf(logFileFormat, paths.Home(), id)
+	return fmt.Sprintf(logFileFormat, paths.BuildLogs(), id)
 }
 
 func PrefixedEndpoint(endpoint string) string {
