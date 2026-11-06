@@ -138,6 +138,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		"path": map[string]any{
 			"home": paths.Components(),
 			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+			"logs": paths.BuildComponentsLogs(),
 		},
 		"queue": map[string]any{
 			"mem": map[string]any{

@@ -16,6 +16,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/release"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -357,4 +359,20 @@ func InstallChecksAllowed(unprivileged bool, versions ...*version.ParsedSemVer) 
 		}
 	}
 	return true
+}
+
+// WritesBuildLogs reports whether the Agent of the fixture writes its logs to a build log directory under data/logs.
+// Only the builds of the code under test do, released and snapshot builds from the artifacts repository,
+// even of the same version, keep their logs in their installation directory.
+func WritesBuildLogs(f *atesting.Fixture) bool {
+	return f.FetchedFromLocalBuild()
+}
+
+// BuildLogsDirName returns the name of the log directory under data/logs of the build of a fixture with the
+// given version, whose binary reports the given version information. The directory is named after the home
+// directory of the build without its prefix: <version>-<commit>. The version is the one of the fixture, which a
+// repackaged build changes in its package version and manifest, so it can differ from the one of the binary
+// it is made from.
+func BuildLogsDirName(fixtureVersion string, binary atesting.AgentBinaryVersion) string {
+	return fixtureVersion + "-" + release.TrimCommit(binary.Commit)
 }

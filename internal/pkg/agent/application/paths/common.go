@@ -235,9 +235,35 @@ func Logs() string {
 	return logsPath
 }
 
+const logsDirName = "logs"
+
+// BuildLogsRoot returns the directory that holds the log directory of each build, in the data directory of
+// the Agent installed in topDirPath.
+func BuildLogsRoot(topDirPath string) string {
+	return filepath.Join(DataFrom(topDirPath), logsDirName)
+}
+
+// BuildLogsDirName returns the name of the running build's directory under BuildLogsRoot: the name of its home
+// directory without the prefix, see buildName.
+func BuildLogsDirName() string {
+	return buildName(topPath)
+}
+
 // BuildLogs returns the directory the running build writes its logs to. Unlike Logs(), it is not affected by --path.logs, and diagnostics collects from it.
+// Unversioned homes (containers) keep logs inside the home.
 func BuildLogs() string {
-	return filepath.Join(Home(), "logs")
+	if unversionedHome {
+		return filepath.Join(Home(), logsDirName)
+	}
+	return filepath.Join(BuildLogsRoot(topPath), BuildLogsDirName())
+}
+
+// BuildComponentsLogs returns the logs path of the Beats and beat receivers of the running build. It mirrors the
+// {home}/components/logs of the default layout, and its last element must stay "logs": Fleet integrations point
+// the request tracer files of an input to "../../logs/<input>/", which only resolves inside the logs path of the input
+// when it does.
+func BuildComponentsLogs() string {
+	return filepath.Join(BuildLogs(), "components", logsDirName)
 }
 
 // SetLogs updates the path for the logs.
