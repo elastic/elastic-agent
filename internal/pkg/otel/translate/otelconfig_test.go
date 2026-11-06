@@ -13,13 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
-	"github.com/stretchr/testify/require"
-	otelcomponent "go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/component/componentstatus"
-	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
-
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -27,6 +20,11 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
+	"github.com/stretchr/testify/require"
+	otelcomponent "go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
@@ -2921,62 +2919,66 @@ func TestGetOtelConfigElasticsearchFailover(t *testing.T) {
 			"sending_queue": exporterCfg["sending_queue"],
 		}
 	}
-	got, err := yaml.Marshal(map[string]any{
-		"exporters":  exporters,
-		"connectors": m["connectors"],
-		"service":    map[string]any{"pipelines": m["service"].(map[string]any)["pipelines"]},
-	})
-	require.NoError(t, err)
+	assert.Equal(t, map[string]any{
+		"elasticsearch/_agent-component/default/1": map[string]any{
+			"endpoints":     []string{"http://localhost:9200"},
+			"sending_queue": map[string]any{"enabled": false},
+		},
+		"elasticsearch/_agent-component/default/2": map[string]any{
+			"endpoints":     []string{"http://localhost:9201"},
+			"sending_queue": map[string]any{"enabled": false},
+		},
+	}, exporters)
 
 	// A single connector and a single pipeline per host are shared by all components using the output.
-	expected := `
-exporters:
-  elasticsearch/_agent-component/default/1:
-    endpoints: [http://localhost:9200]
-    sending_queue:
-      enabled: false
-  elasticsearch/_agent-component/default/2:
-    endpoints: [http://localhost:9201]
-    sending_queue:
-      enabled: false
-connectors:
-  failover/_agent-component/default:
-    priority_levels:
-      - [logs/_agent-component/default/1]
-      - [logs/_agent-component/default/2]
-    retry_interval: 1m0s
-    condition:
-      error:
-        contains: [failed to execute the request]
-    sending_queue:
-      enabled: true
-      queue_size: 6400
-      num_consumers: 2
-      block_on_overflow: true
-      wait_for_result: true
-      batch:
-        flush_timeout: 10s
-        max_size: 1600
-        min_size: 1600
-        sizer: items
-service:
-  pipelines:
-    logs/_agent-component/filestream-default:
-      receivers: [filebeatreceiver/_agent-component/filestream-default/input-test-1]
-      processors: [beat/_agent-component/filestream-default]
-      exporters: [failover/_agent-component/default]
-    logs/_agent-component/log-default:
-      receivers: [filebeatreceiver/_agent-component/log-default/input-test-1]
-      processors: [beat/_agent-component/log-default]
-      exporters: [failover/_agent-component/default]
-    logs/_agent-component/default/1:
-      receivers: [failover/_agent-component/default]
-      exporters: [elasticsearch/_agent-component/default/1]
-    logs/_agent-component/default/2:
-      receivers: [failover/_agent-component/default]
-      exporters: [elasticsearch/_agent-component/default/2]
-`
-	assert.YAMLEq(t, expected, string(got))
+	assert.Equal(t, map[string]any{
+		"failover/_agent-component/default": map[string]any{
+			"priority_levels": [][]string{
+				{"logs/_agent-component/default/1"},
+				{"logs/_agent-component/default/2"},
+			},
+			"retry_interval": time.Minute,
+			"condition": map[string]any{
+				"error": map[string]any{
+					"contains": []string{"failed to execute the request"},
+				},
+			},
+			"sending_queue": map[string]any{
+				"enabled":           true,
+				"queue_size":        6400,
+				"num_consumers":     2,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
+				"batch": map[string]any{
+					"flush_timeout": "10s",
+					"max_size":      1600,
+					"min_size":      1600,
+					"sizer":         "items",
+				},
+			},
+		},
+	}, m["connectors"])
+
+	assert.Equal(t, map[string]any{
+		"logs/_agent-component/filestream-default": map[string][]string{
+			"receivers":  {"filebeatreceiver/_agent-component/filestream-default/input-test-1"},
+			"processors": {"beat/_agent-component/filestream-default"},
+			"exporters":  {"failover/_agent-component/default"},
+		},
+		"logs/_agent-component/log-default": map[string][]string{
+			"receivers":  {"filebeatreceiver/_agent-component/log-default/input-test-1"},
+			"processors": {"beat/_agent-component/log-default"},
+			"exporters":  {"failover/_agent-component/default"},
+		},
+		"logs/_agent-component/default/1": map[string][]string{
+			"receivers": {"failover/_agent-component/default"},
+			"exporters": {"elasticsearch/_agent-component/default/1"},
+		},
+		"logs/_agent-component/default/2": map[string][]string{
+			"receivers": {"failover/_agent-component/default"},
+			"exporters": {"elasticsearch/_agent-component/default/2"},
+		},
+	}, m["service"].(map[string]any)["pipelines"])
 }
 
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
