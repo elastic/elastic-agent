@@ -1773,7 +1773,7 @@ func TestGetReceiversConfigPathsContract(t *testing.T) {
 		ID:        "filestream-paths-contract-test",
 		InputType: "filestream",
 		InputSpec: &component.InputRuntimeSpec{
-			BinaryName: "elastic-otel-collector",
+			BinaryName: "agentbeat",
 			Spec: component.InputSpec{
 				Name: "filestream",
 				Command: &component.CommandSpec{
@@ -1797,7 +1797,7 @@ func TestGetReceiversConfigPathsContract(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(comp, nil, nil)
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, func(string, string) map[string]any { return nil })
 	require.NoError(t, err)
 	require.NotEmpty(t, result)
 

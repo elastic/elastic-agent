@@ -223,7 +223,7 @@ func TestApplyCustomLogsPath(t *testing.T) {
 
 			assert.Equal(t, tt.wantToStderr, cfg.Settings.LoggingConfig.ToStderr)
 			assert.Equal(t, tt.wantToFiles, cfg.Settings.LoggingConfig.ToFiles)
-			assert.Equal(t, filepath.Join(paths.Home(), logger.DefaultLogDirectory, "events"), cfg.Settings.EventLoggingConfig.Files.Path)
+			assert.Equal(t, filepath.Join(paths.BuildLogs(), "events"), cfg.Settings.EventLoggingConfig.Files.Path)
 			if tt.wantFilesPath != "" {
 				assert.Equal(t, tt.wantFilesPath, cfg.Settings.LoggingConfig.Files.Path)
 				assert.False(t, cfg.Settings.EventLoggingConfig.ToStderr)
