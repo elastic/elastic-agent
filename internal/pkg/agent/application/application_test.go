@@ -711,3 +711,46 @@ func loadTestConfig(t *testing.T) (startupCfg, cfg *configuration.Configuration)
 	require.NoError(t, err)
 	return reloader.StartupConfiguration(), reloader.Configuration()
 }
+
+// seedBuildLogs creates the log directory of a build under topDir whose only file was last written age ago.
+func seedBuildLogs(t *testing.T, topDir, name string, age time.Duration) {
+	t.Helper()
+	dir := filepath.Join(paths.BuildLogsRoot(topDir), name)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	f := filepath.Join(dir, "elastic-agent-1.ndjson")
+	require.NoError(t, os.WriteFile(f, []byte("x"), 0o600))
+	ts := time.Now().Add(-age)
+	require.NoError(t, os.Chtimes(f, ts, ts))
+}
+
+func TestCleanupBuildLogs(t *testing.T) {
+	t.Run("keeps the running build and the latest inactive one", func(t *testing.T) {
+		topDir := t.TempDir()
+		// the running build is kept even though it was written the longest ago
+		seedBuildLogs(t, topDir, "9.0.2-cccccc", 3*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.0-aaaaaa", 2*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.1-bbbbbb", time.Hour)
+
+		log, _ := loggertest.New(t.Name())
+		cleanupBuildLogs(log, topDir, "9.0.2-cccccc")
+
+		root := paths.BuildLogsRoot(topDir)
+		assert.DirExists(t, filepath.Join(root, "9.0.2-cccccc"))
+		assert.DirExists(t, filepath.Join(root, "9.0.1-bbbbbb"))
+		assert.NoDirExists(t, filepath.Join(root, "9.0.0-aaaaaa"))
+	})
+
+	t.Run("unversioned home keeps all logs", func(t *testing.T) {
+		paths.SetVersionHome(false)
+		t.Cleanup(func() { paths.SetVersionHome(true) })
+		topDir := t.TempDir()
+		seedBuildLogs(t, topDir, "9.0.0-aaaaaa", 2*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.1-bbbbbb", time.Hour)
+
+		log, _ := loggertest.New(t.Name())
+		cleanupBuildLogs(log, topDir, "9.0.2-cccccc")
+
+		assert.DirExists(t, filepath.Join(paths.BuildLogsRoot(topDir), "9.0.0-aaaaaa"))
+		assert.DirExists(t, filepath.Join(paths.BuildLogsRoot(topDir), "9.0.1-bbbbbb"))
+	})
+}

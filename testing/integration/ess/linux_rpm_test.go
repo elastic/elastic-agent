@@ -157,6 +157,15 @@ func testRpmLogIngestFleetManagedWithCheck(ctx context.Context, t *testing.T, ag
 		t.Run("check components set", componentCheck)
 	}
 
+	t.Run("Internal logs are in the build log directory", func(t *testing.T) {
+		basePath := "/"
+		if installOpts.BasePath != "" {
+			basePath = installOpts.BasePath
+		}
+		requireLogFileInDir(t, filepath.Join(basePath, "var/lib/elastic-agent/data/logs", "*", "elastic-agent-*.ndjson"), "internal logs")
+		assertNoLogsInInstallation(t, filepath.Join(basePath, "var/lib/elastic-agent"))
+	})
+
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		integration.TestMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)
 	})

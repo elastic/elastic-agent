@@ -204,5 +204,33 @@ func TestVersionedHome(t *testing.T) {
 }
 
 func TestBuildLogs(t *testing.T) {
-	assert.Equal(t, filepath.Join(Home(), "logs"), BuildLogs())
+	origTop, origUnversioned := topPath, unversionedHome
+	t.Cleanup(func() {
+		topPath, unversionedHome = origTop, origUnversioned
+	})
+	versioned := fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+
+	t.Run("legacy home without version is named after the commit", func(t *testing.T) {
+		topPath, unversionedHome = t.TempDir(), false
+
+		assert.Equal(t, release.ShortCommit(), BuildLogsDirName())
+		assert.Equal(t, filepath.Join(topPath, "data", "logs", release.ShortCommit()), BuildLogs())
+		assert.Equal(t, "elastic-agent-"+BuildLogsDirName(), filepath.Base(Home()))
+	})
+
+	t.Run("versioned home is named after the version and commit", func(t *testing.T) {
+		topPath, unversionedHome = t.TempDir(), false
+		require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data", "elastic-agent-"+versioned), 0o755))
+
+		assert.Equal(t, versioned, BuildLogsDirName())
+		assert.Equal(t, filepath.Join(topPath, "data", "logs", versioned), BuildLogs())
+		assert.Equal(t, "elastic-agent-"+BuildLogsDirName(), filepath.Base(Home()))
+		assert.Equal(t, filepath.Join(topPath, "data", "logs"), BuildLogsRoot(topPath))
+	})
+
+	t.Run("unversioned home keeps the existing layout", func(t *testing.T) {
+		topPath, unversionedHome = t.TempDir(), true
+
+		assert.Equal(t, filepath.Join(topPath, "logs"), BuildLogs())
+	})
 }
