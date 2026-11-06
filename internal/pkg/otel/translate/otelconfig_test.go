@@ -2852,7 +2852,6 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
 // enabled streams (either no input units, or input units with nil config) falls back to
 // a no-op receiver instead of an error, so the pipeline stays valid and the component
@@ -2929,7 +2928,9 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
 		})
-=======
+	}
+}
+
 // TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
 // Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
 func TestGetReceiversConfigPathsContract(t *testing.T) {
@@ -2961,7 +2962,7 @@ func TestGetReceiversConfigPathsContract(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(comp, nil, nil)
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil, nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, result)
 
@@ -2972,6 +2973,5 @@ func TestGetReceiversConfigPathsContract(t *testing.T) {
 			"home": paths.Components(),
 			"data": BeatDataPath(comp.ID),
 		}, cfg["path"], "receiver %s: unexpected paths", id)
->>>>>>> 61a2cab (Route Elastic Agent log paths through paths.BuildLogs() (#17813))
 	}
 }
