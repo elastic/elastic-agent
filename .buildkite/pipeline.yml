@@ -281,6 +281,7 @@ steps:
         plugins:
           - *google_oidc_plugin
 
+<<<<<<< HEAD
       # Runs only on main and release branches, like "Unit tests - macOS 13".
       # Skipped like "Unit tests - macOS 13" due to Orka provider slowness,
       # see https://github.com/elastic/elastic-agent/pull/17290
@@ -291,14 +292,58 @@ steps:
         branches: "main 8.* 9.*"
         env:
           GO_MODULE_DIR: "internal/edot"
+=======
+      - label: "EDOT unit tests - fips140=only Windows 2022"
+        key: "edot-unit-tests-win2022-fips140-only"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+          FIPS: "true"
+>>>>>>> d42f996 (ci: remove macOS EDOT unit tests on Orka (#17696))
         artifact_paths:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
           - "coverage-*.out"
         agents:
+<<<<<<< HEAD
           provider: orka
           imagePrefix: generic-13-ventura-x64
+=======
+          provider: "gcp"
+          image: "${IMAGE_WIN_2022}"
+          machineType: "n2-standard-8"
+          disk_size: 200
+          disk_type: "pd-ssd"
+        retry:
+          automatic:
+            limit: 1
+          manual:
+            allowed: true
+        plugins:
+          - *google_oidc_plugin
+
+      # The EDOT module does not compile on the Windows arm64 Buildkite agents.
+      # Remove `skip` once https://github.com/elastic/elastic-agent/issues/17227 is resolved.
+      - label: "EDOT unit tests - Windows 11 arm64"
+        key: "edot-unit-tests-win11-arm64"
+        # Buildkite limits the skip reason to 70 characters.
+        skip: "Doesn't compile, see github.com/elastic/elastic-agent/issues/17227"
+        command: .buildkite/scripts/steps/unit-tests.ps1
+        env:
+          GO_MODULE_DIR: "internal/edot"
+        artifact_paths:
+          - "build/TEST-*.html"
+          - "build/TEST-*.xml"
+          - "build/diagnostics/*"
+          - "coverage-*.out"
+        agents:
+          provider: "azure"
+          image: "${IMAGE_WIN_11_ARM64}"
+          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
+          vmSize: "Standard_D8ps_v6"
+          diskSizeGb: "256"
+>>>>>>> d42f996 (ci: remove macOS EDOT unit tests on Orka (#17696))
         retry:
           automatic:
             limit: 1
