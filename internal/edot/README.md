@@ -147,6 +147,7 @@ This section provides a summary of components included in the Elastic Distributi
 | Component | Version |
 |---|---|
 | [elasticapmconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/elasticapmconnector/v0.78.0/connector/elasticapmconnector/README.md) | v0.78.0 |
+| [failoverconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/failoverconnector/v0.164.1/connector/failoverconnector/README.md) | v0.164.1 |
 | [forwardconnector](https://github.com/open-telemetry/opentelemetry-collector/blob/connector/forwardconnector/v0.164.0/connector/forwardconnector/README.md) | v0.164.0 |
 | [otlpjsonconnector](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/connector/otlpjsonconnector/v0.164.1/connector/otlpjsonconnector/README.md) | v0.164.1 |
 | [profilingmetricsconnector](https://github.com/elastic/opentelemetry-collector-components/blob/connector/profilingmetricsconnector/v0.78.0/connector/profilingmetricsconnector/README.md) | v0.78.0 |
