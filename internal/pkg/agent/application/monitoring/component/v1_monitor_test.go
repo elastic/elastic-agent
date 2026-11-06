@@ -25,6 +25,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringcfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -1016,6 +1017,18 @@ func TestMonitoringConfigParameterParsing(t *testing.T) {
 					continue
 				}
 			}
+		})
+	}
+}
+
+func TestLoggingPath(t *testing.T) {
+	for _, operatingSystem := range []string{"", windowsOS} {
+		t.Run("os "+operatingSystem, func(t *testing.T) {
+			logsPath := loggingPath("unit"+string(filepath.Separator)+"1", operatingSystem)
+
+			// the log file of a unit sits in the logs directory of the running build, with the separators of its id replaced
+			assert.True(t, strings.HasPrefix(logsPath, paths.BuildLogs()), "%q must be in %q", logsPath, paths.BuildLogs())
+			assert.True(t, strings.HasSuffix(logsPath, "unit-1"), "%q must end with the sanitized unit id", logsPath)
 		})
 	}
 }
