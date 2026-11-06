@@ -93,7 +93,7 @@ type (
 	}
 
 	// exporter translation logic takes output config, output name, logger
-	// and returns the translated exporter, processor (if any) and extension (if any) configs.
+	// and returns the translated output config and error.
 	exporterConfigTranslationFunc func(*config.C, string, *logp.Logger) (TranslatedOutput, error)
 )
 
@@ -350,6 +350,7 @@ func getCollectorConfigForComponent(
 		return nil, err
 	}
 
+	// This is a special case for failover connectors when using ES output type.
 	connectorsConfig, connectorPipelinesConfig, err := getFailoverConnectorConfig(pipelineID.Signal(), comp.OutputName, translated.Connectors)
 	if err != nil {
 		return nil, err
@@ -403,6 +404,8 @@ func getCollectorConfigForComponent(
 	pipelinesConfig := map[string]any{
 		pipelineID.String(): pipelineConfig,
 	}
+
+	// Copy the pipelines created by failover connectors. This can override the pipelines created by the component.
 	maps.Copy(pipelinesConfig, connectorPipelinesConfig)
 
 	// we need to convert []string to []interface for this to work
@@ -444,10 +447,9 @@ func getCollectorConfigForComponent(
 	return confmap.NewFromStringMap(fullConfig), nil
 }
 
-// getFailoverConnectorConfig builds the pipelines that feed the exporters of the output's failover connectors.
-// The translated priority_levels list one exporter ID per priority level, highest priority first; each exporter
-// gets its own pipeline, named _agent-component/<output name>/<priority>, and priority_levels are rewritten to reference these
-// pipelines. Connectors and their pipelines are scoped to the output, so all components using the output share
+// getFailoverConnectorConfig builds the pipelines for the failover connectors. Each exporter
+// gets its own pipeline, named _agent-component/<output name>/<priority>.
+// Connectors and their pipelines are scoped to the output, so all components using the output share
 // them and produce the same config. It returns the connectors config and the pipelines config.
 func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, connectors map[string]any) (map[string]any, map[string]any, error) {
 	if len(connectors) == 0 {

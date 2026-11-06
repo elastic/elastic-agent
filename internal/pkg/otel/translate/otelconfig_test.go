@@ -2945,6 +2945,9 @@ connectors:
       - [logs/_agent-component/default/1]
       - [logs/_agent-component/default/2]
     retry_interval: 1m0s
+    condition:
+      error:
+        contains: [failed to execute the request]
     sending_queue:
       enabled: true
       queue_size: 6400

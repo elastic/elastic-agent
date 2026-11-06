@@ -29,6 +29,11 @@ import (
 
 var exporterType = otelcomponent.MustNewType("elasticsearch")
 
+// failoverConnectionErrorMessage is how go-docappender prefixes bulk request errors that got no HTTP response
+// (dial, DNS, TLS, timeout, connection reset). Errors with a response read "flush failed (<status>)" must
+// not trigger failover. See https://github.com/elastic/go-docappender/blob/96399368954feaebb9d34aa752c3115a6729409f/bulk_indexer.go#L479-L482
+const failoverConnectionErrorMessage = "failed to execute the request"
+
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
 
@@ -382,6 +387,7 @@ func getFailoverConfig(exporterType otelcomponent.Type, outputName string, expor
 	if retryInterval <= 0 {
 		retryInterval = elasticsearch.DefaultConfig().Backoff.Max
 	}
+
 	connectors = map[string]any{
 		getFailoverConnectorID(outputName).String(): map[string]any{
 			// one exporter ID per level, replaced with the pipelines feeding them by getFailoverConnectorConfig
@@ -389,13 +395,17 @@ func getFailoverConfig(exporterType otelcomponent.Type, outputName string, expor
 			// how often the connector tries to move back to a higher priority endpoint
 			"retry_interval": retryInterval,
 			"sending_queue":  exporterCfg["sending_queue"],
+			"condition": map[string]any{
+				"error": map[string]any{
+					"contains": []string{failoverConnectionErrorMessage},
+				},
+			},
 		},
 	}
 	return exporters, connectors
 }
 
 // getFailoverExporterID returns the id of the exporter for the n-th (1-based) host of an output
-// that fails over between its hosts.
 func getFailoverExporterID(exporterType otelcomponent.Type, outputName string, n int) otelcomponent.ID {
 	exporterName := fmt.Sprintf("%s%s/%d", OtelNamePrefix, EncodeNameSegment(outputName), n)
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
@@ -524,22 +534,6 @@ func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string
 	}
 
 	return hosts, nil
-}
-
-func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
-	for _, field := range fields {
-		if !cfg.HasField(field) {
-			continue
-		}
-		value, err := cfg.String(field, -1)
-		if err != nil {
-			return "", fmt.Errorf("%s must be a string: %w", field, err)
-		}
-		if value != "" {
-			return value, nil
-		}
-	}
-	return "", nil
 }
 
 // getBeatsAuthExtensionID returns the id for beatsauth extension

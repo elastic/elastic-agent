@@ -884,6 +884,11 @@ func TestESToOTelConfigLoadbalanceFalse(t *testing.T) {
 				},
 				"retry_interval": 30 * time.Second,
 				"sending_queue":  singleHostCfg["sending_queue"],
+				"condition": map[string]any{
+					"error": map[string]any{
+						"contains": []string{"failed to execute the request"},
+					},
+				},
 			},
 		}, translated.Connectors)
 	})
