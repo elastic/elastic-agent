@@ -231,6 +231,11 @@ func Logs() string {
 	return logsPath
 }
 
+// BuildLogs returns the directory the running build writes its logs to. Unlike Logs(), it is not affected by --path.logs, and diagnostics collects from it.
+func BuildLogs() string {
+	return filepath.Join(Home(), "logs")
+}
+
 // SetLogs updates the path for the logs.
 func SetLogs(path string) {
 	logsPath = path
