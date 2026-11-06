@@ -4646,7 +4646,7 @@ func TestGetReceiversConfigPathsContract(t *testing.T) {
 		},
 	}
 
-	result, err := getReceiversConfigForComponent(comp, nil, nil)
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, false, nil)
 	require.NoError(t, err)
 	require.NotEmpty(t, result)
 
