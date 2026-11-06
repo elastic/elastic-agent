@@ -194,6 +194,14 @@ components:
       - *linux-amd64
       - *linux-arm64
     packageTypes: *all-package-types
+  - &comp-endpoint-fips
+    projectName: endpoint-dev
+    packageName: endpoint-security-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
+    rootDir: endpoint-security-fips-{{.Version}}-{{.Platform}}
+    binaryName: endpoint-security
+    fips: true
+    platforms: *all-platforms
+    packageTypes: *all-package-types
   - &comp-fleet-server-fips
     projectName: fleet-server
     packageName: fleet-server-fips-{{.Version}}-{{.Platform}}.{{.Ext}}
@@ -263,6 +271,7 @@ shared:
   - &elastic_agent_fips_components
     components:
       - *comp-apm_server-fips
+      - *comp-endpoint-fips
       - *comp-fleet-server-fips
 
   # Deb/RPM spec.
