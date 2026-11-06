@@ -89,6 +89,7 @@ type (
 		Exporters  map[string]any
 		Processors map[string]any
 		Extensions map[string]any
+		Connectors map[string]any
 	}
 
 	// exporter translation logic takes output config, output name, logger
@@ -349,9 +350,18 @@ func getCollectorConfigForComponent(
 		return nil, err
 	}
 
+	connectorsConfig, connectorPipelinesConfig, err := getFailoverConnectorConfig(pipelineID.Signal(), comp.OutputName, translated.Connectors)
+	if err != nil {
+		return nil, err
+	}
+
 	receiverKeys := slices.Sorted(maps.Keys(receiversConfig))
+	pipelineExporters := slices.Sorted(maps.Keys(translated.Exporters))
+	if len(connectorsConfig) > 0 {
+		pipelineExporters = slices.Sorted(maps.Keys(connectorsConfig))
+	}
 	pipelineConfig := map[string][]string{
-		"exporters": slices.Sorted(maps.Keys(translated.Exporters)),
+		"exporters": pipelineExporters,
 		"receivers": receiverKeys,
 	}
 
@@ -393,6 +403,7 @@ func getCollectorConfigForComponent(
 	pipelinesConfig := map[string]any{
 		pipelineID.String(): pipelineConfig,
 	}
+	maps.Copy(pipelinesConfig, connectorPipelinesConfig)
 
 	// we need to convert []string to []interface for this to work
 	extensionKey := make([]any, 0, len(translated.Extensions))
@@ -415,6 +426,9 @@ func getCollectorConfigForComponent(
 			"pipelines":  pipelinesConfig,
 		}
 	}
+	if len(connectorsConfig) > 0 {
+		fullConfig["connectors"] = connectorsConfig
+	}
 
 	allProcessorsConfig := map[string]any{}
 	maps.Copy(allProcessorsConfig, translated.Processors)
@@ -428,6 +442,44 @@ func getCollectorConfigForComponent(
 	}
 
 	return confmap.NewFromStringMap(fullConfig), nil
+}
+
+// getFailoverConnectorConfig builds the pipelines that feed the exporters of the output's failover connectors.
+// The translated priority_levels list one exporter ID per priority level, highest priority first; each exporter
+// gets its own pipeline, named _agent-component/<output name>/<priority>, and priority_levels are rewritten to reference these
+// pipelines. Connectors and their pipelines are scoped to the output, so all components using the output share
+// them and produce the same config. It returns the connectors config and the pipelines config.
+func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, connectors map[string]any) (map[string]any, map[string]any, error) {
+	if len(connectors) == 0 {
+		return nil, nil, nil
+	}
+
+	connectorsConfig := make(map[string]any, len(connectors))
+	pipelinesConfig := map[string]any{}
+	for connectorKey, cfg := range connectors {
+		connectorCfg, ok := cfg.(map[string]any)
+		if !ok {
+			return nil, nil, fmt.Errorf("connector %s config is not a map", connectorKey)
+		}
+		exporterKeys, ok := connectorCfg["priority_levels"].([]string)
+		if !ok {
+			return nil, nil, fmt.Errorf("connector %s has no priority_levels", connectorKey)
+		}
+		pipelineLevels := make([][]string, 0, len(exporterKeys))
+		for i, exporterKey := range exporterKeys {
+			exporterPipelineID := pipeline.NewIDWithName(signal, fmt.Sprintf("%s%s/%d", OtelNamePrefix, EncodeNameSegment(outputName), i+1)).String()
+			pipelinesConfig[exporterPipelineID] = map[string][]string{
+				"receivers": {connectorKey},
+				"exporters": {exporterKey},
+			}
+			pipelineLevels = append(pipelineLevels, []string{exporterPipelineID})
+		}
+
+		outputConnectorCfg := maps.Clone(connectorCfg)
+		outputConnectorCfg["priority_levels"] = pipelineLevels
+		connectorsConfig[connectorKey] = outputConnectorCfg
+	}
+	return connectorsConfig, pipelinesConfig, nil
 }
 
 // getReceiversConfigForComponent returns the receivers configuration for a component.

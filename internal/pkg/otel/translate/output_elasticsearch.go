@@ -13,11 +13,12 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-viper/mapstructure/v2"
+	koanfmaps "github.com/knadh/koanf/maps"
 	otelcomponent "go.opentelemetry.io/collector/component"
 
-	"github.com/elastic/beats/v7/libbeat/cloudid"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
@@ -25,6 +26,8 @@ import (
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
 )
+
+var exporterType = otelcomponent.MustNewType("elasticsearch")
 
 type esToOTelOptions struct {
 	elasticsearch.ElasticsearchConfig `config:",inline"`
@@ -139,16 +142,10 @@ var defaultOptions = esToOTelOptions{
 func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (TranslatedOutput, error) {
 	escfg := defaultOptions
 
-	// Cloud resolution returns a copy, but effective queue settings must be
-	// written back for unitToExporterConfig.
 	originalOutput := output
-	output, err := resolveElasticsearchOutputCloudConfig(output)
-	if err != nil {
-		return TranslatedOutput{}, err
-	}
 
 	// check for unsupported config
-	err = checkUnsupportedConfig(output)
+	err := checkUnsupportedConfig(output)
 	if err != nil {
 		return TranslatedOutput{}, err
 	}
@@ -278,7 +275,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (T
 		// count. Removing it would let the extra consumers open extra connections and
 		// change Elasticsearch-side load, which the sizing above is specifically written
 		// to avoid.
-		"max_conns_per_host": maxConns, // num_workers * len(hosts) if loadbalance is true
+		"max_conns_per_host": maxConns, // num_workers * len(hosts) if loadbalance is true, num_workers otherwise
 
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
@@ -355,11 +352,59 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (T
 		"authenticator": extensionID.String(),
 	}
 
+	if !escfg.LoadBalance && len(hosts) > 1 {
+		exporterCfg, connectorCfg := getFailoverConfig(exporterType, outputName, otelYAMLCfg, hosts, escfg.Backoff.Max)
+		return TranslatedOutput{Exporters: exporterCfg, Extensions: extensionCfg, Connectors: connectorCfg}, nil
+	}
+
 	exporterCfg := map[string]any{
-		GetExporterID(otelcomponent.MustNewType("elasticsearch"), outputName).String(): otelYAMLCfg,
+		GetExporterID(exporterType, outputName).String(): otelYAMLCfg,
 	}
 
 	return TranslatedOutput{Exporters: exporterCfg, Extensions: extensionCfg}, nil
+}
+
+// getFailoverConfig splits an exporter config with multiple endpoints into one exporter per endpoint and a
+// The sending queue moves from the exporters to the connector
+func getFailoverConfig(exporterType otelcomponent.Type, outputName string, exporterCfg map[string]any, endpoints []string, retryInterval time.Duration) (exporters map[string]any, connectors map[string]any) {
+	exporters = make(map[string]any, len(endpoints))
+	priorityLevels := make([]string, 0, len(endpoints))
+	for i, endpoint := range endpoints {
+		cfg := koanfmaps.Copy(exporterCfg)
+		cfg["endpoints"] = []string{endpoint}
+		cfg["sending_queue"] = map[string]any{"enabled": false}
+
+		exporterID := getFailoverExporterID(exporterType, outputName, i+1).String()
+		exporters[exporterID] = cfg
+		priorityLevels = append(priorityLevels, exporterID)
+	}
+
+	if retryInterval <= 0 {
+		retryInterval = elasticsearch.DefaultConfig().Backoff.Max
+	}
+	connectors = map[string]any{
+		getFailoverConnectorID(outputName).String(): map[string]any{
+			// one exporter ID per level, replaced with the pipelines feeding them by getFailoverConnectorConfig
+			"priority_levels": priorityLevels,
+			// how often the connector tries to move back to a higher priority endpoint
+			"retry_interval": retryInterval,
+			"sending_queue":  exporterCfg["sending_queue"],
+		},
+	}
+	return exporters, connectors
+}
+
+// getFailoverExporterID returns the id of the exporter for the n-th (1-based) host of an output
+// that fails over between its hosts.
+func getFailoverExporterID(exporterType otelcomponent.Type, outputName string, n int) otelcomponent.ID {
+	exporterName := fmt.Sprintf("%s%s/%d", OtelNamePrefix, EncodeNameSegment(outputName), n)
+	return otelcomponent.NewIDWithName(exporterType, exporterName)
+}
+
+// getFailoverConnectorID returns the id of the failover connector for the given output name.
+func getFailoverConnectorID(outputName string) otelcomponent.ID {
+	connectorName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("failover"), connectorName)
 }
 
 // calcNamedPresetSizing computes the OTel queue size and consumer count for a
@@ -406,6 +451,10 @@ func calcNamedPresetSizing(maxConns, batchSize, floor int) (queueSize, numConsum
 // getTotalNumConnections returns the number of connections that beats would
 // have used taking into account hosts, loadbalance and worker
 func getTotalNumConnections(cfg *config.C) int {
+	if loadbalance, err := cfg.Bool("loadbalance", -1); err == nil && !loadbalance {
+		// Without load balancing each worker sends to one host at a time.
+		return outputs.NumofWorker(cfg)
+	}
 	hostList, err := outputs.ReadHostList(cfg)
 	if err != nil {
 		return 1
@@ -475,51 +524,6 @@ func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string
 	}
 
 	return hosts, nil
-}
-
-// resolveElasticsearchOutputCloudConfig returns an independently owned,
-// environment-resolved output config and applies output-scoped Cloud ID fields
-// without changing the policy-derived source map.
-func resolveElasticsearchOutputCloudConfig(output *config.C) (*config.C, error) {
-	var resolvedMap map[string]any
-	if err := output.Unpack(&resolvedMap); err != nil {
-		return nil, fmt.Errorf("failed resolving Elasticsearch output config: %w", err)
-	}
-	resolvedOutput, err := config.NewConfigFrom(resolvedMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed copying Elasticsearch output config: %w", err)
-	}
-
-	cloudID, err := firstConfiguredString(resolvedOutput, "cloud_id", "cloud.id")
-	if err != nil {
-		return nil, err
-	}
-	cloudAuth, err := firstConfiguredString(resolvedOutput, "cloud_auth", "cloud.auth")
-	if err != nil {
-		return nil, err
-	}
-	if cloudID == "" {
-		if cloudAuth != "" {
-			return nil, errors.New("cloud_auth is configured but cloud_id is empty")
-		}
-		return resolvedOutput, nil
-	}
-
-	cloudConfig, err := cloudid.NewCloudID(cloudID, cloudAuth)
-	if err != nil {
-		return nil, fmt.Errorf("invalid cloud_id: %w", err)
-	}
-	resolvedMap["hosts"] = []string{cloudConfig.ElasticsearchURL()}
-	if cloudAuth != "" {
-		resolvedMap["username"] = cloudConfig.Username()
-		resolvedMap["password"] = cloudConfig.Password()
-	}
-
-	resolvedOutput, err = config.NewConfigFrom(resolvedMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed applying cloud_id to Elasticsearch output config: %w", err)
-	}
-	return resolvedOutput, nil
 }
 
 func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
@@ -649,8 +653,6 @@ func checkUnsupportedConfig(cfg *config.C) error {
 		return fmt.Errorf("indices is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
 		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
-	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
-		return fmt.Errorf("loadbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	} else if cfg.HasField("non_indexable_policy") {
 		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
 	} else if val, err := cfg.Int("max_retries", -1); err == nil && val < 0 {

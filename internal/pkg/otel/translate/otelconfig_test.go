@@ -18,6 +18,7 @@ import (
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
+	"gopkg.in/yaml.v2"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
@@ -2891,6 +2892,83 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 		receiverConfig := receiver.(map[string]any)
 		assert.Equal(t, elasticsearchStateStoreExtensionName, receiverConfig["storage"])
 	}
+}
+
+func TestGetOtelConfigElasticsearchFailover(t *testing.T) {
+	failoverOutput := map[string]any{
+		"hosts":       []any{"localhost:9200", "localhost:9201"},
+		"loadbalance": false,
+	}
+	model := &component.Model{Components: []component.Component{
+		testFilebeatComp("filestream-default", "default", failoverOutput),
+		testFilebeatComp("log-default", "default", failoverOutput),
+	}}
+	conf, err := GetOtelConfig(model, logp.NewNopLogger())
+	require.NoError(t, err)
+	m := conf.ToStringMap()
+
+	// Only the per-host fields of the exporters are compared, the rest matches a single host exporter.
+	exporters := map[string]any{}
+	for id, cfg := range m["exporters"].(map[string]any) {
+		exporterCfg := cfg.(map[string]any)
+		exporters[id] = map[string]any{
+			"endpoints":     exporterCfg["endpoints"],
+			"sending_queue": exporterCfg["sending_queue"],
+		}
+	}
+	got, err := yaml.Marshal(map[string]any{
+		"exporters":  exporters,
+		"connectors": m["connectors"],
+		"service":    map[string]any{"pipelines": m["service"].(map[string]any)["pipelines"]},
+	})
+	require.NoError(t, err)
+
+	// A single connector and a single pipeline per host are shared by all components using the output.
+	expected := `
+exporters:
+  elasticsearch/_agent-component/default/1:
+    endpoints: [http://localhost:9200]
+    sending_queue:
+      enabled: false
+  elasticsearch/_agent-component/default/2:
+    endpoints: [http://localhost:9201]
+    sending_queue:
+      enabled: false
+connectors:
+  failover/_agent-component/default:
+    priority_levels:
+      - [logs/_agent-component/default/1]
+      - [logs/_agent-component/default/2]
+    retry_interval: 1m0s
+    sending_queue:
+      enabled: true
+      queue_size: 6400
+      num_consumers: 2
+      block_on_overflow: true
+      wait_for_result: true
+      batch:
+        flush_timeout: 10s
+        max_size: 1600
+        min_size: 1600
+        sizer: items
+service:
+  pipelines:
+    logs/_agent-component/filestream-default:
+      receivers: [filebeatreceiver/_agent-component/filestream-default/input-test-1]
+      processors: [beat/_agent-component/filestream-default]
+      exporters: [failover/_agent-component/default]
+    logs/_agent-component/log-default:
+      receivers: [filebeatreceiver/_agent-component/log-default/input-test-1]
+      processors: [beat/_agent-component/log-default]
+      exporters: [failover/_agent-component/default]
+    logs/_agent-component/default/1:
+      receivers: [failover/_agent-component/default]
+      exporters: [elasticsearch/_agent-component/default/1]
+    logs/_agent-component/default/2:
+      receivers: [failover/_agent-component/default]
+      exporters: [elasticsearch/_agent-component/default/2]
+`
+	assert.YAMLEq(t, expected, string(got))
 }
 
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
