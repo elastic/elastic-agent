@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -138,7 +139,7 @@ func runAgentInfoInEventsFleetManaged(t *testing.T, info *define.Info, runtime s
 
 	logFilePath := filepath.Join(createTempDir(t), "flog.log")
 	integration.GenerateLogFile(t, logFilePath, time.Second/2, 0)
-	enrollmentToken := createAgentInfoPolicy(t, ctx, info, agentFixture, runtime, logFilePath, integrationTags)
+	policyID, enrollmentToken := createAgentInfoPolicy(t, ctx, info, agentFixture, runtime, logFilePath, integrationTags)
 
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
@@ -166,12 +167,10 @@ func runAgentInfoInEventsFleetManaged(t *testing.T, info *define.Info, runtime s
 	})
 
 	t.Run("agent tags are updated", func(t *testing.T) {
-		// Fleet Server sends a tags-only change at the next check-in, which can take up
-		// to the long poll timeout (about 5 minutes).
 		err := updateAgentTagsFleet(ctx, info, status.Info.ID, newTags)
 		require.NoError(t, err, "error updating the agent tags")
-
 		updated := time.Now()
+		bumpPolicyRevision(t, ctx, info, policyID, "tags updated to "+strings.Join(newTags, ","))
 		expectedTags := slices.Concat(integrationTags, newTags)
 		requireAgentInfoInEventsAfter(t, ctx, info, status, logFilePath, expectedTags, updated)
 	})
@@ -223,7 +222,7 @@ func runAgentInfoInEventsFleetManagedContainer(t *testing.T, info *define.Info, 
 
 	logFilePath := filepath.Join(createTempDir(t), "flog.log")
 	integration.GenerateLogFile(t, logFilePath, time.Second/2, 0)
-	enrollmentToken := createAgentInfoPolicy(t, ctx, info, agentFixture, runtime, logFilePath, integrationTags)
+	policyID, enrollmentToken := createAgentInfoPolicy(t, ctx, info, agentFixture, runtime, logFilePath, integrationTags)
 
 	fleetServerURL, err := fleettools.DefaultURL(ctx, info.KibanaClient)
 	require.NoError(t, err, "failed getting Fleet Server URL")
@@ -254,12 +253,10 @@ func runAgentInfoInEventsFleetManagedContainer(t *testing.T, info *define.Info, 
 	})
 
 	t.Run("agent tags are updated", func(t *testing.T) {
-		// Fleet Server sends a tags-only change at the next check-in, which can take up
-		// to the long poll timeout (about 5 minutes).
 		err := updateAgentTagsFleet(ctx, info, status.Info.ID, newTags)
 		require.NoError(t, err, "error updating the agent tags")
-
 		updated := time.Now()
+		bumpPolicyRevision(t, ctx, info, policyID, "tags updated to "+strings.Join(newTags, ","))
 		expectedTags := slices.Concat(integrationTags, newTags)
 		requireAgentInfoInEventsAfter(t, ctx, info, status, logFilePath, expectedTags, updated)
 	})
@@ -278,7 +275,9 @@ func runAgentInfoInEventsFleetManagedContainer(t *testing.T, info *define.Info, 
 	})
 }
 
-func createAgentInfoPolicy(t *testing.T, ctx context.Context, info *define.Info, agentFixture *atesting.Fixture, runtime, logFilePath string, integrationTags []string) string {
+// createAgentInfoPolicy creates a policy with include_tags_in_events enabled and a log
+// integration, and returns the policy ID and an enrollment token for it.
+func createAgentInfoPolicy(t *testing.T, ctx context.Context, info *define.Info, agentFixture *atesting.Fixture, runtime, logFilePath string, integrationTags []string) (string, string) {
 	t.Helper()
 	// include_tags_in_events is disabled by default, so the policy must enable it.
 	enabledIncludeTagsInEvents := map[string]any{
@@ -304,7 +303,7 @@ func createAgentInfoPolicy(t *testing.T, ctx context.Context, info *define.Info,
 	policyName := fmt.Sprintf("%s-%s", t.Name(), uuid.Must(uuid.NewV4()).String())
 	policyID, enrollmentToken := createPolicyWithOverride(t, ctx, agentFixture, info, policyName, "", enabledIncludeTagsInEvents)
 	addLogIntegration(t, info, policyID, logFilePath, integrationTags...)
-	return enrollmentToken
+	return policyID, enrollmentToken
 }
 
 func updateAgentTags(ctx context.Context, agentFixture *atesting.Fixture, esHost, esAPIKey, logFilePath, runtime string, integrationTags, tags []string) error {
@@ -344,6 +343,28 @@ agent:
 		return fmt.Errorf("configure agent tags: %w", err)
 	}
 	return nil
+}
+
+// bumpPolicyRevision makes a no-op change to the policy so that Fleet Server ends
+// the agent's current check-in long poll with a policy change instead of at the
+// long poll timeout (about 5 minutes).
+//
+// Fleet Server only compares an agent's tags with the ones it last sent when a
+// check-in request arrives, so a tags-only update made while the agent is
+// waiting in its long poll is delivered at the earliest when that poll returns.
+// The policy change ends the poll now; the agent checks in again right away and
+// Fleet Server re-sends the policy with the updated tags, so the test still
+// verifies the tags-only propagation, only without the long poll wait.
+func bumpPolicyRevision(t *testing.T, ctx context.Context, info *define.Info, policyID, reason string) {
+	t.Helper()
+	policy, err := info.KibanaClient.GetPolicy(ctx, policyID)
+	require.NoError(t, err, "could not get the agent policy")
+	_, err = info.KibanaClient.UpdatePolicy(ctx, policyID, kibana.AgentPolicyUpdateRequest{
+		Name:        policy.Name,
+		Namespace:   policy.Namespace,
+		Description: fmt.Sprintf("%s (%s at %s)", policy.Description, reason, time.Now().UTC().Format(time.RFC3339)),
+	})
+	require.NoError(t, err, "could not bump the agent policy revision")
 }
 
 func updateAgentTagsFleet(ctx context.Context, info *define.Info, agentID string, tags []string) error {

@@ -94,14 +94,17 @@ func TestEnrollReplaceToken(t *testing.T) {
 		t.Fatalf("failed uninstalling the agent: %s", err)
 	}
 
-	// Wait for Agent to be offline
-	require.Eventually(
-		t,
-		check.FleetAgentStatus(ctx, t, info.KibanaClient, agentID, "offline"),
-		10*time.Minute,
-		10*time.Second,
-		"Elastic Agent status didn't go offline",
-	)
+	// The uninstall skipped the Fleet audit, so Fleet still knows the agent as an
+	// enrolled agent: it must not have been unenrolled, marked as uninstalled or
+	// deactivated. Checking this directly, instead of waiting for Fleet to report
+	// the agent offline, saves the ~6 minutes Fleet takes to consider an agent
+	// offline (check-in long poll timeout plus margin), and re-enrolling with a
+	// replace token does not depend on the agent being offline.
+	agent, err := info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+	require.NoError(t, err, "failed getting the agent from Fleet after uninstall")
+	require.True(t, agent.Active, "agent should still be active in Fleet after an uninstall that skipped the Fleet audit")
+	require.NotContains(t, []string{"uninstalled", "orphaned", "unenrolled", "unenrolling", "inactive"}, agent.Status,
+		"agent should not have been unenrolled or marked uninstalled by an uninstall that skipped the Fleet audit")
 
 	// Using a clean fixture to ensure that no previous state is used
 	// re-enroll again and ensure that it all works again.
@@ -116,7 +119,13 @@ func TestEnrollReplaceToken(t *testing.T) {
 
 	t.Logf(">>> Enroll succeeded again. Output: %s", output)
 
-	// Wait for Agent to be healthy
+	// Wait for the re-enrolled Agent to be healthy and connected to Fleet. This is
+	// checked from the agent itself: Fleet keeps reporting the agent ID online for
+	// several minutes after the previous installation stopped checking in, so its
+	// status alone would not prove that the new enrollment works.
+	require.Eventuallyf(t, func() bool {
+		return waitForAgentAndFleetHealthy(ctx, t, fixture)
+	}, 2*time.Minute, time.Second, "re-enrolled agent never became healthy or connected to Fleet")
 	require.Eventually(
 		t,
 		check.FleetAgentStatus(ctx, t, info.KibanaClient, agentID, "online"),
