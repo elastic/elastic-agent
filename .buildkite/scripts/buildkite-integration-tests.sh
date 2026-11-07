@@ -6,6 +6,25 @@ source "$(dirname "$0")/retry.sh"
 GROUP_NAME=$1
 TEST_SUDO=$2
 
+# A matrix variant may carry a shard suffix, "<group>@<i>of<n>" (for example
+# "default@0of2"): the group's tests are then split across n jobs by a stable
+# hash of the test name and this job runs shard i. See the "Test group" section
+# of docs/test-framework-dev-guide.md. The suffix is stripped from the group
+# name passed to -integration.groups and turned into -integration.shard=<i>/<n>;
+# it is kept in the result file names so the shards' reports don't collide.
+TEST_SHARD_FLAG=()
+shard_suffix=""
+if [[ "${GROUP_NAME}" == *@* ]]; then
+  shard_spec="${GROUP_NAME#*@}"
+  GROUP_NAME="${GROUP_NAME%%@*}"
+  if [[ ! "${shard_spec}" =~ ^([0-9]+)of([0-9]+)$ ]]; then
+    echo "Error: invalid shard suffix '@${shard_spec}', expected '<group>@<index>of<count>'" >&2
+    exit 1
+  fi
+  TEST_SHARD_FLAG=("-integration.shard=${BASH_REMATCH[1]}/${BASH_REMATCH[2]}")
+  shard_suffix="-shard${shard_spec}"
+fi
+
 # Set default TEST_PACKAGE if not already defined in env or argument
 : "${TEST_PACKAGE:="github.com/elastic/elastic-agent/testing/integration"}"
 
@@ -54,11 +73,11 @@ root_suffix=""
 if [ "$TEST_SUDO" == "true" ]; then
   root_suffix="_sudo"
 fi
-fully_qualified_group_name="${GROUP_NAME}${root_suffix}_${os_data}"
+fully_qualified_group_name="${GROUP_NAME}${shard_suffix}${root_suffix}_${os_data}"
 outputXML="build/${fully_qualified_group_name}.integration.xml"
 outputJSON="build/${fully_qualified_group_name}.integration.out.json"
 
-echo "~~~ Integration tests: ${GROUP_NAME}"
+echo "~~~ Integration tests: ${GROUP_NAME}${shard_suffix:+ (${TEST_SHARD_FLAG[*]})}"
 # -test.timeout=2h0m0s is set because some tests normally take up to 45 minutes.
 # This 2-hour timeout provides enough room for future, potentially longer tests,
 # while still enforcing a reasonable upper limit on total execution time.
@@ -68,7 +87,7 @@ GOTEST_OPTS="-test.shuffle on -test.timeout 2h0m0s"
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
   GOTEST_OPTS="${GOTEST_OPTS} -test.short"
 fi
-GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
+GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}" "${TEST_SHARD_FLAG[@]}")
 set +e
 AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
   gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- "${GOTEST_ARGS[@]}"
