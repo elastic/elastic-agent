@@ -25,8 +25,8 @@ export GITHUB_TOKEN="ghp_your_token_here"
 For feature freeze, `CURRENT_RELEASE` must already match `version/version.go` on
 `BASE_BRANCH` (typically `main`) before the workflow runs.
 
-For patch releases, `CURRENT_RELEASE` must already match `version/version.go`
-on the release branch (set by the previous cycle's next-patch PR).
+For patch releases, `CURRENT_RELEASE` is the version to land (`NEW_VERSION`); the
+release branch must already be at the previous patch on the same line.
 
 ## Feature freeze — `mage release:runMajorMinor`
 
@@ -65,27 +65,26 @@ mage release:runMajorMinor
 
 ## Patch release — `mage release:runPatch`
 
-Creates **2 merge-ordered PRs** on the release branch.
+Opens **1 PR**: post-release version bump to `CURRENT_RELEASE` (plus Helm/K8s
+manifests). Docs stay off this path (aligned with ingest-dev#10200).
 
-Example: branch `9.4` already has `version/version.go` at `9.4.3` →
-`CURRENT_RELEASE=9.4.3`, next patch `9.4.4`.
+Example: branch `9.4` is at `9.4.3` → `CURRENT_RELEASE=9.4.4` (version to land).
 
 | Step | Target | Branch | Merge label | What changes |
 |------|--------|--------|-------------|--------------|
-| **PR-A** | `9.4` | `patch-release-9.4.3` | `merge:1-before-build` | docs + `:stack-version:` only (no `version.go` bump) |
-| **PR-B** | `9.4` | `ff-prep-next-patch-9.4.4` | `merge:4-after-release` | next patch `version.go` + Helm/K8s manifests + `mage update` |
+| **bump** | `9.4` | `update-version-9.4.4` | `merge:4-after-release` | `version.go` → CURRENT + Helm/K8s + `mage update` |
 
 ```bash
 export PROJECT_OWNER="your-user"
 export GITHUB_TOKEN=$(gh auth token)
 export DRY_RUN=true
-export CURRENT_RELEASE="9.4.3"
+export CURRENT_RELEASE="9.4.4"
 
 git fetch origin 9.4:9.4
 mage release:runPatch
 
 # Expect local branches:
-#   patch-release-9.4.3, ff-prep-next-patch-9.4.4
+#   update-version-9.4.4
 ```
 
 ## Individual Commands
@@ -105,7 +104,7 @@ mage -l | grep release
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `CURRENT_RELEASE` | ✓ | - | Version to release (e.g., `9.5.0`) |
+| `CURRENT_RELEASE` | ✓ | - | FF: version on base; patch: version to land (`NEW_VERSION`) |
 | `GITHUB_TOKEN` | ✓* | - | GitHub token (*not required in `DRY_RUN`) |
 | `DRY_RUN` | | `false` | Preview mode (skip push/PR) |
 | `BASE_BRANCH` | | `main` | Base branch for mainline PRs |
