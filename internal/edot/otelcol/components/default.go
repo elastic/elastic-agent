@@ -125,6 +125,7 @@ import (
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
+	"github.com/elastic/elastic-agent/internal/edot/extensions/awsidentityfederationextension"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
@@ -308,6 +309,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			azureencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 			awscredentialsproviderextension.NewFactory(),
+			awsidentityfederationextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
