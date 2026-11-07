@@ -6,6 +6,7 @@ package release
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -497,12 +498,98 @@ func TestGetCurrentBranch(t *testing.T) {
 	}
 }
 
+func TestGitHTTPSAuthExtraHeader(t *testing.T) {
+	got := gitHTTPSAuthExtraHeader("test-token")
+	wantPrefix := "Authorization: Basic "
+	if !strings.HasPrefix(got, wantPrefix) {
+		t.Fatalf("gitHTTPSAuthExtraHeader() = %q, want prefix %q", got, wantPrefix)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got, wantPrefix))
+	if err != nil {
+		t.Fatalf("decode auth payload: %v", err)
+	}
+	if string(decoded) != "x-access-token:test-token" {
+		t.Fatalf("auth payload = %q, want %q", decoded, "x-access-token:test-token")
+	}
+	if strings.Contains(got, "Bearer") {
+		t.Fatalf("gitHTTPSAuthExtraHeader() must not use Bearer: %q", got)
+	}
+}
+
+func TestGitPushEnv(t *testing.T) {
+	env := gitPushEnv([]string{"PATH=/usr/bin"}, "test-token")
+	wantHeader := gitHTTPSAuthExtraHeader("test-token")
+	got := map[string]string{}
+	for _, entry := range env {
+		key, value, ok := strings.Cut(entry, "=")
+		if !ok {
+			t.Fatalf("malformed env entry %q", entry)
+		}
+		got[key] = value
+	}
+	if got["PATH"] != "/usr/bin" {
+		t.Fatalf("PATH = %q, want /usr/bin", got["PATH"])
+	}
+	if got["GIT_CONFIG_COUNT"] != "1" {
+		t.Fatalf("GIT_CONFIG_COUNT = %q, want 1", got["GIT_CONFIG_COUNT"])
+	}
+	if got["GIT_CONFIG_KEY_0"] != "http.extraHeader" {
+		t.Fatalf("GIT_CONFIG_KEY_0 = %q, want http.extraHeader", got["GIT_CONFIG_KEY_0"])
+	}
+	if got["GIT_CONFIG_VALUE_0"] != wantHeader {
+		t.Fatalf("GIT_CONFIG_VALUE_0 = %q, want %q", got["GIT_CONFIG_VALUE_0"], wantHeader)
+	}
+}
+
 func TestPushRequiresToken(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
 	err := gitRepo.Push("origin", "")
 	if err == nil {
 		t.Error("Push() should fail without a token, got nil error")
+	}
+}
+
+func TestPushRequiresOriginRemote(t *testing.T) {
+	gitRepo, _ := createTestRepo(t)
+
+	err := gitRepo.Push("upstream", "test-token")
+	if err == nil {
+		t.Fatal("Push() should reject non-origin remotes")
+	}
+	if !strings.Contains(err.Error(), "only supports origin") {
+		t.Fatalf("Push() error = %v, want origin restriction", err)
+	}
+}
+
+func TestPushToLocalRemote(t *testing.T) {
+	gitRepo, workDir := createTestRepo(t)
+
+	bareDir := t.TempDir()
+	if _, err := git.PlainInit(bareDir, true); err != nil {
+		t.Fatalf("failed to init bare remote: %v", err)
+	}
+	remoteURL := "file://" + bareDir
+	if err := gitRepo.SetRemoteURL("origin", remoteURL); err != nil {
+		t.Fatalf("SetRemoteURL() error = %v", err)
+	}
+
+	branch := "release-9.6"
+	if err := gitRepo.CreateBranch(branch); err != nil {
+		t.Fatalf("CreateBranch() error = %v", err)
+	}
+	if err := gitRepo.CheckoutBranch(branch); err != nil {
+		t.Fatalf("CheckoutBranch() error = %v", err)
+	}
+
+	// Token is unused for file:// remotes but required by Push.
+	if err := gitRepo.Push("origin", "test-token"); err != nil {
+		t.Fatalf("Push() error = %v", err)
+	}
+
+	remoteHeads := runGit(t, workDir, "ls-remote", "--heads", "origin", branch)
+	if !strings.Contains(remoteHeads, "refs/heads/"+branch) {
+		t.Fatalf("Push() did not create remote branch %s; ls-remote:\n%s", branch, remoteHeads)
 	}
 }
 
