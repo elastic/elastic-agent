@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -20,10 +22,30 @@ import (
 const (
 	FlavorBasic   = "basic"
 	FlavorServers = "servers"
+	FlavorEDR     = release.FlavorEDR
 
-	DefaultFlavor  = FlavorBasic
-	flavorFileName = ".flavor"
+	DefaultFlavor = FlavorBasic
 )
+
+// FlavorForInstall returns the flavor to install. A build of a dedicated flavor
+// (such as edr) always installs that flavor and cannot install another one.
+// Otherwise the flavor is selected by installServers.
+func FlavorForInstall(installServers bool) (string, error) {
+	return flavorForInstall(release.Flavor(), installServers)
+}
+
+func flavorForInstall(builtFlavor string, installServers bool) (string, error) {
+	if builtFlavor != "" {
+		if installServers {
+			return "", fmt.Errorf("installing the servers flavor is not supported by the %s flavor of Elastic Agent", builtFlavor)
+		}
+		return builtFlavor, nil
+	}
+	if installServers {
+		return FlavorServers, nil
+	}
+	return DefaultFlavor, nil
+}
 
 type SkipFn func(relPath string) bool
 
@@ -35,7 +57,7 @@ type FlavorDefinition struct {
 }
 
 func UsedFlavor(topPath, defaultFlavor string) (string, error) {
-	filename := filepath.Join(topPath, flavorFileName)
+	filename := filepath.Join(topPath, paths.FlavorFileName)
 	content, err := os.ReadFile(filename)
 	if err != nil {
 		// file does not exist, flavor was not marked probably due to earlier version
@@ -188,7 +210,7 @@ func skipComponentsPath(relPath string, allowedSubpaths []string) bool {
 // markFlavor persists flavor used with agent.
 // This mark is used during upgrades in order to upgrade to proper set.
 func markFlavor(topPath string, flavor string) error {
-	filename := filepath.Join(topPath, flavorFileName)
+	filename := filepath.Join(topPath, paths.FlavorFileName)
 	if err := os.WriteFile(filename, []byte(flavor), 0o600); err != nil {
 		return fmt.Errorf("failed marking flavor: %w", err)
 	}

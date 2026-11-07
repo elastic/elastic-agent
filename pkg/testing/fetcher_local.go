@@ -19,6 +19,7 @@ type localFetcher struct {
 	dir          string
 	snapshotOnly bool
 	fipsOnly     bool
+	flavor       string
 }
 
 type LocalFetcherOpt func(f *localFetcher)
@@ -34,6 +35,14 @@ func WithLocalSnapshotOnly() LocalFetcherOpt {
 func WithLocalFIPSOnly() LocalFetcherOpt {
 	return func(f *localFetcher) {
 		f.fipsOnly = true
+	}
+}
+
+// WithLocalFlavor sets the LocalFetcher to only pull the build of a flavor that is built as
+// its own distribution, such as "edr".
+func WithLocalFlavor(flavor string) LocalFetcherOpt {
+	return func(f *localFetcher) {
+		f.flavor = flavor
 	}
 }
 
@@ -56,6 +65,9 @@ func (f *localFetcher) Name() string {
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
 func (f *localFetcher) Fetch(_ context.Context, operatingSystem string, architecture string, version string, packageFormat string) (FetcherResult, error) {
 	prefix := GetPackagePrefix(f.fipsOnly)
+	if f.flavor != "" {
+		prefix = f.flavor + "-" + prefix
+	}
 	suffix, err := GetPackageSuffix(operatingSystem, architecture, packageFormat)
 	if err != nil {
 		return nil, err

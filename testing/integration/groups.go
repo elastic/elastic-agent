@@ -80,6 +80,10 @@ const (
 	// which alone takes as long as the rest of FleetEndpointSecurity. Split out to keep CI groups short.
 	FleetEndpointSecurityMTLS = "fleet-endpoint-security-mtls"
 
+	// FleetEDR group of tests. Used for the tests of the EDR flavor of the Elastic Agent, which needs
+	// the EDR packages to be built (FLAVOR=edr) and available to the tests.
+	FleetEDR = "fleet-edr"
+
 	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
 	ECHDeployment = "ech-deployment"
 

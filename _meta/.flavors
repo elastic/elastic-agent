@@ -11,3 +11,6 @@ servers:
   - fleet-server
   - pf-elastic-symbolizer
   - pf-elastic-collector
+edr:
+  - elastic-otel-collector
+  - endpoint-security

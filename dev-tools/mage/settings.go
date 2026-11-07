@@ -48,6 +48,12 @@ const (
 	ManifestUrlEnvVar = "MANIFEST_URL"
 	// AgentCoreProjectName is the project name for elastic-agent-core in the build manifest.
 	AgentCoreProjectName = "elastic-agent-core"
+	// AgentEDRCoreProjectName is the project name for the EDR flavor core artifact.
+	AgentEDRCoreProjectName = "elastic-agent-edr-core"
+	// FlavorBasic is the standard flavor, built as the default elastic-agent distribution.
+	FlavorBasic = "basic"
+	// FlavorEDR is the EDR flavor, built as its own distribution.
+	FlavorEDR = "edr"
 	// AgentCommitHashEnvVar allows to override agent commit hash string during packaging
 
 	// Mapped functions
@@ -1201,6 +1207,10 @@ type CrossBuildSettings struct {
 	// DockerVariants is the comma-separated list of Docker variants (from DOCKER_VARIANTS env var)
 	DockerVariants string
 
+	// Flavors is the comma-separated list of flavors to build (from FLAVOR env var).
+	// Accepted values: "basic", "edr". Defaults to "basic" when unset.
+	Flavors string
+
 	// DevOS is the target OS for config generation (from DEV_OS env var, default "linux")
 	DevOS string
 
@@ -1626,6 +1636,9 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 	}
 	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
 		s.CrossBuild.DockerVariants = v
+	}
+	if v := os.Getenv("FLAVOR"); v != "" {
+		s.CrossBuild.Flavors = v
 	}
 	if v := os.Getenv("DEV_OS"); v != "" {
 		s.CrossBuild.DevOS = v
@@ -2072,6 +2085,20 @@ func (s *Settings) GetDockerVariants() []DockerVariant {
 		}
 	}
 	return variants
+}
+
+// GetFlavors returns the flavors to build, parsed from the FLAVOR env var.
+// Defaults to ["basic"] when unset.
+func (s *Settings) GetFlavors() []string {
+	v := s.CrossBuild.Flavors
+	if v == "" {
+		return []string{FlavorBasic}
+	}
+	flavors := strings.Split(v, ",")
+	for i := range flavors {
+		flavors[i] = strings.TrimSpace(flavors[i])
+	}
+	return flavors
 }
 
 // IsPackageTypeSelected returns true if SelectedPackageTypes is empty or if
