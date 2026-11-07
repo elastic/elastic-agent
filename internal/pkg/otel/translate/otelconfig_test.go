@@ -2898,6 +2898,90 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 	}
 }
 
+func TestGetOtelConfigElasticsearchFailover(t *testing.T) {
+	failoverOutput := map[string]any{
+		"hosts":       []any{"localhost:9200", "localhost:9201"},
+		"loadbalance": false,
+	}
+	model := &component.Model{Components: []component.Component{
+		testFilebeatComp("filestream-default", "default", failoverOutput),
+		testFilebeatComp("log-default", "default", failoverOutput),
+	}}
+	conf, err := GetOtelConfig(model, logp.NewNopLogger())
+	require.NoError(t, err)
+	m := conf.ToStringMap()
+
+	// Only the per-host fields of the exporters are compared, the rest matches a single host exporter.
+	exporters := map[string]any{}
+	for id, cfg := range m["exporters"].(map[string]any) {
+		exporterCfg := cfg.(map[string]any)
+		exporters[id] = map[string]any{
+			"endpoints":     exporterCfg["endpoints"],
+			"sending_queue": exporterCfg["sending_queue"],
+		}
+	}
+	assert.Equal(t, map[string]any{
+		"elasticsearch/_agent-component/default/1": map[string]any{
+			"endpoints":     []string{"http://localhost:9200"},
+			"sending_queue": map[string]any{"enabled": false},
+		},
+		"elasticsearch/_agent-component/default/2": map[string]any{
+			"endpoints":     []string{"http://localhost:9201"},
+			"sending_queue": map[string]any{"enabled": false},
+		},
+	}, exporters)
+
+	// A single connector and a single pipeline per host are shared by all components using the output.
+	assert.Equal(t, map[string]any{
+		"failover/_agent-component/default": map[string]any{
+			"priority_levels": [][]string{
+				{"logs/_agent-component/default/1"},
+				{"logs/_agent-component/default/2"},
+			},
+			"retry_interval": time.Minute,
+			"condition": map[string]any{
+				"error": map[string]any{
+					"contains": []string{"failed to execute the request"},
+				},
+			},
+			"sending_queue": map[string]any{
+				"enabled":           true,
+				"queue_size":        6400,
+				"num_consumers":     2,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
+				"batch": map[string]any{
+					"flush_timeout": "10s",
+					"max_size":      1600,
+					"min_size":      1600,
+					"sizer":         "items",
+				},
+			},
+		},
+	}, m["connectors"])
+
+	assert.Equal(t, map[string]any{
+		"logs/_agent-component/filestream-default": map[string][]string{
+			"receivers":  {"filebeatreceiver/_agent-component/filestream-default/input-test-1"},
+			"processors": {"beat/_agent-component/filestream-default"},
+			"exporters":  {"failover/_agent-component/default"},
+		},
+		"logs/_agent-component/log-default": map[string][]string{
+			"receivers":  {"filebeatreceiver/_agent-component/log-default/input-test-1"},
+			"processors": {"beat/_agent-component/log-default"},
+			"exporters":  {"failover/_agent-component/default"},
+		},
+		"logs/_agent-component/default/1": map[string][]string{
+			"receivers": {"failover/_agent-component/default"},
+			"exporters": {"elasticsearch/_agent-component/default/1"},
+		},
+		"logs/_agent-component/default/2": map[string][]string{
+			"receivers": {"failover/_agent-component/default"},
+			"exporters": {"elasticsearch/_agent-component/default/2"},
+		},
+	}, m["service"].(map[string]any)["pipelines"])
+}
+
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 	filebeatComp := testFilebeatComp("filestream-default", "default")
 
@@ -4457,6 +4541,24 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 	}
 }
 
+// translateExporterConfig runs the given exporter translation function and returns
+// the exporter config stored under the expected exporter ID.
+func translateExporterConfig(
+	translate exporterConfigTranslationFunc,
+	exporterType string,
+	cfg *config.C,
+	outputName string,
+	logger *logp.Logger,
+) (map[string]any, map[string]any, map[string]any, error) {
+	translated, err := translate(cfg, outputName, logger)
+	if err != nil {
+		return nil, translated.Processors, translated.Extensions, err
+	}
+	exporterID := GetExporterID(otelcomponent.MustNewType(exporterType), outputName).String()
+	exporterCfg, _ := translated.Exporters[exporterID].(map[string]any)
+	return exporterCfg, translated.Processors, translated.Extensions, nil
+}
+
 func TestUnitToExporterConfig(t *testing.T) {
 	logger := logp.NewNopLogger()
 	esExporterType := otelcomponent.MustNewType("elasticsearch")
@@ -4467,14 +4569,14 @@ func TestUnitToExporterConfig(t *testing.T) {
 	originalConfigTranslationFuncForExporter := configTranslationFuncForExporter
 	defer func() { configTranslationFuncForExporter = originalConfigTranslationFuncForExporter }()
 	configTranslationFuncForExporter = map[otelcomponent.Type]exporterConfigTranslationFunc{
-		esExporterType: func(c *config.C, _ string, l *logp.Logger) (map[string]any, map[string]any, map[string]any, error) {
+		esExporterType: func(c *config.C, outputName string, l *logp.Logger) (TranslatedOutput, error) {
 			if c.HasField("unsupported") {
-				return nil, nil, nil, errors.New("unsupported config")
+				return TranslatedOutput{}, errors.New("unsupported config")
 			}
 			// Simple translation for testing purposes
 			cfgMap := make(map[string]any)
 			if err := c.Unpack(&cfgMap); err != nil {
-				return nil, nil, nil, err
+				return TranslatedOutput{}, err
 			}
 
 			cfgMap["translated"] = true
@@ -4487,13 +4589,16 @@ func TestUnitToExporterConfig(t *testing.T) {
 			// return extension config
 			beatsAuthCfg, err := getBeatsAuthExtensionConfig(c)
 			if err != nil {
-				return nil, nil, nil, err
+				return TranslatedOutput{}, err
 			}
 
 			extensionConfig := make(map[string]any)
 			extensionConfig[getBeatsAuthExtensionID("default").String()] = beatsAuthCfg
 
-			return cfgMap, nil, extensionConfig, nil
+			exporterCfg := map[string]any{
+				GetExporterID(esExporterType, outputName).String(): cfgMap,
+			}
+			return TranslatedOutput{Exporters: exporterCfg, Extensions: extensionConfig}, nil
 		},
 		kafkaExporterType: KafkaToOTelConfig,
 	}
@@ -4910,7 +5015,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				fbfeatures.ReinitForTest()
 			}
 
-			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
+			translated, queueSettings, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
@@ -4919,11 +5024,13 @@ func TestUnitToExporterConfig(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedExporterCfg, exportersCfg)
+			exporterID := GetExporterID(tt.exporterType, tt.outputName).String()
+			require.Len(t, translated.Exporters, 1, "expected a single exporter config")
+			assert.Equal(t, tt.expectedExporterCfg, translated.Exporters[exporterID], "exporter config should be keyed by %s", exporterID)
 			assert.Equal(t, tt.expectedQueueSettings, queueSettings)
-			assert.Equal(t, tt.expectedExtensionCfg, extensionCfg)
-			if processorConfig != nil {
-				assert.Equal(t, 1, len(processorConfig))
+			assert.Equal(t, tt.expectedExtensionCfg, translated.Extensions)
+			if translated.Processors != nil {
+				assert.Equal(t, 1, len(translated.Processors))
 			}
 		})
 	}

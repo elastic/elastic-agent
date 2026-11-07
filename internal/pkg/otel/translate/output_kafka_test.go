@@ -241,7 +241,7 @@ broker_timeout: 20s`,
 		t.Run(testc.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(testc.input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, _, _, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+			gotMap, _, _, err := translateExporterConfig(KafkaToOTelConfig, "kafka", cfg, "default", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 			require.Equal(t, testc.expectedMap, gotMap)
 		})
@@ -280,7 +280,7 @@ compression: %s
 `, tc.compression)
 			cfg, err := config.NewConfigFrom(input)
 			require.NoError(t, err, "error creating kafka config")
-			gotMap, _, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			gotMap, _, _, err := translateExporterConfig(KafkaToOTelConfig, "kafka", cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
 			producer, ok := gotMap["producer"].(map[string]any)
@@ -434,7 +434,7 @@ ssl:
 		t.Run(test.name, func(t *testing.T) {
 			cfg, err := config.NewConfigFrom(test.input)
 			require.NoError(t, err)
-			_, _, _, err = KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			_, err = KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.ErrorIs(t, err, errors.ErrUnsupported)
 		})
 	}

@@ -7,6 +7,8 @@ package translate
 import (
 	"fmt"
 
+	otelcomponent "go.opentelemetry.io/collector/component"
+
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/logstash"
 	"github.com/elastic/elastic-agent-libs/config"
@@ -19,22 +21,26 @@ type logstashOutputConfig struct {
 }
 
 // LogstashToOTelConfig converts a Beat config into logstash exporter config
-func LogstashToOTelConfig(output *config.C, _ string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
+func LogstashToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (TranslatedOutput, error) {
 	logstashConfig := logstashOutputConfig{
 		Config: logstash.DefaultConfig(),
 	}
 
 	// unpack and validate lsConfig
 	if err := output.Unpack(&logstashConfig); err != nil {
-		return nil, nil, nil, fmt.Errorf("failed unpacking config. %w", err)
+		return TranslatedOutput{}, fmt.Errorf("failed unpacking config. %w", err)
 	}
 
 	// convert logstash config into a map
 	var finalMap map[string]any
 	lsConfig := config.MustNewConfigFrom(logstashConfig)
 	if err := lsConfig.Unpack(&finalMap); err != nil {
-		return nil, nil, nil, fmt.Errorf("error translating logstash config %w", err)
+		return TranslatedOutput{}, fmt.Errorf("error translating logstash config %w", err)
 	}
 
-	return finalMap, nil, nil, nil
+	exporterCfg := map[string]any{
+		GetExporterID(otelcomponent.MustNewType("logstash"), outputName).String(): finalMap,
+	}
+
+	return TranslatedOutput{Exporters: exporterCfg}, nil
 }
