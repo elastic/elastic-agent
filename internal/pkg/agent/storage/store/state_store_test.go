@@ -5,7 +5,10 @@
 package store
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -356,7 +359,7 @@ func runTestStateStore(t *testing.T, ackToken string) {
 		require.NoError(t, store.SaveAction(newActionPolicyChange("tag-a", "tag-b")))
 		want := newActionPolicyChange("tag-c")
 		require.NoError(t, store.SaveAction(want))
-		require.Equal(t, want, store.Action(), "in-memory action should be the last saved action")
+		require.Equal(t, compactPolicyChange(want), store.Action(), "in-memory action should be the last saved action, compacted")
 
 		s, err = storage.NewDiskStore(storePath)
 		require.NoError(t, err, "failed creating DiskStore")
@@ -792,6 +795,137 @@ func TestStateStorePendingAckAction(t *testing.T) {
 		store := newStore(t, path)
 		assert.Nil(t, store.PendingAckAction())
 		assert.Equal(t, "tok", store.AckToken())
+	})
+}
+
+func TestStateStoreSaveActionCompactsPolicyChange(t *testing.T) {
+	log, _ := loggertest.New("state_store_compact")
+
+	newStore := func(t *testing.T, path string) *StateStore {
+		s, err := storage.NewDiskStore(path)
+		require.NoError(t, err, "failed creating DiskStore")
+		store, err := NewStateStore(log, s)
+		require.NoError(t, err)
+		return store
+	}
+	readFile := func(t *testing.T, path string) []byte {
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		return data
+	}
+	// marshalFull returns what the store wrote before the policy was compacted:
+	// st with the full action marshalled again.
+	marshalFull := func(t *testing.T, st state, a fleetapi.Action) []byte {
+		st.ActionSerializer = actionSerializer{Action: a}
+		data, err := json.Marshal(&st)
+		require.NoError(t, err)
+		return data
+	}
+	newPolicyChange := func() *fleetapi.ActionPolicyChange {
+		return &fleetapi.ActionPolicyChange{
+			ActionID:   "policy:p1:2:1",
+			ActionType: fleetapi.ActionTypePolicyChange,
+			Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
+				"id":       "p1",
+				"revision": 2.0,
+				"inputs": []interface{}{map[string]interface{}{
+					"id":      "i1",
+					"streams": []interface{}{map[string]interface{}{"urls": "https://example.com/?a=1&b=<2>"}},
+				}},
+			}},
+		}
+	}
+
+	t.Run("keeps a compact policy in memory and the full policy on disk", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "state.json")
+		store := newStore(t, path)
+		action := newPolicyChange()
+
+		require.NoError(t, store.SaveAction(action))
+		assert.Contains(t, action.Data.Policy, "inputs", "the caller's action must not be modified")
+
+		inMemory, ok := store.Action().(*fleetapi.ActionPolicyChange)
+		require.True(t, ok)
+		assert.Equal(t, "policy:p1:2:1", inMemory.ID())
+		assert.Equal(t, fleetapi.ActionTypePolicyChange, inMemory.Type())
+		assert.Equal(t, "p1", inMemory.PolicyID())
+		assert.Equal(t, int64(2), inMemory.PolicyRevisionIDX())
+		assert.Equal(t, map[string]interface{}{"id": "p1", "revision": 2.0}, inMemory.Data.Policy)
+		assert.NotContains(t, fmt.Sprintf("%+v", store.state), "raw:",
+			"the state logged by Save must not dump the persisted policy")
+
+		assert.Equal(t, string(marshalFull(t, store.state, action)), string(readFile(t, path)),
+			"persisted bytes must be the same as for the full action")
+		assert.Equal(t, action, newStore(t, path).Action())
+	})
+
+	t.Run("later saves write the full policy without a new action", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "state.json")
+		store := newStore(t, path)
+		action := newPolicyChange()
+
+		require.NoError(t, store.SaveAction(action))
+		first := readFile(t, path)
+
+		// SetQueue marks the store dirty without changing what is persisted.
+		store.SetQueue(nil)
+		require.NoError(t, store.Save())
+		assert.Equal(t, string(first), string(readFile(t, path)))
+
+		store.SetAckToken("new-token")
+		require.NoError(t, store.Save())
+		assert.Equal(t, string(marshalFull(t, store.state, action)), string(readFile(t, path)))
+
+		reloaded := newStore(t, path)
+		assert.Equal(t, action, reloaded.Action())
+		assert.Equal(t, "new-token", reloaded.AckToken())
+	})
+
+	t.Run("SetAction replaces a compacted policy", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "state.json")
+		store := newStore(t, path)
+		require.NoError(t, store.SaveAction(newPolicyChange()))
+
+		unenroll := &fleetapi.ActionUnenroll{ActionID: "u1", ActionType: fleetapi.ActionTypeUnenroll}
+		store.SetAction(unenroll)
+		require.NoError(t, store.Save())
+
+		assert.Equal(t, unenroll, store.Action())
+		assert.Equal(t, unenroll, newStore(t, path).Action())
+	})
+
+	t.Run("non policy change actions are kept as is", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), "state.json")
+		store := newStore(t, path)
+		unenroll := &fleetapi.ActionUnenroll{ActionID: "u1", ActionType: fleetapi.ActionTypeUnenroll}
+
+		require.NoError(t, store.SaveAction(unenroll))
+		assert.Same(t, unenroll, store.Action())
+		assert.Nil(t, store.state.ActionSerializer.raw)
+		assert.Equal(t, string(marshalFull(t, store.state, unenroll)), string(readFile(t, path)))
+	})
+
+	t.Run("loads a state file written by 9.7.0 and saves it unchanged", func(t *testing.T) {
+		// Written by the state store before policy changes were compacted.
+		fixture, err := os.ReadFile(filepath.Join("testdata", "9.7.0-state_policy_change.json"))
+		require.NoError(t, err)
+		path := filepath.Join(t.TempDir(), "state.json")
+		s, err := storage.NewDiskStore(path)
+		require.NoError(t, err)
+		require.NoError(t, s.Save(bytes.NewReader(fixture)))
+
+		store := newStore(t, path)
+		loaded, ok := store.Action().(*fleetapi.ActionPolicyChange)
+		require.True(t, ok)
+		assert.Equal(t, "p1", loaded.PolicyID())
+		assert.Equal(t, int64(7), loaded.PolicyRevisionIDX())
+		assert.Contains(t, loaded.Data.Policy, "inputs", "a policy loaded from disk is complete")
+		assert.Equal(t, "ack-token-1", store.AckToken())
+
+		// Re-applying the restored policy on startup saves it again.
+		require.NoError(t, store.SaveAction(loaded))
+		assert.Equal(t, string(fixture), string(readFile(t, path)))
+		assert.NotContains(t, store.Action().(*fleetapi.ActionPolicyChange).Data.Policy, "inputs")
 	})
 }
 

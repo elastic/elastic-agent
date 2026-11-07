@@ -63,6 +63,9 @@ type actionSerializer struct {
 	json.Unmarshaler
 
 	Action fleetapi.Action
+	// raw, when set, is the persisted JSON of the action and Action is only a
+	// compacted copy of it. See SaveAction.
+	raw json.RawMessage
 }
 
 // actionQueue stores scheduled actions to be executed and the type is needed
@@ -192,7 +195,7 @@ func (s *StateStore) SetAction(a fleetapi.Action) {
 			return
 		}
 		s.dirty = true
-		s.state.ActionSerializer.Action = a
+		s.state.ActionSerializer = actionSerializer{Action: a}
 	default:
 		s.log.Debugw("trying to set invalid action type on the state store, ignoring the action",
 			"action.type", a.Type(),
@@ -334,6 +337,13 @@ func (s *StateStore) Queue() []fleetapi.ScheduledAction {
 // SaveAction atomically persists the action to disk and, on success, updates
 // the in-memory state. Concurrent reads always observe either the old or the
 // new action — never a partially committed state.
+//
+// An ActionPolicyChange is persisted in full, but only its action ID, type and
+// policy id and revision are kept in memory: the policy has already been
+// applied when it is saved, and the decoded policy is several times larger than
+// its JSON. Its JSON is kept and reused by later saves, so the bytes written to
+// disk are the same as for the full action. Load the store from disk to get the
+// full policy back.
 func (s *StateStore) SaveAction(a fleetapi.Action) error {
 	if isNilAction(a) {
 		return fmt.Errorf("cannot save nil action")
@@ -345,12 +355,21 @@ func (s *StateStore) SaveAction(a fleetapi.Action) error {
 		return fmt.Errorf("incompatible action type %T, expected ActionPolicyChange or ActionUnenroll", a)
 	}
 
+	next := actionSerializer{Action: a}
+	if pc, ok := a.(*fleetapi.ActionPolicyChange); ok {
+		raw, err := json.Marshal(pc)
+		if err != nil {
+			return fmt.Errorf("could not marshal action: %w", err)
+		}
+		next = actionSerializer{Action: compactPolicyChange(pc), raw: raw}
+	}
+
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
 	// tmp is a shallow copy; safe because the write lock is held throughout.
 	tmp := s.state
-	tmp.ActionSerializer.Action = a
+	tmp.ActionSerializer = next
 	reader, err := jsonToReader(&tmp)
 	if err != nil {
 		return fmt.Errorf("could not marshal state: %w", err)
@@ -359,12 +378,29 @@ func (s *StateStore) SaveAction(a fleetapi.Action) error {
 		return err
 	}
 
-	s.state.ActionSerializer.Action = a
+	s.state.ActionSerializer = next
 	s.dirty = false
 	return nil
 }
 
+// compactPolicyChange returns a copy of pc whose policy holds only the "id"
+// and "revision" keys, which is all the check-in needs.
+func compactPolicyChange(pc *fleetapi.ActionPolicyChange) *fleetapi.ActionPolicyChange {
+	policy := map[string]interface{}{}
+	for _, key := range []string{"id", "revision"} {
+		if v, ok := pc.Data.Policy[key]; ok {
+			policy[key] = v
+		}
+	}
+	return &fleetapi.ActionPolicyChange{
+		ActionID:   pc.ActionID,
+		ActionType: pc.ActionType,
+		Data:       fleetapi.ActionPolicyChangeData{Policy: policy},
+	}
+}
+
 // Action the action to execute. See SetAction for the possible action types.
+// An ActionPolicyChange stored with SaveAction is compacted, see SaveAction.
 func (s *StateStore) Action() fleetapi.Action {
 	s.mx.RLock()
 	defer s.mx.RUnlock()
@@ -383,7 +419,18 @@ func (s *StateStore) AckToken() string {
 	return s.state.AckToken
 }
 
+// String keeps raw out of the state printed by Save's debug log.
+func (as actionSerializer) String() string {
+	if as.Action == nil {
+		return "<nil>"
+	}
+	return as.Action.String()
+}
+
 func (as *actionSerializer) MarshalJSON() ([]byte, error) {
+	if as.raw != nil {
+		return as.raw, nil
+	}
 	return json.Marshal(as.Action)
 }
 
