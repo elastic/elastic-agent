@@ -33,8 +33,31 @@ fi
 
 IFS=',' read -r -a docker_variants <<< "${DOCKER_VARIANTS}"
 
+# A variant may carry a shard suffix, "<variant>@<i>of<n>" (for example
+# "wolfi@0of2"): the variant's tests are then split across n jobs by a stable
+# hash of the test name and this job runs shard i (see the "Test group" section
+# of docs/test-framework-dev-guide.md). The suffix is stripped for everything
+# that names the image, and passed to the tests through TEST_SHARD, which the
+# define framework reads when -integration.shard is not given (the runner's
+# GOTEST_FLAGS can only carry -test.* flags).
+# variant_shard <variant@shard> prints "<variant> <i>/<n>" (shard empty if none).
+variant_shard() {
+  local spec="$1"
+  if [[ "${spec}" != *@* ]]; then
+    echo "${spec} "
+    return 0
+  fi
+  local shard="${spec#*@}"
+  if [[ ! "${shard}" =~ ^([0-9]+)of([0-9]+)$ ]]; then
+    echo "Error: invalid shard suffix '@${shard}' in variant '${spec}', expected '<variant>@<index>of<count>'" >&2
+    return 1
+  fi
+  echo "${spec%%@*} ${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+}
+
 echo "~~~ Loading Docker images"
-for variant in "${docker_variants[@]}"; do
+for variant_spec in "${docker_variants[@]}"; do
+  read -r variant _ <<< "$(variant_shard "${variant_spec}")"
   # construct image archive path
   image_archive="elastic-agent-${variant}-${AGENT_VERSION}-linux-${TARGET_ARCH}.docker.tar.gz"
   if [[ "${variant}" == "basic" ]]; then
@@ -66,8 +89,9 @@ for variant in "${docker_variants[@]}"; do
 done
 
 TESTS_EXIT_STATUS=0
-for variant in "${docker_variants[@]}"; do
-  echo "~~~ Kubernetes integration tests for variant: ${variant}"
+for variant_spec in "${docker_variants[@]}"; do
+  read -r variant shard <<< "$(variant_shard "${variant_spec}")"
+  echo "~~~ Kubernetes integration tests for variant: ${variant}${shard:+ (shard ${shard})}"
 
   # We are setting TEST_INTEG_CLEAN_ON_EXIT=false because the .buildkite/hooks/pre-exit script
   # will automatically clean up the kubernetes clusters on CI completion.
@@ -76,10 +100,26 @@ for variant in "${docker_variants[@]}"; do
     STACK_PROVISIONER=external \
     TEST_PLATFORMS="kubernetes/${TARGET_ARCH}/${K8S_VERSION}/${variant}" \
     GOTEST_FLAGS="${GOTEST_FLAGS}" \
+    TEST_SHARD="${shard}" \
     TEST_INTEG_CLEAN_ON_EXIT=false \
     mage -v integration:testKubernetes
   exit_status=$?
   set -e
+
+  # The report file names only encode version and variant; add the shard so
+  # the shards' artifacts don't overwrite each other when they are aggregated.
+  if [[ -n "${shard}" ]]; then
+    shard_tag="shard${shard/\//of}"
+    for f in build/TEST-go-k8s-*-"${variant}"-kubernetes.k8s.* build/TEST-go-integration.*; do
+      [[ -e "${f}" ]] || continue
+      if [[ "${f}" == *.k8s.* ]]; then
+        base="${f%%.k8s.*}"
+      else
+        base="build/TEST-go-integration"
+      fi
+      mv "${f}" "${base}-${shard_tag}${f#"${base}"}"
+    done
+  fi
 
   if [[ $exit_status -ne 0 ]]; then
     echo "^^^ +++"

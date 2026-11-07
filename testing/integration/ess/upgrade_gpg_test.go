@@ -278,10 +278,10 @@ func TestFleetManagedUpgradeWithFleetServerPGPFallback(t *testing.T) {
 	require.NoError(t, err)
 	checkinWithAcker.AddCheckin("upgrade-token", 0, upgradeAction)
 
-	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForWatcher(ctx, 5*time.Minute, upgradetest.WatcherPollInterval)
 	require.NoError(t, err, "waiting for upgrade watcher to start")
 
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err, "agent did not upgrade to %s", endVersionInfo.Binary.String())
 	assert.NotZero(t, pgpKeyRequests.Load(), "Fleet Server PGP key was not requested")
 }

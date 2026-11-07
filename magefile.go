@@ -447,6 +447,9 @@ func getIntegrationTestBinariesPath() ([]string, error) {
 		return nil, fmt.Errorf("could not get working directory: %w", err)
 	}
 
+	// CI builds these binaries without mage, keep the list in sync with
+	// .buildkite/scripts/build-integration-test-binaries.sh and the
+	// integration_tests_tf*.ps1 scripts.
 	testBinaryPkgs := []string{
 		filepath.Join(wd, "pkg", "component", "fake", "component"),
 	}

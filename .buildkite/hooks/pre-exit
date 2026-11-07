@@ -8,10 +8,21 @@ if [[ "$BUILDKITE_STEP_KEY" == *"integration-tests"* ]]; then
   fi
   source "${WORKSPACE}/.buildkite/scripts/common.sh"
 
-  # Perform cleanup of integration tests resources
+  # Perform cleanup of integration tests resources.
+  # A failed cleanup must not fail the job: the test results are already in,
+  # and the ephemeral resources expire on their own. Steps that never used the
+  # Go test runner (for example the ECH step) have nothing to clean up, and
+  # compiling mage here can fail when a sudo'ed `go test` left root-owned
+  # directories in the shared module cache.
   echo "--- Cleaning up integration test resources"
-  STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean
-  SNAPSHOT=true mage integration:clean
+  if ! STACK_PROVISIONER=serverless SNAPSHOT=true mage integration:clean; then
+    echo "^^^ +++"
+    echo "Warning: mage integration:clean (serverless) failed, continuing"
+  fi
+  if ! SNAPSHOT=true mage integration:clean; then
+    echo "^^^ +++"
+    echo "Warning: mage integration:clean failed, continuing"
+  fi
 fi
 
 if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
@@ -24,4 +35,28 @@ if [ -n "${TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE:-}" ]; then
   if test -f "$TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE"; then
     rm $TEST_INTEG_AUTH_GCP_SERVICE_TOKEN_FILE
   fi
+fi
+
+if [[ -n "${CI_CACHEPROG_LOG:-}" ]]; then
+  echo "--- cacheprog statistics"
+  # Sum the per-process statistics over every `go` invocation in the job,
+  # including ones run as root by the sudo integration tests.
+  # cacheprog-container.log holds the statistics of the Go toolchains running
+  # in the golang-crossbuild containers.
+  for log_name in cacheprog.log cacheprog-container.log; do
+    cat "$(dirname "$(dirname "${CI_CACHEPROG_LOG}")")"/cacheprog-*/"${log_name}" 2>/dev/null |
+      awk -v name="${log_name}" '/msg="cacheprog statistics"/ {
+        n++
+        for (i = 1; i <= NF; i++) {
+          split($i, kv, "=")
+          if (kv[1] == "get_calls") gets += kv[2]
+          if (kv[1] == "get_hits") hits += kv[2]
+          if (kv[1] == "put_calls") puts += kv[2]
+        }
+      }
+      END {
+        printf "%s: processes=%d get_calls=%d get_hits=%d hit_ratio=%.2f put_calls=%d\n", name, n, gets, hits, (gets ? hits / gets : 0), puts
+      }' || true
+  done
+  grep -h 'level=\(WARN\|ERROR\)' "${CI_CACHEPROG_LOG}" "$(dirname "${CI_CACHEPROG_LOG}")/cacheprog-container.log" 2>/dev/null | tail -n 20 || true
 fi

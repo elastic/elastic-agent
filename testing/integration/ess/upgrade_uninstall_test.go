@@ -68,14 +68,21 @@ func TestStandaloneUpgradeUninstallKillWatcher(t *testing.T) {
 		return ErrPostExit
 	}
 
+	// This test leaves PerformUpgrade early and needs the watcher to still be
+	// running when it calls uninstall below, after the upgraded agent has become
+	// healthy. Give the watcher a longer grace period than FastWatcherCfg so a
+	// slow restart cannot end the watch before uninstall gets to kill it.
+	watcherCfg := upgradetest.WatcherCfg(100*time.Second, upgradetest.FastWatcherErrorCheckInterval)
 	err = upgradetest.PerformUpgrade(
-		ctx, startFixture, endFixture, t, upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		ctx, startFixture, endFixture, t,
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+		upgradetest.WithCustomWatcherConfig(watcherCfg))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
 
 	// wait for the agent to be healthy and at the new version
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 10*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 10*time.Minute, upgradetest.StatusPollInterval, t)
 	if err != nil {
 		// agent never got healthy, but we need to ensure the watcher is stopped before continuing (this
 		// prevents this test failure from interfering with another test)
