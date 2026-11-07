@@ -149,7 +149,7 @@ func enroll(
 ) error {
 	cmd := fleetapi.NewEnrollCmd(client)
 
-	metadata, err := info.Metadata(ctx, log)
+	metadata, err := info.Metadata(ctx, log, nil)
 	if err != nil {
 		return fmt.Errorf("acquiring metadata failed: %w", err)
 	}

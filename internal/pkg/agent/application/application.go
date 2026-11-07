@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -149,6 +150,9 @@ func New(
 	var composableManaged bool
 	var isManaged bool
 	var actionAcker acker.Acker
+	// hostInfo is shared by everything that reports the host information, so it's only gathered every check
+	// interval. The coordinator runs it.
+	hostInfo := hostinfo.NewWatcher(log.Named("hostinfo"), hostinfo.DefaultCheckInterval)
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
@@ -244,7 +248,7 @@ func New(
 				return nil, nil, nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
 			}
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(log, agentInfo, startupCfg, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
+			managed, err = newManagedConfigManager(log, agentInfo, startupCfg, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, hostInfo, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -272,7 +276,7 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, hostInfo, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
