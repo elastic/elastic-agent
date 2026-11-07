@@ -20,7 +20,7 @@ import (
 func switchPlatformMode(pt ProgressDescriber, ownership utils.FileOwner) error {
 	ctx := context.Background()
 
-	unprivilegedVault, err := checkForUnprivilegedVault(ctx)
+	unprivilegedVault, err := secret.HasUnprivilegedVault(ctx)
 	if err != nil {
 		return fmt.Errorf("error checking for unprivileged vault: %w", err)
 	}
