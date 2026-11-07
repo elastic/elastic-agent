@@ -959,8 +959,13 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	}
 	// ensure that the elastic-agent.yml exists in the state directory or if given in the config directory
 	baseConfig := filepath.Join(configPath, paths.DefaultConfigName)
-	if _, err := os.Stat(baseConfig); os.IsNotExist(err) {
-		if err := copyFile(baseConfig, paths.ConfigFile(), 0); err != nil {
+	sourceConfig := paths.ConfigFile()
+	if sourceConfig != filepath.Join(paths.Config(), paths.DefaultConfigName) && sourceConfig != baseConfig {
+		if err := copyFile(baseConfig, sourceConfig, 0o600); err != nil {
+			return err
+		}
+	} else if _, err := os.Stat(baseConfig); os.IsNotExist(err) {
+		if err := copyFile(baseConfig, sourceConfig, 0); err != nil {
 			return err
 		}
 	}
@@ -968,6 +973,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	originalInstall := paths.Install()
 	paths.SetTop(topPath)
 	paths.SetConfig(configPath)
+	paths.SetConfigFile(paths.DefaultConfigName)
 	paths.SetControlSocket(socketPath)
 	diagnosticSocketPath := paths.SocketFromPath(runtime.GOOS, topPath, paths.DiagnosticsExtensionSocketName)
 	paths.SetDiagnosticsExtensionSocket(diagnosticSocketPath)
@@ -1067,13 +1073,24 @@ func copyFile(destPath string, srcPath string, mode os.FileMode) error {
 		return err
 	}
 	defer src.Close()
-	dest, err := os.OpenFile(destPath, os.O_CREATE|os.O_WRONLY, mode)
+	tmpPath := destPath + ".tmp"
+	if err := os.Remove(tmpPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	dest, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
-	defer dest.Close()
-	_, err = io.Copy(dest, src)
-	return err
+	if _, err := io.Copy(dest, src); err != nil {
+		_ = dest.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := dest.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return os.Rename(tmpPath, destPath)
 }
 
 type kibanaPolicy struct {

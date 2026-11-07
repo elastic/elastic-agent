@@ -280,6 +280,90 @@ func TestBuildEnrollArgs(t *testing.T) {
 	}
 }
 
+func setupSetPathsTest(t *testing.T) (statePath string, stateConfig string) {
+	t.Helper()
+
+	for _, key := range []string{"STATE_PATH", "CONFIG_PATH", "LOGS_PATH"} {
+		t.Setenv(key, "")
+		require.NoError(t, os.Unsetenv(key))
+	}
+
+	oldTop := paths.Top()
+	oldConfig := paths.Config()
+	oldLogs := paths.Logs()
+	oldSocket := paths.ControlSocket()
+	oldDiagSocket := paths.DiagnosticsExtensionSocket()
+	oldVersioned := paths.IsVersionHome()
+	t.Cleanup(func() {
+		paths.SetTop(oldTop)
+		paths.SetConfig(oldConfig)
+		paths.SetLogs(oldLogs)
+		paths.SetControlSocket(oldSocket)
+		paths.SetDiagnosticsExtensionSocket(oldDiagSocket)
+		paths.SetVersionHome(oldVersioned)
+		paths.SetInstall("")
+		paths.SetConfigFile(paths.DefaultConfigName)
+	})
+
+	statePath = t.TempDir()
+	return statePath, filepath.Join(statePath, paths.DefaultConfigName)
+}
+
+func TestSetPathsConfigOverride(t *testing.T) {
+	statePath, stateConfig := setupSetPathsTest(t)
+
+	mounted := filepath.Join(t.TempDir(), "agent.yml")
+	require.NoError(t, os.WriteFile(mounted, []byte("fleet:\n  enabled: true\nagent:\n  logging:\n    level: debug\n"), 0o644))
+	paths.SetConfigFile(mounted)
+
+	require.NoError(t, setPaths(statePath, "", "", "", false))
+	require.Equal(t, stateConfig, paths.ConfigFile())
+
+	require.NoError(t, os.WriteFile(mounted, []byte("fleet:\n  enabled: true\n"), 0o644))
+	paths.SetConfigFile(mounted)
+	require.NoError(t, setPaths(statePath, "", "", "", false))
+
+	require.Equal(t, stateConfig, paths.ConfigFile())
+	got, err := os.ReadFile(stateConfig)
+	require.NoError(t, err)
+	require.Equal(t, "fleet:\n  enabled: true\n", string(got))
+}
+
+func TestSetPathsConfigOverrideSamePath(t *testing.T) {
+	statePath, stateConfig := setupSetPathsTest(t)
+
+	require.NoError(t, os.WriteFile(stateConfig, []byte("fleet:\n  enabled: true\n"), 0o644))
+	paths.SetConfigFile(stateConfig)
+
+	require.NoError(t, setPaths(statePath, "", "", "", false))
+
+	require.Equal(t, stateConfig, paths.ConfigFile())
+	got, err := os.ReadFile(stateConfig)
+	require.NoError(t, err)
+	require.Equal(t, "fleet:\n  enabled: true\n", string(got))
+}
+
+func TestSetPathsNoConfigOverride(t *testing.T) {
+	statePath, stateConfig := setupSetPathsTest(t)
+
+	configDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, paths.DefaultConfigName), []byte("image: default\n"), 0o644))
+	paths.SetConfig(configDir)
+
+	require.NoError(t, setPaths(statePath, "", "", "", false))
+	got, err := os.ReadFile(stateConfig)
+	require.NoError(t, err)
+	require.Equal(t, "image: default\n", string(got))
+
+	require.NoError(t, os.WriteFile(stateConfig, []byte("fleet:\n  enabled: true\n"), 0o644))
+	paths.SetConfig(configDir)
+	require.NoError(t, setPaths(statePath, "", "", "", false))
+
+	got, err = os.ReadFile(stateConfig)
+	require.NoError(t, err)
+	require.Equal(t, "fleet:\n  enabled: true\n", string(got))
+}
+
 func TestShouldEnroll(t *testing.T) {
 	// enroll token
 	enrollmentToken := "test-enroll-token"
