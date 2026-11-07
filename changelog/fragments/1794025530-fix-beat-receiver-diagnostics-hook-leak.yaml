@@ -1,0 +1,9 @@
+kind: bug-fix
+summary: Fix the EDOT collector keeping diagnostics hooks of stopped beat receivers in memory
+description: >-
+  The elastic_diagnostics extension kept every diagnostics hook a beat receiver
+  registered, so each receiver restart on a config reload left the old receiver
+  in memory and added duplicate files to diagnostics bundles. Registering a hook
+  again for the same receiver and file now replaces the old one, and beat
+  receivers can remove their hooks when they stop.
+component: elastic-agent
