@@ -425,35 +425,37 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 	}
 }
 
-// runHooks runs all hooks while holding hooksMtx, so a hook never runs after
-// UnregisterDiagnosticHooks has returned for its component.
+// runHooks runs the hooks without holding hooksMtx, so a slow hook doesn't
+// block receivers that register or unregister hooks.
 func (d *diagnosticsExtension) runHooks() ([]*proto.ActionDiagnosticUnitResult, []*proto.ActionDiagnosticUnitResult) {
 	d.hooksMtx.Lock()
-	defer d.hooksMtx.Unlock()
-	componentResults := make([]*proto.ActionDiagnosticUnitResult, 0)
+	componentHooks := make(map[string][]*diagHook, len(d.componentHooks))
 	for name, hooks := range d.componentHooks {
+		componentHooks[name] = slices.Clone(hooks)
+	}
+	d.hooksMtx.Unlock()
+
+	componentResults := make([]*proto.ActionDiagnosticUnitResult, 0)
+	for name, hooks := range componentHooks {
 		for _, hook := range hooks {
-			componentResults = append(componentResults, &proto.ActionDiagnosticUnitResult{
-				Name:        name,
-				Filename:    hook.filename,
-				ContentType: hook.contentType,
-				Description: hook.description,
-				Content:     hook.hook(),
-				Generated:   timestamppb.Now(),
-			})
+			componentResults = append(componentResults, hook.result(name))
 		}
 	}
 
 	globalResults := make([]*proto.ActionDiagnosticUnitResult, 0)
 	for name, hook := range d.globalHooks {
-		globalResults = append(globalResults, &proto.ActionDiagnosticUnitResult{
-			Name:        name,
-			Filename:    hook.filename,
-			ContentType: hook.contentType,
-			Description: hook.description,
-			Content:     hook.hook(),
-			Generated:   timestamppb.Now(),
-		})
+		globalResults = append(globalResults, hook.result(name))
 	}
 	return componentResults, globalResults
+}
+
+func (h *diagHook) result(name string) *proto.ActionDiagnosticUnitResult {
+	return &proto.ActionDiagnosticUnitResult{
+		Name:        name,
+		Filename:    h.filename,
+		ContentType: h.contentType,
+		Description: h.description,
+		Content:     h.hook(),
+		Generated:   timestamppb.Now(),
+	}
 }

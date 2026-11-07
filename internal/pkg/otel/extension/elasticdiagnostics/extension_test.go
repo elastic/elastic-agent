@@ -14,7 +14,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -453,25 +452,4 @@ func TestDiagnosticHooks_Concurrent(t *testing.T) {
 	wg.Wait()
 
 	assert.Empty(t, d.componentHooks, "all hooks should be gone once every component unregistered")
-}
-
-func TestDiagnosticHooks_NoHookRunsAfterUnregister(t *testing.T) {
-	d := newTestDiagnosticsExtension(t)
-
-	var unregistered atomic.Bool
-	d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", func() []byte {
-		assert.False(t, unregistered.Load(), "hook ran after UnregisterDiagnosticHooks returned")
-		return nil
-	})
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for range 100 {
-			serveDiagnostics(t.Context(), d)
-		}
-	}()
-	d.UnregisterDiagnosticHooks("comp1")
-	unregistered.Store(true)
-	<-done
 }
