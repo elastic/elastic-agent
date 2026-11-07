@@ -108,7 +108,7 @@ func newWatchCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command 
 			}
 
 			if err = withAppLocker(log, func() error {
-				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, new(upgradeAgentWatcher), new(upgradeInstallationModifier))
+				return watchCmd(log, paths.Top(), cfg.Settings.Upgrade.Watcher, cfg.Settings.Upgrade.Rollback.LogsRetention, new(upgradeAgentWatcher), new(upgradeInstallationModifier))
 			}); err != nil {
 				log.Errorw("Watch command failed", "error.message", err)
 				fmt.Fprintf(streams.Err, "Watch command failed: %v\n%s\n", err, troubleshootMessage)
@@ -145,6 +145,12 @@ func WithSkipRestart(skipRestart bool) upgrade.RollbackOption {
 	}
 }
 
+func WithLogsRetention(failedUpgrade *upgrade.UpdateMarker, retention time.Duration) upgrade.RollbackOption {
+	return func(ros upgrade.RollbackOptionSetter) {
+		ros.SetLogsRetention(failedUpgrade, retention)
+	}
+}
+
 func WithRemoveMarker(removeMarker bool) upgrade.RollbackOption {
 	return func(ros upgrade.RollbackOptionSetter) {
 		ros.SetRemoveMarker(removeMarker)
@@ -174,7 +180,7 @@ func withAppLocker(log *logp.Logger, f func() error) error {
 	return f()
 }
 
-func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, watcher agentWatcher, installModifier installationModifier) error {
+func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcherConfig, logsRetention time.Duration, watcher agentWatcher, installModifier installationModifier) error {
 	log.Infow("Upgrade Watcher started", "process.pid", os.Getpid(), "agent.version", version.GetAgentPackageVersion(), "config", cfg)
 	dataDir := paths.DataFrom(topDir)
 	marker, err := upgrade.LoadMarker(dataDir)
@@ -265,7 +271,11 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 			return nil
 		}
 
-		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, WithRemoveMarker(removeMarker), WithPreRestartHook(revertRegistryHook))
+		rollbackOpts := []upgrade.RollbackOption{WithRemoveMarker(removeMarker), WithPreRestartHook(revertRegistryHook)}
+		if logsRetention > 0 {
+			rollbackOpts = append(rollbackOpts, WithLogsRetention(marker, logsRetention))
+		}
+		err = installModifier.Rollback(ctx, log, client.New(), paths.Top(), marker.PrevVersionedHome, marker.PrevHash, rollbackOpts...)
 		if err != nil {
 			log.Error("rollback failed", err)
 			upgradeDetails.Fail(err)

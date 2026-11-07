@@ -420,7 +420,7 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	// get available rollbacks
-	rollbacks, _, err := f.rollbackSource.GetAll()
+	rollbacks, err := f.rollbackSource.GetAvailableRollbacks()
 	if err != nil {
 		f.log.Warnf("error getting available rollbacks: %s", err.Error())
 		rollbacks = nil
@@ -428,16 +428,13 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 
 	var validRollbacks []fleetapi.CheckinRollback
 	if len(rollbacks) > 0 {
-		now := time.Now()
 		validRollbacks = make([]fleetapi.CheckinRollback, 0, len(rollbacks))
 		for _, rollback := range rollbacks {
-			if rollback.ValidUntil.After(now) {
-				// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
-				validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
-					Version:    rollback.Version,
-					ValidUntil: rollback.ValidUntil,
-				})
-			}
+			// map the `ttl.Marker` to the `fleetapi.CheckinRollback`
+			validRollbacks = append(validRollbacks, fleetapi.CheckinRollback{
+				Version:    rollback.Version,
+				ValidUntil: rollback.ValidUntil,
+			})
 		}
 	}
 

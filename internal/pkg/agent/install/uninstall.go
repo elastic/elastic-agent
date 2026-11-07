@@ -329,18 +329,22 @@ func RemoveBut(log *logger.Logger, path string, bestEffort bool, exceptions ...s
 		return fmt.Errorf("error reading directory %s: %w", path, err)
 	}
 
+	var errs []error
 	for _, f := range files {
 		if containsString(f.Name(), exceptions, runtime.GOOS != component.Windows) {
 			continue
 		}
 
 		err = RemovePath(log, filepath.Join(path, f.Name()))
-		if !bestEffort && err != nil {
-			return fmt.Errorf("error removing path %s: %w", f.Name(), err)
+		if err != nil {
+			if !bestEffort {
+				return fmt.Errorf("error removing path %s: %w", f.Name(), err)
+			}
+			errs = append(errs, fmt.Errorf("error removing path %s: %w", f.Name(), err))
 		}
 	}
 
-	return err
+	return errors.Join(errs...)
 }
 
 func containsString(str string, a []string, caseSensitive bool) bool {

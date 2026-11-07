@@ -111,6 +111,61 @@ func (_c *MockReadOnlySource_GetAll_Call) RunAndReturn(run func() (map[string]TT
 	return _c
 }
 
+// GetAvailableRollbacks provides a mock function for the type MockReadOnlySource
+func (_mock *MockReadOnlySource) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAvailableRollbacks")
+	}
+
+	var r0 map[string]TTLMarker
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (map[string]TTLMarker, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() map[string]TTLMarker); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]TTLMarker)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockReadOnlySource_GetAvailableRollbacks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAvailableRollbacks'
+type MockReadOnlySource_GetAvailableRollbacks_Call struct {
+	*mock.Call
+}
+
+// GetAvailableRollbacks is a helper method to define mock.On call
+func (_e *MockReadOnlySource_Expecter) GetAvailableRollbacks() *MockReadOnlySource_GetAvailableRollbacks_Call {
+	return &MockReadOnlySource_GetAvailableRollbacks_Call{Call: _e.mock.On("GetAvailableRollbacks")}
+}
+
+func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) Run(run func()) *MockReadOnlySource_GetAvailableRollbacks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) Return(stringToTTLMarker map[string]TTLMarker, err error) *MockReadOnlySource_GetAvailableRollbacks_Call {
+	_c.Call.Return(stringToTTLMarker, err)
+	return _c
+}
+
+func (_c *MockReadOnlySource_GetAvailableRollbacks_Call) RunAndReturn(run func() (map[string]TTLMarker, error)) *MockReadOnlySource_GetAvailableRollbacks_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockSource creates a new instance of MockSource. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockSource(t interface {
@@ -206,6 +261,61 @@ func (_c *MockSource_GetAll_Call) Return(stringToTTLMarker map[string]TTLMarker,
 }
 
 func (_c *MockSource_GetAll_Call) RunAndReturn(run func() (map[string]TTLMarker, map[string]error, error)) *MockSource_GetAll_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetAvailableRollbacks provides a mock function for the type MockSource
+func (_mock *MockSource) GetAvailableRollbacks() (map[string]TTLMarker, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAvailableRollbacks")
+	}
+
+	var r0 map[string]TTLMarker
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (map[string]TTLMarker, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() map[string]TTLMarker); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]TTLMarker)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockSource_GetAvailableRollbacks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAvailableRollbacks'
+type MockSource_GetAvailableRollbacks_Call struct {
+	*mock.Call
+}
+
+// GetAvailableRollbacks is a helper method to define mock.On call
+func (_e *MockSource_Expecter) GetAvailableRollbacks() *MockSource_GetAvailableRollbacks_Call {
+	return &MockSource_GetAvailableRollbacks_Call{Call: _e.mock.On("GetAvailableRollbacks")}
+}
+
+func (_c *MockSource_GetAvailableRollbacks_Call) Run(run func()) *MockSource_GetAvailableRollbacks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockSource_GetAvailableRollbacks_Call) Return(stringToTTLMarker map[string]TTLMarker, err error) *MockSource_GetAvailableRollbacks_Call {
+	_c.Call.Return(stringToTTLMarker, err)
+	return _c
+}
+
+func (_c *MockSource_GetAvailableRollbacks_Call) RunAndReturn(run func() (map[string]TTLMarker, error)) *MockSource_GetAvailableRollbacks_Call {
 	_c.Call.Return(run)
 	return _c
 }

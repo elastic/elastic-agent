@@ -24,19 +24,29 @@ import (
 // Callers detect it via errors.Is.
 var errCleanupDegraded = errors.New("cleanup completed with degraded verification")
 
+// errStripIncomplete signals that a retained diagnostics home could not be stripped down to its logs.
+// It is not critical, the strip is retried by the next periodic cleanup. Callers detect it via errors.Is.
+var errStripIncomplete = errors.New("stripping a diagnostics home is incomplete")
+
 // isDegradedOnly returns true when err wraps errCleanupDegraded and carries no non-degraded
 // sibling errors at any level of the error chain.
+func isDegradedOnly(err error) bool {
+	return isOnly(err, errCleanupDegraded)
+}
+
+// isOnly returns true when err wraps target and every error joined with it wraps target too, at any level of the
+// error chain.
 // For errors.Join results it inspects the join siblings directly; for single-Unwrap wrappers
 // (e.g. fmt.Errorf("%w", ...)) it recurses into the wrapped error so that a join nested inside
 // a plain wrap is still inspected.
-func isDegradedOnly(err error) bool {
-	if !errors.Is(err, errCleanupDegraded) {
+func isOnly(err, target error) bool {
+	if !errors.Is(err, target) {
 		return false
 	}
 	type unwrapList interface{ Unwrap() []error }
 	if u, ok := err.(unwrapList); ok {
 		for _, e := range u.Unwrap() {
-			if !errors.Is(e, errCleanupDegraded) {
+			if !errors.Is(e, target) {
 				return false
 			}
 		}
@@ -45,7 +55,7 @@ func isDegradedOnly(err error) bool {
 	// Single-Unwrap wrapper: recurse so a nested join is fully inspected.
 	type unwrapSingle interface{ Unwrap() error }
 	if u, ok := err.(unwrapSingle); ok {
-		return isDegradedOnly(u.Unwrap())
+		return isOnly(u.Unwrap(), target)
 	}
 	return true
 }
@@ -62,6 +72,9 @@ type cleanupOpts struct {
 	requireMarkerDetails bool
 	// keepLogs skips the "logs" subdirectory when removing a versioned home.
 	keepLogs bool
+	// stripDiagnostics strips the unexpired homes of the diagnostics kind down to their logs.
+	// What cannot be stripped is reported with errStripIncomplete.
+	stripDiagnostics bool
 }
 
 // dirClassifier holds the inputs needed to decide whether each agent directory
@@ -122,14 +135,20 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 	}
 	// In strict mode (requireMarkerDetails=true), a nil-Details marker cannot confirm an
 	// active upgrade, so it does not protect directories.
-	markerProtects := dc.marker != nil && !IsTerminalState(dc.marker) && (!dc.requireMarkerDetails || dc.marker.Details != nil)
-	if markerProtects {
-		if (dc.marker.VersionedHome != "" && relPath == filepath.Clean(dc.marker.VersionedHome)) ||
-			(dc.marker.PrevVersionedHome != "" && relPath == filepath.Clean(dc.marker.PrevVersionedHome)) {
-			return false
-		}
+	if dc.referencedByActiveUpgrade(relPath) {
+		return false
 	}
 	return true
+}
+
+// referencedByActiveUpgrade returns true when relPath is one of the homes of the upgrade the marker says is active.
+func (dc *dirClassifier) referencedByActiveUpgrade(relPath string) bool {
+	markerProtects := dc.marker != nil && !IsTerminalState(dc.marker) && (!dc.requireMarkerDetails || dc.marker.Details != nil)
+	if !markerProtects {
+		return false
+	}
+	return (dc.marker.VersionedHome != "" && relPath == filepath.Clean(dc.marker.VersionedHome)) ||
+		(dc.marker.PrevVersionedHome != "" && relPath == filepath.Clean(dc.marker.PrevVersionedHome))
 }
 
 // cleanupAgentDirectories removes agent directories that are safe to delete and
@@ -250,6 +269,21 @@ func cleanupAgentDirectories(
 		}
 	}
 
+	if opts.stripDiagnostics && dc.symlinkErr == nil {
+		for versionedHome, m := range leftoverRollbacks {
+			isDiagnostics := m.Kind == ttl.KindDiagnostics
+			// never strip an install that is in use, or that is gone
+			isLive := callerProtected[versionedHome] || versionedHome == dc.symlinkTarget || dc.referencedByActiveUpgrade(filepath.Clean(versionedHome))
+			exists := existingDirSet[filepath.Clean(versionedHome)]
+			if !isDiagnostics || isLive || !exists {
+				continue
+			}
+			if stripErr := stripToLogs(log, topDir, versionedHome); stripErr != nil {
+				aggregateErr = errors.Join(aggregateErr, fmt.Errorf("stripping %q: %w", versionedHome, errors.Join(errStripIncomplete, stripErr)))
+			}
+		}
+	}
+
 	// Build the return value: unexpired rollbacks whose directory still exists.
 	// In practice always identical to leftoverRollbacks (unexpired entries are never removed),
 	// but defends against a directory disappearing between snapshotAgentDirs and now.
@@ -281,10 +315,6 @@ func cleanupAgentDirectories(
 	}
 }
 
-// hasOnlyLogs returns true when dir contains exactly one visible (non-hidden) entry
-// and that entry is a directory named "logs".
-// Hidden entries (names starting with ".") are ignored so that OS artefacts like
-// .DS_Store or a leftover .ttl file do not cause a false negative.
 // snapshotAgentDirs returns absolute paths of all elastic-agent-* dirs in the data directory.
 // Take the snapshot before reading markers or TTL entries: directories created by a concurrent
 // upgrade afterward won't appear and therefore can't be swept by this cleanup run.
@@ -305,6 +335,23 @@ func snapshotAgentDirs(topDir string) ([]string, error) {
 	return dirs, nil
 }
 
+// stripToLogs removes everything but the logs and the TTL marker from the versioned home of a diagnostics kind
+// install. It is best effort: what could not be removed is reported so that the next cleanup retries it.
+func stripToLogs(log *logger.Logger, topDir, versionedHome string) error {
+	homePath := filepath.Join(topDir, versionedHome)
+	if _, err := os.Stat(homePath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	return install.RemoveBut(log, homePath, true, "logs", ttl.MarkerFileName)
+}
+
+// hasOnlyLogs returns true when dir contains exactly one visible (non-hidden) entry
+// and that entry is a directory named "logs".
+// Hidden entries (names starting with ".") are ignored so that OS artefacts like
+// .DS_Store or a .ttl marker do not cause a false negative.
 func hasOnlyLogs(log *logger.Logger, dir string) bool {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
