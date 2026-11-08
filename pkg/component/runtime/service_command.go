@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -20,6 +21,39 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 )
+
+// Lines of command output have the form "<date> <time>: <level>: <message>".
+var (
+	errorLevelLine = regexp.MustCompile(`^\S+ \S+: error: `)
+	logLinePrefix  = regexp.MustCompile(`^\S+ \S+: \w+: `)
+)
+
+// commandError is the error of a failed command. Its text is the last line of the
+// command output followed by the reason the command failed. It also keeps the last
+// line logged at the error level, if there was one.
+type commandError struct {
+	line      string
+	errorLine string
+	err       error
+}
+
+func (e *commandError) Error() string { return e.line + ": " + e.err.Error() }
+
+// summary returns the line of the command output that best describes the failure.
+func (e *commandError) summary() string {
+	if e.errorLine != "" {
+		return e.errorLine
+	}
+	return e.line
+}
+
+func (e *commandError) Unwrap() error { return e.err }
+
+// outputLines are the lines of the command output used to describe a failure.
+type outputLines struct {
+	last      string
+	lastError string
+}
 
 func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, args []string, env []string, timeout time.Duration) error {
 	log = log.With("context", "command output")
@@ -52,24 +86,27 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 		return fmt.Errorf("failed starting the command: %w", err)
 	}
 
-	// channel for the last error message from the stderr output
-	errch := make(chan string, 1)
+	// channel for the last line and the last error level line of the stderr output
+	errch := make(chan outputLines, 1)
 	ctxStderr := contextio.NewReader(ctx, proc.Stderr)
 	go func() {
-		var errText string
+		var lastLine, lastErrorLine string
 		scanner := bufio.NewScanner(ctxStderr)
 		for scanner.Scan() {
 			line := scanner.Text()
 			if len(line) > 0 {
 				txt := strings.TrimSpace(line)
 				if len(txt) > 0 {
-					errText = txt
+					lastLine = txt
+					if errorLevelLine.MatchString(txt) {
+						lastErrorLine = txt
+					}
 					// Log error output line
-					log.Error(errText)
+					log.Error(txt)
 				}
 			}
 		}
-		errch <- errText
+		errch <- outputLines{last: lastLine, lastError: lastErrorLine}
 	}()
 
 	procState := <-proc.Wait()
@@ -80,10 +117,10 @@ func executeCommand(ctx context.Context, log *logger.Logger, binaryPath string, 
 	}
 
 	if err != nil {
-		errmsg := <-errch
-		errmsg = strings.TrimSpace(errmsg)
+		lines := <-errch
+		errmsg := strings.TrimSpace(lines.last)
 		if errmsg != "" {
-			err = fmt.Errorf("%s: %w", errmsg, err)
+			err = &commandError{line: errmsg, errorLine: lines.lastError, err: err}
 		}
 	}
 

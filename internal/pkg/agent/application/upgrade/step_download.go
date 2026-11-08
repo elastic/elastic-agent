@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 
 	"go.elastic.co/apm/v2"
 
@@ -41,22 +41,26 @@ const (
 )
 
 type artifactDownloader struct {
-	log            *logger.Logger
-	settings       *artifact.Config
-	fleetServerURI string
-	getPGPSources  func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
-	retryTimeout   time.Duration
-	totalTimeout   time.Duration
-	fileOps        download.FileOps
+	log              *logger.Logger
+	settings         *artifact.Config
+	fleetServerURI   string
+	getPGPSources    func(log *logger.Logger, fleetServerURI string, targetVersion *agtversion.ParsedSemVer, pgpSources []string) []string
+	getUpgradeSize   func(context.Context, *artifact.Config, string) (uint64, uint64, error)
+	reserveDiskSpace func(context.Context, string, uint64, uint64) (bool, error)
+	retryTimeout     time.Duration
+	totalTimeout     time.Duration
+	fileOps          download.FileOps
 }
 
 func newArtifactDownloader(settings *artifact.Config, log *logger.Logger) *artifactDownloader {
 	return &artifactDownloader{
-		log:           log,
-		settings:      settings,
-		getPGPSources: download.AppendFallbackPGP,
-		retryTimeout:  defaultRetryTimeout,
-		totalTimeout:  totalTimeout,
+		log:              log,
+		settings:         settings,
+		getPGPSources:    download.AppendFallbackPGP,
+		getUpgradeSize:   getUpgradeSize,
+		reserveDiskSpace: ReserveDiskSpace,
+		retryTimeout:     defaultRetryTimeout,
+		totalTimeout:     totalTimeout,
 		fileOps: download.FileOps{
 			CopyFile: io.Copy,
 			OpenFile: os.OpenFile,
@@ -115,6 +119,20 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 		fileName = strings.Replace(fileName, target.Version.String(), target.Version.VersionWithPrerelease(), 1)
 	}
 	targetPath := filepath.Join(settings.TargetDirectory, fileName)
+	archiveReservation := getArchiveReservation(settings.TargetDirectory)
+	defer func() {
+		if err != nil {
+			if removeErr := os.Remove(targetPath); removeErr != nil && !goerrors.Is(removeErr, os.ErrNotExist) {
+				err = goerrors.Join(err, fmt.Errorf("failed to remove download archive %s: %w", targetPath, removeErr))
+			}
+			if removeErr := os.Remove(archiveReservation); removeErr != nil && !goerrors.Is(removeErr, os.ErrNotExist) {
+				err = goerrors.Join(err, fmt.Errorf("failed to remove reserved archive file %s: %w", archiveReservation, removeErr))
+			}
+			if removeErr := os.Remove(download.AddHashExtension(targetPath)); removeErr != nil && !goerrors.Is(removeErr, os.ErrNotExist) {
+				err = goerrors.Join(err, fmt.Errorf("failed to remove download archive sha512 file %s: %w", download.AddHashExtension(targetPath), removeErr))
+			}
+		}
+	}()
 
 	if err := os.MkdirAll(settings.TargetDirectory, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create target directory %s: %w", settings.TargetDirectory, err)
@@ -129,24 +147,21 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 	retryDeadline := time.Now().Add(retryTimeout)
 	upgradeDetails.SetRetryUntil(&retryDeadline)
 
-	retrier := backoff.NewExponentialBackOff(
-		backoff.WithInitialInterval(settings.RetrySleepInitDuration),
-		backoff.WithMaxElapsedTime(retryTimeout),
-	)
-	retryCtx := backoff.WithContext(retrier, ctx)
+	retrier := backoff.NewExponentialBackOff()
+	retrier.InitialInterval = settings.RetrySleepInitDuration
 
 	attempt := 0
 	skip := make([]bool, len(sources))
 	errs := make([]error, len(sources))
 
-	fetchSources := func() error {
+	fetchSources := func() (struct{}, error) {
 		for i, src := range sources {
 			if skip[i] {
 				continue
 			}
 
 			if target.Version.IsSnapshot() && src == artifact.DefaultSourceURI && target.Version.BuildMetadata() == "" {
-				buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version)
+				buildID, err := latestSnapshotBuildID(ctx, &settings, target.Version, upgradeDetails)
 				if err != nil {
 					e := fmt.Errorf("couldn't retrieve latest snapshot build ID: %w", err)
 					a.log.Debugf("%v", e)
@@ -171,21 +186,46 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				skip[i] = true
 				continue
 			}
+
+			if settings.ReserveDiskSpace.Enabled {
+				archiveSize, decompressedSize, err := a.getUpgradeSize(ctx, &settings, sourceURI)
+				if err != nil {
+					if download.IsLocal(sourceURI) || downloaderrors.IsPermanentHTTPError(err) {
+						skip[i] = true
+					}
+					e := fmt.Errorf("error checking available disk space for %s: %w", src, err)
+					a.log.Warnf("%v", e)
+					errs[i] = e
+					continue
+				}
+
+				a.log.Infow("Reserving disk space for upgrade", "source_uri", sourceURI, "archive_size", archiveSize, "decompressed_size", decompressedSize)
+				hasDiskSpace, err := a.reserveDiskSpace(ctx, settings.TargetDirectory, archiveSize, decompressedSize)
+				if err != nil {
+					e := fmt.Errorf("error reserving disk space for %s: %w", src, err)
+					a.log.Warnf("%v", e)
+					errs[i] = e
+				}
+				if !hasDiskSpace {
+					return struct{}{}, backoff.Permanent(err)
+				}
+			}
+
 			if download.IsLocal(sourceURI) {
 				a.log.Infow("Copying local artifact", "source_uri", sourceURI)
 			} else {
 				a.log.Infow("Downloading artifact", "source_uri", sourceURI, "proxy_uri", settings.Proxy.URL, "proxy_disable", settings.Proxy.Disable)
 			}
 
-			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, targetPath, a.fileOps); err != nil {
-				if downloaderrors.IsDiskSpaceError(err) {
-					return backoff.Permanent(err)
+			if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, sourceURI, archiveReservation, a.fileOps); err != nil {
+				if downloaderrors.IsDiskSpaceLowError(err) {
+					return struct{}{}, backoff.Permanent(err)
 				}
 				var agentErr errors.Error
 				if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
-					if agentErr.Meta()[errors.MetaKeyPath] == targetPath {
+					if agentErr.Meta()[errors.MetaKeyPath] == archiveReservation {
 						// can't write to target
-						return backoff.Permanent(err)
+						return struct{}{}, backoff.Permanent(err)
 					}
 				}
 
@@ -205,14 +245,14 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 			if !skipVerifyOverride {
 				if err = download.Fetch(ctx, a.log, &settings, upgradeDetails, download.AddHashExtension(sourceURI), download.AddHashExtension(targetPath), a.fileOps); err != nil {
-					if downloaderrors.IsDiskSpaceError(err) {
-						return backoff.Permanent(err)
+					if downloaderrors.IsDiskSpaceLowError(err) {
+						return struct{}{}, backoff.Permanent(err)
 					}
 					var agentErr errors.Error
 					if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem && !errors.Is(err, os.ErrNotExist) {
 						if agentErr.Meta()[errors.MetaKeyPath] == download.AddHashExtension(targetPath) {
 							// can't write to target
-							return backoff.Permanent(err)
+							return struct{}{}, backoff.Permanent(err)
 						}
 					}
 
@@ -230,7 +270,7 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 					continue
 				}
 
-				if err = download.Verify(ctx, a.log, &settings, release.PGP(), sourceURI, targetPath, skipDefaultPgp, pgpBytes...); err != nil {
+				if err = download.Verify(ctx, a.log, &settings, release.PGP(), targetPath, sourceURI, archiveReservation, skipDefaultPgp, pgpBytes...); err != nil {
 					e := fmt.Errorf("verification failed for %s: %w", src, err)
 					a.log.Debugf("%v", e)
 					if !errors.IsNetworkError(err) {
@@ -241,7 +281,14 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 				}
 			}
 
-			return nil
+			if err = os.Rename(archiveReservation, targetPath); err != nil {
+				e := fmt.Errorf("could not move archive to target path: %w", err)
+				a.log.Debugf("%v", e)
+				errs[i] = e
+				continue
+			}
+
+			return struct{}{}, nil
 		}
 
 		attempt++
@@ -255,9 +302,9 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 
 		if !slices.Contains(skip, false) {
 			// all sources exhausted
-			return backoff.Permanent(err)
+			return struct{}{}, backoff.Permanent(err)
 		}
-		return err
+		return struct{}{}, err
 	}
 
 	retryFailure := func(err error, retryAfter time.Duration) {
@@ -266,7 +313,10 @@ func (a *artifactDownloader) downloadArtifact(ctx context.Context, target artifa
 		upgradeDetails.SetRetryableError(err)
 	}
 
-	if err := backoff.RetryNotify(fetchSources, retryCtx, retryFailure); err != nil {
+	if _, err := backoff.Retry(ctx, fetchSources, backoff.WithBackOff(retrier), backoff.WithMaxElapsedTime(retryTimeout), backoff.WithNotify(retryFailure)); err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return targetPath, fmt.Errorf("failed to get upgrade artifact: %w", re.LastErr)
+		}
 		return targetPath, fmt.Errorf("failed to get upgrade artifact: %w", err)
 	}
 
@@ -300,7 +350,16 @@ func Resolve(target artifact.Artifact, sourceURI, sourceSubdir, fileName string)
 	return uri, nil
 }
 
-func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version *agtversion.ParsedSemVer) (string, error) {
+func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version *agtversion.ParsedSemVer, upgradeDetails *details.Details) (string, error) {
+	cancelDeadline := time.Now().Add(config.Timeout)
+	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
+	defer cancel()
+
+	upgradeDetails.SetRetryUntil(&cancelDeadline)
+
+	expBo := backoff.NewExponentialBackOff()
+	expBo.InitialInterval = config.RetrySleepInitDuration
+
 	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
@@ -314,33 +373,52 @@ func latestSnapshotBuildID(ctx context.Context, config *artifact.Config, version
 	versionStr := version.CoreVersion()
 	latestSnapshotURI := fmt.Sprintf("https://snapshots.elastic.co/latest/%s-SNAPSHOT.json", versionStr)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, latestSnapshotURI, nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request to the snapshot API: %w", err)
+	var snapshotBuildID string
+	opFn := func() (struct{}, error) {
+		req, err := http.NewRequestWithContext(cancelCtx, http.MethodGet, latestSnapshotURI, nil)
+		if err != nil {
+			return struct{}{}, backoff.Permanent(fmt.Errorf("failed to create request to the snapshot API: %w", err))
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return struct{}{}, err
+		}
+		defer resp.Body.Close()
+
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			return struct{}{}, backoff.Permanent(fmt.Errorf("snapshot for version %q not found", versionStr))
+		case http.StatusOK:
+			var info struct {
+				BuildID string `json:"build_id"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+				return struct{}{}, backoff.Permanent(err)
+			}
+			parts := strings.Split(info.BuildID, "-")
+			if len(parts) != 2 {
+				return struct{}{}, backoff.Permanent(fmt.Errorf("wrong format for a build ID: %s", info.BuildID))
+			}
+			snapshotBuildID = parts[1]
+			return struct{}{}, nil
+		default:
+			return struct{}{}, fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
+		}
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
+	opFailureNotificationFn := func(err error, _ time.Duration) {
+		upgradeDetails.SetRetryableError(err)
+	}
+
+	if _, err := backoff.Retry(cancelCtx, opFn, backoff.WithBackOff(expBo), backoff.WithNotify(opFailureNotificationFn)); err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return "", re.LastErr
+		}
 		return "", err
 	}
-	defer resp.Body.Close()
 
-	switch resp.StatusCode {
-	case http.StatusNotFound:
-		return "", fmt.Errorf("snapshot for version %q not found", versionStr)
-	case http.StatusOK:
-		var info struct {
-			BuildID string `json:"build_id"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-			return "", err
-		}
-		parts := strings.Split(info.BuildID, "-")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("wrong format for a build ID: %s", info.BuildID)
-		}
-		return parts[1], nil
-	default:
-		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, latestSnapshotURI)
-	}
+	upgradeDetails.SetRetryableError(nil)
+	upgradeDetails.SetRetryUntil(nil)
+	return snapshotBuildID, nil
 }

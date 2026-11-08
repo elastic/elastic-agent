@@ -162,6 +162,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
 	setIfNotNil(kafkaExporter, "record_headers", headers)
+	setIfNotNil(kafkaExporter, "dial_timeout", kConfig.Timeout)
 
 	// Set partitioner extension config
 	partitionerExtensionCfg, err := getKafkaPartitionerExtensionConfig(kConfig.Partition, outputName)
@@ -365,7 +366,7 @@ func oauth2MapEncodeHook() mapstructure.DecodeHookFunc {
 }
 
 func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(oauth2ClientExtensionType), extensionName)
 }
 
@@ -398,14 +399,14 @@ func getLogBody(field string) string {
 
 // getTransformProcessorID returns the id for transform processor
 func getTransformProcessorID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
 }
 
 // getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
@@ -414,8 +415,6 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
 	if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("timeout") {
-		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Child("ssl", -1); err == nil {
 		if value.HasField("ca_trusted_fingerprint") {
 			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)

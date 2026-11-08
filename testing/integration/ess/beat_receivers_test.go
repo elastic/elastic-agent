@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/gofrs/uuid/v5"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/mapstr"
@@ -36,8 +36,8 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esapi"
+	"github.com/elastic/go-elasticsearch/v9"
+	"github.com/elastic/go-elasticsearch/v9/esapi"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -795,7 +795,8 @@ agent.monitoring.enabled: false
 				RuntimeExperimental: string(component.ProcessRuntimeManager),
 				OutputURL:           mockESURL.String(),
 			}))
-	processConfig := configBuffer.Bytes()
+	processConfig := bytes.Clone(configBuffer.Bytes())
+	configBuffer.Reset()
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
@@ -1371,7 +1372,8 @@ agent.monitoring.enabled: false
 			configOptions{
 				RuntimeExperimental: string(component.ProcessRuntimeManager),
 			}))
-	processConfig := configBuffer.Bytes()
+	processConfig := bytes.Clone(configBuffer.Bytes())
+	configBuffer.Reset()
 	require.NoError(t,
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{

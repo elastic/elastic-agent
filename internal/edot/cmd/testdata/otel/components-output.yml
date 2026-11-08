@@ -58,6 +58,11 @@ receivers:
       logs: Undefined
       metrics: Beta
       traces: Undefined
+  - name: prometheusscrape
+    stability:
+      logs: Undefined
+      metrics: Development
+      traces: Undefined
   - name: zipkin
     stability:
       logs: Undefined

@@ -217,8 +217,9 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 	expectedConfig := confmap.NewFromStringMap(map[string]any{
 		"exporters": map[string]any{
 			"kafka/_agent-component/default": map[string]any{
-				"brokers":   []string{"127.0.0.1:9022"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9022"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "static-topic",
 					"encoding": "raw",

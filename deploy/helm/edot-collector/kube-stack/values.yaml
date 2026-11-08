@@ -39,6 +39,9 @@ collectors:
   cluster:
     enabled: true
     fullnameOverride: "opentelemetry-kube-stack-cluster-stats"
+    resources:
+      limits:
+        memory: 256Mi
     env:
       - name: ELASTIC_AGENT_OTEL
         value: "true"
@@ -499,7 +502,7 @@ collectors:
       service:
         extensions: [cgroup_runtime, health_check]
         pipelines:
-          # Disable default non used kube-stack Helm Chart pipelines
+          # Disable default unused kube-stack Helm Chart pipelines
           logs: null
           metrics: null
           traces: null
@@ -691,8 +694,12 @@ instrumentation:
   nodejs:
     image: docker.elastic.co/observability/elastic-otel-node:1.20.0
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.1
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.7.0
+    env:
+      # The operator does not load the EDOT .NET plugin by default; without it only upstream OpenTelemetry .NET behaviour applies.
+      - name: OTEL_DOTNET_AUTO_PLUGINS
+        value: "Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation"
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.18.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.19.0
   go:
     image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0

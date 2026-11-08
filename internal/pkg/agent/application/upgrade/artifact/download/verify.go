@@ -121,14 +121,14 @@ func AppendFallbackPGP(log *logger.Logger, fleetServerURI string, targetVersion 
 func VerifySHA512Hash(filename string) error {
 	hasher := sha512.New()
 	checksumFileName := AddHashExtension(filename)
-	return VerifyChecksum(hasher, filename, checksumFileName)
+	return VerifyChecksum(hasher, filename, checksumFileName, filepath.Base(filename))
 }
 
 // VerifyChecksum checks that the hash contained in checksumFileName correspond to the hash calculated for filename using
 // hasher.Sum()
-func VerifyChecksum(hasher hash.Hash, filename, checksumFileName string) error {
+func VerifyChecksum(hasher hash.Hash, filename, checksumFileName, checksumEntry string) error {
 	// Read expected checksum.
-	expectedHash, err := readChecksumFile(checksumFileName, filepath.Base(filename))
+	expectedHash, err := readChecksumFile(checksumFileName, checksumEntry)
 	if err != nil {
 		return fmt.Errorf("could not read checksum file: %w", err)
 	}
@@ -389,8 +389,8 @@ func FetchPGPSignature(ctx context.Context, log *logger.Logger, config *artifact
 	return io.ReadAll(resp.Body)
 }
 
-func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, defaultPGP []byte, src, dst string, skipDefaultPgp bool, pgpBytes ...string) error {
-	if err := VerifySHA512Hash(dst); err != nil {
+func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, defaultPGP []byte, name, src, dst string, skipDefaultPgp bool, pgpBytes ...string) error {
+	if err := VerifyChecksum(sha512.New(), dst, AddHashExtension(name), filepath.Base(name)); err != nil {
 		return fmt.Errorf("failed to verify checksum: %w", err)
 	}
 
@@ -404,7 +404,7 @@ func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, de
 		return fmt.Errorf("could not get pgp keys: %w", err)
 	}
 	if len(keys) == 0 {
-		return fmt.Errorf("no PGP keys available to verify %q", dst)
+		return fmt.Errorf("no PGP keys available to verify %q", name)
 	}
 
 	if err := VerifyPGPSignatureWithKeys(log, dst, signature, keys); err != nil {

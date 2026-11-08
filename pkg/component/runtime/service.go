@@ -27,9 +27,13 @@ import (
 type actionModeSigned struct {
 	actionMode
 	signed *component.Signed
+
+	// retryGen is set on the retry of a failed start, see serviceRuntime.startRetryGen.
+	retryGen uint64
 }
 
 const (
+	defaultStartFailedAfter           = 5 * time.Minute
 	defaultCheckServiceStatusInterval = 30 * time.Second // 30 seconds default for now, consistent with the command check-in interval
 )
 
@@ -68,6 +72,17 @@ type serviceRuntime struct {
 	// serviceRestartDelay is the time duration the service runtime will wait before
 	// attempting to restart a service that failed to start.
 	serviceRestartDelay time.Duration
+
+	// startFailingSince is when the current run of failed start attempts began. It is
+	// zero unless the last attempt to start the service failed. The failure is kept
+	// reported until a start attempt succeeds.
+	startFailingSince time.Time
+
+	// startRetryGen identifies the current retry of a failed start. It changes whenever
+	// a retry is scheduled or discarded, so that a retry that fires after the service
+	// was stopped, or after a new start action, is recognized as stale by Run.
+	// Only accessed by Run.
+	startRetryGen uint64
 }
 
 // newServiceRuntime creates a new command runtime for the provided component.
@@ -162,6 +177,8 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 		// the flag is set once and never reset since the serviceRuntime object
 		// is not supposed to be reused once it's stopping
 		stopping = true
+		s.startFailingSince = time.Time{}
+		s.invalidateStartRetry()
 		// Stop check-in timer
 		s.log.Debugf("stop check-in timer for %s service", s.name())
 		checkinTimer.Stop()
@@ -198,6 +215,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 	onTeardown := func(as actionModeSigned) {
 		tamperProtection := features.TamperProtection()
 		s.log.Debugf("got teardown for %s service, tearingDown: %v, tamperProtection: %v", s.name(), tearingDown, tamperProtection)
+		s.invalidateStartRetry()
 
 		// If tamper protection is disabled do the old behavior
 		if !tamperProtection {
@@ -218,11 +236,16 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 			s.log.Debug("context is done. exiting.")
 			return ctx.Err()
 		case as := <-s.actionCh:
+			if as.retryGen != 0 && as.retryGen != s.startRetryGen {
+				s.log.Debugf("discarding stale start retry for %s service", s.name())
+				continue
+			}
 			s.log.Debugf("got action %v for %s service", as.actionMode, s.name())
 			s.actionState = as
 			switch as.actionMode {
 			case actionStart:
 				// Initial state on start
+				s.invalidateStartRetry()
 				lastCheckin = time.Time{}
 				ignoreCheckins = false
 				missedCheckins = 0
@@ -243,6 +266,7 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 							slices.Contains(s.comp.InputSpec.Spec.Service.Operations.Install.NonFatalExitCodes, exitCode) {
 							s.log.Warnf("exit code %d is non-fatal, continuing to run...", exitCode)
 							err = nil // fall through to open CIS and reset check-in timer
+							s.clearStartFailure()
 						}
 					}
 					if err != nil {
@@ -261,8 +285,24 @@ func (s *serviceRuntime) Run(ctx context.Context, comm Communicator) (err error)
 						// the start action on the action channel.
 						delay := s.serviceRestartDelay
 						s.log.Errorf("failed to start %s service, err: %v, restarting after waiting for %v", s.name(), err, delay)
+						if s.startFailingSince.IsZero() {
+							s.startFailingSince = time.Now()
+						}
+						failureState, failureLabel := client.UnitStateDegraded, "Degraded"
+						if time.Since(s.startFailingSince) >= s.startFailedAfter() {
+							failureState, failureLabel = client.UnitStateFailed, "Failed"
+						}
+						s.forceCompState(failureState,
+							fmt.Sprintf("%s: %s service failed to start: %s, retrying in %v. See the Elastic Agent logs for details",
+								failureLabel, s.name(), describeStartFailure(err), delay))
+						s.startRetryGen++
+						retry := as
+						retry.retryGen = s.startRetryGen
 						time.AfterFunc(delay, func() {
-							s.actionCh <- as
+							select {
+							case s.actionCh <- retry:
+							case <-ctx.Done():
+							}
 						})
 						continue
 					}
@@ -405,8 +445,10 @@ func injectSigned(comp component.Component, signed *component.Signed) (component
 func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	name := s.name()
 
-	// Set state to starting
-	s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
+	// Keep reporting the failure while retrying a failed start.
+	if s.startFailingSince.IsZero() {
+		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", name))
+	}
 
 	// Call the check command of the service
 	s.log.Infof("check if %s service is installed", name)
@@ -422,7 +464,54 @@ func (s *serviceRuntime) start(ctx context.Context) (err error) {
 	}
 
 	// The service should start on it's own, expecting check-ins
+	s.clearStartFailure()
 	return nil
+}
+
+// invalidateStartRetry discards the pending retry of a failed start, so that it does not
+// start the service after it was stopped or when a new start action supersedes it.
+func (s *serviceRuntime) invalidateStartRetry() {
+	s.startRetryGen++
+}
+
+// maxStartFailureLineLength limits the line of command output shown in a state message.
+const maxStartFailureLineLength = 200
+
+// describeStartFailure returns a short description of a failed start: what failed and
+// how, followed by the most relevant line of the command output when there is one.
+// start only returns the error of the install step, so the failure is described as one.
+func describeStartFailure(err error) string {
+	var reason string
+	var exitErr *exec.ExitError
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		reason = "install timed out"
+	case errors.As(err, &exitErr):
+		reason = fmt.Sprintf("install exited with code %d", exitErr.ExitCode())
+	default:
+		reason = "install failed"
+	}
+
+	var cmdErr *commandError
+	if errors.As(err, &cmdErr) {
+		line := logLinePrefix.ReplaceAllString(cmdErr.summary(), "")
+		if runes := []rune(line); len(runes) > maxStartFailureLineLength {
+			line = string(runes[:maxStartFailureLineLength]) + "..."
+		}
+		if line != "" {
+			reason += ": " + line
+		}
+	}
+	return reason
+}
+
+// clearStartFailure moves the state from the reported failure back to STARTING once a
+// start attempt no longer fails.
+func (s *serviceRuntime) clearStartFailure() {
+	if !s.startFailingSince.IsZero() {
+		s.startFailingSince = time.Time{}
+		s.forceCompState(client.UnitStateStarting, fmt.Sprintf("Starting: %s service runtime", s.name()))
+	}
 }
 
 func (s *serviceRuntime) stop(ctx context.Context, comm Communicator, lastCheckin time.Time, teardown bool) {
@@ -620,6 +709,15 @@ func (s *serviceRuntime) maxCheckinMisses(checkinPeriod time.Duration) int {
 	return misses
 }
 
+// startFailedAfter returns how long failed start attempts are reported as degraded
+// before they are reported as failed.
+func (s *serviceRuntime) startFailedAfter() time.Duration {
+	if d := s.comp.InputSpec.Spec.Service.Timeouts.StartFailedAfter; d > 0 {
+		return d
+	}
+	return defaultStartFailedAfter
+}
+
 func (s *serviceRuntime) checkinPeriod() time.Duration {
 	checkinPeriod := s.comp.InputSpec.Spec.Service.Timeouts.Checkin
 	if checkinPeriod == 0 {
@@ -644,7 +742,7 @@ func (s *serviceRuntime) Start() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionModeSigned{actionStart, nil}
+	s.actionCh <- actionModeSigned{actionMode: actionStart}
 	return nil
 }
 
@@ -670,7 +768,7 @@ func (s *serviceRuntime) Stop() error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionModeSigned{actionStop, nil}
+	s.actionCh <- actionModeSigned{actionMode: actionStop}
 	return nil
 }
 
@@ -683,7 +781,7 @@ func (s *serviceRuntime) Teardown(signed *component.Signed) error {
 	case <-s.actionCh:
 	default:
 	}
-	s.actionCh <- actionModeSigned{actionTeardown, signed}
+	s.actionCh <- actionModeSigned{actionMode: actionTeardown, signed: signed}
 	return nil
 }
 

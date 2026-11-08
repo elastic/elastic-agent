@@ -43,9 +43,15 @@ jobs:
             allowed="main|${previous_major_last//./\\.}"
           fi
 
-          jq --argjson branches "$branches" --arg allowed "$allowed" '
+          # Rules to rewrite are identified by a marker entry in their
+          # "description" array rather than by the human-readable text.
+          marker="managed-by: update-renovate-branches"
+
+          jq --argjson branches "$branches" --arg allowed "$allowed" --arg marker "$marker" '
             .baseBranchPatterns = $branches
-            | (.packageRules[] | select(.description | startswith("Major updates:")) | .matchBaseBranches)
+            | (.packageRules[]
+                | select([.description] | flatten | index($marker))
+                | .matchBaseBranches)
               = ["!/^(" + $allowed + ")$/"]
           ' renovate.json > renovate.json.new
           mv renovate.json.new renovate.json

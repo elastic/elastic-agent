@@ -2853,72 +2853,97 @@ func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 }
 
 func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
-	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
-
-	mockUpgradeManager := &mockUpgradeManager{
-		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+	diskSpaceLowErr := upgradeErrors.DiskSpaceLowError{
+		"need 1 GB at /data",
+		"need 500 MB at /downloads",
 	}
-
-	initialState := State{
-		CoordinatorState:   agentclient.Healthy,
-		CoordinatorMessage: "Running",
-	}
-
-	coord := &Coordinator{
-		state:              initialState,
-		logger:             log,
-		upgradeMgr:         mockUpgradeManager,
-		stateBroadcaster:   broadcaster.New(initialState, 64, 32),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		upgradeDetailsChan: make(chan *details.Details),
-	}
-
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	overrideStates := []agentclient.State{}
-	go func() {
-		state1 := <-coord.overrideStateChan
-		overrideStates = append(overrideStates, state1.state)
-
-		state2 := <-coord.overrideStateChan
-		if state2 != nil {
-			overrideStates = append(overrideStates, state2.state)
-		}
-
-		wg.Done()
-	}()
-
-	upgradeDetails := []*details.Details{}
-	go func() {
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		wg.Done()
-	}()
-
-	err := coord.Upgrade(t.Context(), "", nil, nil)
-	require.Error(t, err)
-	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
-
-	wg.Wait()
-
-	require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
-
-	require.Equal(t, []*details.Details{
+	testCases := []struct {
+		name        string
+		upgradeErr  error
+		expectedErr error
+	}{
 		{
-			TargetVersion: "",
-			State:         details.StateRequested,
-			ActionID:      "",
+			name:        "disk space low joined with os error",
+			upgradeErr:  fmt.Errorf("wrapped: %w", errors.Join(upgradeErrors.OS_DiskSpaceErrors[0], diskSpaceLowErr)),
+			expectedErr: diskSpaceLowErr,
 		},
 		{
-			TargetVersion: "",
-			State:         details.StateFailed,
-			Metadata: details.Metadata{
-				FailedState: details.StateRequested,
-				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
-			},
+			name:        "disk space low",
+			upgradeErr:  fmt.Errorf("wrapped: %w", diskSpaceLowErr),
+			expectedErr: diskSpaceLowErr,
 		},
-	}, upgradeDetails)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
+
+			mockUpgradeManager := &mockUpgradeManager{
+				upgradeErr: tc.upgradeErr,
+			}
+
+			initialState := State{
+				CoordinatorState:   agentclient.Healthy,
+				CoordinatorMessage: "Running",
+			}
+
+			coord := &Coordinator{
+				state:              initialState,
+				logger:             log,
+				upgradeMgr:         mockUpgradeManager,
+				stateBroadcaster:   broadcaster.New(initialState, 64, 32),
+				overrideStateChan:  make(chan *coordinatorOverrideState),
+				upgradeDetailsChan: make(chan *details.Details),
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+
+			overrideStates := []agentclient.State{}
+			go func() {
+				state1 := <-coord.overrideStateChan
+				overrideStates = append(overrideStates, state1.state)
+
+				state2 := <-coord.overrideStateChan
+				if state2 != nil {
+					overrideStates = append(overrideStates, state2.state)
+				}
+
+				wg.Done()
+			}()
+
+			upgradeDetails := []*details.Details{}
+			go func() {
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				wg.Done()
+			}()
+
+			err := coord.Upgrade(t.Context(), "", nil, nil)
+			require.Error(t, err)
+			require.Equal(t, tc.expectedErr, err)
+
+			wg.Wait()
+
+			require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
+
+			require.Equal(t, []*details.Details{
+				{
+					TargetVersion: "",
+					State:         details.StateRequested,
+					ActionID:      "",
+				},
+				{
+					TargetVersion: "",
+					State:         details.StateFailed,
+					Metadata: details.Metadata{
+						FailedState: details.StateRequested,
+						ErrorMsg:    tc.expectedErr.Error(),
+					},
+				},
+			}, upgradeDetails)
+		})
+	}
 }
 
 func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
@@ -3118,7 +3143,7 @@ func TestCoordinator_Restart(t *testing.T) {
 		coord := &Coordinator{
 			// buffered so SetOverrideState (via ReExec) never blocks without a run loop
 			overrideStateChan: make(chan *coordinatorOverrideState, 2),
-			canReExec:         func() bool { return false },
+			canRestart:        func() bool { return false },
 			reexecMgr:         reexecMgr,
 			logger:            logp.NewLogger("testing"),
 		}
@@ -3132,7 +3157,7 @@ func TestCoordinator_Restart(t *testing.T) {
 		reexecMgr := &recordingReExecManager{}
 		coord := &Coordinator{
 			overrideStateChan: make(chan *coordinatorOverrideState, 2),
-			canReExec:         func() bool { return true },
+			canRestart:        func() bool { return true },
 			reexecMgr:         reexecMgr,
 			logger:            logp.NewLogger("testing"),
 		}
@@ -3148,5 +3173,26 @@ func TestCoordinator_Restart(t *testing.T) {
 		default:
 			t.Fatal("expected an override state to be set")
 		}
+	})
+
+	t.Run("containerized environment returns ErrContainerNotSupported and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		platformSpecs, _ := pkgcomponent.NewRuntimeSpecs(pkgcomponent.PlatformDetail{
+			Platform: pkgcomponent.Platform{OS: pkgcomponent.Container},
+		}, nil)
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			// canRestart would otherwise allow the restart (a containerized agent
+			// runs under an init such as tini and appears supervised), so this
+			// proves the container guard takes precedence.
+			canRestart: func() bool { return true },
+			reexecMgr:  reexecMgr,
+			specs:      platformSpecs,
+			logger:     logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrContainerNotSupported)
+		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
 	})
 }

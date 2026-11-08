@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -456,6 +457,207 @@ func TestServiceStartRetry(t *testing.T) {
 		}
 		return false
 	}, service.serviceRestartDelay+1*time.Second, 500*time.Millisecond)
+}
+
+// TestServiceStartFailureReportedAcrossRetries tests that a failed service start
+// is reported as DEGRADED, and that it stays DEGRADED while the start is retried.
+func TestServiceStartFailureReportedAcrossRetries(t *testing.T) {
+	log, logObs := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".sfrteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var mu sync.Mutex
+	var states []client.UnitState
+	var degradedMsg string
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case st := <-service.ch:
+				mu.Lock()
+				states = append(states, st.State)
+				if st.State == client.UnitStateDegraded && degradedMsg == "" {
+					degradedMsg = st.Message
+				}
+				mu.Unlock()
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	// Wait for the start to be retried after failing.
+	require.Eventually(t, func() bool {
+		return logObs.FilterMessageSnippet("failed to start endpoint service").Len() >= 2
+	}, 30*time.Second, 100*time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	degradedAt := slices.Index(states, client.UnitStateDegraded)
+	require.GreaterOrEqual(t, degradedAt, 0, "DEGRADED was not reported")
+	for _, st := range states[degradedAt:] {
+		require.Equal(t, client.UnitStateDegraded, st, "the retry must not reset the state from DEGRADED")
+	}
+	require.Contains(t, degradedMsg, "install exited with code 99")
+}
+
+// TestServiceStartFailureBecomesFailedAfterBudget tests that failed starts are reported
+// as DEGRADED at first and as FAILED once they have kept failing for long enough.
+func TestServiceStartFailureBecomesFailedAfterBudget(t *testing.T) {
+	log, _ := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".ssfabteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+		Timeouts: component.ServiceTimeoutSpec{StartFailedAfter: 300 * time.Millisecond},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var mu sync.Mutex
+	var states []client.UnitState
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case st := <-service.ch:
+				mu.Lock()
+				states = append(states, st.State)
+				mu.Unlock()
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+
+	observed := func() []client.UnitState {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(states)
+	}
+	require.Eventually(t, func() bool {
+		return slices.Contains(observed(), client.UnitStateFailed)
+	}, 30*time.Second, 50*time.Millisecond)
+
+	// The failure is first reported as degraded, and the retries never reset it to starting.
+	got := observed()
+	degradedAt := slices.Index(got, client.UnitStateDegraded)
+	failedAt := slices.Index(got, client.UnitStateFailed)
+	require.GreaterOrEqual(t, degradedAt, 0, "DEGRADED was not reported")
+	require.Less(t, degradedAt, failedAt)
+	require.NotContains(t, got[degradedAt:], client.UnitStateStarting)
+
+	// Once failed, the state is kept by the following attempts.
+	require.Never(t, func() bool {
+		return slices.ContainsFunc(observed()[failedAt+1:], func(st client.UnitState) bool { return st != client.UnitStateFailed })
+	}, 2*service.serviceRestartDelay, 50*time.Millisecond)
+}
+
+func TestDescribeStartFailure(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{
+			name: "timeout with output",
+			err:  &commandError{line: "2026-01-02 03:04:05: error: A.cpp:1 something broke", err: context.DeadlineExceeded},
+			want: "install timed out: A.cpp:1 something broke",
+		},
+		{
+			name: "no output",
+			err:  errors.New("boom"),
+			want: "install failed",
+		},
+		{
+			name: "long line is shortened",
+			err:  &commandError{line: strings.Repeat("x", 300), err: errors.New("boom")},
+			want: "install failed: " + strings.Repeat("x", maxStartFailureLineLength) + "...",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, describeStartFailure(tc.err))
+		})
+	}
+}
+
+// TestServiceStartRetryDiscardedAfterStop tests that a stopped service is not started
+// by a retry of a failed start that was scheduled before the stop.
+func TestServiceStartRetryDiscardedAfterStop(t *testing.T) {
+	log, logObs := loggertest.New("test")
+
+	endpoint := makeEndpointComponent(t, map[string]interface{}{})
+	endpoint.InputSpec.Spec.Service = &component.ServiceSpec{
+		CPort:   9999,
+		CSocket: ".ssrcteaci.sock",
+		Operations: component.ServiceOperationsSpec{
+			Check:   &component.ServiceOperationsCommandSpec{},
+			Install: &component.ServiceOperationsCommandSpec{},
+		},
+	}
+	endpoint.InputSpec.BinaryPath = mockEndpointBinary(t, 99)
+	endpoint.InputSpec.BinaryName = "endpoint"
+
+	service, err := newServiceRuntime(endpoint, log, true)
+	require.NoError(t, err)
+	service.serviceRestartDelay = 500 * time.Millisecond
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-service.ch:
+			}
+		}
+	}()
+
+	startServiceRuntime(t, ctx, cancel, service, newMockCommunicator(""))
+	failedStarts := func() int {
+		return logObs.FilterMessageSnippet("failed to start endpoint service").Len()
+	}
+	service.actionCh <- actionModeSigned{actionMode: actionStart}
+	require.Eventually(t, func() bool { return failedStarts() == 1 }, 30*time.Second, 50*time.Millisecond)
+
+	require.NoError(t, service.Stop())
+	require.Never(t, func() bool { return failedStarts() > 1 }, 3*service.serviceRestartDelay, 50*time.Millisecond,
+		"the service was started again after it was stopped")
 }
 
 // startServiceRuntime runs service.Run in the background and registers a cleanup

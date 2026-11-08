@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/go-ucfg"
 )
@@ -110,6 +110,15 @@ func TestToMapStr(t *testing.T) {
 	if diff != "" {
 		t.Error(diff)
 	}
+
+	t.Run("releasing", func(t *testing.T) {
+		c := MustNewConfigFrom(input)
+		observed, err := c.ToMapStrReleasing("inputs")
+		require.NoError(t, err)
+		assert.Empty(t, cmp.Diff(expected, observed))
+		assert.False(t, c.Agent.HasField("inputs"), "released key must not be merged back")
+		assert.True(t, c.Agent.HasField("outputs"))
+	})
 }
 
 func TestCommaParsing(t *testing.T) {
