@@ -24,7 +24,6 @@ actions:
     scmid: githubConfig
     sourceid: latestGoVersion
     spec:
-      automerge: false
       labels:
         - automation
         - dependencies
