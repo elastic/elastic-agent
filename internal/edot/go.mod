@@ -85,6 +85,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
+	go.opentelemetry.io/collector/component/componentstatus v0.164.0
 	go.opentelemetry.io/collector/component/componenttest v0.164.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.164.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.164.0
@@ -205,7 +206,6 @@ require (
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/vultr/govultr/v3 v3.33.0 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.9.1 // indirect
-	go.opentelemetry.io/collector/component/componentstatus v0.164.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.164.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.164.0 // indirect
 	go.opentelemetry.io/collector/internal/statusutil v0.164.0 // indirect
@@ -847,3 +847,5 @@ replace (
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20260105140042-f602c1ebde13
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b
 )
+
+replace go.opentelemetry.io/contrib/otelconf => github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317
