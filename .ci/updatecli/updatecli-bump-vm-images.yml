@@ -24,7 +24,6 @@ actions:
     scmid: githubConfig
     sourceid: latestGoVersion
     spec:
-      automerge: false
       labels:
         - dependencies
         - backport-skip
@@ -37,7 +36,8 @@ sources:
     kind: json
     spec:
       file: https://storage.googleapis.com/artifacts-api/vm-images/elastic-agent/latest.json
-      key: .date
+      engine: dasel/v3
+      key: date
 
 conditions:
   latestVersion-check:
