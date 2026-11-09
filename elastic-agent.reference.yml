@@ -166,6 +166,9 @@ inputs:
 #   certificate_reload:
 #     # check the CAs for changes while running, so none needs a restart
 #     enabled: true
+#     # Positive intervals below 1s use 1s and log a warning.
+#     # In containers, ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL overrides this interval;
+#     # setting the environment variable to 0 disables reloading.
 #     reload_interval: 30s
 
 # agent.grpc:

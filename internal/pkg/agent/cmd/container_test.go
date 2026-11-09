@@ -1848,6 +1848,12 @@ func TestContainerBrowserCAOverrides(t *testing.T) {
 			wantInterval: 2 * time.Minute,
 		},
 		{
+			name:         "a subsecond interval is passed to the browser watcher for clamping",
+			env:          map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "1ns"},
+			wantReload:   true,
+			wantInterval: time.Nanosecond,
+		},
+		{
 			name:       "a zero reload interval disables reloading",
 			env:        map[string]string{"ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL": "0"},
 			wantReload: false,

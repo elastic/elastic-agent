@@ -12,7 +12,8 @@ description: >
   building a custom image or ignoring TLS errors. Only the browser trusts them:
   the trust store of the operating system is unchanged. In containers
   ELASTIC_AGENT_BROWSER_CA sets the paths and ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL
-  the interval (0 disables it). The complete images ship certutil (nss-tools /
+  the interval (0 disables it). Positive reload intervals below 1s use 1s and log
+  a warning. The complete images ship certutil (nss-tools /
   libnss-tools) for this. The Helm chart gains `agent.browserCAs.secretName` to
   mount a Secret with the CAs at /etc/elastic-agent/browser-cas and set
   ELASTIC_AGENT_BROWSER_CA to it.

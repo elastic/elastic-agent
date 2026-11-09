@@ -127,15 +127,17 @@ func TestStartWatchesInitiallyMissingPaths(t *testing.T) {
 				require.NoError(t, os.Symlink(caPath, configuredPath))
 			}
 			cfg := Config{CertificateAuthorities: []string{configuredPath}}
-			cfg.CertificateReload.ReloadInterval = testInterval
+			// Exercise the minimum interval through Start, including the disabled case.
+			cfg.CertificateReload.ReloadInterval = time.Nanosecond
 			if name == "reload disabled" {
 				disabled := false
 				cfg.CertificateReload.Enabled = &disabled
 			}
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
-			log, _ := loggertest.New(t.Name())
+			log, logs := loggertest.New(t.Name())
 			Start(ctx, log, cfg)
+			assert.Equal(t, name != "reload disabled", logs.FilterMessageSnippet("below the minimum of 1s").Len() == 1)
 			require.NoDirExists(t, filepath.Join(home, ".pki"), "do not create a store before a CA exists")
 
 			require.NoError(t, os.MkdirAll(filepath.Dir(caPath), 0o700))
@@ -143,7 +145,7 @@ func TestStartWatchesInitiallyMissingPaths(t *testing.T) {
 			if name == "reload disabled" {
 				assert.Never(t, func() bool {
 					return exists(filepath.Join(home, ".pki"))
-				}, 250*time.Millisecond, testInterval, "disabled reload must not import a late CA")
+				}, 1250*time.Millisecond, testInterval, "disabled reload must not import a late CA")
 				return
 			}
 			require.Eventually(t, func() bool {

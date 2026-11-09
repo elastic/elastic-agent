@@ -29,8 +29,43 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
+
+func TestReloadInterval(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		want  time.Duration
+		warn  bool
+	}{
+		{value: "", want: 30 * time.Second},
+		{value: "0s", want: 30 * time.Second},
+		{value: "-1s", want: 30 * time.Second},
+		{value: "1ns", want: time.Second, warn: true},
+		{value: "500ms", want: time.Second, warn: true},
+		{value: "999999999ns", want: time.Second, warn: true},
+		{value: "1s", want: time.Second},
+		{value: "1000000001ns", want: time.Second + time.Nanosecond},
+		{value: "30s", want: 30 * time.Second},
+		{value: "2m", want: 2 * time.Minute},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			raw := map[string]any{}
+			if tc.value != "" {
+				raw["certificate_reload.reload_interval"] = tc.value
+			}
+			var cfg Config
+			require.NoError(t, config.MustNewConfigFrom(raw).UnpackTo(&cfg))
+			log := &testLog{}
+			assert.Equal(t, tc.want, cfg.reloadInterval(log))
+			assert.Equal(t, tc.warn, log.has("below the minimum of 1s, using 1s"))
+			if !tc.warn {
+				assert.Empty(t, log.logs)
+			}
+		})
+	}
+}
 
 // newCA returns a self-signed CA certificate in PEM form.
 func newCA(t *testing.T, cn string) string {

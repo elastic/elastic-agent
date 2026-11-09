@@ -12,6 +12,7 @@ import (
 	"os/user"
 	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -71,12 +72,21 @@ func Start(ctx context.Context, log *logger.Logger, cfg Config) {
 	}
 	// Without configured paths there is nothing to watch, only a failed cleanup to retry.
 	if reload && (len(m.paths) > 0 || err != nil) {
-		interval := cfg.CertificateReload.ReloadInterval
-		if interval <= 0 {
-			interval = defaultInterval
-		}
-		go m.run(ctx, interval)
+		go m.run(ctx, cfg.reloadInterval(log))
 	}
+}
+
+// reloadInterval bounds polling work for both YAML and container overrides.
+func (cfg Config) reloadInterval(log logs) time.Duration {
+	interval := cfg.CertificateReload.ReloadInterval
+	if interval <= 0 {
+		return defaultInterval
+	}
+	if interval < time.Second {
+		log.Warnf("browser CA reload interval %s is below the minimum of 1s, using 1s", interval)
+		return time.Second
+	}
+	return interval
 }
 
 func exists(path string) bool {
