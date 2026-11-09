@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v93/github"
 )
 
 // globalReleaseTrackerURL is the ingest-wide release tracker linked from every Elastic Agent release issue.

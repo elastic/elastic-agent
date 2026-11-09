@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v93/github"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
