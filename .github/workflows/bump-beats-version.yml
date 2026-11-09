@@ -68,7 +68,7 @@ jobs:
     - name: Run Updatecli in Apply mode
       uses: elastic/oblt-actions/updatecli/run@v1
       with:
-        command: apply --config .ci/updatecli/update-beats.yml --commit=false
+        command: pipeline apply --config .ci/updatecli/update-beats.yml --commit=false
         version-file: .updatecli-version
       env:
         BRANCH_NAME: ${{ matrix.branch }}
