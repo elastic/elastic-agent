@@ -246,7 +246,10 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"auth": map[string]any{

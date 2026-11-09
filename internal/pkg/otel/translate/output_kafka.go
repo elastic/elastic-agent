@@ -64,13 +64,16 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		"client_id":        kConfig.ClientID,
 		"protocol_version": string(kConfig.Version),
 		"sending_queue": map[string]any{
+			"enabled": true,
 			"batch": map[string]any{
 				"max_size":      kConfig.BulkMaxSize,
 				"flush_timeout": getFlushTimeout(logger, config),
 				"min_size":      min(getFlushMinEvents(logger, config), kConfig.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
 				"sizer":         "items",
 			},
-			"queue_size": getQueueSize(logger, config),
+			"queue_size":        getQueueSize(logger, config),
+			"block_on_overflow": true,
+			"wait_for_result":   true,
 		},
 		"producer": map[string]any{
 			"compression":       kConfig.Compression,
