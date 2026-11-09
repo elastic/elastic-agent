@@ -15,6 +15,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configtelemetry"
+	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/service/telemetry"
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
@@ -25,6 +26,32 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap"
 )
+
+// partialReloadGates are the collector gates the per-component meter lifecycle
+// is conditional on. service.partialReload is Alpha and off by default, so
+// tests that exercise the lifecycle provider must turn them on explicitly.
+var partialReloadGates = []string{"service.partialReload", "service.partialReloadReceivers"}
+
+func gateEnabled(id string) bool {
+	var on bool
+	featuregate.GlobalRegistry().VisitAll(func(g *featuregate.Gate) {
+		if g.ID() == id {
+			on = g.IsEnabled()
+		}
+	})
+	return on
+}
+
+func setPartialReloadGates(t *testing.T, enabled bool) {
+	t.Helper()
+	for _, id := range partialReloadGates {
+		prev := gateEnabled(id)
+		if err := featuregate.GlobalRegistry().Set(id, enabled); err != nil {
+			t.Fatalf("set %s=%v: %v", id, enabled, err)
+		}
+		t.Cleanup(func() { _ = featuregate.GlobalRegistry().Set(id, prev) })
+	}
+}
 
 // testScopeName stands in for an instrumentation scope a component would use.
 const testScopeName = "github.com/elastic/elastic-agent/internal/edot/internaltelemetry/test"
@@ -60,12 +87,30 @@ func asComponent(mp metric.MeterProvider, id string) metric.MeterProvider {
 // prometheus port of 0 lets the OS pick one, which keeps parallel tests apart.
 func newTestProvider(t *testing.T, promPort int, views []otelconf.View) telemetry.MeterProvider {
 	t.Helper()
+	setPartialReloadGates(t, true)
+	return buildProvider(t, promPort, views)
+}
+
+// newTestProviderWithoutPartialReload builds a provider with the gates off,
+// which is how the collector runs when partial reload is disabled.
+func newTestProviderWithoutPartialReload(t *testing.T) telemetry.MeterProvider {
+	t.Helper()
+	setPartialReloadGates(t, false)
+	return buildProvider(t, 0, nil)
+}
+
+func buildProvider(t *testing.T, promPort int, views []otelconf.View) telemetry.MeterProvider {
+	t.Helper()
 
 	// Bypass the NewFactory singleton so each test gets its own factory, and
 	// install it globally so ComponentStopped reaches this one.
+	// Restore whatever factory was installed rather than clearing it: NewFactory
+	// is a sync.Once singleton, so leaving nil behind breaks any later caller
+	// that goes through it (the external test package does).
+	prev := globalFactory.Load()
 	wf := &wrappedFactory{Factory: otelconftelemetry.NewFactory()}
 	globalFactory.Store(wf)
-	t.Cleanup(func() { globalFactory.Store(nil) })
+	t.Cleanup(func() { globalFactory.Store(prev) })
 
 	cfg, ok := otelconftelemetry.NewFactory().CreateDefaultConfig().(*otelconftelemetry.Config)
 	if !ok {
@@ -280,4 +325,31 @@ func scrapeMetrics(t *testing.T, port int) string {
 		t.Fatalf("read scrape body: %v", err)
 	}
 	return string(b)
+}
+
+// TestWithoutPartialReloadNoPerComponentProviders checks the escape hatch: with
+// partial reload off, a full reload rebuilds the MeterProvider and releases
+// everything anyway, so no per-component providers are created and component
+// telemetry still flows through the base provider.
+func TestWithoutPartialReloadNoPerComponentProviders(t *testing.T) {
+	mp := newTestProviderWithoutPartialReload(t)
+
+	const id = "receiver/no-partial-reload"
+	observeCounter(t, asComponent(mp, id), "metric_ungated")
+
+	if got := LiveMeterComponents(); got != 0 {
+		t.Errorf("expected no per-component providers with partial reload off, got %d", got)
+	}
+	if !collectedMetricNames(t)["metric_ungated"] {
+		t.Error("component metric is missing from collected output")
+	}
+	if ids := collectedComponentIDs(t); !ids[id] {
+		t.Errorf("component id missing from scope attributes: %v", ids)
+	}
+
+	// ComponentStopped must stay a safe no-op in this mode.
+	ComponentStopped(context.Background(), id)
+	if !collectedMetricNames(t)["metric_ungated"] {
+		t.Error("ComponentStopped removed metrics from the base provider")
+	}
 }
