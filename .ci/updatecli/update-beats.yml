@@ -7,7 +7,8 @@ sources:
     kind: json
     spec:
       file: 'https://api.github.com/repos/elastic/beats/commits?sha={{ requiredEnv "BRANCH_NAME" }}&per_page=1'
-      key: '.[0].sha'
+      engine: dasel/v3
+      key: '$this[0].sha'
     transformers:
     # substring 12 chars so it works for the condition
     - findsubmatch:
