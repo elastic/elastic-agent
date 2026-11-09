@@ -21,7 +21,6 @@ actions:
     kind: github/pullrequest
     scmid: elastic-agent
     spec:
-      automerge: false
       labels:
         - backport-active-9
         - dependencies
