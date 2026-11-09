@@ -7,12 +7,14 @@
 package browserca
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -98,6 +100,56 @@ func TestStartCleansUpCAsNoLongerConfigured(t *testing.T) {
 			out, err := previous.certs(t.Context(), nil, "-L", "-d", "sql:"+filepath.Join(home, ".pki", "nssdb"))
 			require.NoError(t, err, "listing the database")
 			assert.Zero(t, countManaged(string(out)), "a CA no longer configured must be removed at start:\n%s", out)
+		})
+	}
+}
+
+// Configured paths may be populated after the agent starts, for example by a
+// sidecar provisioning the CA. Watch them even when no database exists yet.
+func TestStartWatchesInitiallyMissingPaths(t *testing.T) {
+	certutil, err := exec.LookPath("certutil")
+	if err != nil || runtime.GOOS != "linux" {
+		t.Skip("needs certutil on Linux")
+	}
+	for _, name := range []string{"file", "directory", "dangling symlink", "reload disabled"} {
+		t.Run(name, func(t *testing.T) {
+			home, dir := t.TempDir(), t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv(browserUserEnv, "")
+			caPath := filepath.Join(dir, "ca.pem")
+			configuredPath := caPath
+			switch name {
+			case "directory":
+				configuredPath = filepath.Join(dir, "late")
+				caPath = filepath.Join(configuredPath, "ca.pem")
+			case "dangling symlink":
+				configuredPath = filepath.Join(dir, "link.pem")
+				require.NoError(t, os.Symlink(caPath, configuredPath))
+			}
+			cfg := Config{CertificateAuthorities: []string{configuredPath}}
+			cfg.CertificateReload.ReloadInterval = testInterval
+			if name == "reload disabled" {
+				disabled := false
+				cfg.CertificateReload.Enabled = &disabled
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			log, _ := loggertest.New(t.Name())
+			Start(ctx, log, cfg)
+			require.NoDirExists(t, filepath.Join(home, ".pki"), "do not create a store before a CA exists")
+
+			require.NoError(t, os.MkdirAll(filepath.Dir(caPath), 0o700))
+			require.NoError(t, os.WriteFile(caPath, []byte(newCA(t, "late CA")), 0o600))
+			if name == "reload disabled" {
+				assert.Never(t, func() bool {
+					return exists(filepath.Join(home, ".pki"))
+				}, 250*time.Millisecond, testInterval, "disabled reload must not import a late CA")
+				return
+			}
+			require.Eventually(t, func() bool {
+				out, err := execRunner(certutil, nil)(ctx, nil, "-L", "-d", "sql:"+filepath.Join(home, ".pki", "nssdb"))
+				return err == nil && countManaged(string(out)) == 1
+			}, 5*time.Second, testInterval, "a CA appearing after startup must be imported without restarting")
 		})
 	}
 }

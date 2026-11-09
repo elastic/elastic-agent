@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"os/user"
 	"runtime"
-	"slices"
 	"strconv"
 
 	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
@@ -33,9 +32,10 @@ type Config struct {
 // Start imports the configured CAs into the browser's trust store and, unless
 // certificate_reload is disabled, keeps it in sync until ctx is done. A store left
 // by a previous run is cleaned up even when no CA is configured any more. It does
-// nothing outside Linux, when there are neither configured paths that exist nor a
-// store, or without certutil. It never returns an error: a failure only logs a
-// warning, so it can't stop the agent from starting.
+// nothing outside Linux, when there are neither configured paths nor a store, or
+// without certutil. Configured paths are watched even if they do not exist yet.
+// It never returns an error: a failure only logs a warning, so it can't stop the
+// agent from starting.
 //
 // It must run before the agent starts the browser, because it may change HOME.
 func Start(ctx context.Context, log *logger.Logger, cfg Config) {
@@ -45,7 +45,7 @@ func Start(ctx context.Context, log *logger.Logger, cfg Config) {
 	m := &manager{paths: cfg.CertificateAuthorities, log: log}
 	var setHome bool
 	m.home, m.owner, setHome = browserHome(log)
-	if !slices.ContainsFunc(m.paths, exists) && !m.hasDB() {
+	if len(m.paths) == 0 && !m.hasDB() {
 		return
 	}
 	certutil, err := exec.LookPath("certutil")

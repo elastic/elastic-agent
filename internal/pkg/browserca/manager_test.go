@@ -548,12 +548,14 @@ func TestBrowserHome(t *testing.T) {
 	})
 }
 
-func TestStartDoesNothingWithoutTheConfiguredPathsOrAStore(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+func TestStartDoesNothingWithoutConfiguredPathsOrAStore(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
 	t.Setenv(browserUserEnv, "")
 	log, logs := loggertest.New(t.Name())
-	Start(t.Context(), log, Config{CertificateAuthorities: []string{filepath.Join(t.TempDir(), "missing")}})
-	assert.Zero(t, logs.Len(), "nothing may be logged or done when no configured path exists")
+	Start(t.Context(), log, Config{})
+	assert.Zero(t, logs.Len(), "nothing may be logged when no paths or store are configured")
+	assert.NoDirExists(t, filepath.Join(home, ".pki"), "no database may be created without configuration")
 }
 
 func TestLookupBrowserUser(t *testing.T) {
