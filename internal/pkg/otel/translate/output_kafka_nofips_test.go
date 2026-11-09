@@ -26,6 +26,10 @@ auth:
     client_id: my-client
     client_secret: my-secret
     token_url: https://example.com/oauth2/token
+    timeout: 10s
+    endpoint_params:
+      foo: bar,join
+      new: info
 `
 	expectedMap := map[string]any{
 		"brokers":   []string{"kafka1:9092"},
@@ -78,7 +82,26 @@ auth:
 	require.NoError(t, err, "error translating kafka to kafka exporter")
 	require.Equal(t, expectedMap, gotMap)
 	require.Nil(t, processorCfg)
-	require.Contains(t, extensionCfg, "oauth2client/_agent-component/default")
+	require.Equal(t, map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+		"client_certificate_key":      "",
+		"client_certificate_key_file": "",
+		"client_certificate_key_id":   "",
+		"client_id":                   "my-client",
+		"client_id_file":              "",
+		"client_secret":               "my-secret",
+		"client_secret_file":          "",
+		"endpoint_params": map[string][]string{
+			"foo": {"bar", "join"},
+			"new": {"info"},
+		},
+		"expiry_buffer": "5m0s",
+		"grant_type":    "",
+		"timeout":       "10s",
+		"tls": map[string]any{
+			"tpm": map[string]any{},
+		},
+		"token_url": "https://example.com/oauth2/token",
+	}, extensionCfg["oauth2client/_agent-component/default"])
 }
 
 func TestKafkaOAuthRequiresOauthConfig(t *testing.T) {

@@ -318,8 +318,17 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		ExpiryBuffer: 5 * time.Minute,
 	}
 
-	err = mapstructure.Decode(oauthMap, &defaultConfig)
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result: &defaultConfig,
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToSliceHookFunc(","),
+			mapstructure.StringToTimeDurationHookFunc(),
+		),
+	})
 	if err != nil {
+		return nil, fmt.Errorf("failed creating decoder: %w", err)
+	}
+	if err = decoder.Decode(oauthMap); err != nil {
 		return nil, fmt.Errorf("error decoding oauth2client extension config: %w", err)
 	}
 
@@ -359,6 +368,8 @@ func oauth2MapEncodeHook() mapstructure.DecodeHookFunc {
 			return string(v), nil
 		case url.URL:
 			return v.String(), nil
+		case url.Values:
+			return map[string][]string(v), nil
 		default:
 			return data, nil
 		}
@@ -418,8 +429,8 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 	} else if value, err := cfg.Child("ssl", -1); err == nil {
 		if value.HasField("ca_trusted_fingerprint") {
 			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
-		} else if value.HasField("ca_sha_256") {
-			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
+		} else if value.HasField("ca_sha256") {
+			return fmt.Errorf("ca_sha256 is currently not supported: %w", errors.ErrUnsupported)
 		}
 	}
 
