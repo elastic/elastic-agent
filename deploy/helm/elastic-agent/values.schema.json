@@ -2065,6 +2065,27 @@
                         }
                     ]
                 },
+                "startupProbe": {
+                    "type": "object",
+                    "description": "Startup probe of the agent container.",
+                    "examples": [
+                        { "httpGet": { "path": "/", "port": 13133 }, "periodSeconds": 10, "failureThreshold": 30 }
+                    ]
+                },
+                "livenessProbe": {
+                    "type": "object",
+                    "description": "Liveness probe of the agent container.",
+                    "examples": [
+                        { "httpGet": { "path": "/", "port": 13133 }, "periodSeconds": 30, "failureThreshold": 3 }
+                    ]
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "description": "Readiness probe of the agent container.",
+                    "examples": [
+                        { "httpGet": { "path": "/", "port": 13133 }, "periodSeconds": 10 }
+                    ]
+                },
                 "securityContext": {
                     "type": "object",
                     "description": "Security context for the deployment.",
