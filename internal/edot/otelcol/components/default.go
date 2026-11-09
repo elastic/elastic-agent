@@ -125,6 +125,7 @@ import (
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
+	"github.com/elastic/elastic-agent/internal/edot/extensions/meterlifecycle"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
@@ -302,6 +303,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			headersetterextension.NewFactory(),
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			meterlifecycle.NewFactory(),
 			elasticsearchstorage.NewFactory(),
 			kafkapartitionerextension.NewFactory(),
 			awslogsencodingextension.NewFactory(),

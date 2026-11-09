@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Fix component telemetry memory leak with partial config reload enabled
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/17877

@@ -1616,6 +1616,8 @@ github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
+github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317 h1:UYpCIqIDIH0XOaV3z+9HX1uLS7T/FT93gdmluo/Db2A=
+github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317/go.mod h1:2Pf2b8pJDpLtymJ9Sv0z0ANPAxDpZ7QLezLdIKNusww=
 github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRVe/J8=
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
 github.com/testcontainers/testcontainers-go v0.45.0 h1:ss9Stm9KDX6JLgGL4jr2fC5dwpabTbCBsRcGadBPR9k=
@@ -1937,8 +1939,6 @@ go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.
 go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.71.0/go.mod h1:+H3sPOFwag14eMHTPMElZtV0e4YfVZ/85KgrKUCB5FI=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 h1:LxwW/9ctSCv+QkE/cLR7M91ZIkXNMqJtEMi1vCw9U8s=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0/go.mod h1:tOsftB4SslBwwErVEPaenU2RpThXWPIU8DoJHEC4dyw=
-go.opentelemetry.io/contrib/otelconf v0.25.0 h1:rbVGzm5OsVQhdnjqv2hvKuJhVTVHux9Ltra+N4FKy7M=
-go.opentelemetry.io/contrib/otelconf v0.25.0/go.mod h1:2Pf2b8pJDpLtymJ9Sv0z0ANPAxDpZ7QLezLdIKNusww=
 go.opentelemetry.io/contrib/propagators/autoprop v0.70.0 h1:yNNN177cOlxAJ5F8l1YKiD6rJk9GOUi/HnRQbI83DeQ=
 go.opentelemetry.io/contrib/propagators/autoprop v0.70.0/go.mod h1:6dIm7zAgfmLdrSmO7TWOnZ/l2naqO5qTkD5PuIa0FLY=
 go.opentelemetry.io/contrib/propagators/aws v1.45.0 h1:XIsTznOtglVtajrcqKOfKJzMJtC6GsNYw7kWsnPPB8g=
