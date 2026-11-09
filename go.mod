@@ -37,7 +37,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.22.1
 	github.com/google/go-github/v68 v68.0.0
-	github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88
+	github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b
 	github.com/gorilla/mux v1.8.1
 	github.com/jedib0t/go-pretty/v6 v6.8.3
 	github.com/josephspurrier/goversioninfo v1.7.0
@@ -58,7 +58,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
-	github.com/testcontainers/testcontainers-go v0.44.0
+	github.com/testcontainers/testcontainers-go v0.45.0
 	github.com/winlabs/gowin32 v0.0.0-20260308155911-6a6dc53430f0
 	go.elastic.co/apm/module/apmgorilla/v2 v2.7.12
 	go.elastic.co/apm/module/apmgrpc/v2 v2.7.12
@@ -249,7 +249,7 @@ require (
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
 	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
-	github.com/magiconair/properties v1.8.10 // indirect
+	github.com/magiconair/properties v1.18.12 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/mattn/go-runewidth v0.0.20 // indirect
@@ -260,7 +260,7 @@ require (
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
-	github.com/moby/go-archive v0.3.0 // indirect
+	github.com/moby/go-archive v0.3.3 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
