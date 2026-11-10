@@ -9,7 +9,6 @@ package ess
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -24,6 +23,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
+	"github.com/elastic/elastic-agent/testing/upgradetest"
 )
 
 // TestBuildLogsCleanupOnStartup verifies that an installed Agent keeps, next to the logs of the running
@@ -141,12 +141,7 @@ func assertNoFilesIn(t *testing.T, dirGlob string) {
 	dirs, err := filepath.Glob(dirGlob)
 	require.NoError(t, err)
 	for _, dir := range dirs {
-		err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-			require.NoError(t, err)
-			assert.Truef(t, d.IsDir(), "unexpected file %s, logs must be written to data/logs/<build>", p)
-			return nil
-		})
-		require.NoError(t, err)
+		assert.NoError(t, upgradetest.CheckNoFilesIn(dir))
 	}
 }
 
