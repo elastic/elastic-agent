@@ -274,3 +274,24 @@ func TestRootOwnershipRepairRejectsLinkedDatabaseFile(t *testing.T) {
 		})
 	}
 }
+
+func TestRootCleanupLeavesUnmanagedStoreUntouched(t *testing.T) {
+	certutil, o := rootTestOwner(t)
+	home := rootTestHome(t, o)
+	m := &manager{home: home, certs: execRunner(certutil, o), owner: o, inspect: execRunner(certutil, nil), log: &testLog{}}
+	require.NoError(t, os.MkdirAll(m.dbDir(), 0o700))
+	_, err := m.inspect(t.Context(), nil, "-N", "-d", "sql:"+m.dbDir(), "--empty-password")
+	require.NoError(t, err)
+	_, err = m.inspect(t.Context(), []byte(newCA(t, "unmanaged")), "-A", "-d", "sql:"+m.dbDir(), "-n", "user-ca", "-t", "C,,", "-a")
+	require.NoError(t, err)
+	path := filepath.Join(m.dbDir(), "cert9.db")
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, m.reconcile(t.Context()))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Zero(t, info.Sys().(*syscall.Stat_t).Uid)
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+}

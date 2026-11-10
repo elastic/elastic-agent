@@ -21,7 +21,7 @@ import (
 )
 
 func TestRejectedCAInputsPreserveTrust(t *testing.T) {
-	for _, kind := range []string{"fifo", "symlink to fifo", "oversized file", "total size", "too many paths", "too many entries"} {
+	for _, kind := range []string{"fifo", "symlink to fifo", "oversized file", "total size", "too many paths", "too many files", "too many entries", "too many certificates"} {
 		t.Run(kind, func(t *testing.T) {
 			m, fake, dir, _ := setup(t)
 			write(t, dir, "ca.pem", newCA(t, "original"))
@@ -45,6 +45,18 @@ func TestRejectedCAInputsPreserveTrust(t *testing.T) {
 				}
 			case "too many paths":
 				m.paths = make([]string, maxCAFiles+1)
+			case "too many files":
+				for range maxCAFiles {
+					f, err := os.CreateTemp(dir, "extra-*.pem")
+					require.NoError(t, err)
+					require.NoError(t, f.Close())
+				}
+			case "too many certificates":
+				var bundle strings.Builder
+				for range maxCertificates {
+					bundle.WriteString(newCA(t, "extra"))
+				}
+				write(t, dir, "bundle.pem", bundle.String())
 			case "too many entries":
 				for i := range maxDirectoryEntries {
 					f, err := os.CreateTemp(dir, "unrelated-*")
