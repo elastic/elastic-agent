@@ -764,3 +764,50 @@ func TestCobraCmd(t *testing.T) {
 		t.Logf("Log lines:\n%s", strings.Join(lines, "\n"))
 	}
 }
+
+// TestLogsCmdWithoutEventLogsDirectory runs the logs command for an Agent that is not running and has not written an
+// event, so the events directory does not exist, and checks that the command keeps following the logs. It must not
+// depend on the text of the error of a missing directory or on the separator of the path, which differ between
+// operating systems: Windows reports a missing file differently from Linux.
+func TestLogsCmdWithoutEventLogsDirectory(t *testing.T) {
+	const marker = "marker-line"
+	streams, _, out, _ := cli.NewTestingIOStreams()
+	cmd := newLogsCommandWithArgs(nil, streams)
+	require.NoError(t, cmd.Flags().Set("follow", "true"))
+	cmd.SetContext(t.Context())
+
+	logsDir := t.TempDir()
+	createFileContent(t, logsDir, "elastic-agent-20260101.ndjson", bytes.NewBufferString(marker+"\n"))
+	// the path does not end in logs/events, which is what the check of the text of the error looked for
+	eventLogsDir := filepath.Join(t.TempDir(), "events")
+
+	var cmdErr error
+	returned := make(chan struct{})
+	go func() {
+		defer close(returned)
+		cmdErr = logsCmd(streams, cmd, logsDir, eventLogsDir)
+	}()
+	// The context of the test is done just before the cleanup, which stops the command. Wait for it, so that it does
+	// not use the directories when they are removed.
+	t.Cleanup(func() { <-returned })
+
+	// Following, the command only returns when it fails or when the context is done, so any return before that is
+	// a failure. Without --follow it would return as soon as the logs are printed.
+	failIfReturned := func(wait time.Duration) {
+		t.Helper()
+		select {
+		case <-returned:
+			t.Fatalf("the command returned while it must follow the logs: %v", cmdErr)
+		case <-time.After(wait):
+		}
+	}
+
+	// Wait until the command prints the logs: it is following them, and the events part has been started next to it.
+	deadline := time.Now().Add(30 * time.Second)
+	for !strings.Contains(out.String(), marker) {
+		require.True(t, time.Now().Before(deadline), "the command did not print the logs")
+		failIfReturned(10 * time.Millisecond)
+	}
+	// a failing events part returns within microseconds, give it the time
+	failIfReturned(500 * time.Millisecond)
+}
