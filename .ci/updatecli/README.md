@@ -40,13 +40,8 @@ instrumentation:
 
 ### Configuration Files
 
-<<<<<<< HEAD
-- **`bump-edot-images.yml`**: Main updatecli configuration that defines sources and targets
-- **`values.d/scm.yml`**: Contains SCM configuration values for GitHub authentication
-=======
 - **`updatecli-bump-edot.yml`**: Main updatecli configuration that defines sources and targets
-- **`values.d/scm.yml`**: Contains SCM configuration values for GitHub authentication and checkout
->>>>>>> 08f1126 (ci: fix updatecli deprecation warnings (#17892))
+- **`values.d/scm.yml`**: Contains SCM configuration values for GitHub authentication
 
 ### GitHub Workflow
 
