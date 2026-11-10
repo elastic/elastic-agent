@@ -7,23 +7,23 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1793354375"
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1793354375"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1793354375"
-  IMAGE_UBUNTU_2604_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1793354375"
-  IMAGE_UBUNTU_2604_ARM_64: "platform-ingest-elastic-agent-ubuntu-2604-aarch64-1793354375"
-  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1793354375"
-  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1793354375"
-  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1793354375"
-  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1793354375"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1793354375"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1793354375"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1793354375"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1793494863"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1793494863"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1793494863"
+  IMAGE_UBUNTU_2604_X86_64: "platform-ingest-elastic-agent-ubuntu-2604-1793494863"
+  IMAGE_UBUNTU_2604_ARM_64: "platform-ingest-elastic-agent-ubuntu-2604-aarch64-1793494863"
+  IMAGE_RHEL_8: "platform-ingest-elastic-agent-rhel-8-1793494863"
+  IMAGE_RHEL_10: "platform-ingest-elastic-agent-rhel-10-1793494863"
+  IMAGE_DEBIAN_11: "platform-ingest-elastic-agent-debian-11-1793494863"
+  IMAGE_DEBIAN_13: "platform-ingest-elastic-agent-debian-13-1793494863"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1793494863"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1793494863"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1793494863"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
   # Same version for all the azure images
-  IMAGE_WIN_VERSION: "1.0.1793354375"
+  IMAGE_WIN_VERSION: "1.0.1793494863"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -180,14 +180,12 @@ common:
       image: "${IMAGE_UBUNTU_2404_X86_64}"
       diskSizeGb: 80
     command: &k8s_test_command |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     command_retry: &k8s_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
       sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
       - build/*
@@ -234,14 +232,12 @@ common:
       image: "${IMAGE_UBUNTU_2404_X86_64}"
       diskSizeGb: 80
     command: &openshift_test_command |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
     command_retry: &openshift_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
       sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
     artifact_paths: &openshift_test_artifact_paths
       - build/*
@@ -1170,8 +1166,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        # TODO(samuelvl): Remove soft_fail once the OpenShift jobs are stable in CI.
-        soft_fail: true
         agents:
           *openshift_test_agent
         plugins:
@@ -1245,8 +1239,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        # TODO(samuelvl): Remove soft_fail once the OpenShift jobs are stable in CI.
-        soft_fail: true
         agents:
           *openshift_test_agent
         plugins:
@@ -1304,8 +1296,6 @@ steps:
         retry:
           automatic:
             limit: 1
-        # TODO(samuelvl): Remove soft_fail once the OpenShift jobs are stable in CI.
-        soft_fail: true
         agents:
           *openshift_test_agent
         plugins:

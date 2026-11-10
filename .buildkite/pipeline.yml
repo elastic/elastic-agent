@@ -21,16 +21,16 @@ common:
 env:
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1793354375"
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1793354375"
-  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1793354375"
-  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1793354375"
+  IMAGE_UBUNTU_2204_X86_64: "platform-ingest-elastic-agent-ubuntu-2204-1793494863"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1793494863"
+  IMAGE_WIN_2016: "platform-ingest-elastic-agent-windows-2016-1793494863"
+  IMAGE_WIN_2022: "platform-ingest-elastic-agent-windows-2022-1793494863"
   IMAGE_WIN_10: "platform-ingest-elastic-agent-windows-10-pro"
   IMAGE_WIN_11: "platform-ingest-elastic-agent-windows-11-pro"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_10_VERSION: "1.0.1793354375"
-  IMAGE_WIN_11_VERSION: "1.0.1793354375"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1793354375"
+  IMAGE_WIN_10_VERSION: "1.0.1793494863"
+  IMAGE_WIN_11_VERSION: "1.0.1793494863"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1793494863"
 
 steps:
 
@@ -54,7 +54,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -76,7 +75,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -98,7 +96,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -118,7 +115,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
@@ -139,7 +135,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -161,7 +156,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         env:
           # NOTE: We need to skip token redaction to avoid OIDC token issues. Only for version <= Windows build 17063
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
@@ -188,7 +182,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -220,7 +213,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -243,7 +235,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -265,7 +256,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
@@ -288,7 +278,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -313,7 +302,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -337,7 +325,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"
@@ -362,7 +349,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_10}"
@@ -389,7 +375,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11}"
@@ -411,7 +396,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"
@@ -435,7 +419,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"

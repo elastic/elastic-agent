@@ -508,6 +508,10 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
+	if err := injectMeterLifecycleExtension(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to inject meter lifecycle extension: %w", err)
+	}
+
 	// if the otel log level is unset, use the most verbose level across agent and all units
 	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
 	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
@@ -541,6 +545,21 @@ func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
+}
+
+// injectMeterLifecycleExtension forces on the extension that releases a
+// component's meters when it stops. Without it the collector retains the meters
+// of every receiver generation under partial reload; see
+// internal/edot/extensions/meterlifecycle.
+func injectMeterLifecycleExtension(config *confmap.Conf) error {
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			"elastic_meter_lifecycle": map[string]any{},
+		},
+		"service": map[string]any{
+			"extensions": []any{"elastic_meter_lifecycle"},
+		},
+	}))
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {
@@ -683,7 +702,7 @@ func exporterIDToOutputNameLookup(components []component.Component) (map[string]
 }
 
 // internalTelemetryDiagnosticsFileName is the filename for the diagnostics file.
-// It is written to filepath.Join(paths.Home(), "logs") so that it sits alongside the
+// It is written to paths.BuildLogs() so that it sits alongside the
 // other elastic-agent log files and is automatically included in diagnostics bundles.
 // The file contains uncompressed OTLP JSON records (one per line). Plain NDJSON is
 // used here deliberately: the diagnostics collector packages files into a zip archive
@@ -739,7 +758,7 @@ func injectMonitoringReceiver(
 	// Records are written as plain OTLP JSON (one record per line). No compression.
 	// This data format compresses very well, so impact on diagnostics is minimal.
 	fileExporterID := otelcomponent.NewIDWithName(otelcomponent.MustNewType("file"), diagName).String()
-	diagFilePath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+	diagFilePath := filepath.Join(paths.BuildLogs(), internalTelemetryDiagnosticsFileName)
 
 	// The metrics pipeline always writes to the file exporter (for diagnostics in
 	// proper OTel metrics format). When OTel-based monitoring is also configured,
