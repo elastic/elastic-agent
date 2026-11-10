@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -211,4 +212,106 @@ func newTestLog(t *testing.T) *logger.Logger {
 	t.Helper()
 	l, _ := loggertest.New(t.Name())
 	return l
+}
+
+// TestCleanupBuildLogsDoesNotFollowLinks checks that a link to something outside of the logs root is never
+// followed, wherever it is.
+func TestCleanupBuildLogsDoesNotFollowLinks(t *testing.T) {
+	const current = "9.4.0-aaaaaa"
+
+	tests := []struct {
+		name string
+		// builds are the build log directories, with how long ago their file was written
+		builds map[string]time.Duration
+		// links are links to the outside directory, by path in the logs root
+		links []string
+		// outsideAge is how long ago the file in the outside directory was written, now if not set
+		outsideAge time.Duration
+		// rootIsLink makes the logs root a link to the directory that holds the builds
+		rootIsLink bool
+		wantErr    bool
+		// kept and removed are the paths in the logs root that must and must not exist after the cleanup, a link
+		// counts as existing even if it is the one to a directory
+		kept    []string
+		removed []string
+	}{
+		{
+			name:    "a link in place of a build directory is ignored",
+			builds:  map[string]time.Duration{current: 0, "9.3.0-bbbbbb": 2 * time.Hour, "9.3.1-cccccc": time.Hour},
+			links:   []string{"9.2.0-dddddd"},
+			kept:    []string{current, "9.3.1-cccccc", "9.2.0-dddddd"},
+			removed: []string{"9.3.0-bbbbbb"},
+		},
+		{
+			name:    "a link inside a removed build directory is removed, not followed",
+			builds:  map[string]time.Duration{current: 0, "9.3.0-bbbbbb": 2 * time.Hour, "9.3.1-cccccc": time.Hour},
+			links:   []string{"9.3.0-bbbbbb/link"},
+			kept:    []string{current, "9.3.1-cccccc"},
+			removed: []string{"9.3.0-bbbbbb"},
+		},
+		{
+			// the file the link points to was written more recently than any log
+			name:    "a link inside a build directory does not make it more recent",
+			builds:  map[string]time.Duration{current: 0, "9.3.0-bbbbbb": 3 * time.Hour, "9.3.1-cccccc": 2 * time.Hour},
+			links:   []string{"9.3.0-bbbbbb/link"},
+			kept:    []string{current, "9.3.1-cccccc"},
+			removed: []string{"9.3.0-bbbbbb"},
+		},
+		{
+			name:       "a link in place of the logs root fails the cleanup",
+			builds:     map[string]time.Duration{current: 0, "9.3.0-bbbbbb": 2 * time.Hour, "9.3.1-cccccc": time.Hour},
+			rootIsLink: true,
+			wantErr:    true,
+			kept:       []string{current, "9.3.0-bbbbbb", "9.3.1-cccccc"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// outside is a directory that is not part of the logs, its file must survive
+			outside := t.TempDir()
+			outsideFile := filepath.Join(outside, "keep.txt")
+			require.NoError(t, os.WriteFile(outsideFile, []byte("keep"), 0o600))
+			setTime(t, outsideFile, tc.outsideAge)
+
+			// the builds are in the logs root, or in the directory its link points to
+			root := t.TempDir()
+			buildsDir := root
+			if tc.rootIsLink {
+				buildsDir = t.TempDir()
+				root = filepath.Join(t.TempDir(), "logs")
+				if err := os.Symlink(buildsDir, root); err != nil {
+					t.Skipf("cannot create symbolic links: %s", err)
+				}
+			}
+			for name, age := range tc.builds {
+				f := filepath.Join(buildsDir, name, "elastic-agent-20260101.ndjson")
+				require.NoError(t, os.MkdirAll(filepath.Dir(f), 0o755))
+				require.NoError(t, os.WriteFile(f, []byte("x"), 0o600))
+				setTime(t, f, age)
+			}
+			for _, link := range tc.links {
+				if err := os.Symlink(outside, filepath.Join(buildsDir, link)); err != nil {
+					t.Skipf("cannot create symbolic links: %s", err)
+				}
+			}
+
+			err := CleanupBuildLogs(newTestLog(t), root, current)
+
+			if tc.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			assert.FileExists(t, outsideFile, "the cleanup must not reach the outside directory")
+			for _, p := range tc.kept {
+				_, err := os.Lstat(filepath.Join(root, p))
+				assert.NoErrorf(t, err, "%s must be kept", p)
+			}
+			for _, p := range tc.removed {
+				_, err := os.Lstat(filepath.Join(root, p))
+				assert.ErrorIsf(t, err, fs.ErrNotExist, "%s must be removed", p)
+			}
+		})
+	}
 }

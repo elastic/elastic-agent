@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -30,8 +31,16 @@ type buildLogsDir struct {
 //
 // It keeps the directory of the running build (currentDirName) and the inactiveBuildsToKeep most recently
 // written inactive build directories. Everything else that looks like a build directory is removed.
-// A directory that cannot be removed does not stop the others; the failures are returned joined.
+// Links are never followed: a link in place of a build directory is ignored, one inside a build directory is
+// removed together with it, and a link in place of logsRoot makes the whole cleanup fail.
+// A directory that cannot be removed does not stop the others; the failures are returned joined. Windows can
+// refuse to remove a file that another process still has open, so the removal is retried for a while.
 func CleanupBuildLogs(log *logger.Logger, logsRoot, currentDirName string) error {
+	// a link in place of the logs root could make the cleanup remove directories somewhere else
+	if info, err := os.Lstat(logsRoot); err == nil && info.Mode()&fs.ModeSymlink != 0 {
+		return fmt.Errorf("logs root %q is a symbolic link, not cleaning it", logsRoot)
+	}
+
 	entries, err := os.ReadDir(logsRoot)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -63,14 +72,14 @@ func CleanupBuildLogs(log *logger.Logger, logsRoot, currentDirName string) error
 	var errs []error
 	for _, d := range inactive[inactiveBuildsToKeep:] {
 		log.Infof("Removing the logs of the old build %q", d.path)
-		if err := os.RemoveAll(d.path); err != nil {
+		if err := install.RemovePath(log, d.path); err != nil {
 			errs = append(errs, fmt.Errorf("removing %q: %w", d.path, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// lastWrite returns the most recent modification time of any file below dir.
+// lastWrite returns the most recent modification time of any regular file below dir.
 // It is best effort: entries that cannot be read, for example because rotation removed them, are skipped.
 // Directory times are ignored, they change on rotation, not on writes. The time of a file is read from the file,
 // not from the directory listing, which can be out of date for a file that is still open on Windows.
@@ -80,7 +89,8 @@ func lastWrite(dir string) time.Time {
 		if err != nil {
 			return nil //nolint:nilerr // best effort, an entry that cannot be read is skipped
 		}
-		if d.IsDir() {
+		// only regular files count: a link is not a log, and its own time is the time it was created
+		if !d.Type().IsRegular() {
 			return nil
 		}
 		if info, err := os.Lstat(path); err == nil && info.ModTime().After(latest) {
