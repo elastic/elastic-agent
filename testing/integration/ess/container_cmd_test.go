@@ -9,6 +9,8 @@ package ess
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -28,12 +30,14 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent-libs/testing/estools"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
@@ -1243,4 +1247,168 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 		"Elastic-Agent did not report healthy after restart with an explicitly empty FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
 		err, agentOutput,
 	)
+}
+
+// Regression test for #17357: FLEET_CA overrides fleet.enc Fleet Server client CAs
+func TestContainerCMDFleetServerCAOverride(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Stack: &define.Stack{},
+		Local: false,
+		Sudo:  true,
+		OS: []define.OS{
+			{Type: define.Linux},
+		},
+		Group: "container",
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	defer cancel()
+
+	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	require.NoError(t, agentFixture.Prepare(ctx))
+
+	certDir := t.TempDir()
+
+	caKeyA, caCertA, caPairA, err := certutil.NewRSARootCA()
+	require.NoError(t, err)
+	caPathA := filepath.Join(certDir, "ca-a.crt")
+	require.NoError(t, os.WriteFile(caPathA, caPairA.Cert, 0o644))
+
+	_, serverPair, err := certutil.GenerateRSAChildCert("localhost", nil, caKeyA, caCertA)
+	require.NoError(t, err)
+	serverCertPath := filepath.Join(certDir, "server.crt")
+	serverKeyPath := filepath.Join(certDir, "server.key")
+	require.NoError(t, os.WriteFile(serverCertPath, serverPair.Cert, 0o644))
+	require.NoError(t, os.WriteFile(serverKeyPath, serverPair.Key, 0o600))
+
+	clientA, clientPairA, err := certutil.GenerateRSAChildCert("", nil, caKeyA, caCertA, certutil.WithClientCert(true))
+	require.NoError(t, err)
+	clientCertPathA := filepath.Join(certDir, "client-a.crt")
+	clientKeyPathA := filepath.Join(certDir, "client-a.key")
+	require.NoError(t, os.WriteFile(clientCertPathA, clientPairA.Cert, 0o644))
+	require.NoError(t, os.WriteFile(clientKeyPathA, clientPairA.Key, 0o600))
+
+	caPairB, clientPairB, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	caPathB := filepath.Join(certDir, "ca-b.crt")
+	require.NoError(t, os.WriteFile(caPathB, caPairB.Cert, 0o644))
+	clientB, err := tls.X509KeyPair(clientPairB.Cert, clientPairB.Key)
+	require.NoError(t, err)
+
+	policyResp, err := info.KibanaClient.CreatePolicy(ctx, fleetPolicy())
+	require.NoError(t, err, "failed creating policy")
+	_, err = tools.InstallPackageFromDefaultFile(ctx, info.KibanaClient, "fleet-server",
+		integration.PreinstalledPackages["fleet_server"], filepath.Join("testdata", "fleet-server.json"),
+		uuid.Must(uuid.NewV4()).String(), policyResp.ID)
+	require.NoError(t, err, "failed creating fleet-server integration")
+	serviceToken, err := estools.CreateServiceToken(ctx, info.ESClient, "fleet-server")
+	require.NoError(t, err, "failed creating service token")
+	esHost, err := integration.GetESHost()
+	require.NoError(t, err)
+
+	statePath := agentFixture.WorkDir()
+	env := []string{
+		"FLEET_SERVER_ENABLE=1",
+		"FLEET_SERVER_ELASTICSEARCH_HOST=" + esHost,
+		"FLEET_SERVER_SERVICE_TOKEN=" + serviceToken,
+		"FLEET_SERVER_POLICY_ID=" + policyResp.ID,
+		"FLEET_SERVER_CERT=" + serverCertPath,
+		"FLEET_SERVER_CERT_KEY=" + serverKeyPath,
+		"FLEET_SERVER_CLIENT_AUTH=required",
+		"FLEET_URL=https://localhost:8220",
+		"ELASTIC_AGENT_CERT=" + clientCertPathA,
+		"ELASTIC_AGENT_CERT_KEY=" + clientKeyPathA,
+		"STATE_PATH=" + statePath,
+	}
+
+	rootCAs := x509.NewCertPool()
+	require.True(t, rootCAs.AppendCertsFromPEM(caPairA.Cert))
+	fleetServerStatus := func(clientCert *tls.Certificate) (int, error) {
+		client := &http.Client{
+			Timeout: 5 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{RootCAs: rootCAs, Certificates: []tls.Certificate{*clientCert}},
+			},
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://localhost:8220/api/status", nil)
+		if err != nil {
+			return 0, err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return 0, err
+		}
+		resp.Body.Close()
+		return resp.StatusCode, nil
+	}
+
+	// Fleet Server should reject client B when FLEET_CA only has CA A
+	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPathA}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		code, err := fleetServerStatus(clientA)
+		return err == nil && code == http.StatusOK
+	},
+		2*time.Minute, time.Second,
+		"Fleet Server did not accept client A after first enrollment. Agent logs\n%s",
+		agentOutput,
+	)
+
+	require.FileExists(t, filepath.Join(statePath, "fleet.enc"),
+		"fleet.enc must exist for regression test")
+	_, err = fleetServerStatus(&clientB)
+	require.Error(t, err, "client B should be rejected")
+
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	cmd.Process = nil
+
+	// Fleet Server should accept client B after CA B is added to FLEET_CA
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPathA + "," + caPathB}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		code, err := fleetServerStatus(clientA)
+		return err == nil && code == http.StatusOK
+	},
+		2*time.Minute, time.Second,
+		"Fleet Server did not accept client A after restart with CA B added to FLEET_CA. Agent logs\n%s",
+		agentOutput,
+	)
+
+	code, err := fleetServerStatus(&clientB)
+	require.NoError(t, err, "client B should be accepted")
+	require.Equal(t, http.StatusOK, code)
+
+	_ = cmd.Process.Kill()
+	_ = cmd.Wait()
+	cmd.Process = nil
+
+	// Fleet Server should reject client B after CA B is removed from FLEET_CA
+	cmd, agentOutput = prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPathA}, env...))
+	t.Logf(">> running binary with: %v", cmd.Args)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("error running container cmd: %s", err)
+	}
+
+	require.Eventuallyf(t, func() bool {
+		code, err := fleetServerStatus(clientA)
+		return err == nil && code == http.StatusOK
+	},
+		2*time.Minute, time.Second,
+		"Fleet Server did not accept client A after restart with CA B removed from FLEET_CA. Agent logs\n%s",
+		agentOutput,
+	)
+
+	_, err = fleetServerStatus(&clientB)
+	require.Error(t, err, "client B should be rejected")
 }

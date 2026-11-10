@@ -930,6 +930,31 @@ func containerCfgOverrides(cfg *config.Config) error {
 		}
 	}
 
+	hasServerTLS, err := cfg.Agent.Has("fleet.server.ssl", -1, ucfg.PathSep("."))
+	if err != nil {
+		return fmt.Errorf("failed to check Fleet Server TLS config for container override: %w", err)
+	}
+	if hasServerTLS {
+		for cfgKey, envKey := range map[string]string{ //nolint:gosec // G101: env var names
+			"fleet.server.ssl.certificate":           "FLEET_SERVER_CERT",
+			"fleet.server.ssl.key":                   "FLEET_SERVER_CERT_KEY",
+			"fleet.server.ssl.key_passphrase_path":   "FLEET_SERVER_CERT_KEY_PASSPHRASE",
+			"fleet.server.ssl.client_authentication": "FLEET_SERVER_CLIENT_AUTH",
+		} {
+			if val, ok := os.LookupEnv(envKey); ok {
+				uCfg[cfgKey] = val
+			}
+		}
+
+		if caEnv, ok := os.LookupEnv("FLEET_CA"); ok {
+			if caChild, err := ucfg.NewFrom(cli.StringToSlice(caEnv)); err != nil {
+				return fmt.Errorf("failed to create Fleet Server CA config for container override: %w", err)
+			} else if err := cfg.Agent.SetChild("fleet.server.ssl.certificate_authorities", -1, caChild, ucfg.PathSep(".")); err != nil {
+				return fmt.Errorf("failed to write Fleet Server CA config for container override: %w", err)
+			}
+		}
+	}
+
 	return cfg.Merge(uCfg)
 }
 

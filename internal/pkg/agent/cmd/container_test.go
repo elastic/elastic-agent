@@ -29,6 +29,7 @@ import (
 
 	"github.com/elastic/elastic-agent-libs/kibana"
 	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -1804,6 +1805,103 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 				loaded := reloader.Configuration()
 				require.Equal(t, tc.wantCAs, loaded.Fleet.Client.Transport.TLS.CAs)
 			}
+		})
+	}
+}
+
+// Regression test for #17357: ensure env vars override fleet.enc for Fleet Server TLS
+func TestContainerEnvOverridesFleetServerTLS(t *testing.T) {
+	rootPair, _, err := certutil.NewRSARootAndChildCerts()
+	require.NoError(t, err)
+	envCAPath := filepath.Join(t.TempDir(), "ca.crt")
+	require.NoError(t, os.WriteFile(envCAPath, rootPair.Cert, 0o644))
+
+	origCfg := paths.Config()
+	t.Cleanup(func() { paths.SetConfig(origCfg) })
+	paths.SetConfig(t.TempDir())
+	for _, key := range []string{"FLEET_SERVER_CERT", "FLEET_SERVER_CERT_KEY", "FLEET_SERVER_CERT_KEY_PASSPHRASE", "FLEET_SERVER_CLIENT_AUTH", "FLEET_CA"} {
+		if orig, ok := os.LookupEnv(key); ok {
+			t.Cleanup(func() { os.Setenv(key, orig) })
+		} else {
+			t.Cleanup(func() { os.Unsetenv(key) })
+		}
+		os.Unsetenv(key)
+	}
+
+	ctx := t.Context()
+	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
+	require.NoError(t, os.WriteFile(paths.ConfigFile(), []byte("fleet:\n  enabled: true\n"), 0o644))
+	store, err := storage.NewEncryptedDiskStore(ctx, paths.AgentConfigFile())
+	require.NoError(t, err)
+
+	cases := []struct {
+		name           string
+		env            map[string]string
+		wantCert       string
+		wantKey        string
+		wantPassphrase string
+		wantCAs        []string
+		wantClientAuth tlscommon.TLSClientAuth
+	}{
+		{ //nolint:gosec // G101: test
+			name:           "no Fleet Server TLS env vars keeps fleet.enc values",
+			env:            map[string]string{},
+			wantCert:       "/stored-server.crt",
+			wantKey:        "/stored-server.key",
+			wantPassphrase: "/stored-passphrase",
+			wantCAs:        []string{"/stored-a.crt", "/stored-b.crt"},
+			wantClientAuth: tlscommon.TLSClientAuthRequired,
+		},
+		{ //nolint:gosec // G101: test
+			name:           "explicitly empty FLEET_CA clears fleet.enc CAs",
+			env:            map[string]string{"FLEET_CA": ""},
+			wantCert:       "/stored-server.crt",
+			wantKey:        "/stored-server.key",
+			wantPassphrase: "/stored-passphrase",
+			wantCAs:        []string{},
+			wantClientAuth: tlscommon.TLSClientAuthRequired,
+		},
+		{ //nolint:gosec // G101: test
+			name: "env overrides all fleet.server.ssl values",
+			env: map[string]string{ //nolint:gosec // G101: test
+				"FLEET_SERVER_CERT":                "/env-server.crt",
+				"FLEET_SERVER_CERT_KEY":            "/env-server.key",
+				"FLEET_SERVER_CERT_KEY_PASSPHRASE": "/env-passphrase",
+				"FLEET_SERVER_CLIENT_AUTH":         "optional",
+				"FLEET_CA":                         envCAPath,
+			},
+			wantCert:       "/env-server.crt",
+			wantKey:        "/env-server.key",
+			wantPassphrase: "/env-passphrase",
+			wantCAs:        []string{envCAPath},
+			wantClientAuth: tlscommon.TLSClientAuthOptional,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, store.Save(strings.NewReader(`fleet:
+  server:
+    ssl:
+      certificate: "/stored-server.crt"
+      key: "/stored-server.key"
+      key_passphrase_path: "/stored-passphrase"
+      client_authentication: required
+      certificate_authorities:
+        - "/stored-a.crt"
+        - "/stored-b.crt"`)))
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+
+			reloader, err := configuration.NewConfigReloader(ctx, nil, containerCfgOverrides)
+			require.NoError(t, err)
+			serverTLS := reloader.Configuration().Fleet.Server.TLS
+			require.Equal(t, tc.wantCert, serverTLS.Certificate.Certificate)
+			require.Equal(t, tc.wantKey, serverTLS.Certificate.Key)
+			require.Equal(t, tc.wantPassphrase, serverTLS.Certificate.PassphrasePath)
+			require.Equal(t, tc.wantCAs, serverTLS.CAs)
+			require.Equal(t, tc.wantClientAuth, *serverTLS.ClientAuth)
 		})
 	}
 }
