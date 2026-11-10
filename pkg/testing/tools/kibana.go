@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 )
 
 type DashboardResponse struct {

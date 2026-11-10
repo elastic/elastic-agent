@@ -22,7 +22,7 @@ import (
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/otel/sdk/metric"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent/internal/edot/otelcol/components"
 	"github.com/elastic/mock-es/pkg/api"
 )
