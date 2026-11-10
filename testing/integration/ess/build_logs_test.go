@@ -102,21 +102,26 @@ func TestBuildLogsCleanupOnStartup(t *testing.T) {
 	assertNoLogsInInstallation(t, fixture.WorkDir())
 }
 
-// restartAndWait restarts the installed Agent and returns once a new process answers, which is after it has
-// cleaned up the build logs: the restart command returns when the restart is triggered, not when it is done.
+// restartAndWait restarts the installed Agent and returns once the new process is running, which is after it
+// has cleaned up the build logs: the restart command returns when the restart is triggered, not when it is done.
+// The Agent restarts in place, so its process ID does not change. A start is seen in its log instead, and
+// the control server of the new process answers only after its start up, which includes the cleanup.
 func restartAndWait(ctx context.Context, t *testing.T, fixture *atesting.Fixture) {
 	t.Helper()
 
-	before, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err, "failed to get the status before the restart")
+	const startedMessage = "Elastic Agent started"
+	starts := agentLogCount(t, fixture, startedMessage)
 
 	restartOutput, err := fixture.Exec(ctx, []string{"restart"})
 	require.NoErrorf(t, err, "restart failed: %s\noutput:\n%s", err, restartOutput)
 
 	require.Eventually(t, func() bool {
-		status, err := fixture.ExecStatus(ctx, atesting.WithNoRetry())
-		return err == nil && status.Info.PID != before.Info.PID
-	}, 2*time.Minute, time.Second, "the Agent did not restart")
+		return agentLogCount(t, fixture, startedMessage) > starts
+	}, 2*time.Minute, time.Second, "the Agent did not start again")
+	require.Eventually(t, func() bool {
+		_, err := fixture.ExecStatus(ctx, atesting.WithNoRetry())
+		return err == nil
+	}, 2*time.Minute, time.Second, "the Agent did not answer after the restart")
 }
 
 // assertNoLogsInInstallation fails if the installation directories of the Agent installed in topPath have log files.
