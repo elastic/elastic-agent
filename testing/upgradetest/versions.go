@@ -373,6 +373,20 @@ func WritesBuildLogs(f *atesting.Fixture) bool {
 // directory of the build without its prefix: <version>-<commit>. The version is the one of the fixture, which a
 // repackaged build changes in its package version and manifest, so it can differ from the one of the binary
 // it is made from.
+//
+// This is the name of a build that was installed or upgraded to by a build that names its home directories like
+// this one. See InstalledBuildLogsDirName for a build that was upgraded to by an older release.
 func BuildLogsDirName(fixtureVersion string, binary atesting.AgentBinaryVersion) string {
 	return fixtureVersion + "-" + release.TrimCommit(binary.Commit)
+}
+
+// InstalledBuildLogsDirName returns the name of the log directory of a build that is installed in topPath. An
+// upgrade from an older release creates the home directory of the new build with the legacy name, which has
+// only the commit, and the build then names its log directory after it, see BuildLogsDirName.
+func InstalledBuildLogsDirName(topPath, fixtureVersion string, binary atesting.AgentBinaryVersion) string {
+	name := BuildLogsDirName(fixtureVersion, binary)
+	if _, err := os.Stat(filepath.Join(topPath, "data", "elastic-agent-"+name)); err != nil {
+		return release.TrimCommit(binary.Commit)
+	}
+	return name
 }

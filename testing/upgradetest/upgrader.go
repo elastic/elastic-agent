@@ -495,7 +495,9 @@ func PerformUpgrade(
 
 	// the upgraded Agent logs to the log directory of its own build, outside of its installation
 	if WritesBuildLogs(endFixture) {
-		pattern := filepath.Join(startFixture.WorkDir(), "data", "logs", BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary), "elastic-agent-*.ndjson")
+		topPath := startFixture.WorkDir()
+		buildName := InstalledBuildLogsDirName(topPath, endFixture.Version(), endVersionInfo.Binary)
+		pattern := filepath.Join(topPath, "data", "logs", buildName, "elastic-agent-*.ndjson")
 		files, err := filepath.Glob(pattern)
 		if err != nil {
 			return fmt.Errorf("searching the build logs of the upgraded Agent matching %s: %w", pattern, err)

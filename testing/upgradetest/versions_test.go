@@ -7,6 +7,8 @@ package upgradetest
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -819,4 +821,22 @@ func TestBuildLogsDirName(t *testing.T) {
 	assert.Equal(t, "9.7.0-SNAPSHOT-ff7609", BuildLogsDirName("9.7.0-SNAPSHOT", binary))
 	// a repackaged build has its own version, with the build metadata, and the commit of the build it is made from
 	assert.Equal(t, "9.7.0+build202611061200-SNAPSHOT-ff7609", BuildLogsDirName("9.7.0+build202611061200-SNAPSHOT", binary))
+}
+
+func TestInstalledBuildLogsDirName(t *testing.T) {
+	binary := atesting.AgentBinaryVersion{Version: "9.7.0", Commit: "ff76092f1dd1d8e0a1b3c4d5e6f708192a3b4c5d", Snapshot: true}
+
+	t.Run("home directory with a version", func(t *testing.T) {
+		topPath := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data", "elastic-agent-9.7.0-SNAPSHOT-ff7609"), 0o755))
+
+		assert.Equal(t, "9.7.0-SNAPSHOT-ff7609", InstalledBuildLogsDirName(topPath, "9.7.0-SNAPSHOT", binary))
+	})
+
+	t.Run("legacy home directory of an upgrade from an older release", func(t *testing.T) {
+		topPath := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data", "elastic-agent-ff7609"), 0o755))
+
+		assert.Equal(t, "ff7609", InstalledBuildLogsDirName(topPath, "9.7.0-SNAPSHOT", binary))
+	})
 }
