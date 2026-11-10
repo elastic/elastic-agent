@@ -156,6 +156,9 @@ inputs:
 #   # CAs that browser monitors trust: PEM files, or directories of *.crt and *.pem files.
 #   # In containers, ELASTIC_AGENT_BROWSER_CA replaces this list when it is set.
 #   # Requires certutil (in the complete images), Linux only.
+#   # Limits: 4 MiB per file, 16 MiB total, 1024 paths/files, 4096 directory entries
+#   # and 4096 distinct certificates. Unreadable or oversized inputs leave existing trust unchanged.
+#   # Startup waits up to 30s; certutil commands time out after 5s. Failures retry when reload is enabled.
 #   certificate_authorities: []
 #   certificate_reload:
 #     # check the CAs for changes while running, so none needs a restart
