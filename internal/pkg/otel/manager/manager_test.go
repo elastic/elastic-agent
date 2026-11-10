@@ -2111,6 +2111,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, injectMeterLifecycleExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))
