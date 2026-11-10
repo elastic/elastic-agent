@@ -818,8 +818,8 @@ github.com/google/gofuzz v1.0.0/go.mod h1:dBl0BpW6vV/+mYPU4Po3pmUjxk6FQPldtuIdl/
 github.com/google/martian/v3 v3.3.3 h1:DIhPTQrbPkgs2yJYdXU/eNACCG5DVQjySNRNlflZ9Fc=
 github.com/google/martian/v3 v3.3.3/go.mod h1:iEPrYcgCF7jA9OtScMFQyAlZZ4YXTKEtJ1E6RWzmBA0=
 github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7/go.mod h1:czg5+yv1E0ZGTi6S6vVK1mke0fV+FaUhNGcd6VRS9Ik=
-github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88 h1:BnzMe/RUfFezpFwXsOWHmSMNO8qt7755OL25C+AezGQ=
-github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88/go.mod h1:yUo1AMMpsPIDFGuwDK8nLcf8+vvAd5l2O6JDZ6hpwrM=
+github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b h1:5NKFt6kcAJNVt3XBOf8jwp8TnWZVOZFmmGkK0XextI4=
+github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b/go.mod h1:yUo1AMMpsPIDFGuwDK8nLcf8+vvAd5l2O6JDZ6hpwrM=
 github.com/google/s2a-go v0.1.11 h1:7v1V1TraNGP63WptsAkNqr2w8jgm4vM6A6qx6Lsw9iM=
 github.com/google/s2a-go v0.1.11/go.mod h1:pz4tyvwXvJLLbyrkh6FW1eS2zPUXMaTmyNhYtyP2tNw=
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
@@ -1051,8 +1051,8 @@ github.com/madflojo/testcerts v1.5.0 h1:GhQllyAiGzXVZU+i8O/cQkPTHzN59RxMGtm3uETg
 github.com/madflojo/testcerts v1.5.0/go.mod h1:MW8sh39gLnkKh4K0Nc55AyHEDl9l/FBLDUsQhpmkuo0=
 github.com/magefile/mage v1.17.2 h1:fyXVu1eadI8Ap1HCCNgEhJ5McIWiYhLR8uol64ZZc40=
 github.com/magefile/mage v1.17.2/go.mod h1:Yj51kqllmsgFpvvSzgrZPK9WtluG3kUhFaBUVLo4feA=
-github.com/magiconair/properties v1.8.10 h1:s31yESBquKXCV9a/ScB3ESkOjUYYv+X0rg8SYxI99mE=
-github.com/magiconair/properties v1.8.10/go.mod h1:Dhd985XPs7jluiymwWYZ0G4Z61jb3vdS329zhj2hYo0=
+github.com/magiconair/properties v1.18.12 h1:sT9zQpvTB3B4gzrX0tmZNTEaGyg8Zw55MFYRE32Mr9I=
+github.com/magiconair/properties v1.18.12/go.mod h1:Dhd985XPs7jluiymwWYZ0G4Z61jb3vdS329zhj2hYo0=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 h1:YFh+sjyJTMQSYjKwM4dFKhJPJC/wfo98tPUc17HdoYw=
@@ -1107,8 +1107,8 @@ github.com/mitchellh/reflectwalk v1.0.2 h1:G2LzWKi524PWgd3mLHV8Y5k7s6XUvT0Gef6zx
 github.com/mitchellh/reflectwalk v1.0.2/go.mod h1:mSTlrgnPZtwu0c4WaC2kGObEpuNDbx0jmZXqmk4esnw=
 github.com/moby/docker-image-spec v1.3.1 h1:jMKff3w6PgbfSa69GfNg+zN/XLhfXJGnEx3Nl2EsFP0=
 github.com/moby/docker-image-spec v1.3.1/go.mod h1:eKmb5VW8vQEh/BAr2yvVNvuiJuY6UIocYsFu/DxxRpo=
-github.com/moby/go-archive v0.3.0 h1:nos4BtzzUIqB406BgQnWGMI4qib9BZ8XUHU+ucv/n1c=
-github.com/moby/go-archive v0.3.0/go.mod h1:Npdv43fFqlhZW7Xo8fbm3ZMYFvAGNviUPqX21VERbcE=
+github.com/moby/go-archive v0.3.3 h1:OxxR9paxsluYi+zDUEXTTaIxtkK3viymW+Ka7vRhhME=
+github.com/moby/go-archive v0.3.3/go.mod h1:Npdv43fFqlhZW7Xo8fbm3ZMYFvAGNviUPqX21VERbcE=
 github.com/moby/moby/api v1.56.1 h1:PpWkvVPB7Fr/No8w+TfyJ/I6rWZ2YPZhT3JorIg+06c=
 github.com/moby/moby/api v1.56.1/go.mod h1:sZ+THbVWkjOmBPPfbnzdD/G1LuIexWhqlSHHPTDQ1Uk=
 github.com/moby/moby/client v0.6.2 h1:ekSPlMccrZGcw6Scb8T9D39qE0mB+XupU/yS0zNw9N4=
@@ -1616,10 +1616,12 @@ github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
+github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317 h1:UYpCIqIDIH0XOaV3z+9HX1uLS7T/FT93gdmluo/Db2A=
+github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317/go.mod h1:2Pf2b8pJDpLtymJ9Sv0z0ANPAxDpZ7QLezLdIKNusww=
 github.com/teambition/rrule-go v1.8.2 h1:lIjpjvWTj9fFUZCmuoVDrKVOtdiyzbzc93qTmRVe/J8=
 github.com/teambition/rrule-go v1.8.2/go.mod h1:Ieq5AbrKGciP1V//Wq8ktsTXwSwJHDD5mD/wLBGl3p4=
-github.com/testcontainers/testcontainers-go v0.44.0 h1:/Fwh6HY1mIikhnm9e7HwoxGycx0lzRAE0f5VQpjFxzI=
-github.com/testcontainers/testcontainers-go v0.44.0/go.mod h1:IcnwQrYTO86xHXu5bvMaBH7ATlbS3Qn1M1QWW3c66rE=
+github.com/testcontainers/testcontainers-go v0.45.0 h1:ss9Stm9KDX6JLgGL4jr2fC5dwpabTbCBsRcGadBPR9k=
+github.com/testcontainers/testcontainers-go v0.45.0/go.mod h1:VMJZ7M+qhgfEHWNbtjm596OyEOraULSTDaus/h0hmJI=
 github.com/tidwall/gjson v1.10.2/go.mod h1:/wbyibRr2FHMks5tjHJ5F8dMZh3AcwJEMf5vlfC0lxk=
 github.com/tidwall/gjson v1.19.0 h1:xwxm7n691Uf3u5OFjzngavjGTh55KX5q/9w9xHW88JU=
 github.com/tidwall/gjson v1.19.0/go.mod h1:V37/opeE/JbLUOfH0QTXiNez2l0RUjYUhpT4szFQAfc=
@@ -1937,8 +1939,6 @@ go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.
 go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.71.0/go.mod h1:+H3sPOFwag14eMHTPMElZtV0e4YfVZ/85KgrKUCB5FI=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 h1:LxwW/9ctSCv+QkE/cLR7M91ZIkXNMqJtEMi1vCw9U8s=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0/go.mod h1:tOsftB4SslBwwErVEPaenU2RpThXWPIU8DoJHEC4dyw=
-go.opentelemetry.io/contrib/otelconf v0.25.0 h1:rbVGzm5OsVQhdnjqv2hvKuJhVTVHux9Ltra+N4FKy7M=
-go.opentelemetry.io/contrib/otelconf v0.25.0/go.mod h1:2Pf2b8pJDpLtymJ9Sv0z0ANPAxDpZ7QLezLdIKNusww=
 go.opentelemetry.io/contrib/propagators/autoprop v0.70.0 h1:yNNN177cOlxAJ5F8l1YKiD6rJk9GOUi/HnRQbI83DeQ=
 go.opentelemetry.io/contrib/propagators/autoprop v0.70.0/go.mod h1:6dIm7zAgfmLdrSmO7TWOnZ/l2naqO5qTkD5PuIa0FLY=
 go.opentelemetry.io/contrib/propagators/aws v1.45.0 h1:XIsTznOtglVtajrcqKOfKJzMJtC6GsNYw7kWsnPPB8g=

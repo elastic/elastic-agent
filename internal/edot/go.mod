@@ -85,6 +85,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
+	go.opentelemetry.io/collector/component/componentstatus v0.164.0
 	go.opentelemetry.io/collector/component/componenttest v0.164.0
 	go.opentelemetry.io/collector/connector/forwardconnector v0.164.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.164.0
@@ -142,7 +143,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.29.2 // indirect
 	github.com/go-openapi/swag/yamlutils v0.29.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20261026192309-dbd0ed30aa88 // indirect
+	github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.45.0 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
@@ -203,7 +204,6 @@ require (
 	github.com/u-root/uio v0.0.0-20230220225925-ffce2a382923 // indirect
 	github.com/vultr/govultr/v3 v3.33.0 // indirect
 	go.mongodb.org/mongo-driver/v2 v2.9.1 // indirect
-	go.opentelemetry.io/collector/component/componentstatus v0.164.0 // indirect
 	go.opentelemetry.io/collector/config/confighttp v0.164.0 // indirect
 	go.opentelemetry.io/collector/internal/componentalias v0.164.0 // indirect
 	go.opentelemetry.io/collector/internal/statusutil v0.164.0 // indirect
@@ -845,3 +845,5 @@ replace (
 	github.com/meraki/dashboard-api-go/v3 => github.com/tommyers-elastic/dashboard-api-go/v3 v3.0.0-20260105140042-f602c1ebde13
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b
 )
+
+replace go.opentelemetry.io/contrib/otelconf => github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317
