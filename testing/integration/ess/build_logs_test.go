@@ -89,16 +89,34 @@ func TestBuildLogsCleanupOnStartup(t *testing.T) {
 		require.NoError(t, os.Chtimes(logFile, ts, ts))
 	}
 
+	// the cleanup runs on every start: the first one removes the older previous build ...
+	restartAndWait(ctx, t, fixture)
+	assert.NoDirExists(t, filepath.Join(logsRoot, "1.0.0-aaaaaa"), "logs of the older previous build must be removed on startup")
+	assert.DirExists(t, filepath.Join(logsRoot, "1.0.1-bbbbbb"), "logs of the latest previous build must be kept")
+	assert.DirExists(t, filepath.Join(logsRoot, runningBuild), "logs of the running build must be kept")
+
+	// ... and the next one keeps the remaining previous build, it is not removed because it is the oldest
+	restartAndWait(ctx, t, fixture)
+	assert.DirExists(t, filepath.Join(logsRoot, "1.0.1-bbbbbb"), "logs of the latest previous build must be kept on every startup")
+	assert.DirExists(t, filepath.Join(logsRoot, runningBuild), "logs of the running build must be kept")
+	assertNoLogsInInstallation(t, fixture.WorkDir())
+}
+
+// restartAndWait restarts the installed Agent and returns once a new process answers, which is after it has
+// cleaned up the build logs: the restart command returns when the restart is triggered, not when it is done.
+func restartAndWait(ctx context.Context, t *testing.T, fixture *atesting.Fixture) {
+	t.Helper()
+
+	before, err := fixture.ExecStatus(ctx)
+	require.NoError(t, err, "failed to get the status before the restart")
+
 	restartOutput, err := fixture.Exec(ctx, []string{"restart"})
 	require.NoErrorf(t, err, "restart failed: %s\noutput:\n%s", err, restartOutput)
 
 	require.Eventually(t, func() bool {
-		_, err := os.Stat(filepath.Join(logsRoot, "1.0.0-aaaaaa"))
-		return os.IsNotExist(err)
-	}, time.Minute, time.Second, "logs of the older previous build must be removed on startup")
-	assert.DirExists(t, filepath.Join(logsRoot, "1.0.1-bbbbbb"), "logs of the latest previous build must be kept")
-	assert.DirExists(t, filepath.Join(logsRoot, runningBuild), "logs of the running build must be kept")
-	assertNoLogsInInstallation(t, fixture.WorkDir())
+		status, err := fixture.ExecStatus(ctx, atesting.WithNoRetry())
+		return err == nil && status.Info.PID != before.Info.PID
+	}, 2*time.Minute, time.Second, "the Agent did not restart")
 }
 
 // assertNoLogsInInstallation fails if the installation directories of the Agent installed in topPath have log files.
