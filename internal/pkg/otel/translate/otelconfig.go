@@ -108,7 +108,11 @@ func GetOtelConfig(
 	if len(components) == 0 {
 		return nil, nil
 	}
-	otelConfig := confmap.New()     // base config, nothing here for now
+	// otelConfig is the config of the first component, followed by the merged configs of the rest. Conf.Merge
+	// deep-copies its source and re-flattens its destination, which is expensive for a config with thousands of
+	// receivers, so the first component's config is used as the base instead of being merged into an empty Conf.
+	// It is newly built by getCollectorConfigForComponent, so we own it.
+	var otelConfig *confmap.Conf
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
@@ -125,6 +129,11 @@ func GetOtelConfig(
 			}
 		}
 
+		if otelConfig == nil {
+			otelConfig = componentConfig
+			continue
+		}
+
 		// the assumption here is that each component will define its own receivers, and the shared exporters
 		// will be merged
 		mergeErr := otelConfig.Merge(componentConfig)
@@ -136,19 +145,37 @@ func GetOtelConfig(
 	if len(extensions) != 0 {
 		// create a deduplicated extensions lists in a deterministic order
 		extensionsSlice := slices.Sorted(maps.Keys(extensions))
-		// for consistency, we set this back as a slice of any
-		untypedExtensions := make([]any, len(extensionsSlice))
-		for i, ext := range extensionsSlice {
-			untypedExtensions[i] = ext
-		}
-		extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
-		err := otelConfig.Merge(extensionsConf)
-		if err != nil {
-			return nil, fmt.Errorf("error merging otel extensions: %w", err)
+		// A single component already defines its extensions in this order, and merging would copy the whole
+		// config to write the list it already has.
+		if !hasServiceExtensions(otelConfig, extensionsSlice) {
+			// for consistency, we set this back as a slice of any
+			untypedExtensions := make([]any, len(extensionsSlice))
+			for i, ext := range extensionsSlice {
+				untypedExtensions[i] = ext
+			}
+			extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
+			err := otelConfig.Merge(extensionsConf)
+			if err != nil {
+				return nil, fmt.Errorf("error merging otel extensions: %w", err)
+			}
 		}
 	}
 
 	return otelConfig, nil
+}
+
+// hasServiceExtensions returns true if the service::extensions list of conf is exactly the given extensions, in order.
+func hasServiceExtensions(conf *confmap.Conf, extensions []string) bool {
+	current, ok := conf.Get("service::extensions").([]any)
+	if !ok || len(current) != len(extensions) {
+		return false
+	}
+	for i, ext := range current {
+		if name, ok := ext.(string); !ok || name != extensions[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func LogpLevelToOTel(lvl logp.Level) (string, error) {
@@ -387,9 +414,10 @@ func getCollectorConfigForComponent(
 		pipelineID.String(): pipelineConfig,
 	}
 
-	// we need to convert []string to []interface for this to work
+	// we need to convert []string to []interface for this to work. The keys are sorted so the list is
+	// deterministic, and GetOtelConfig can recognize it as already being in its final order.
 	extensionKey := make([]any, 0, len(extensionConfig))
-	for k := range extensionConfig {
+	for _, k := range slices.Sorted(maps.Keys(extensionConfig)) {
 		extensionKey = append(extensionKey, k)
 	}
 

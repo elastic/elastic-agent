@@ -1,0 +1,3 @@
+kind: enhancement
+summary: Reduce the memory and CPU used to build the OTel collector configuration for policies with many inputs
+component: elastic-agent

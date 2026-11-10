@@ -10,6 +10,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -2895,6 +2896,40 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 	for _, receiver := range receivers {
 		receiverConfig := receiver.(map[string]any)
 		assert.Equal(t, elasticsearchStateStoreExtensionName, receiverConfig["storage"])
+	}
+}
+
+// TestGetOtelConfigExtensionsAreSortedAndDeduplicated checks that the extensions of all components end
+// up in one sorted list without duplicates, whatever the order of the components is.
+func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
+	// The first and last components share an output, so they share an extension.
+	compA := testFilebeatComp("filestream-a", "a")
+	compB := testFilebeatComp("filestream-b", "b")
+	compA2 := testFilebeatComp("filestream-a2", "a")
+	expected := []any{"beatsauth/_agent-component/a", "beatsauth/_agent-component/b"}
+
+	for name, components := range map[string][]component.Component{
+		"sorted":   {compA, compB, compA2},
+		"reversed": {compA2, compB, compA},
+		"shuffled": {compB, compA, compA2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			conf, err := GetOtelConfig(&component.Model{Components: components}, logp.NewNopLogger())
+			require.NoError(t, err)
+			require.NotNil(t, conf)
+
+			require.Equal(t, expected, conf.Get("service::extensions"))
+			// The config of every component is part of the result, not only the one the others were merged into.
+			receivers, ok := conf.Get("receivers").(map[string]any)
+			require.True(t, ok)
+			for _, comp := range components {
+				prefix := "filebeatreceiver/_agent-component/" + comp.ID + "/"
+				found := slices.ContainsFunc(slices.Collect(maps.Keys(receivers)), func(id string) bool {
+					return strings.HasPrefix(id, prefix)
+				})
+				require.True(t, found, "no receiver for component %s in %v", comp.ID, receivers)
+			}
+		})
 	}
 }
 
