@@ -297,6 +297,88 @@ compression: %s
 	}
 }
 
+func TestKafkaBearerTokenAuthTranslation(t *testing.T) {
+	testCases := []struct {
+		name        string
+		auth        string
+		expectedExt map[string]any
+		expectedErr string
+	}{
+		{
+			name: "token file with retry",
+			auth: `
+  bearertokenauth:
+    filename: /var/run/secrets/tokens/kafka-token
+    retry_on_failure:
+      enabled: true
+      interval: 1s
+    wait_for_token_file: true
+`,
+			expectedExt: map[string]any{
+				"filename": "/var/run/secrets/tokens/kafka-token",
+				"retry_on_failure": map[string]any{
+					"enabled":  true,
+					"interval": "1s",
+				},
+				"wait_for_token_file": true,
+			},
+		},
+		{
+			name: "multiple tokens",
+			auth: `
+  bearertokenauth:
+    tokens: [first, second]
+`,
+			expectedExt: map[string]any{
+				"tokens": []any{"first", "second"},
+			},
+		},
+		{
+			name: "unknown field",
+			auth: `
+  bearertokenauth:
+    file_name: /var/run/secrets/tokens/kafka-token
+`,
+			expectedErr: "file_name",
+		},
+		{
+			name: "no token configured",
+			auth: `
+  bearertokenauth:
+    scheme: Bearer
+`,
+			expectedErr: "no bearer token provided",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+auth:` + tc.auth
+			cfg, err := config.NewConfigFrom(input)
+			require.NoError(t, err, "error creating kafka config")
+
+			gotMap, _, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+				return
+			}
+			require.NoError(t, err, "error translating kafka to kafka exporter")
+
+			require.Equal(t, map[string]any{
+				"sasl": map[string]any{
+					"mechanism":                "OAUTHBEARER",
+					"oauthbearer_token_source": "bearertokenauth/_agent-component/default",
+				},
+			}, gotMap["auth"])
+			require.Equal(t, tc.expectedExt, extensionCfg["bearertokenauth/_agent-component/default"])
+		})
+	}
+}
+
 func TestDynamicTopicSetter(t *testing.T) {
 	testCases := []struct {
 		name                 string
