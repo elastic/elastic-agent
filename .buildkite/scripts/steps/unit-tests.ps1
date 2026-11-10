@@ -29,10 +29,8 @@ if ($env:PROCESSOR_ARCHITECTURE -ne "ARM64" -and $env:DISABLE_RACE_DETECTOR -ne 
 }
 mage $mageTarget
 $testsExitCode = $LASTEXITCODE
-# Copy coverage file to build directory so it can be downloaded as an artifact
 Write-Host "--- Prepare artifacts"
 $buildkiteJobId = $env:BUILDKITE_JOB_ID
-Move-Item -Path "build/TEST-go-$testName.cov" -Destination "coverage-$buildkiteJobId.out"
 Move-Item -Path "build/TEST-go-$testName.xml" -Destination "build/TEST-$buildkiteJobId.xml"
 if ($testsExitCode -ne 0) {
   exit 1
