@@ -73,7 +73,9 @@ Each build of the Agent writes its internal logs to its own directory,
 directories, so they are not deleted together with an old installation. This
 keeps the logs of a failed upgrade available after the Agent rolled back to a
 build that has this layout. Builds from before this change keep their logs in
-their installation directory and do not collect `data/logs` in diagnostics.
+their installation directory, so after a rollback to one of them the `diagnostics`
+command of that build does not collect the logs in `data/logs`, although the
+files are kept.
 
 To keep disk use bounded, the Agent tidies up whenever it starts:
  - it always keeps the logs of the build that is running,

@@ -13,12 +13,12 @@ kind: upgrade
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Keep Elastic Agent logs in data/logs/<build>, outside installation directories
+summary: Keep Elastic Agent logs in data/logs/<build> instead of data/elastic-agent-<version>, so they are retained on upgrade failure
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
-description: "The internal logs of the Agent, which diagnostics collects, are now written to data/logs/<build> instead of the logs directory of the installation directory (data/elastic-agent-<build>/logs). The logs of the running build and of the latest previous build are kept. Tools that read the logs from the installation directory need the new path."
+description: "The internal logs of the Agent, which diagnostics collects, are now written to data/logs/<build> instead of the logs directory of the installation directory (data/elastic-agent-<build>/logs). Both are inside the installation directory of the Agent, but the new one is not removed with an old build. The logs of the running build and of the latest previous build are kept. Tools that read the logs from the versioned directory need the new path."
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
