@@ -266,20 +266,9 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		"extensions": map[string]any{
 			"kafkapartitioner/_agent-component/default": map[string]any{},
 			"oauth2client/_agent-component/default": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
-				"client_certificate_key":      "",
-				"client_certificate_key_file": "",
-				"client_certificate_key_id":   "",
-				"client_id":                   "my-client",
-				"client_id_file":              "",
-				"client_secret":               "my-secret",
-				"client_secret_file":          "",
-				"endpoint_params":             map[string][]string(nil),
-				"expiry_buffer":               "5m0s",
-				"grant_type":                  "",
-				"tls": map[string]any{
-					"tpm": map[string]any{},
-				},
-				"token_url": "https://example.com/oauth2/token",
+				"client_id":     "my-client",
+				"client_secret": "my-secret",
+				"token_url":     "https://example.com/oauth2/token",
 			},
 		},
 		"processors": map[string]any{

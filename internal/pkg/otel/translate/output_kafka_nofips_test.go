@@ -7,10 +7,13 @@
 package translate
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -86,25 +89,24 @@ auth:
 	require.Equal(t, expectedMap, gotMap)
 	require.Nil(t, processorCfg)
 	require.Equal(t, map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
-		"client_certificate_key":      "",
-		"client_certificate_key_file": "",
-		"client_certificate_key_id":   "",
-		"client_id":                   "my-client",
-		"client_id_file":              "",
-		"client_secret":               "my-secret",
-		"client_secret_file":          "",
-		"endpoint_params": map[string][]string{
-			"foo": {"bar", "join"},
-			"new": {"info"},
-		},
-		"expiry_buffer": "5m0s",
-		"grant_type":    "",
+		"client_id":     "my-client",
+		"client_secret": "my-secret",
+		"token_url":     "https://example.com/oauth2/token",
 		"timeout":       "10s",
-		"tls": map[string]any{
-			"tpm": map[string]any{},
+		"endpoint_params": map[string]any{
+			"foo": "bar,join",
+			"new": "info",
 		},
-		"token_url": "https://example.com/oauth2/token",
 	}, extensionCfg["oauth2client/_agent-component/default"])
+
+	oauth2Cfg, ok := oauth2clientauthextension.NewFactory().CreateDefaultConfig().(*oauth2clientauthextension.Config)
+	require.True(t, ok)
+	extCfgMap, ok := extensionCfg["oauth2client/_agent-component/default"].(map[string]any)
+	require.True(t, ok)
+	require.NoError(t, confmap.NewFromStringMap(extCfgMap).Unmarshal(oauth2Cfg))
+	require.Equal(t, 10*time.Second, oauth2Cfg.Timeout)
+	require.Equal(t, 5*time.Minute, oauth2Cfg.ExpiryBuffer)
+	require.Equal(t, url.Values{"foo": {"bar", "join"}, "new": {"info"}}, oauth2Cfg.EndpointParams)
 }
 
 func TestKafkaOAuthRequiresOauthConfig(t *testing.T) {
