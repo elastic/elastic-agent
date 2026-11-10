@@ -1074,6 +1074,9 @@ func readTarContents(tarName string, data io.Reader) (*packageFile, error) {
 		if excludedPathsPattern.MatchString(header.Name) {
 			continue
 		}
+		if _, found := p.Contents[header.Name]; found {
+			return nil, fmt.Errorf("duplicate entry %q in %s", header.Name, tarName)
+		}
 		p.Contents[header.Name] = packageEntry{
 			File: header.Name,
 			UID:  header.Uid,
@@ -1100,6 +1103,9 @@ func readZip(t *testing.T, zipFile string, inspectors ...inspector) (*packageFil
 	for _, f := range r.File {
 		if excludedPathsPattern.MatchString(f.Name) {
 			continue
+		}
+		if _, found := p.Contents[f.Name]; found {
+			return nil, fmt.Errorf("duplicate entry %q in %s", f.Name, zipFile)
 		}
 		p.Contents[f.Name] = packageEntry{
 			File: f.Name,
