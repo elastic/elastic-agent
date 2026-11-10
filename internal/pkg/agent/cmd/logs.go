@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -226,7 +227,9 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir s
 			for !done {
 				err := printLogs(cmd.Context(), streams.Out, eventLogsDir, lines, follow, filter, modifier)
 				if err != nil {
-					if !strings.Contains(err.Error(), "logs/events: no such file or directory") {
+					// the directory does not exist until the first event is logged, whatever the text of the error
+					// and the path of the directory are on this operating system
+					if _, statErr := os.Stat(eventLogsDir); !errors.Is(statErr, fs.ErrNotExist) {
 						errChan <- fmt.Errorf("failed to get event logs: %w", err)
 						return
 					}
