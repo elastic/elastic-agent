@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -258,19 +257,6 @@ func TestBuildMergedConfigMatchesSequentialMerge(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-// buildMergedConfig assumes that the config generated for components never sets
-// service::telemetry, so that the collector metrics readers it appends to are the ones from the
-// collector config.
-func TestComponentConfigDoesNotSetCollectorTelemetry(t *testing.T) {
-	componentCfg, err := translate.GetOtelConfig(&component.Model{Components: []component.Component{testComponent("test")}}, logp.NewNopLogger())
-	require.NoError(t, err)
-	require.NotNil(t, componentCfg)
-
-	for _, key := range componentCfg.AllKeys() {
-		assert.False(t, strings.HasPrefix(key, "service::telemetry"), "component config sets %s", key)
 	}
 }
 

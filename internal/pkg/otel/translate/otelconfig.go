@@ -145,14 +145,14 @@ func GetOtelConfig(
 	if len(extensions) != 0 {
 		// create a deduplicated extensions lists in a deterministic order
 		extensionsSlice := slices.Sorted(maps.Keys(extensions))
+		// for consistency, we set this back as a slice of any
+		untypedExtensions := make([]any, len(extensionsSlice))
+		for i, ext := range extensionsSlice {
+			untypedExtensions[i] = ext
+		}
 		// A single component already defines its extensions in this order, and merging would copy the whole
 		// config to write the list it already has.
-		if !hasServiceExtensions(otelConfig, extensionsSlice) {
-			// for consistency, we set this back as a slice of any
-			untypedExtensions := make([]any, len(extensionsSlice))
-			for i, ext := range extensionsSlice {
-				untypedExtensions[i] = ext
-			}
+		if current, _ := otelConfig.Get("service::extensions").([]any); !slices.Equal(current, untypedExtensions) {
 			extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
 			err := otelConfig.Merge(extensionsConf)
 			if err != nil {
@@ -162,20 +162,6 @@ func GetOtelConfig(
 	}
 
 	return otelConfig, nil
-}
-
-// hasServiceExtensions returns true if the service::extensions list of conf is exactly the given extensions, in order.
-func hasServiceExtensions(conf *confmap.Conf, extensions []string) bool {
-	current, ok := conf.Get("service::extensions").([]any)
-	if !ok || len(current) != len(extensions) {
-		return false
-	}
-	for i, ext := range current {
-		if name, ok := ext.(string); !ok || name != extensions[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func LogpLevelToOTel(lvl logp.Level) (string, error) {

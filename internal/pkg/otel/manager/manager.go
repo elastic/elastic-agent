@@ -481,10 +481,8 @@ func (m *OTelManager) buildMergedConfig(
 	overlay := confmap.New()
 
 	if componentOtelCfg != nil {
-		// mergeWithExtensions needs to see the extensions of the component config to order the union of the
-		// lists, so the overlay starts with them. Its list is then the complete list, which replaces the base's.
-		if err := seedServiceExtensions(overlay, componentOtelCfg); err != nil {
-			return nil, fmt.Errorf("failed to read component otel extensions: %w", err)
+		if err := seedOverlay(overlay, componentOtelCfg); err != nil {
+			return nil, fmt.Errorf("failed to seed the otel config overlay: %w", err)
 		}
 
 		if err := injectHeaderSetterExtension(overlay, agentInfo); err != nil {
@@ -494,10 +492,8 @@ func (m *OTelManager) buildMergedConfig(
 		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
-				// collector's internal telemetry. It shares the monitoring exporter
-				// of the components, if they have one.
-				monitoringExporterFound := hasMonitoringExporter(componentOtelCfg)
-				if err := injectMonitoringReceiverIntoConfig(overlay, monitoringExporterFound, mCfg, agentInfo, cfgUpdate.components, logger); err != nil {
+				// collector's internal telemetry.
+				if err := injectMonitoringReceiver(overlay, mCfg, agentInfo, cfgUpdate.components, logger); err != nil {
 					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 				}
 			}
@@ -523,10 +519,8 @@ func (m *OTelManager) buildMergedConfig(
 
 	// if the otel log level is unset, use the most verbose level across agent and all units
 	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
-	if componentOtelCfg == nil || !componentOtelCfg.IsSet(serviceLogLevelKey) {
-		if err := maybeInjectLogLevel(overlay, minLogLevel); err != nil {
-			return nil, err
-		}
+	if err := maybeInjectLogLevel(overlay, minLogLevel); err != nil {
+		return nil, err
 	}
 
 	// Inject health check extension with port 0 as a placeholder. The actual port is resolved
@@ -536,7 +530,6 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
 	}
 
-	// Component configs never set service::telemetry, so the readers in the overlay are all of them.
 	if err := addCollectorMetricsReader(overlay, m.collectorMetricsPort); err != nil {
 		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
@@ -553,31 +546,37 @@ func (m *OTelManager) buildMergedConfig(
 	return componentOtelCfg, nil
 }
 
-// serviceLogLevelKey is the key of the log level of the collector's own logs.
-const serviceLogLevelKey = "service::telemetry::logs::level"
-
-// seedServiceExtensions sets the service::extensions list of dst to a copy of the list of src, if it has one.
-func seedServiceExtensions(dst, src *confmap.Conf) error {
-	extensions, err := serviceExtensionsList(src)
+// seedOverlay copies the parts of the component config that the steps merging into the overlay read, so that
+// they see what they would see when merging into the component config itself: the extensions, which
+// mergeWithExtensions needs to order, the exporters, which the monitoring receiver looks at, and the collector
+// telemetry, which the log level and the metrics readers depend on. They are small compared to the whole config.
+func seedOverlay(overlay, componentCfg *confmap.Conf) error {
+	seed := map[string]any{}
+	extensions, err := serviceExtensionsList(componentCfg)
 	if err != nil {
 		return err
 	}
-	if extensions == nil {
-		return nil
+	if extensions != nil {
+		seed["service::extensions"] = extensions
 	}
-	return dst.Merge(confmap.NewFromStringMap(map[string]any{"service::extensions": extensions}))
+	for _, key := range []string{"exporters", "service::telemetry"} {
+		if componentCfg.IsSet(key) {
+			seed[key] = componentCfg.Get(key)
+		}
+	}
+	return overlay.Merge(confmap.NewFromStringMap(seed))
 }
 
 // maybeInjectLogLevel adds the given log level to the collector config if it's not set.
 func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
-	if config.IsSet(serviceLogLevelKey) {
+	if config.IsSet("service::telemetry::logs::level") {
 		return nil
 	}
 	level, err := translate.LogpLevelToOTel(logplevel)
 	if err != nil {
 		return fmt.Errorf("failed to translate log level: %s", logplevel)
 	}
-	if err := mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{serviceLogLevelKey: level})); err != nil {
+	if err := mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{"service::telemetry::logs::level": level})); err != nil {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
@@ -751,24 +750,6 @@ const internalTelemetryDiagnosticsFileName = "elastic-agent-metrics.ndjson"
 // diagnostics file.
 const defaultDiagnosticsFileSizeMB = 10
 
-// monitoringExporterID is the ID of the ES exporter that OTel-based monitoring produces, which the
-// internal telemetry pipeline can share.
-func monitoringExporterID() string {
-	exporterType := otelcomponent.MustNewType("elasticsearch")
-	return translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
-}
-
-// hasMonitoringExporter returns true if config defines the exporter of OTel-based monitoring.
-func hasMonitoringExporter(config *confmap.Conf) bool {
-	if !config.IsSet("exporters") {
-		return false
-	}
-	_, found := config.Get("exporters").(map[string]any)[monitoringExporterID()]
-	return found
-}
-
-// injectMonitoringReceiver merges the internal telemetry monitoring receiver into config, sharing the
-// monitoring exporter if config defines it.
 func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
@@ -776,21 +757,18 @@ func injectMonitoringReceiver(
 	components []component.Component,
 	logger *logp.Logger,
 ) error {
-	return injectMonitoringReceiverIntoConfig(config, hasMonitoringExporter(config), monitoring, agentInfo, components, logger)
-}
-
-// injectMonitoringReceiverIntoConfig merges the internal telemetry monitoring receiver into config.
-// monitoringExporterFound says whether the monitoring exporter exists, which allows config to be a
-// config that does not itself hold the exporters.
-func injectMonitoringReceiverIntoConfig(
-	config *confmap.Conf,
-	monitoringExporterFound bool,
-	monitoring *monitoringCfg.MonitoringConfig,
-	agentInfo info.Agent,
-	components []component.Component,
-	logger *logp.Logger,
-) error {
-	exporterID := monitoringExporterID()
+	// Check whether OTel-based monitoring is configured — it produces an ES exporter
+	// named "monitoring" that the internal telemetry pipeline can share.
+	exporterType := otelcomponent.MustNewType("elasticsearch")
+	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
+	monitoringExporterFound := false
+	if config.IsSet("exporters") {
+		for exporter := range config.Get("exporters").(map[string]any) {
+			if exporter == exporterID {
+				monitoringExporterFound = true
+			}
+		}
+	}
 
 	outputNameLookup, err := exporterIDToOutputNameLookup(components)
 	if err != nil {
