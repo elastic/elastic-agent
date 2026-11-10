@@ -176,20 +176,73 @@ common:
       image: "${IMAGE_UBUNTU_2404_X86_64}"
       diskSizeGb: 80
     command: &k8s_test_command |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     command_retry: &k8s_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
       sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
       - build/*
       - build/diagnostics/**
       - build/k8s-logs-*/**
 
+<<<<<<< HEAD
+=======
+  # key to hold the list of OpenShift versions to test against
+  - openshift_test:
+    versions: &openshift_test_versions
+      - &openshift_min_test_version v1.33.0 # OpenShift 4.20
+      - v1.34.0                             # OpenShift 4.21
+      - &openshift_max_test_version v1.35.0 # OpenShift 4.22
+    versions_without_min_max: &openshift_test_versions_without_min_max
+      - v1.34.0
+    all_variants: &openshift_test_all_variants
+      - basic
+      - complete
+      - complete-wolfi
+      - elastic-otel-collector
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+      - wolfi
+    default_variants: &openshift_test_default_variants
+      - wolfi
+      - complete
+      - elastic-otel-collector
+    extended_variants: &openshift_test_extended_variants
+      - basic
+      - complete-wolfi
+      - elastic-otel-collector-wolfi
+      - service
+      - slim
+      - slim-wolfi
+    env: &openshift_test_env
+      K8S_VERSION: "{{matrix.version}}"
+      DOCKER_VARIANTS: "{{matrix.variants}}"
+      TARGET_ARCH: "amd64"
+      K8S_PROVISIONER: "microshift"
+    agent: &openshift_test_agent
+      provider: "gcp"
+      machineType: "n2-standard-8"
+      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      diskSizeGb: 80
+    command: &openshift_test_command |
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
+    command_retry: &openshift_test_command_with_sleep |
+      MIN=0
+      MAX=9
+      # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
+      sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
+      .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
+    artifact_paths: &openshift_test_artifact_paths
+      - build/*
+      - build/diagnostics/**
+      - build/k8s-logs-*/**
+
+>>>>>>> 834c479 (bk: download only the needed docker archive in k8s/openshift tests (#17847))
 steps:
   - label: "Custom ECH Testing"
     key: integration-tests-ech
