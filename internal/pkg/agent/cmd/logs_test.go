@@ -8,11 +8,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -778,7 +781,7 @@ func TestLogsCmdWithoutEventLogsDirectory(t *testing.T) {
 
 	logsDir := t.TempDir()
 	createFileContent(t, logsDir, "elastic-agent-20260101.ndjson", bytes.NewBufferString(marker+"\n"))
-	// the path does not end in logs/events, which is what the check of the text of the error looked for
+	// the directory name alone, so the check must not rely on the parent path
 	eventLogsDir := filepath.Join(t.TempDir(), "events")
 
 	var cmdErr error
@@ -802,12 +805,50 @@ func TestLogsCmdWithoutEventLogsDirectory(t *testing.T) {
 		}
 	}
 
-	// Wait until the command prints the logs: it is following them, and the events part has been started next to it.
+	// Wait until the command prints the logs: it is following them.
 	deadline := time.Now().Add(30 * time.Second)
 	for !strings.Contains(out.String(), marker) {
 		require.True(t, time.Now().Before(deadline), "the command did not print the logs")
 		failIfReturned(10 * time.Millisecond)
 	}
-	// a failing events part returns within microseconds, give it the time
+	// The events part starts next to the logs part and a failure of it returns within microseconds, give it the time.
 	failIfReturned(500 * time.Millisecond)
+}
+
+func TestIsMissingDir(t *testing.T) {
+	dir := filepath.Join("data", "logs", "events")
+	wrap := func(err error) error {
+		return fmt.Errorf("failed to fetch log filenames: failed to list logs directory: %w", err)
+	}
+
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"missing directory, ENOENT":       {err: wrap(&fs.PathError{Op: "open", Path: dir, Err: syscall.ENOENT}), want: true},
+		"missing directory, ErrNotExist":  {err: wrap(&fs.PathError{Op: "open", Path: dir, Err: fs.ErrNotExist}), want: true},
+		"missing directory, unclean path": {err: wrap(&fs.PathError{Op: "open", Path: dir + string(filepath.Separator), Err: fs.ErrNotExist}), want: true},
+		"missing log file in directory":   {err: wrap(&fs.PathError{Op: "open", Path: filepath.Join(dir, "elastic-agent-1.ndjson"), Err: fs.ErrNotExist}), want: false},
+		"other directory":                 {err: wrap(&fs.PathError{Op: "open", Path: "other", Err: fs.ErrNotExist}), want: false},
+		"permission denied":               {err: wrap(&fs.PathError{Op: "open", Path: dir, Err: fs.ErrPermission}), want: false},
+		"not a path error":                {err: errors.New("boom"), want: false},
+		"nil":                             {err: nil, want: false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, isMissingDir(tc.err, dir))
+		})
+	}
+}
+
+// TestIsMissingDirDirectoryCreatedAfterError covers the start of the Agent: the error of a missing directory is
+// returned, the Agent creates the directory when it logs the first event, and only then the error is classified.
+func TestIsMissingDirDirectoryCreatedAfterError(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "events")
+	_, err := getLogFilenames(dir)
+	require.Error(t, err)
+
+	require.NoError(t, os.Mkdir(dir, 0o755))
+
+	assert.True(t, isMissingDir(err, dir), "the missing directory must be tolerated after it was created")
 }
