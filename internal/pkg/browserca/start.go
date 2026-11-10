@@ -46,35 +46,30 @@ func Start(ctx context.Context, log *logger.Logger, cfg Config) string {
 func start(ctx context.Context, log logs, cfg Config, timeout time.Duration) string {
 	initialCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	homes := make(chan string)
-	done := make(chan struct{})
+	ready := make(chan string)
 	go func() {
 		m := &manager{paths: cfg.CertificateAuthorities, log: log}
 		var setHome bool
-		if len(m.paths) == 0 {
-			// Discovery is read-only: do not probe HOME or repair ownership unless
-			// there are certificates from a previous run to remove.
-			m.home, m.owner = cleanupHome()
-			if !m.hasDB() {
-				close(done)
-				return
-			}
-		} else {
-			m.home, m.owner, setHome = browserHome(log)
+		m.home, m.owner, setHome = browserHome(log, len(m.paths) > 0)
+		if len(m.paths) == 0 && !m.hasDB() {
+			close(ready)
+			return
 		}
 		certutil, err := exec.LookPath("certutil")
 		if err != nil {
-			log.Warnf("certutil not found, the custom CAs for browser monitors are not imported")
-			close(done)
+			if len(m.paths) > 0 {
+				log.Warnf("certutil not found, the custom CAs for browser monitors are not imported")
+			}
+			close(ready)
 			return
 		}
 		m.certs = execRunner(certutil, m.owner)
 		if setHome {
 			// Do not continue with a fallback that the caller never received.
 			select {
-			case homes <- m.home:
+			case ready <- m.home:
 			case <-initialCtx.Done():
-				close(done)
+				close(ready)
 				return
 			}
 		}
@@ -92,7 +87,7 @@ func start(ctx context.Context, log logs, cfg Config, timeout time.Duration) str
 		if reload {
 			interval = cfg.reloadInterval(log)
 		}
-		close(done)
+		close(ready)
 		if reload {
 			m.run(ctx, interval)
 		}
@@ -100,28 +95,16 @@ func start(ctx context.Context, log logs, cfg Config, timeout time.Duration) str
 	var home string
 	for {
 		select {
-		case home = <-homes:
-		case <-done:
-			return home
+		case resolved, ok := <-ready:
+			if !ok {
+				return home
+			}
+			home = resolved
 		case <-initialCtx.Done():
 			log.Warnf("browser CA startup did not finish within its time budget: %v", initialCtx.Err())
 			return home
 		}
 	}
-}
-
-// cleanupHome locates an existing store without a writability probe. Arbitrary
-// UIDs may have used the configured browser user's home on a previous run.
-func cleanupHome() (string, *owner) {
-	home := os.Getenv("HOME")
-	userHome, o, _ := lookupBrowserUser(os.Getenv(browserUserEnv))
-	if os.Geteuid() == 0 && userHome != "" {
-		return userHome, o
-	}
-	if !exists(filepath.Join(home, ".pki", "nssdb", "cert9.db")) && userHome != "" {
-		home = userHome
-	}
-	return home, nil
 }
 
 // reloadInterval bounds polling work for both YAML and container overrides.
@@ -149,14 +132,15 @@ func exists(path string) bool {
 // the database goes there and is given to that user. Otherwise the browser uses
 // HOME, unless HOME isn't writable (arbitrary UIDs on OpenShift get "/"): then HOME
 // must be changed to that user's home, which the browser inherits when it starts.
-func browserHome(log logs) (string, *owner, bool) {
+func browserHome(log logs, configured bool) (string, *owner, bool) {
 	home := os.Getenv("HOME")
 	isRoot := os.Geteuid() == 0
-	if !isRoot && writable(home) {
+	// Without configured CAs, locate an existing store without a write probe.
+	if !isRoot && ((configured && writable(home)) || (!configured && exists(filepath.Join(home, ".pki", "nssdb", "cert9.db")))) {
 		return home, nil, false
 	}
 	userHome, o, err := lookupBrowserUser(os.Getenv(browserUserEnv))
-	if err != nil {
+	if err != nil && configured {
 		log.Warnf("the browser may not read the custom CAs: %v", err)
 	}
 	if userHome == "" {
@@ -165,7 +149,7 @@ func browserHome(log logs) (string, *owner, bool) {
 	if isRoot {
 		return userHome, o, false
 	}
-	return userHome, nil, true
+	return userHome, nil, configured
 }
 
 func writable(dir string) bool {

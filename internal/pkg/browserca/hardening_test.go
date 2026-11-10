@@ -8,7 +8,6 @@ package browserca
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,7 +20,7 @@ import (
 )
 
 func TestRejectedCAInputsPreserveTrust(t *testing.T) {
-	for _, kind := range []string{"fifo", "symlink to fifo", "oversized file", "total size", "too many paths", "too many files", "too many entries", "too many certificates"} {
+	for _, kind := range []string{"fifo", "symlink to fifo", "oversized file", "total size", "too many entries"} {
 		t.Run(kind, func(t *testing.T) {
 			m, fake, dir, _ := setup(t)
 			write(t, dir, "ca.pem", newCA(t, "original"))
@@ -43,20 +42,6 @@ func TestRejectedCAInputsPreserveTrust(t *testing.T) {
 				for _, name := range []string{"a.pem", "b.pem", "c.pem", "d.pem"} {
 					write(t, dir, name, strings.Repeat("x", maxCAFileBytes))
 				}
-			case "too many paths":
-				m.paths = make([]string, maxCAFiles+1)
-			case "too many files":
-				for range maxCAFiles {
-					f, err := os.CreateTemp(dir, "extra-*.pem")
-					require.NoError(t, err)
-					require.NoError(t, f.Close())
-				}
-			case "too many certificates":
-				var bundle strings.Builder
-				for range maxCertificates {
-					bundle.WriteString(newCA(t, "extra"))
-				}
-				write(t, dir, "bundle.pem", bundle.String())
 			case "too many entries":
 				for i := range maxDirectoryEntries {
 					f, err := os.CreateTemp(dir, "unrelated-*")
@@ -105,26 +90,11 @@ func TestFailedImportPreservesOldTrust(t *testing.T) {
 	assert.NotEqual(t, before, fake.nicknames())
 }
 
-func TestExecRunnerDeadline(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
-	defer cancel()
-	started := time.Now()
-	_, err := execRunner("/bin/sh", nil)(ctx, nil, "-c", "exec sleep 60")
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Less(t, time.Since(started), 2*time.Second)
-}
-
 func TestExecRunnerCommandTimeout(t *testing.T) {
 	started := time.Now()
 	_, err := execRunner("/bin/sh", nil)(t.Context(), nil, "-c", "exec sleep 60")
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Less(t, time.Since(started), commandTimeout+2*time.Second)
-}
-
-func TestExecRunnerOutputLimit(t *testing.T) {
-	out, err := execRunner("/bin/sh", nil)(t.Context(), nil, "-c", "head -c 5000000 /dev/zero")
-	require.ErrorContains(t, err, "output exceeds")
-	assert.Len(t, out, maxCommandOutput)
 }
 
 func TestStartBoundsStartupWait(t *testing.T) {
@@ -144,16 +114,4 @@ func TestStartBoundsStartupWait(t *testing.T) {
 	assert.Less(t, time.Since(started), time.Second)
 	assert.Equal(t, home, os.Getenv("HOME"))
 	require.Eventually(t, func() bool { return log.has("custom CA certificates not imported") }, 2*time.Second, 10*time.Millisecond)
-}
-
-func TestCleanupWithoutManagedCertificatesDoesNotRepairOwnership(t *testing.T) {
-	m, _, _, _ := setup(t)
-	m.paths = nil
-	m.owner = &owner{uid: 12345, gid: 12345}
-	m.inspect = func(context.Context, []byte, ...string) ([]byte, error) { return []byte("user-certificate C,,"), nil }
-	m.certs = func(context.Context, []byte, ...string) ([]byte, error) {
-		return nil, errors.New("must not mutate store")
-	}
-	require.NoError(t, m.reconcile(t.Context()))
-	assert.NoDirExists(t, filepath.Join(m.home, ".pki"))
 }

@@ -39,10 +39,7 @@ const (
 	reconcileTimeout    = 30 * time.Second
 	maxCAFileBytes      = 4 << 20
 	maxCATotalBytes     = 16 << 20
-	maxCAFiles          = 1024
 	maxDirectoryEntries = 4096
-	maxCertificates     = 4096
-	maxCommandOutput    = 4 << 20
 
 	// nicknamePrefix marks the certificates managed here, so others in the database are left alone.
 	nicknamePrefix = "custom-ca-"
@@ -70,38 +67,15 @@ func execRunner(path string, o *owner) runner {
 		if o != nil {
 			runAs(cmd, o)
 		}
-		var output limitedOutput
-		cmd.Stdout, cmd.Stderr = &output, &output
-		err := cmd.Run()
-		out := output.buffer.Bytes()
+		out, err := cmd.CombinedOutput()
 		if ctx.Err() != nil {
 			err = ctx.Err()
-		}
-		if output.overflow {
-			err = errors.Join(err, fmt.Errorf("certutil output exceeds %d bytes", maxCommandOutput))
 		}
 		if err != nil {
 			return out, fmt.Errorf("certutil %s: %w: %s", args[0], err, bytes.TrimSpace(out[:min(len(out), 4096)]))
 		}
 		return out, nil
 	}
-}
-
-// limitedOutput drains command output without retaining an unbounded buffer.
-// exec serializes writes when stdout and stderr share the same writer.
-type limitedOutput struct {
-	buffer   bytes.Buffer
-	overflow bool
-}
-
-func (b *limitedOutput) Write(p []byte) (int, error) {
-	n := len(p)
-	if available := maxCommandOutput - b.buffer.Len(); n > available {
-		p = p[:available]
-		b.overflow = true
-	}
-	_, _ = b.buffer.Write(p)
-	return n, nil
 }
 
 // owner is the user and group the browser runs as when the agent runs as root. They
@@ -136,9 +110,7 @@ func (m *manager) dbDir() string {
 func (m *manager) files(ctx context.Context) ([]string, error) {
 	var files []string
 	entriesLeft := maxDirectoryEntries
-	if len(m.paths) > maxCAFiles {
-		return nil, fmt.Errorf("more than %d configured CA paths", maxCAFiles)
-	}
+	var errs []error
 	for _, p := range m.paths {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -149,43 +121,43 @@ func (m *manager) files(ctx context.Context) ([]string, error) {
 			continue
 		}
 		if err != nil {
-			return nil, err
+			errs = append(errs, err)
+			continue
 		}
 		if !info.IsDir() {
 			if !info.Mode().IsRegular() {
-				return nil, fmt.Errorf("CA path %s is not a regular file", p)
+				errs = append(errs, fmt.Errorf("CA path %s is not a regular file", p))
+				continue
 			}
 			files = append(files, p)
-		} else {
-			entries, err := readDirectory(p, entriesLeft)
-			if err != nil {
-				return nil, err
-			}
-			entriesLeft -= len(entries)
-			for _, e := range entries {
-				if ext := filepath.Ext(e.Name()); ext != ".crt" && ext != ".pem" {
-					continue
-				}
-				f := filepath.Join(p, e.Name())
-				info, err := os.Stat(f)
-				switch {
-				case errors.Is(err, fs.ErrNotExist):
-					// A dangling symlink.
-				case err != nil:
-					return nil, err
-				case info.Mode().IsRegular():
-					files = append(files, f)
-				case !info.IsDir():
-					return nil, fmt.Errorf("CA path %s is not a regular file", f)
-				}
-			}
+			continue
 		}
-		if len(files) > maxCAFiles {
-			return nil, fmt.Errorf("more than %d CA files", maxCAFiles)
+		entries, err := readDirectory(p, entriesLeft)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		entriesLeft -= len(entries)
+		for _, e := range entries {
+			if ext := filepath.Ext(e.Name()); ext != ".crt" && ext != ".pem" {
+				continue
+			}
+			f := filepath.Join(p, e.Name())
+			info, err := os.Stat(f)
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				// A dangling symlink.
+			case err != nil:
+				errs = append(errs, err)
+			case info.Mode().IsRegular():
+				files = append(files, f)
+			case !info.IsDir():
+				errs = append(errs, fmt.Errorf("CA path %s is not a regular file", f))
+			}
 		}
 	}
 	slices.Sort(files)
-	return slices.Compact(files), nil
+	return slices.Compact(files), errors.Join(errs...)
 }
 
 // readDirectory bounds allocation even for directories full of unrelated files.
@@ -269,9 +241,6 @@ func (m *manager) certificates(ctx context.Context) (map[string][]byte, error) {
 			}
 			sum := sha256.Sum256(block.Bytes)
 			want[nicknamePrefix+hex.EncodeToString(sum[:8])] = block.Bytes
-			if len(want) > maxCertificates {
-				return nil, fmt.Errorf("more than %d CA certificates", maxCertificates)
-			}
 		}
 	}
 	return want, nil
@@ -413,19 +382,12 @@ func (m *manager) prepareDBDir() error {
 		return fmt.Errorf("opening the browser home: %w", err)
 	}
 	defer root.Close()
-	for _, path := range []string{".pki", filepath.Join(".pki", "nssdb")} {
-		if err := root.Mkdir(path, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+	for _, dir := range []string{".pki", filepath.Join(".pki", "nssdb")} {
+		if err := root.Mkdir(dir, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
 			return fmt.Errorf("creating database directory: %w", err)
 		}
-		info, err := root.Lstat(path)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			return fmt.Errorf("database directory %s is not a directory", path)
-		}
 		if m.owner != nil {
-			if err := chownDatabasePath(root, path, m.owner, true); err != nil {
+			if err := chownDatabasePath(root, dir, m.owner, true); err != nil {
 				return fmt.Errorf("changing database directory owner: %w", err)
 			}
 		}
@@ -434,18 +396,8 @@ func (m *manager) prepareDBDir() error {
 		return nil
 	}
 	for _, name := range []string{"cert9.db", "key4.db", "pkcs11.txt", "cert9.db-journal", "cert9.db-wal", "cert9.db-shm", "key4.db-journal", "key4.db-wal", "key4.db-shm"} {
-		path := filepath.Join(".pki", "nssdb", name)
-		info, err := root.Lstat(path)
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("database file %s is not a regular file", path)
-		}
-		if err := chownDatabasePath(root, path, m.owner, false); err != nil {
+		err := chownDatabasePath(root, filepath.Join(".pki", "nssdb", name), m.owner, false)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("changing database file owner: %w", err)
 		}
 	}
