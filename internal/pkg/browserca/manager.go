@@ -190,7 +190,8 @@ func (m *manager) files(ctx context.Context) ([]string, error) {
 
 // readDirectory bounds allocation even for directories full of unrelated files.
 func readDirectory(path string, limit int) ([]os.DirEntry, error) {
-	f, err := os.Open(path)
+	// A directory discovered earlier can also be replaced by a FIFO.
+	f, err := openCAFile(path)
 	if err != nil {
 		return nil, err
 	}

@@ -75,6 +75,8 @@ func TestReadCAFileChecksOpenedDescriptorAndLimit(t *testing.T) {
 	require.NoError(t, syscall.Mkfifo(path, 0o600))
 	_, err := readCAFile(path, maxCAFileBytes)
 	require.ErrorContains(t, err, "not a regular file")
+	_, err = readDirectory(path, maxDirectoryEntries)
+	require.Error(t, err, "a directory replaced by a FIFO must also fail without blocking")
 	require.NoError(t, os.Remove(path))
 	require.NoError(t, os.WriteFile(path, []byte("1234"), 0o600))
 	data, err := readCAFile(path, 4)
