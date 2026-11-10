@@ -135,7 +135,7 @@ func (d *EncryptedDiskStore) Save(in io.Reader) error {
 
 	tmpFile := d.target + ".tmp"
 
-	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask) //nolint:gosec // G703: target is an agent-controlled path, not user input
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),

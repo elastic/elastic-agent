@@ -149,6 +149,7 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 
 	initResp, err := client.Do(req)
 	require.NoError(runner.T(), err)
+	defer initResp.Body.Close()
 	require.Equal(runner.T(), http.StatusOK, initResp.StatusCode)
 
 	// use the fleet override API to change the port that we're running on.
@@ -188,6 +189,7 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 
 	initResp, err = client.Do(req)
 	require.NoError(runner.T(), err)
+	defer initResp.Body.Close()
 	require.Equal(runner.T(), http.StatusOK, initResp.StatusCode)
 }
 

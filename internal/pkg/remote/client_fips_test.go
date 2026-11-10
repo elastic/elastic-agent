@@ -170,6 +170,7 @@ func TestClientWithCertificate(t *testing.T) {
 				},
 			}
 			client, err := NewWithConfig(testLogger, config, nil)
+			require.NoError(t, err)
 
 			// Use client to call fake API on HTTPS server
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -180,6 +181,7 @@ func TestClientWithCertificate(t *testing.T) {
 			if test.expectedHandshakeErr == "" {
 				require.NotNil(t, resp)
 				require.NoError(t, err)
+				defer resp.Body.Close()
 			} else {
 				require.Nil(t, resp)
 				require.Error(t, err)

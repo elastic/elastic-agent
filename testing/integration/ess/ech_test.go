@@ -41,11 +41,14 @@ func TestECH(t *testing.T) {
 
 	// Check that the Fleet Server in the deployment is healthy
 	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
+	require.NoError(t, err)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	require.NoError(t, err)
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		resp, err := http.Get(statusUrl)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, statusUrl, nil)
+		require.NoError(c, err)
+		resp, err := http.DefaultClient.Do(req)
 		require.NoError(c, err)
 		defer resp.Body.Close()
 

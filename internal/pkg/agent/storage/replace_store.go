@@ -65,7 +65,7 @@ func NewReplaceOnSuccessStore(target string, replaceWith []byte, wrapped Store, 
 // Save will replace a target file with new content if the wrapped store is successful.
 func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	// Ensure we can read the target files before delegating any call to the wrapped store.
-	target, err := os.ReadFile(r.target)
+	target, err := os.ReadFile(r.target) //nolint:gosec // G703: target is an agent-controlled path, not user input
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("fail to read content of %s", r.target),
@@ -100,7 +100,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 			errors.M(errors.MetaKeyPath, r.target))
 	}
 
-	fd, err := os.OpenFile(r.target, os.O_CREATE|os.O_WRONLY, permMask)
+	fd, err := os.OpenFile(r.target, os.O_CREATE|os.O_WRONLY, permMask) //nolint:gosec // G703: target is an agent-controlled path, not user input
 	if err != nil {
 		// Rollback on any errors to minimize non working state.
 		if err := file.SafeFileRotate(r.target, backFilename); err != nil {
@@ -123,7 +123,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	// Always clean up the temporary file and ignore errors.
 	defer os.Remove(tmpFile)
 
-	fdt, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
+	fdt, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask) //nolint:gosec // G703: target is an agent-controlled path, not user input
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
@@ -177,7 +177,7 @@ func (r *ReplaceOnSuccessStore) Save(in io.Reader) error {
 	}
 
 	if r.removeBackup {
-		if err := os.Remove(backFilename); err != nil {
+		if err := os.Remove(backFilename); err != nil { //nolint:gosec // G703: target is an agent-controlled path, not user input
 			if !errors.Is(err, os.ErrNotExist) {
 				return fmt.Errorf("failed to remove %s: %w", backFilename, err)
 			}

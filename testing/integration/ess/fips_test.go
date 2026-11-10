@@ -76,12 +76,15 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 
 	// Check that the Fleet Server in the deployment is healthy
 	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
+	require.NoError(t, err)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	t.Logf("statusUrl = %s", statusUrl)
 	require.NoError(t, err)
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		resp, err := http.Get(statusUrl)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, statusUrl, nil)
+		require.NoError(collect, err)
+		resp, err := http.DefaultClient.Do(req)
 		require.NoError(collect, err)
 		defer resp.Body.Close()
 

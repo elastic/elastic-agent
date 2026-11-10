@@ -58,7 +58,7 @@ ssl:
 	got, err := TLSToOTel(tlsCfg, logptest.NewTestingLogger(t, ""))
 	require.NoError(t, err)
 
-	assert.Equal(t, map[string]any{
+	assert.Equal(t, map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 		"ca_pem": `-----BEGIN CERTIFICATE-----
 MIIDzTCCArWgAwIBAgIURzQp9/bWT37HJX71yfGEO0xrs2wwDQYJKoZIhvcNAQEL
 BQAwdjELMAkGA1UEBhMCVVMxDzANBgNVBAgMBkFsYXNrYTETMBEGA1UEBwwKR2xl

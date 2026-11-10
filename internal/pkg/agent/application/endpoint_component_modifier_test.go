@@ -273,7 +273,7 @@ func TestEndpointComponentModifier(t *testing.T) {
 			}`),
 				cfg: map[string]interface{}{
 					"fleet": map[string]interface{}{
-						"ssl": map[string]interface{}{
+						"ssl": map[string]interface{}{ //nolint:gosec // G101: test fixture, not a real credential
 							"key":                 "/path/to/cert",
 							"key_passphrase_path": "/path/to/key_passphrase_path",
 						},

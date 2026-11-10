@@ -26,7 +26,7 @@ import (
 )
 
 func TestEscapingSecretsInPolicy(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	info := define.Require(t, define.Requirements{ //nolint:staticcheck // SA4006: false positive, info is unreachable only while the test is skipped
 		Group: integration.Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
@@ -52,6 +52,7 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 		},
 	}
 	policy, err := info.KibanaClient.CreatePolicy(ctx, policyReq)
+	require.NoError(t, err)
 
 	pkgPolicyReq := kibana.PackagePolicyRequest{
 		Force:     true,

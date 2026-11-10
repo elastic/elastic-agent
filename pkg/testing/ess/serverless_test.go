@@ -20,7 +20,7 @@ func TestProvisionGetRegions(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 
-	_ = logp.DevelopmentSetup()
+	_ = logp.DevelopmentSetup() //nolint:staticcheck // SA1019: ServerlessProvisioner logs through the global logger
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -43,7 +43,7 @@ func TestStackProvisioner(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	_ = logp.DevelopmentSetup()
+	_ = logp.DevelopmentSetup() //nolint:staticcheck // SA1019: ServerlessProvisioner logs through the global logger
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")
@@ -72,7 +72,7 @@ func TestStackProvisioner(t *testing.T) {
 }
 
 func TestStartServerless(t *testing.T) {
-	_ = logp.DevelopmentSetup()
+	_ = logp.DevelopmentSetup() //nolint:staticcheck // SA1019: ServerlessProvisioner logs through the global logger
 	key, found, err := GetESSAPIKey()
 	if !found {
 		t.Skip("No credentials found for ESS")

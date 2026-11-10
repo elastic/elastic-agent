@@ -37,7 +37,7 @@ func DeleteDashboard(ctx context.Context, client *kibana.Client, id string) erro
 	// In the future there should be logic to check if we need this header, waiting for https://github.com/elastic/kibana/pull/164850
 	headers := http.Header{}
 	headers.Add("x-elastic-internal-origin", "integration-tests")
-	status, resp, err := client.Connection.Request("DELETE", fmt.Sprintf("/api/saved_objects/dashboard/%s", id), nil, headers, nil)
+	status, resp, err := client.Request("DELETE", fmt.Sprintf("/api/saved_objects/dashboard/%s", id), nil, headers, nil)
 	if err != nil {
 		return fmt.Errorf("error making API request: %w, response: '%s'", err, string(resp))
 	}
@@ -60,7 +60,7 @@ func GetDashboards(ctx context.Context, client *kibana.Client) ([]Dashboard, err
 	for {
 		headers := http.Header{}
 		headers.Add("x-elastic-internal-origin", "integration-tests")
-		status, resp, err := client.Connection.Request("GET", "/api/saved_objects/_find", params, headers, nil)
+		status, resp, err := client.Request("GET", "/api/saved_objects/_find", params, headers, nil)
 		if err != nil {
 			return nil, fmt.Errorf("error making api request: %w", err)
 		}

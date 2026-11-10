@@ -210,18 +210,21 @@ func testFleetServerInternalAPI() func(t *testing.T) {
 		// in order to interact with the API we need to ignore the cert.
 		client := &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // G402: fleet-server uses a self-signed certificate
 			},
 		}
 		fleetOK := false
 		for i := 0; i < 10; i++ {
 			t.Log("Checking fleet-server status")
-			resp, err := client.Get("https://localhost:8220/api/status")
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://localhost:8220/api/status", nil)
+			require.NoError(t, err)
+			resp, err := client.Do(req)
 			if err != nil {
 				t.Logf("fleet-server status check returned error: %v, retry in 10s...", err)
 				time.Sleep(10 * time.Second)
 				continue
 			}
+			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				fleetOK = true
 				break
