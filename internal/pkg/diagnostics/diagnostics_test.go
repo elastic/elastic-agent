@@ -1577,6 +1577,18 @@ func TestZipLogsBuildLogs(t *testing.T) {
 			},
 		},
 		{
+			name: "ignores directories in the logs root that are not builds",
+			setup: func(t *testing.T, topPath string) {
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "elastic-agent-watcher-20260101.ndjson"), "watch failed\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, "custom"), "elastic-agent-1.ndjson"), "not a build\n")
+			},
+			want: map[string][]string{
+				"logs/": dir, current: dir, current + "components/": dir,
+				failed: dir, failed + "components/": dir,
+				failed + "elastic-agent-watcher-20260101.ndjson": {"watch failed\n"},
+			},
+		},
+		{
 			name:             "reports a logs root that cannot be read and collects the rest",
 			needsPermissions: true,
 			setup: func(t *testing.T, topPath string) {

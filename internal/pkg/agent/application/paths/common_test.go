@@ -234,3 +234,35 @@ func TestBuildLogs(t *testing.T) {
 		assert.Equal(t, filepath.Join(topPath, "logs"), BuildLogs())
 	})
 }
+
+func TestIsBuildLogsDirName(t *testing.T) {
+	for _, name := range []string{
+		"aaaaaa",
+		"ff7609",
+		"9.7.0-ff7609",
+		"9.7.0-SNAPSHOT-ff7609",
+		"10.12.3-rc1.2-SNAPSHOT-abcdef",
+		"9.5.4+build202609161310-abcdef",
+		"9.5.4+build202609161310-SNAPSHOT-abcdef",
+	} {
+		assert.Truef(t, IsBuildLogsDirName(name), "%q is a build log directory", name)
+	}
+	for _, name := range []string{
+		"",
+		"unknow",
+		"custom",
+		"ff76",
+		"ff76090",
+		"0123456789abcdef0123456789abcdef01234567",
+		"FF7609",
+		"9.7.0",
+		"9.7-ff7609",
+		"9.7.0-",
+		"9.7.0-SNAPSHOT",
+		"elastic-agent-ff7609",
+		"ff7609.ndjson",
+		"9.7.0-ff7609/extra",
+	} {
+		assert.Falsef(t, IsBuildLogsDirName(name), "%q is not a build log directory", name)
+	}
+}

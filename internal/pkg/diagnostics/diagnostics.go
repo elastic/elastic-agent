@@ -474,7 +474,7 @@ func zipLogs(zw *zip.Writer, ts time.Time, topPath string, componentsPath string
 		fmt.Fprintf(errOut, "[WARNING] unable to list the build log directories in %s: %s\n", logsRoot, err)
 	}
 	for _, d := range buildLogsDirs {
-		if d.IsDir() {
+		if d.IsDir() && isCollectedBuildLogsDir(d.Name()) {
 			builds[d.Name()] = struct{}{}
 		}
 	}
@@ -742,4 +742,12 @@ func RedactEnv() (map[string]any, error) {
 		return nil, errors.New(errOut.String())
 	}
 	return envMap, nil
+}
+
+// isCollectedBuildLogsDir reports whether the directory called name in the build logs root holds logs that
+// diagnostics collects: the log directory of a build, and the one of the running build whatever its name.
+// The second case is for a build whose name does not look like a build, such as a development build without a commit:
+// it still writes its logs to its own directory, which would otherwise be skipped as an unknown one.
+func isCollectedBuildLogsDir(name string) bool {
+	return paths.IsBuildLogsDirName(name) || name == paths.BuildLogsDirName()
 }

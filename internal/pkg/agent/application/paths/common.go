@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -236,6 +237,16 @@ func Logs() string {
 }
 
 const logsDirName = "logs"
+
+// buildLogsDirPattern matches the name of a build log directory: [<package-version>-]<commit>, where the
+// package version may carry build metadata (+build...) and the commit has the length of release.ShortCommit.
+// A build without a commit, such as a development build, does not match.
+var buildLogsDirPattern = regexp.MustCompile(fmt.Sprintf(`^(\d+\.\d+\.\d+(\+[0-9A-Za-z.]+)?(-[0-9A-Za-z.]+)*-)?[0-9a-f]{%d}$`, len(release.TrimCommit(strings.Repeat("0", 64)))))
+
+// IsBuildLogsDirName reports whether name looks like the name of the log directory of a build, see BuildLogsDirName.
+func IsBuildLogsDirName(name string) bool {
+	return buildLogsDirPattern.MatchString(name)
+}
 
 // BuildLogsRoot returns the directory that holds the log directory of each build, in the data directory of
 // the Agent installed in topDirPath.

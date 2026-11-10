@@ -10,18 +10,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
-
-// buildLogsDirPattern matches the name of a build log directory: [<package-version>-]<commit>, where the
-// package version may carry build metadata (+build...) and the
-// commit is the 6 hexadecimal characters of release.ShortCommit. Anything else under the logs root,
-// including the directory of a build without a commit, is not removed.
-var buildLogsDirPattern = regexp.MustCompile(fmt.Sprintf(`^(\d+\.\d+\.\d+(\+[0-9A-Za-z.]+)?(-[0-9A-Za-z.]+)*-)?[0-9a-f]{%d}$`, HashLen))
 
 // inactiveBuildsToKeep is the number of the most recently written inactive builds whose logs are kept,
 // in addition to the logs of the running build.
@@ -48,7 +42,7 @@ func CleanupBuildLogs(log *logger.Logger, logsRoot, currentDirName string) error
 
 	var inactive []buildLogsDir
 	for _, e := range entries {
-		if !e.IsDir() || e.Name() == currentDirName || !buildLogsDirPattern.MatchString(e.Name()) {
+		if !e.IsDir() || e.Name() == currentDirName || !paths.IsBuildLogsDirName(e.Name()) {
 			continue
 		}
 		p := filepath.Join(logsRoot, e.Name())
