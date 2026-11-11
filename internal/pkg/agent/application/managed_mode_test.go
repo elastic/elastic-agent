@@ -197,9 +197,9 @@ func newTestManagedConfigManager(t *testing.T, agentInfo *info.MockAgent, ss *st
 	cfg := configuration.DefaultConfiguration()
 	setter := &fakeClientSetter{clientCh: make(chan client.Sender, 1)}
 	upgradeMgr := &fakeUpgradeManager{}
-	m, err := newManagedConfigManager(log, agentInfo, nil, cfg, nil, nil, 0, "", fleetClient, nil, nil, retrier.New(nil, log), ss, nil, rollbacksSource, setter)
+	m, err := newManagedConfigManager(log, agentInfo, nil, cfg, nil, nil, 0, "", fleetClient, nil, nil, retrier.New(nil, log), ss, nil, rollbacksSource, nil, setter)
 	require.NoError(t, err)
-	m.coord = coordinator.New(log, cfg, logger.DefaultLogLevel, agentInfo, component.RuntimeSpecs{}, nil, upgradeMgr, nil, nil, nil, nil, nil, true, nil, nil, nil)
+	m.coord = coordinator.New(log, cfg, logger.DefaultLogLevel, agentInfo, component.RuntimeSpecs{}, nil, upgradeMgr, nil, nil, nil, nil, nil, true, nil, nil, nil, nil)
 	return m, setter, upgradeMgr
 }
 

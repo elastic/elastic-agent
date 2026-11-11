@@ -41,8 +41,8 @@ type Watcher struct {
 // NewWatcher returns a Watcher that fetches the host information every interval, or every DefaultCheckInterval if
 // interval isn't positive.
 func NewWatcher(log *logger.Logger, interval time.Duration) *Watcher {
-	return NewWatcherWithFetcher(log, interval, func(context.Context) (Info, error) {
-		return Fetch(log)
+	return NewWatcherWithFetcher(log, interval, func(ctx context.Context) (Info, error) {
+		return Fetch(ctx, log)
 	})
 }
 
