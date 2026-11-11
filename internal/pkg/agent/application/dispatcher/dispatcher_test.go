@@ -72,7 +72,7 @@ func TestGateUninstallActions(t *testing.T) {
 		assert.Equal(t, 1, acker.committed, "rejection acks are flushed")
 	})
 
-	t.Run("while awaiting uninstall only UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS are allowed", func(t *testing.T) {
+	t.Run("while awaiting uninstall only UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS/POLICY_CHANGE are allowed", func(t *testing.T) {
 		d := &ActionDispatcher{log: log}
 		d.SetWasUnenrolled(func() bool { return true })
 
@@ -80,11 +80,14 @@ func TestGateUninstallActions(t *testing.T) {
 		uninstall := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
 		cancel := &fleetapi.ActionCancel{ActionID: "c1", ActionType: fleetapi.ActionTypeCancel}
 		diag := &fleetapi.ActionDiagnostics{ActionID: "d1", ActionType: fleetapi.ActionTypeDiagnostics}
+		// POLICY_CHANGE resumes a re-enrolled agent; it must pass through so the
+		// policy-change handler can clear the stored UNENROLL (wasUnenrolled).
+		policy := &fleetapi.ActionPolicyChange{ActionID: "p1", ActionType: fleetapi.ActionTypePolicyChange}
 		acker := &recordingAcker{}
 
-		kept := d.gateUninstallActions(ctx, []fleetapi.Action{upgrade, uninstall, cancel, diag}, acker)
+		kept := d.gateUninstallActions(ctx, []fleetapi.Action{upgrade, uninstall, cancel, diag, policy}, acker)
 
-		assert.Equal(t, []string{"u1", "c1", "d1"}, ids(kept), "allowed actions pass through")
+		assert.Equal(t, []string{"u1", "c1", "d1", "p1"}, ids(kept), "allowed actions pass through")
 		assert.Equal(t, []string{"up1"}, ids(acker.acked), "the disallowed action is rejected and acked")
 		assert.ErrorIs(t, upgrade.Err, errActionWhileAwaitingUninstall)
 		assert.Equal(t, 1, acker.committed)

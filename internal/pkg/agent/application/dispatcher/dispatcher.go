@@ -267,8 +267,9 @@ var (
 // actions are valid given the agent's unenroll state:
 //
 //   - while the agent is awaiting a remote uninstall (it has been unenrolled) it
-//     only accepts UNINSTALL, its grace-period CANCEL, and REQUEST_DIAGNOSTICS;
-//     every other action is rejected;
+//     only accepts UNINSTALL, its grace-period CANCEL, REQUEST_DIAGNOSTICS, and
+//     POLICY_CHANGE (which resumes a re-enrolled agent, see
+//     isAllowedWhileAwaitingUninstall); every other action is rejected;
 //   - otherwise an UNINSTALL is rejected because the agent must be unenrolled
 //     first.
 //
@@ -322,9 +323,18 @@ func (ad *ActionDispatcher) gateUninstallActions(ctx context.Context, actions []
 
 // isAllowedWhileAwaitingUninstall reports whether an action type may be acted on
 // by an unenrolled agent that is awaiting a remote uninstall.
+//
+// POLICY_CHANGE is allowed so the agent can be resumed: Fleet Server does not
+// deliver policy changes to a pending-uninstall agent, so a POLICY_CHANGE only
+// arrives once the agent has been re-enrolled (which clears uninstall_pending on
+// the Fleet side). Letting it through lets the policy-change handler persist the
+// new action over the stored UNENROLL, which clears wasUnenrolled() and takes
+// the agent out of the awaiting-uninstall state. Rejecting it would deadlock a
+// re-enrolled agent (it would reject every policy it is ever sent).
 func isAllowedWhileAwaitingUninstall(actionType string) bool {
 	switch actionType {
-	case fleetapi.ActionTypeUninstall, fleetapi.ActionTypeCancel, fleetapi.ActionTypeDiagnostics:
+	case fleetapi.ActionTypeUninstall, fleetapi.ActionTypeCancel,
+		fleetapi.ActionTypeDiagnostics, fleetapi.ActionTypePolicyChange:
 		return true
 	default:
 		return false

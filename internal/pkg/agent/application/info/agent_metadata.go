@@ -106,11 +106,17 @@ func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 				// only upgradeable if running from Agent installer and running under the
 				// control of the system supervisor (or built specifically with upgrading enabled)
 				Upgradeable: release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
-				// only uninstallable via the Fleet remote UNINSTALL action when the
-				// agent is installed and supervised (same population that can be
-				// upgraded). Older agents that don't support UNINSTALL omit this flag,
-				// which signals Fleet Server to keep the legacy unenroll behavior.
-				Uninstallable: release.Upgradeable() || (paths.RunningInstalled() && RunningUnderSupervisor()),
+				// Uninstallable via the Fleet remote UNINSTALL action only when the
+				// agent can actually execute it. This mirrors Coordinator.Uninstall's
+				// preconditions so the agent never advertises support it cannot honor
+				// (which would strand it in Fleet's pending-uninstall state): it must
+				// be installed and supervised, and privileged — an unprivileged agent's
+				// service runs as a non-root user and cannot remove its own service.
+				// Requiring RunningInstalled also excludes containers (not installed via
+				// the install command). Older agents that don't support UNINSTALL omit
+				// this flag, which signals Fleet Server to keep the legacy unenroll
+				// behavior.
+				Uninstallable: !i.unprivileged && paths.RunningInstalled() && RunningUnderSupervisor(),
 				LogLevel:      i.GetLogLevelRuntime(),
 				Unprivileged:  i.unprivileged,
 				FIPS:          release.FIPSDistribution(),
