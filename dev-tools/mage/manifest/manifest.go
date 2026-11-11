@@ -85,7 +85,7 @@ var (
 	errorNotAllowedManifestURL = errors.New("the provided ManifestURL is not allowed URL")
 )
 
-var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co", "artifacts.elastic.co"}
+var AllowedManifestHosts = []string{"snapshots.elastic.co", "staging.elastic.co", "artifacts.elastic.co", "artifacts-snapshot.elastic.co", "artifacts-staging.elastic.co"}
 
 var PlatformPackages = map[string]string{
 	"darwin/amd64":  "darwin-x86_64.tar.gz",
