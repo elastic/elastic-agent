@@ -55,8 +55,43 @@ func (r *ackRecorder) ackedWithoutError(actionID string) bool {
 	return ok && errMsg == ""
 }
 
+// ackedWithError reports whether the action was acknowledged and its ack
+// carried an error (for example a rejection).
+func (r *ackRecorder) ackedWithError(actionID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	errMsg, ok := r.errs[actionID]
+	return ok && errMsg != ""
+}
+
+// unenrollAgent delivers a Fleet UNENROLL action and waits for the agent to
+// acknowledge it, leaving the agent in the awaiting-uninstall state: it keeps
+// checking in (Fleet Server keeps its access key) and only accepts
+// UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS. A preceding UNENROLL is required before
+// the agent accepts an UNINSTALL; the agent is the authoritative source of this
+// state and rejects an UNINSTALL otherwise.
+func unenrollAgent(t *testing.T, ctx context.Context, checkinWithAcker *fleetservertest.CheckinActionsWithAcker, recorder *ackRecorder, policy fleetservertest.TmplPolicy) {
+	t.Helper()
+
+	unenrollActionID := "unenroll-action-id"
+	unenrollAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
+		AgentID:  policy.AgentID,
+		ActionID: unenrollActionID,
+		Type:     fleetapi.ActionTypeUnenroll,
+		Data:     `{}`,
+	})
+	require.NoError(t, err, "failed to create unenroll action")
+	checkinWithAcker.AddCheckin("token", 1*time.Second, unenrollAction)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.True(collect, recorder.ackedWithoutError(unenrollActionID),
+			"unenroll action was not acknowledged without error")
+	}, 3*time.Minute, 500*time.Millisecond, "agent did not acknowledge the unenroll action")
+}
+
 // TestFleetUninstallAction validates the end-to-end UNINSTALL action flow against
-// a Fleet Server: the agent receives an UNINSTALL action on checkin, spawns a
+// a Fleet Server: the agent is first unenrolled (the required first step of the
+// remote-uninstall flow), then receives an UNINSTALL action on checkin, spawns a
 // detached uninstaller, and the action is acknowledged to Fleet by that
 // uninstaller at the point of no return (after the agent is effectively
 // uninstalled but before its credentials are removed).
@@ -72,6 +107,10 @@ func TestFleetUninstallAction(t *testing.T) {
 	defer cancel()
 
 	fixture, checkinWithAcker, recorder, policy := setupUninstallFleetServer(t, ctx)
+
+	// Unenroll the agent first: the agent only accepts an UNINSTALL once it has
+	// been unenrolled (it is the authoritative source of its own state).
+	unenrollAgent(t, ctx, checkinWithAcker, recorder, policy)
 
 	// Deliver an UNINSTALL action on the next checkin. The agent enforces a
 	// grace-period window of [created_at+1h, created_at+24h] on the start_time.
@@ -134,7 +173,10 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 	ctx, cancel := testcontext.WithTimeout(t, t.Context(), time.Minute*10)
 	defer cancel()
 
-	fixture, checkinWithAcker, _, policy := setupUninstallFleetServer(t, ctx)
+	fixture, checkinWithAcker, recorder, policy := setupUninstallFleetServer(t, ctx)
+
+	// Unenroll the agent first: an UNINSTALL is only accepted after unenroll.
+	unenrollAgent(t, ctx, checkinWithAcker, recorder, policy)
 
 	// Deliver an UNINSTALL action with a *future* start_time so it is held in the
 	// scheduled-action queue, giving the cancel below a window to remove it before
@@ -207,6 +249,81 @@ func TestFleetUninstallActionCancelled(t *testing.T) {
 	// The agent must still be installed and responding to status.
 	_, statusErr := fixture.ExecStatus(ctx)
 	require.NoError(t, statusErr, "agent should still be installed after the uninstall was cancelled")
+}
+
+// TestFleetUninstallActionRejectedBeforeUnenroll validates the agent-side
+// enforcement: an UNINSTALL delivered to an agent that has not been unenrolled
+// is rejected (acknowledged with an error) and the agent stays installed. Once
+// the agent is unenrolled, a subsequent UNINSTALL is accepted and uninstalls it.
+func TestFleetUninstallActionRejectedBeforeUnenroll(t *testing.T) {
+	_ = define.Require(t, define.Requirements{
+		Group: integration.Fleet,
+		Stack: &define.Stack{},
+		Local: false, // requires Agent installation
+		Sudo:  true,  // requires Agent installation
+	})
+
+	ctx, cancel := testcontext.WithTimeout(t, t.Context(), time.Minute*10)
+	defer cancel()
+
+	fixture, checkinWithAcker, recorder, policy := setupUninstallFleetServer(t, ctx)
+
+	// 1. Deliver an UNINSTALL before any unenroll. The agent rejects it because it
+	// has not been unenrolled, acknowledging the action with an error. (The
+	// backdated created_at/start_time keep the action inside the grace-period
+	// window, though the agent rejects it at receipt before scheduling.)
+	base := time.Now()
+	rejectedActionID := "uninstall-before-unenroll"
+	rejectedAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
+		AgentID:   policy.AgentID,
+		ActionID:  rejectedActionID,
+		Type:      fleetapi.ActionTypeUninstall,
+		CreatedAt: base.Add(-2 * time.Hour).UTC().Format(time.RFC3339),
+		StartTime: base.Add(-30 * time.Minute).UTC().Format(time.RFC3339),
+		Data:      `{}`,
+	})
+	require.NoError(t, err, "failed to create uninstall action")
+	checkinWithAcker.AddCheckin("token", 1*time.Second, rejectedAction)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.True(collect, recorder.ackedWithError(rejectedActionID),
+			"uninstall before unenroll should be rejected with an error")
+	}, 3*time.Minute, 500*time.Millisecond, "agent did not reject the premature uninstall action")
+
+	// The agent must still be installed and responding to status.
+	_, statusErr := fixture.ExecStatus(ctx)
+	require.NoError(t, statusErr, "agent should still be installed after the premature uninstall was rejected")
+
+	// 2. Unenroll, then deliver a fresh UNINSTALL. Now it is accepted and the
+	// agent uninstalls itself.
+	unenrollAgent(t, ctx, checkinWithAcker, recorder, policy)
+
+	base = time.Now()
+	uninstallActionID := "uninstall-after-unenroll"
+	uninstallAction, err := fleetservertest.NewAction(fleetservertest.ActionTmpl{
+		AgentID:   policy.AgentID,
+		ActionID:  uninstallActionID,
+		Type:      fleetapi.ActionTypeUninstall,
+		CreatedAt: base.Add(-2 * time.Hour).UTC().Format(time.RFC3339),
+		StartTime: base.Add(-30 * time.Minute).UTC().Format(time.RFC3339),
+		Data:      `{}`,
+	})
+	require.NoError(t, err, "failed to create uninstall action")
+	checkinWithAcker.AddCheckin("token", 1*time.Second, uninstallAction)
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		assert.True(collect, recorder.ackedWithoutError(uninstallActionID),
+			"uninstall after unenroll was not acknowledged without error")
+	}, 5*time.Minute, 500*time.Millisecond, "agent did not acknowledge the uninstall action after unenroll")
+
+	installDir := paths.InstallPath(paths.DefaultBasePath)
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		_, statErr := os.Stat(installDir)
+		assert.Truef(collect, os.IsNotExist(statErr),
+			"install directory %q still exists; agent was acked but not fully uninstalled (stat err: %v)", installDir, statErr)
+		_, execErr := fixture.ExecStatus(ctx)
+		assert.Error(collect, execErr, "agent still responds to status; expected it to be uninstalled")
+	}, 5*time.Minute, 1*time.Second, "agent was not uninstalled after acknowledging the action")
 }
 
 // setupUninstallFleetServer starts a mock Fleet Server that serves queued actions

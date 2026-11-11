@@ -28,6 +28,96 @@ import (
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
+// recordingAcker records acked actions and commit calls for assertions.
+type recordingAcker struct {
+	acked     []fleetapi.Action
+	committed int
+}
+
+func (a *recordingAcker) Ack(_ context.Context, action fleetapi.Action) error {
+	a.acked = append(a.acked, action)
+	return nil
+}
+
+func (a *recordingAcker) Commit(_ context.Context) error {
+	a.committed++
+	return nil
+}
+
+func TestGateUninstallActions(t *testing.T) {
+	log, _ := loggertest.New("TestGateUninstallActions")
+	ctx := context.Background()
+
+	ids := func(actions []fleetapi.Action) []string {
+		out := make([]string, len(actions))
+		for i, a := range actions {
+			out[i] = a.ID()
+		}
+		return out
+	}
+
+	t.Run("rejects UNINSTALL when the agent has not been unenrolled", func(t *testing.T) {
+		d := &ActionDispatcher{log: log}
+		d.SetWasUnenrolled(func() bool { return false })
+
+		uninstall := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
+		upgrade := &fleetapi.ActionUpgrade{ActionID: "up1", ActionType: fleetapi.ActionTypeUpgrade}
+		acker := &recordingAcker{}
+
+		kept := d.gateUninstallActions(ctx, []fleetapi.Action{uninstall, upgrade}, acker)
+
+		assert.Equal(t, []string{"up1"}, ids(kept), "non-uninstall actions pass through when not unenrolled")
+		assert.Equal(t, []string{"u1"}, ids(acker.acked), "the rejected UNINSTALL is acked")
+		assert.ErrorIs(t, uninstall.Err, errUninstallRequiresUnenroll, "the rejection reason is recorded on the action")
+		assert.Equal(t, 1, acker.committed, "rejection acks are flushed")
+	})
+
+	t.Run("while awaiting uninstall only UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS are allowed", func(t *testing.T) {
+		d := &ActionDispatcher{log: log}
+		d.SetWasUnenrolled(func() bool { return true })
+
+		upgrade := &fleetapi.ActionUpgrade{ActionID: "up1", ActionType: fleetapi.ActionTypeUpgrade}
+		uninstall := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
+		cancel := &fleetapi.ActionCancel{ActionID: "c1", ActionType: fleetapi.ActionTypeCancel}
+		diag := &fleetapi.ActionDiagnostics{ActionID: "d1", ActionType: fleetapi.ActionTypeDiagnostics}
+		acker := &recordingAcker{}
+
+		kept := d.gateUninstallActions(ctx, []fleetapi.Action{upgrade, uninstall, cancel, diag}, acker)
+
+		assert.Equal(t, []string{"u1", "c1", "d1"}, ids(kept), "allowed actions pass through")
+		assert.Equal(t, []string{"up1"}, ids(acker.acked), "the disallowed action is rejected and acked")
+		assert.ErrorIs(t, upgrade.Err, errActionWhileAwaitingUninstall)
+		assert.Equal(t, 1, acker.committed)
+	})
+
+	t.Run("no rejection when nothing is disallowed", func(t *testing.T) {
+		d := &ActionDispatcher{log: log}
+		d.SetWasUnenrolled(func() bool { return false })
+
+		upgrade := &fleetapi.ActionUpgrade{ActionID: "up1", ActionType: fleetapi.ActionTypeUpgrade}
+		cancel := &fleetapi.ActionCancel{ActionID: "c1", ActionType: fleetapi.ActionTypeCancel}
+		acker := &recordingAcker{}
+
+		kept := d.gateUninstallActions(ctx, []fleetapi.Action{upgrade, cancel}, acker)
+
+		assert.Equal(t, []string{"up1", "c1"}, ids(kept))
+		assert.Empty(t, acker.acked, "nothing is rejected")
+		assert.Equal(t, 0, acker.committed, "no commit when there were no rejections")
+	})
+
+	t.Run("no gate when wasUnenrolled is unset", func(t *testing.T) {
+		d := &ActionDispatcher{log: log}
+
+		uninstall := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
+		acker := &recordingAcker{}
+
+		kept := d.gateUninstallActions(ctx, []fleetapi.Action{uninstall}, acker)
+
+		assert.Equal(t, []string{"u1"}, ids(kept), "without the predicate the dispatcher does not gate")
+		assert.Empty(t, acker.acked)
+	})
+}
+
 type mockHandler struct {
 	mock.Mock
 }

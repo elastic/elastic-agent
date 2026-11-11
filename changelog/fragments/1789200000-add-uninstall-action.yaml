@@ -38,6 +38,11 @@ description: >
   with the error so Fleet learns it did not complete and the agent remains
   installed.
 
+  The agent is the authoritative source of its own state and enforces the
+  remote-uninstall action policy itself: it rejects an UNINSTALL unless it has
+  been unenrolled first, and while it is awaiting an uninstall it only acts on
+  UNINSTALL, its CANCEL and REQUEST_DIAGNOSTICS, rejecting any other action.
+
 # REQUIRED for breaking-change, deprecation, known-issue
 # impact:
 

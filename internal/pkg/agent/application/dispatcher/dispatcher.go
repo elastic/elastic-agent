@@ -62,6 +62,11 @@ type ActionDispatcher struct {
 	// dispatched (and rejected by the handler) immediately rather than after its
 	// grace period.
 	verifyUninstallSignature func(action *fleetapi.ActionUninstall) error
+	// wasUnenrolled, when set, reports whether the agent has been unenrolled and
+	// is therefore awaiting a remote uninstall. The agent is the authoritative
+	// source of its own state, so the dispatcher (not Fleet Server) enforces the
+	// remote-uninstall action policy: see gateUninstallActions.
+	wasUnenrolled func() bool
 }
 
 // SetUninstallPendingObserver registers a callback that is notified, after every
@@ -76,6 +81,13 @@ func (ad *ActionDispatcher) SetUninstallPendingObserver(fn func(pending *fleetap
 // is rejected immediately instead of waiting out its grace period.
 func (ad *ActionDispatcher) SetUninstallSignatureVerifier(fn func(action *fleetapi.ActionUninstall) error) {
 	ad.verifyUninstallSignature = fn
+}
+
+// SetWasUnenrolled registers a predicate reporting whether the agent has been
+// unenrolled (and is therefore awaiting a remote uninstall). It gates which
+// freshly received actions the dispatcher will act on; see gateUninstallActions.
+func (ad *ActionDispatcher) SetWasUnenrolled(fn func() bool) {
+	ad.wasUnenrolled = fn
 }
 
 // New creates a new action dispatcher.
@@ -146,6 +158,13 @@ func (ad *ActionDispatcher) Dispatch(ctx context.Context, detailsSetter details.
 	now := time.Now().UTC()
 
 	upgradeDetailsNeedUpdate := false
+
+	// Enforce the remote-uninstall action policy from the agent side (the agent
+	// is the authoritative source of its own state): reject a freshly received
+	// UNINSTALL unless the agent has been unenrolled, and while the agent is
+	// awaiting an uninstall reject any action other than
+	// UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS. Fleet Server no longer filters these.
+	actions = ad.gateUninstallActions(ctx, actions, acker)
 
 	// remove duplicate upgrade actions from fleetgateway actions and remove all upgrade actions in the queue
 	actions = ad.compactAndRemoveQueuedUpgrades(actions, &upgradeDetailsNeedUpdate)
@@ -233,6 +252,102 @@ func (ad *ActionDispatcher) dispatchAction(ctx context.Context, a fleetapi.Actio
 	}
 
 	return handler.Handle(ctx, a, acker)
+}
+
+var (
+	// errUninstallRequiresUnenroll is recorded on an UNINSTALL received by an
+	// agent that has not been unenrolled first.
+	errUninstallRequiresUnenroll = errors.New("UNINSTALL rejected: the agent must be unenrolled before it can be uninstalled")
+	// errActionWhileAwaitingUninstall is recorded on a disallowed action received
+	// while the agent is awaiting a remote uninstall.
+	errActionWhileAwaitingUninstall = errors.New("action rejected: the unenrolled agent only accepts UNINSTALL, CANCEL and REQUEST_DIAGNOSTICS while awaiting uninstall")
+)
+
+// gateUninstallActions enforces, from the agent side, which freshly received
+// actions are valid given the agent's unenroll state:
+//
+//   - while the agent is awaiting a remote uninstall (it has been unenrolled) it
+//     only accepts UNINSTALL, its grace-period CANCEL, and REQUEST_DIAGNOSTICS;
+//     every other action is rejected;
+//   - otherwise an UNINSTALL is rejected because the agent must be unenrolled
+//     first.
+//
+// Rejected actions are acknowledged to Fleet with the failure (so the operator
+// sees why) and dropped from the returned slice. The agent persists its
+// unenroll state (state store), so this remains correct across check-ins and is
+// robust to a lost unenroll ack, unlike a decision made from Fleet Server's
+// (possibly stale) view of the agent.
+func (ad *ActionDispatcher) gateUninstallActions(ctx context.Context, actions []fleetapi.Action, acker acker.Acker) []fleetapi.Action {
+	// Without the unenroll-state predicate (e.g. not wired) the dispatcher does
+	// not gate; the agent's state cannot be determined so no action is rejected.
+	if ad.wasUnenrolled == nil {
+		return actions
+	}
+	awaitingUninstall := ad.wasUnenrolled()
+
+	kept := make([]fleetapi.Action, 0, len(actions))
+	rejected := false
+	for _, a := range actions {
+		var rejectErr error
+		switch {
+		case awaitingUninstall && !isAllowedWhileAwaitingUninstall(a.Type()):
+			rejectErr = errActionWhileAwaitingUninstall
+		case !awaitingUninstall && a.Type() == fleetapi.ActionTypeUninstall:
+			rejectErr = errUninstallRequiresUnenroll
+		}
+
+		if rejectErr == nil {
+			kept = append(kept, a)
+			continue
+		}
+
+		ad.log.Warnf("rejecting action id %q of type %q: %v", a.ID(), a.Type(), rejectErr)
+		markActionError(a, rejectErr)
+		if err := acker.Ack(ctx, a); err != nil {
+			ad.log.Errorf("failed to ack rejected action id %q: %v", a.ID(), err)
+		}
+		rejected = true
+	}
+
+	if rejected {
+		// Flush the rejection acks now: when no actions remain the normal dispatch
+		// path returns early and would otherwise skip the commit.
+		if err := acker.Commit(ctx); err != nil {
+			ad.log.Errorf("failed to commit rejected action acks: %v", err)
+		}
+	}
+
+	return kept
+}
+
+// isAllowedWhileAwaitingUninstall reports whether an action type may be acted on
+// by an unenrolled agent that is awaiting a remote uninstall.
+func isAllowedWhileAwaitingUninstall(actionType string) bool {
+	switch actionType {
+	case fleetapi.ActionTypeUninstall, fleetapi.ActionTypeCancel, fleetapi.ActionTypeDiagnostics:
+		return true
+	default:
+		return false
+	}
+}
+
+// markActionError records err on the action when its type carries an error
+// field, so the failure is reported to Fleet in the ack. Action types without
+// such a field are still acknowledged (so Fleet stops redelivering them) but
+// without a recorded error.
+func markActionError(a fleetapi.Action, err error) {
+	switch act := a.(type) {
+	case *fleetapi.ActionUpgrade:
+		act.SetError(err)
+	case *fleetapi.ActionRestart:
+		act.Err = err
+	case *fleetapi.ActionUninstall:
+		act.Err = err
+	case *fleetapi.ActionMigrate:
+		act.Err = err
+	case *fleetapi.ActionPrivilegeLevelChange:
+		act.Err = err
+	}
 }
 
 func detectTypes(actions []fleetapi.Action) []string {

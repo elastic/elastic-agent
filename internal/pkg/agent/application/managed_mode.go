@@ -241,6 +241,12 @@ func (m *managedConfigManager) Run(ctx context.Context) error {
 		return gateway.Run(ctx)
 	})
 
+	// The agent is the authoritative source of its own unenroll state, so the
+	// dispatcher (not Fleet Server) enforces which actions are valid: an UNINSTALL
+	// is rejected unless the agent has been unenrolled, and while awaiting the
+	// uninstall only UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS are accepted.
+	m.dispatcher.SetWasUnenrolled(m.wasUnenrolled)
+
 	// Surface a visible "Uninstall pending" state while an UNINSTALL action waits
 	// out its grace period in the queue, and clear it once the action executes,
 	// is cancelled, or expires. Runs on the single dispatcher goroutine, so the
