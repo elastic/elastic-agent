@@ -9,3 +9,5 @@ dependencies:
   - cloudbeat
   - elastic-agent-core
   - prodfiler
+  - endpoint-dev
+  - connectors
