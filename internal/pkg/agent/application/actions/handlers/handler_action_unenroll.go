@@ -106,8 +106,9 @@ func (h *Unenroll) handle(ctx context.Context, a fleetapi.Action, acker acker.Ac
 	// A Fleet-delivered UNENROLL is the first step of the remote-uninstall flow:
 	// keep the Fleet gateway open so the agent keeps checking in and can still
 	// receive the follow-up UNINSTALL action (and its grace-period CANCEL). Fleet
-	// Server keeps the agent's credentials and delivers only UNINSTALL/CANCEL
-	// while the agent is pending uninstall.
+	// Server keeps the agent's access key valid while it is pending uninstall; the
+	// agent itself enforces that it only acts on UNINSTALL/CANCEL/REQUEST_DIAGNOSTICS
+	// while awaiting the uninstall (see the dispatcher's uninstall gate).
 	//
 	// An agent-detected unenroll (IsDetected, e.g. an invalid API key) is not part
 	// of that flow and cannot keep communicating, so close the gateway loop.
