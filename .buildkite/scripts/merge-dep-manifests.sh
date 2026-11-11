@@ -36,6 +36,7 @@ echo "--- :package: Merging DRA manifests for branch=${BRANCH} workflow=${WORKFL
 echo "Dependencies: ${DEPS[*]}"
 
 PROJECTS_JSON="{}"
+STACK_VERSION=""
 
 for dep in "${DEPS[@]}"; do
   latest_url="${ARTIFACT_HOST}/${dep}/latest/${BRANCH}.json"
@@ -56,6 +57,7 @@ for dep in "${DEPS[@]}"; do
   build_id=$(echo "${latest_json}" | jq -r '.build_id')
 
   echo "  ${dep}: version=${version} build_id=${build_id}"
+  [[ -z "${STACK_VERSION}" ]] && STACK_VERSION="${version}"
 
   # Add this product's entry to the projects map.
   # The packaging code reads external_artifacts_manifest_url to find artifacts.
@@ -66,13 +68,19 @@ for dep in "${DEPS[@]}"; do
     '.[$dep] = {external_artifacts_manifest_url: $manifest_url, build_id: $build_id}')
 done
 
+if [[ -z "${STACK_VERSION}" ]]; then
+  echo "ERROR: could not determine stack version from dependencies" >&2
+  exit 1
+fi
+
 # Write the merged manifest
 jq -n \
   --argjson projects "${PROJECTS_JSON}" \
   --arg branch "${BRANCH}" \
   --arg workflow "${WORKFLOW}" \
+  --arg version "${STACK_VERSION}" \
   '{
-    version: "merged",
+    version: $version,
     branch: $branch,
     workflow: $workflow,
     projects: $projects
