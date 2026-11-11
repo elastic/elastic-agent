@@ -134,6 +134,9 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				return waitForAgentAndFleetHealthy(ctx, t, fixture)
 			}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 		})
+		t.Run("fleet-server does not write logs to the installation", func(t *testing.T) {
+			assertNoLogsInInstallation(t, fixture.WorkDir())
+		})
 
 		// Make sure uninstall from within the topPath fails on Windows
 		if runtime.GOOS == "windows" {
@@ -185,6 +188,9 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				return waitForAgentAndFleetHealthy(ctx, t, fixture)
 			}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 		})
+		t.Run("fleet-server does not write logs to the installation", func(t *testing.T) {
+			assertNoLogsInInstallation(t, fixture.WorkDir())
+		})
 
 		// Make sure uninstall from within the topPath fails on Windows
 		if runtime.GOOS == "windows" {
@@ -210,23 +216,27 @@ func testFleetServerInternalAPI() func(t *testing.T) {
 		// in order to interact with the API we need to ignore the cert.
 		client := &http.Client{
 			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec // the test fleet-server uses a self-signed certificate
 			},
 		}
 		fleetOK := false
 		for i := 0; i < 10; i++ {
 			t.Log("Checking fleet-server status")
-			resp, err := client.Get("https://localhost:8220/api/status")
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://localhost:8220/api/status", nil)
+			require.NoError(t, err)
+			resp, err := client.Do(req)
 			if err != nil {
 				t.Logf("fleet-server status check returned error: %v, retry in 10s...", err)
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			if resp.StatusCode == http.StatusOK {
+			statusCode := resp.StatusCode
+			_ = resp.Body.Close()
+			if statusCode == http.StatusOK {
 				fleetOK = true
 				break
 			}
-			t.Logf("fleet-server status check returned incorrect status: %d, retry in 10s", resp.StatusCode)
+			t.Logf("fleet-server status check returned incorrect status: %d, retry in 10s", statusCode)
 			time.Sleep(10 * time.Second)
 			continue
 		}

@@ -349,28 +349,34 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 }
 
 // agentLogContains reports whether any of the installed agent's NDJSON log
-// files under <workDir>/data/elastic-agent-*/logs/ contain substr. Errors
+// files under <workDir>/data/logs/<build>/ contain substr. Errors
 // reading individual files are logged and skipped so a transient rotation
 // doesn't fail the assertion.
 func agentLogContains(t *testing.T, f *atesting.Fixture, substr string) bool {
 	t.Helper()
-	pattern := filepath.Join(f.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
+	return agentLogCount(t, f, substr) > 0
+}
+
+// agentLogCount returns how many times substr occurs in the installed agent's NDJSON log
+// files under <workDir>/data/logs/<build>/, see agentLogContains.
+func agentLogCount(t *testing.T, f *atesting.Fixture, substr string) int {
+	t.Helper()
+	pattern := filepath.Join(f.WorkDir(), "data", "logs", "*", "elastic-agent-*.ndjson")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
-		t.Logf("agentLogContains: glob %q error: %v", pattern, err)
-		return false
+		t.Logf("agentLogCount: glob %q error: %v", pattern, err)
+		return 0
 	}
+	count := 0
 	for _, p := range matches {
 		data, err := os.ReadFile(p)
 		if err != nil {
-			t.Logf("agentLogContains: read %q error: %v", p, err)
+			t.Logf("agentLogCount: read %q error: %v", p, err)
 			continue
 		}
-		if strings.Contains(string(data), substr) {
-			return true
-		}
+		count += strings.Count(string(data), substr)
 	}
-	return false
+	return count
 }
 
 // WaitHealthyAndUnprivileged polls the agent's status until it reports

@@ -117,11 +117,12 @@ func runEventLogFile(t *testing.T, runtime string) {
 		}
 	})
 
-	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
+	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/logs/*")
 
 	// Event logs should not be created at info level.
 	requireLogFilesForRuntime(t, logsDirGlob, runtime)
 	requireEventLogFileNeverExists(t, logsDirGlob)
+	assertNoLogsInInstallation(t, agentFixture.WorkDir())
 
 	// Switch to debug level to enable event log file creation.
 	cfgDebug := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, logp.DebugLevel.String(), runtime)
@@ -259,7 +260,7 @@ func runEventLogOutputConfiguredViaFleet(t *testing.T, info *define.Info, runtim
 		return waitForAgentAndFleetHealthy(ctx, t, agentFixture)
 	}, 2*time.Minute, time.Second, "elastic-agent did not report healthy")
 
-	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/elastic-agent-*/logs")
+	logsDirGlob := filepath.Join(agentFixture.WorkDir(), "data/logs/*")
 
 	// Ensure the event logs are going to the events log file by default.
 	requireEventLogFileExistsWithData(t, logsDirGlob, "Publish event:")
