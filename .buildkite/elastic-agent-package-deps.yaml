@@ -8,3 +8,4 @@ dependencies:
   - cloud-defend
   - cloudbeat
   - elastic-agent-core
+  - prodfiler
