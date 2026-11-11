@@ -30,7 +30,7 @@ case "${WORKFLOW}" in
 esac
 
 # Read dependency list from config file
-mapfile -t DEPS < <(grep '^ *- ' "${DEPS_CONFIG}" | sed 's/^ *- //')
+IFS=$'\n' read -r -d '' -a DEPS < <(grep '^ *- ' "${DEPS_CONFIG}" | sed 's/^ *- //' && printf '\0')
 
 echo "--- :package: Merging DRA manifests for branch=${BRANCH} workflow=${WORKFLOW}"
 echo "Dependencies: ${DEPS[*]}"
