@@ -59,13 +59,23 @@ for dep in "${DEPS[@]}"; do
   echo "  ${dep}: version=${version} build_id=${build_id}"
   [[ -z "${STACK_VERSION}" ]] && STACK_VERSION="${version}"
 
-  # Add this product's entry to the projects map.
-  # The packaging code reads external_artifacts_manifest_url to find artifacts.
-  PROJECTS_JSON=$(echo "${PROJECTS_JSON}" | jq \
-    --arg dep "${dep}" \
-    --arg manifest_url "${manifest_url}" \
-    --arg build_id "${build_id}" \
-    '.[$dep] = {external_artifacts_manifest_url: $manifest_url, build_id: $build_id}')
+  # Fetch the dep's full manifest and inline its projects.
+  # The packaging code (manifest.go DownloadComponents) only downloads the single
+  # merged manifest and looks up packages inline in projects[spec.ProjectName].
+  # It does NOT follow external_artifacts_manifest_url — packages must be inlined.
+  echo "  Fetching manifest for ${dep}: ${manifest_url}"
+  dep_manifest=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors "${manifest_url}") || {
+    echo "ERROR: failed to fetch manifest for ${dep} from ${manifest_url}" >&2
+    exit 1
+  }
+
+  # Merge all projects from the dep manifest into PROJECTS_JSON.
+  # This inlines packages for every project the dep publishes (e.g. beats publishes
+  # beats, filebeat, metricbeat, etc.) so the packaging code can find them by name.
+  # The dep's project entries already carry build_id, which the poller uses for
+  # change detection via .projects[$dep].build_id.
+  dep_projects=$(echo "${dep_manifest}" | jq '.projects // {}')
+  PROJECTS_JSON=$(echo "${PROJECTS_JSON}" | jq --argjson dp "${dep_projects}" '. * $dp')
 done
 
 if [[ -z "${STACK_VERSION}" ]]; then
