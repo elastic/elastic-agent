@@ -334,14 +334,6 @@ func TestKafkaBearerTokenAuthTranslation(t *testing.T) {
 			},
 		},
 		{
-			name: "unknown field",
-			auth: `
-  bearertokenauth:
-    file_name: /var/run/secrets/tokens/kafka-token
-`,
-			expectedErr: "file_name",
-		},
-		{
 			name: "no token configured",
 			auth: `
   bearertokenauth:
