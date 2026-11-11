@@ -530,14 +530,23 @@ func TestGitPushEnv(t *testing.T) {
 	if got["PATH"] != "/usr/bin" {
 		t.Fatalf("PATH = %q, want /usr/bin", got["PATH"])
 	}
-	if got["GIT_CONFIG_COUNT"] != "1" {
-		t.Fatalf("GIT_CONFIG_COUNT = %q, want 1", got["GIT_CONFIG_COUNT"])
+	if got["GIT_TERMINAL_PROMPT"] != "0" {
+		t.Fatalf("GIT_TERMINAL_PROMPT = %q, want 0", got["GIT_TERMINAL_PROMPT"])
 	}
-	if got["GIT_CONFIG_KEY_0"] != "http.extraHeader" {
-		t.Fatalf("GIT_CONFIG_KEY_0 = %q, want http.extraHeader", got["GIT_CONFIG_KEY_0"])
+	if got["GIT_CONFIG_COUNT"] != "2" {
+		t.Fatalf("GIT_CONFIG_COUNT = %q, want 2", got["GIT_CONFIG_COUNT"])
 	}
-	if got["GIT_CONFIG_VALUE_0"] != wantHeader {
-		t.Fatalf("GIT_CONFIG_VALUE_0 = %q, want %q", got["GIT_CONFIG_VALUE_0"], wantHeader)
+	if got["GIT_CONFIG_KEY_0"] != "http.https://github.com/.extraHeader" {
+		t.Fatalf("GIT_CONFIG_KEY_0 = %q, want http.https://github.com/.extraHeader", got["GIT_CONFIG_KEY_0"])
+	}
+	if got["GIT_CONFIG_VALUE_0"] != "" {
+		t.Fatalf("GIT_CONFIG_VALUE_0 = %q, want empty clear header", got["GIT_CONFIG_VALUE_0"])
+	}
+	if got["GIT_CONFIG_KEY_1"] != "http.https://github.com/.extraHeader" {
+		t.Fatalf("GIT_CONFIG_KEY_1 = %q, want http.https://github.com/.extraHeader", got["GIT_CONFIG_KEY_1"])
+	}
+	if got["GIT_CONFIG_VALUE_1"] != wantHeader {
+		t.Fatalf("GIT_CONFIG_VALUE_1 = %q, want %q", got["GIT_CONFIG_VALUE_1"], wantHeader)
 	}
 }
 
