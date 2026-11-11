@@ -15,6 +15,8 @@ import (
 	"net/url"
 
 	mock "github.com/stretchr/testify/mock"
+
+	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
 )
 
 // NewMockSender creates a new instance of MockSender. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -141,6 +143,50 @@ func (_c *MockSender_Send_Call) Return(response *http.Response, err error) *Mock
 }
 
 func (_c *MockSender_Send_Call) RunAndReturn(run func(ctx context.Context, method string, path string, params url.Values, headers http.Header, body io.ReadSeeker) (*http.Response, error)) *MockSender_Send_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Transport provides a mock function for the type MockSender
+func (_mock *MockSender) Transport() httpcommon.HTTPTransportSettings {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Transport")
+	}
+
+	var r0 httpcommon.HTTPTransportSettings
+	if returnFunc, ok := ret.Get(0).(func() httpcommon.HTTPTransportSettings); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(httpcommon.HTTPTransportSettings)
+	}
+	return r0
+}
+
+// MockSender_Transport_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Transport'
+type MockSender_Transport_Call struct {
+	*mock.Call
+}
+
+// Transport is a helper method to define mock.On call
+func (_e *MockSender_Expecter) Transport() *MockSender_Transport_Call {
+	return &MockSender_Transport_Call{Call: _e.mock.On("Transport")}
+}
+
+func (_c *MockSender_Transport_Call) Run(run func()) *MockSender_Transport_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockSender_Transport_Call) Return(hTTPTransportSettings httpcommon.HTTPTransportSettings) *MockSender_Transport_Call {
+	_c.Call.Return(hTTPTransportSettings)
+	return _c
+}
+
+func (_c *MockSender_Transport_Call) RunAndReturn(run func() httpcommon.HTTPTransportSettings) *MockSender_Transport_Call {
 	_c.Call.Return(run)
 	return _c
 }
