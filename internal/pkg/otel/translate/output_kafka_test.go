@@ -361,7 +361,7 @@ auth:` + tc.auth
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
 			require.Equal(t, map[string]any{
-				"sasl": map[string]any{
+				"sasl": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 					"mechanism":                "OAUTHBEARER",
 					"oauthbearer_token_source": "bearertokenauth/_agent-component/default",
 				},
