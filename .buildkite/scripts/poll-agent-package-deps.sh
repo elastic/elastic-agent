@@ -117,7 +117,11 @@ DEPS_CONFIG="${DEPS_CONFIG}" \
 
 TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
 MERGED_MANIFEST_GCS_PATH="${GCS_BUCKET}/elastic-agent-package/poller-merged/${BRANCH}/${TIMESTAMP}/agent-artifacts-merged.json"
-MERGED_MANIFEST_URL="https://storage.googleapis.com/${MERGED_MANIFEST_GCS_PATH}"
+# GCS buckets are fronted by elastic.co CDN domains that are in the packaging allowlist.
+# elastic-artifacts-snapshot → artifacts-snapshot.elastic.co
+# elastic-artifacts-staging  → artifacts-staging.elastic.co
+ARTIFACT_HOST_DOMAIN="${GCS_BUCKET/elastic-artifacts-/artifacts-}.elastic.co"
+MERGED_MANIFEST_URL="https://${ARTIFACT_HOST_DOMAIN}/elastic-agent-package/poller-merged/${BRANCH}/${TIMESTAMP}/agent-artifacts-merged.json"
 
 echo "--- :gcloud: Uploading merged manifest to gs://${MERGED_MANIFEST_GCS_PATH}"
 gcloud storage cp \
