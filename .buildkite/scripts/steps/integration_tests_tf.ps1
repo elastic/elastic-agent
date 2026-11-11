@@ -18,8 +18,12 @@ if ($packageVersionContent -and $packageVersionContent.stack_version ) {
     $STACK_BUILD_ID = $packageVersionContent.stack_build_id
 }
 
+# Build the helper binaries the integration tests need directly with `go build`
+# instead of `mage build:integrationTestBinaries`: compiling the magefile costs
+# ~2.5 minutes on a fresh agent, the binary itself builds in seconds. Keep in
+# sync with getIntegrationTestBinariesPath in magefile.go.
 Write-Output "~~~ Building test binaries"
-& mage build:integrationTestBinaries
+& go build -v -o pkg\component\fake\component\component.exe .\pkg\component\fake\component
 if ($LASTEXITCODE -ne 0) {
     Write-Output "^^^ +++"
     Write-Output "Failed to build test binaries"
