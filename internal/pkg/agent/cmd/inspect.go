@@ -31,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/utils"
 )
 
 func newInspectCommandWithArgs(s []string, streams *cli.IOStreams) *cobra.Command {
@@ -136,11 +135,11 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return fmt.Errorf("error creating logger: %w", err)
 	}
 
-	isAdmin, err := utils.HasRoot()
+	unprivileged, err := componentvalidation.IsUnprivileged(ctx)
 	if err != nil {
-		return fmt.Errorf("error checking for root/Administrator privileges: %w", err)
+		return err
 	}
-	fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, !isAdmin)
+	fullCfg, err := operations.LoadFullAgentConfig(ctx, l, cfgPath, true, unprivileged)
 	if err != nil {
 		return fmt.Errorf("error loading agent config: %w", err)
 	}
@@ -161,7 +160,7 @@ func inspectConfig(ctx context.Context, cfgPath string, opts inspectConfigOpts, 
 		return nil
 	}
 
-	cfg, otel, lvl, err := componentvalidation.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, !isAdmin)
+	cfg, otel, lvl, err := componentvalidation.GetConfigWithVariables(ctx, l, cfgPath, opts.variablesWait, unprivileged)
 	if err != nil {
 		return fmt.Errorf("error fetching config with variables: %w", err)
 	}
