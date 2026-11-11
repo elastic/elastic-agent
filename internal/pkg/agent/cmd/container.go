@@ -939,7 +939,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	}
 
 	// ensure that the internal logger directory exists
-	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	loggerPath := paths.BuildLogs()
 	if err := os.MkdirAll(loggerPath, logsPathPerms); err != nil {
 		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
 	}

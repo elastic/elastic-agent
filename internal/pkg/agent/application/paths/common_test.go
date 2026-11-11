@@ -7,6 +7,7 @@ package paths
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -172,4 +173,34 @@ func TestPathSplitWindows(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVersionedHome(t *testing.T) {
+	versioned := fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+
+	t.Run("without a home directory with the version it falls back to the commit", func(t *testing.T) {
+		base := t.TempDir()
+
+		assert.Equal(t, release.ShortCommit(), buildName(base))
+		assert.Equal(t, filepath.Join(base, "data", "elastic-agent-"+release.ShortCommit()), VersionedHome(base))
+	})
+
+	t.Run("with a home directory with the version it uses the version and the commit", func(t *testing.T) {
+		base := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(base, "data", "elastic-agent-"+versioned), 0o755))
+
+		assert.Equal(t, versioned, buildName(base))
+		assert.Equal(t, filepath.Join(base, "data", "elastic-agent-"+versioned), VersionedHome(base))
+	})
+
+	t.Run("a home directory with the commit only does not change the result", func(t *testing.T) {
+		base := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(base, "data", "elastic-agent-"+release.ShortCommit()), 0o755))
+
+		assert.Equal(t, filepath.Join(base, "data", "elastic-agent-"+release.ShortCommit()), VersionedHome(base))
+	})
+}
+
+func TestBuildLogs(t *testing.T) {
+	assert.Equal(t, filepath.Join(Home(), "logs"), BuildLogs())
 }
