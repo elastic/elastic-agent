@@ -52,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -368,6 +369,15 @@ func runElasticAgent(
 		return errors.New(err, "failed to reload configuration")
 	}
 	cfg := configReloader.Configuration()
+
+	// Browser monitors trust the configured CAs. This must run before any component
+	// starts the browser: it may change HOME, which the browser inherits. It runs
+	// without configuration too, to clean up CAs a previous run imported.
+	var browserCAs browserca.Config
+	if synthetics := cfg.Settings.Synthetics; synthetics != nil {
+		browserCAs = synthetics.Browser
+	}
+	browserca.Start(ctx, l.Named("browserca"), browserCAs)
 
 	logLvl := logger.DefaultLogLevel
 	if cfg.Settings.LoggingConfig != nil {

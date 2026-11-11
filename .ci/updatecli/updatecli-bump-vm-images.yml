@@ -16,7 +16,6 @@ scms:
       branch: '{{ requiredEnv "BRANCH_NAME" }}'
       force: false
       submodules: false
-      singleBranch: true
 
 actions:
   elastic-agent:
@@ -24,7 +23,6 @@ actions:
     scmid: githubConfig
     sourceid: latestGoVersion
     spec:
-      automerge: false
       labels:
         - automation
         - dependencies
@@ -39,7 +37,8 @@ sources:
     kind: json
     spec:
       file: https://storage.googleapis.com/artifacts-api/vm-images/elastic-agent/latest.json
-      key: .date
+      engine: dasel/v3
+      key: date
 
 conditions:
   latestVersion-check:
