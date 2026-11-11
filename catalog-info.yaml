@@ -310,6 +310,48 @@ spec:
           env:
             DRA_WORKFLOW: "snapshot"
             GCS_BUCKET: "elastic-artifacts-snapshot"
+        Snapshot polling 9.6:
+          branch: "9.6"
+          cronline: "*/30 * * * *"
+          message: "Poll elastic-agent-package snapshot dependencies"
+          env:
+            DRA_WORKFLOW: "snapshot"
+            GCS_BUCKET: "elastic-artifacts-snapshot"
+        Staging polling 9.6:
+          branch: "9.6"
+          cronline: "*/30 * * * *"
+          message: "Poll elastic-agent-package staging dependencies"
+          env:
+            DRA_WORKFLOW: "staging"
+            GCS_BUCKET: "elastic-artifacts-staging"
+        Snapshot polling 9.5:
+          branch: "9.5"
+          cronline: "*/30 * * * *"
+          message: "Poll elastic-agent-package snapshot dependencies"
+          env:
+            DRA_WORKFLOW: "snapshot"
+            GCS_BUCKET: "elastic-artifacts-snapshot"
+        Staging polling 9.5:
+          branch: "9.5"
+          cronline: "*/30 * * * *"
+          message: "Poll elastic-agent-package staging dependencies"
+          env:
+            DRA_WORKFLOW: "staging"
+            GCS_BUCKET: "elastic-artifacts-staging"
+        Snapshot polling 8.19:
+          branch: "8.19"
+          cronline: "*/30 * * * *"
+          message: "Poll elastic-agent-package snapshot dependencies"
+          env:
+            DRA_WORKFLOW: "snapshot"
+            GCS_BUCKET: "elastic-artifacts-snapshot"
+        Staging polling 8.19:
+          branch: "8.19"
+          cronline: "*/30 * * * *"
+          message: "Poll elastic-agent-package staging dependencies"
+          env:
+            DRA_WORKFLOW: "staging"
+            GCS_BUCKET: "elastic-artifacts-staging"
       skip_intermediate_builds: true
       provider_settings:
         trigger_mode: none
