@@ -26,6 +26,7 @@ common:
 
 steps:
   - input: "Build parameters"
+    if: 'build.env("DRA_WORKFLOW") == null || build.env("DRA_VERSION") == null'
     fields:
       - text: "MANIFEST_URL"
         key: "MANIFEST_URL"
