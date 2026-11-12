@@ -37,7 +37,7 @@ type Downloader struct {
 // artifact.Config struct is part of agent configuration and a version
 // override makes no sense there
 func NewDownloader(log *logger.Logger, config *artifact.Config, versionOverride *agtversion.ParsedSemVer, upgradeDetails *details.Details) (download.Downloader, error) {
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithKeepaliveSettings{Disable: false, IdleConnTimeout: 30 * time.Second},
 	)
