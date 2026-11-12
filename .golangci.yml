@@ -69,7 +69,6 @@ linters:
         - go.opentelemetry.io/otel/exporters/prometheus
         - github.com/elastic/elastic-agent/internal/edot
         - github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter
-        - github.com/elastic/elastic-agent-libs
       replace-local: true
     gomodguard_v2:
       blocked:

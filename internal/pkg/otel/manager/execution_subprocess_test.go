@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	internalstatus "github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"

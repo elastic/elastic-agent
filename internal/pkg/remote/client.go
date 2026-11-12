@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	urlutil "github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	urlutil "github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/id"
 	"github.com/elastic/elastic-agent/pkg/core/logger"

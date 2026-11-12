@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	agtversion "github.com/elastic/elastic-agent/pkg/version"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
