@@ -3,12 +3,12 @@
 env:
   ASDF_MAGE_VERSION: 1.14.0
 
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1793354375"
-  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1793354375"
-  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1793354375"
-  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1793354375"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1793494863"
+  IMAGE_UBUNTU_X86_64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-1793494863"
+  IMAGE_UBUNTU_ARM64_FIPS: "platform-ingest-elastic-agent-ubuntu-2204-fips-aarch64-1793494863"
+  IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1793494863"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
-  IMAGE_WIN_11_ARM64_VERSION: "1.0.1793354375"
+  IMAGE_WIN_11_ARM64_VERSION: "1.0.1793494863"
   ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
@@ -78,10 +78,10 @@ steps:
           TF_VAR_docker_images_name_suffix: "-fips"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64-fips'
+          buildkite-agent artifact download "build/distributions/elastic-agent-*-linux-x86_64*" . --step 'packaging-amd64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -113,10 +113,10 @@ steps:
           TF_VAR_docker_images_name_suffix: "-fips"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64-fips'
+          buildkite-agent artifact download "build/distributions/elastic-agent-*-linux-arm64*" . --step 'packaging-arm64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -146,7 +146,7 @@ steps:
         command: |
           .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -179,7 +179,7 @@ steps:
           buildkite-agent artifact download "build/distributions/elastic-agent-*-windows-x86_64*" . --step 'packaging-amd64-fips'
           .buildkite/scripts/steps/integration_tests_tf_fips.ps1 {{matrix.groups}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -208,7 +208,7 @@ steps:
           buildkite-agent artifact download "build/distributions/elastic-agent-*-windows-arm64*" . --step 'packaging-arm64-fips'
           .buildkite/scripts/steps/integration_tests_tf_fips.ps1 {{matrix.groups}} true
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:

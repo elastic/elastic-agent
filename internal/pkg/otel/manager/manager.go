@@ -24,9 +24,9 @@ import (
 	"go.uber.org/zap"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/useragent"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/useragent"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -508,6 +508,10 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
+	if err := injectMeterLifecycleExtension(mergedOtelCfg); err != nil {
+		return nil, fmt.Errorf("failed to inject meter lifecycle extension: %w", err)
+	}
+
 	// if the otel log level is unset, use the most verbose level across agent and all units
 	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
 	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
@@ -541,6 +545,21 @@ func maybeInjectLogLevel(config *confmap.Conf, logplevel logp.Level) error {
 		return fmt.Errorf("failed to set log level in otel config: %w", err)
 	}
 	return nil
+}
+
+// injectMeterLifecycleExtension forces on the extension that releases a
+// component's meters when it stops. Without it the collector retains the meters
+// of every receiver generation under partial reload; see
+// internal/edot/extensions/meterlifecycle.
+func injectMeterLifecycleExtension(config *confmap.Conf) error {
+	return mergeWithExtensions(config, confmap.NewFromStringMap(map[string]any{
+		"extensions": map[string]any{
+			"elastic_meter_lifecycle": map[string]any{},
+		},
+		"service": map[string]any{
+			"extensions": []any{"elastic_meter_lifecycle"},
+		},
+	}))
 }
 
 func injectDiagnosticsExtension(config *confmap.Conf) error {

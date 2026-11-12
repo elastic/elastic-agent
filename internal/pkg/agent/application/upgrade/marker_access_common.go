@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/beats/v7/pkg/file"
 )
 
 func writeMarkerFileCommon(markerFile string, markerBytes []byte, shouldFsync bool) error {

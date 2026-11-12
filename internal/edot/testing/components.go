@@ -15,14 +15,15 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	"go.opentelemetry.io/collector/receiver/nopreceiver"
 
+	"github.com/elastic/elastic-agent/internal/edot/extensions/meterlifecycle"
 	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 )
 
 // testComponents returns the minimal set of OTel factories needed by the
 // manager unit tests. Tests only use nop receivers/exporters, batch processor,
-// healthcheckv2 extension (injected by the manager), and elasticdiagnostics
-// extension (force-injected on every startup).
+// healthcheckv2 extension (injected by the manager), and the elasticdiagnostics
+// and meterlifecycle extensions (force-injected on every startup).
 func testComponents() (otelcol.Factories, error) {
 	var err error
 	factories := otelcol.Factories{
@@ -53,6 +54,7 @@ func testComponents() (otelcol.Factories, error) {
 	factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](
 		healthcheckv2extension.NewFactory(),
 		elasticdiagnostics.NewFactory(),
+		meterlifecycle.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

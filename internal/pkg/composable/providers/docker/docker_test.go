@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/autodiscover/bus"
 	"github.com/elastic/beats/v7/pkg/autodiscover/docker"
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 )
 
 func TestGenerateData(t *testing.T) {
