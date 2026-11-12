@@ -17,8 +17,10 @@ import (
 )
 
 const (
-	fbreceiverScopeName = "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
-	mbreceiverScopeName = "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
+	fbreceiverScopeName        = "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
+	mbreceiverScopeName        = "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
+	esExporterScopeName        = "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
+	failoverConnectorScopeName = "github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector"
 )
 
 // newMetricsWithScope returns a Metrics with one ResourceMetrics and one ScopeMetrics
@@ -34,8 +36,7 @@ func newMetricsWithScope(scopeName string, attrs ...string) (pmetric.Metrics, pm
 }
 
 func newMetricsWithExporterScope(exporterID string) (pmetric.Metrics, pmetric.ScopeMetrics) {
-	return newMetricsWithScope(
-		"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter",
+	return newMetricsWithScope(esExporterScopeName,
 		otelComponentKindKey, "exporter",
 		otelComponentIDKey, exporterID,
 	)
@@ -188,19 +189,18 @@ func findMetricValue(t *testing.T, out pmetric.Metrics, idx int, name string) an
 }
 
 func TestBuildExporterMetricsMergesFailoverOutput(t *testing.T) {
-	const exporterScopeName = "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	md, sm1 := newMetricsWithExporterScope("elasticsearch/_agent-component/default/1")
 	appendSumInt(sm1, otelSentLogsKey, 90)
 	appendSumInt(sm1, otelFailedLogsKey, 2)
 	appendSumInt(sm1, otelBulkRequestsKey, 3)
 
-	sm2 := appendScopeToMetrics(md, exporterScopeName,
+	sm2 := appendScopeToMetrics(md, esExporterScopeName,
 		otelComponentKindKey, "exporter",
 		otelComponentIDKey, "elasticsearch/_agent-component/default/2")
 	appendSumInt(sm2, otelSentLogsKey, 10)
 	appendSumInt(sm2, otelBulkRequestsKey, 1)
 
-	connector := appendScopeToMetrics(md, "github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector",
+	connector := appendScopeToMetrics(md, failoverConnectorScopeName,
 		otelComponentKindKey, "connector",
 		otelComponentIDKey, "failover/_agent-component/default")
 	appendGaugeInt(connector, otelQueueSizeKey, 40)
