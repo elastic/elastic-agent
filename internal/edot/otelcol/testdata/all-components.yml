@@ -40,6 +40,8 @@ extensions:
     client_id: someclientid
     client_secret: someclientsecret
     token_url: https://example.com/oauth2/default/v1/token
+  bearertokenauth:
+    token: sometoken
 
 processors:
   attributes:
@@ -260,6 +262,7 @@ service:
     - azure_auth
     - azure_encoding
     - oauth2client
+    - bearertokenauth
     - awscredentialsprovider
   pipelines:
     logs:
