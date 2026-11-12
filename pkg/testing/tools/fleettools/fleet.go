@@ -15,7 +15,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 )
 
 type EnrollParams struct {
@@ -66,8 +66,7 @@ func UpgradeAgent(ctx context.Context, client *kibana.Client, agentID, version s
 }
 
 // RollbackAgent requests a rollback for the given agent via the Fleet API.
-// TODO: Replace with a dedicated method once elastic-agent-libs supports
-// the rollback endpoint (https://github.com/elastic/elastic-agent-libs/pull/399).
+// TODO: Replace with kibana.Client.RollbackAgent.
 func RollbackAgent(ctx context.Context, client *kibana.Client, agentID string) error {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s/rollback", agentID)
 	resp, err := client.SendWithContext(ctx, http.MethodPost, apiURL, nil, nil, nil)

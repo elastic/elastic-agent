@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/redact"
+	"github.com/elastic/beats/v7/pkg/redact"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/go-ucfg"

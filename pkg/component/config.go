@@ -14,8 +14,8 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	"google.golang.org/protobuf/types/known/structpb"
 
+	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/pkg/limits"
 )
 

@@ -23,9 +23,9 @@ import (
 	"go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/x-pack/otel/otelmanager"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/pkg/ipc"
 )
