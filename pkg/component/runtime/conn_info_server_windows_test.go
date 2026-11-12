@@ -11,7 +11,7 @@ import (
 
 	"github.com/Microsoft/go-winio"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
+	"github.com/elastic/beats/v7/pkg/api/npipe"
 )
 
 func dialLocal(address string) (net.Conn, error) {
