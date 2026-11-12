@@ -5,9 +5,8 @@ go 1.26.10
 replace github.com/elastic/elastic-agent => ../../
 
 require (
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261106185606-1d47f32be576
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110104352-97393d2e775c
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
-	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.78.0
 	github.com/elastic/opentelemetry-collector-components/extension/apikeyauthextension v0.79.0
 	github.com/elastic/opentelemetry-collector-components/extension/apmconfigextension v0.78.0
@@ -69,6 +68,7 @@ require (
 	github.com/coreos/go-oidc/v3 v3.21.0 // indirect
 	github.com/dgryski/go-farm v0.0.0-20240924180020-3414d57e47da // indirect
 	github.com/elastic/apm-data v1.22.2 // indirect
+	github.com/elastic/elastic-agent-libs v0.47.0 // indirect
 	github.com/elastic/lumberjack v0.0.0-20260715013204-c5b60bbeaaab // indirect
 	github.com/elastic/opentelemetry-collector-components/internal/elasticattr v0.78.0 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
@@ -350,7 +350,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20251113000200-a6f7cddc8520 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.78.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.50.0 // indirect
-	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
+	github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.39.1-0.20260819172001-e6e3fd93e4be // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect

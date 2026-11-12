@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -417,7 +417,7 @@ func updateAgentLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana
 }
 
 func updatePolicyLogLevel(ctx context.Context, t *testing.T, kibanaClient *kibana.Client, policy kibana.AgentPolicy, newPolicyLogLevel string) error {
-	// The request we would need is the one below, but at the time of writing there is no way to set overrides with fleet api definition in elastic-agent-libs, need to update
+	// The request we would need is the one below, but at the time of writing there is no way to set overrides with fleet api definition in the Beats pkg/kibana package, need to update
 	// info.KibanaClient.UpdatePolicy(ctx, policyResp.ID, kibana.AgentPolicyUpdateRequest{})
 	// Let's do a generic HTTP request
 
@@ -483,7 +483,7 @@ func getLogLevelFromInspectOutput(ctx context.Context, f *atesting.Fixture) (str
 }
 
 func getLogLevelFromFleetMetadata(ctx context.Context, kibanaClient *kibana.Client, agentID string) (string, error) {
-	// The request we would need is kibanaClient.GetAgent(), but at the time of writing there is no way to get loglevel with fleet api definition in elastic-agent-libs, need to update
+	// The request we would need is kibanaClient.GetAgent(), but at the time of writing there is no way to get loglevel with fleet api definition in the Beats pkg/kibana package, need to update
 	// kibana.AgentCommon struct to pick up log level from `local_metadata`
 	// Let's do a generic HTTP request
 

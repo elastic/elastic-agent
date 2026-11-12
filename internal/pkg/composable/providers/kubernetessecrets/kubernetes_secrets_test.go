@@ -23,7 +23,7 @@ import (
 	k8sfake "k8s.io/client-go/kubernetes/fake"
 
 	"github.com/elastic/beats/v7/pkg/autodiscover/kubernetes"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 )
