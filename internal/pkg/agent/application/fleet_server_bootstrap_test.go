@@ -155,6 +155,56 @@ func TestFleetServerComponentModifier(t *testing.T) {
 	}
 }
 
+func TestToMapStr(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  []interface{}
+		expect map[string]interface{}
+	}{{
+		name: "merge nested maps",
+		input: []interface{}{
+			map[string]interface{}{
+				"cache":  map[string]interface{}{"max_cost": 419430400},
+				"server": map[string]interface{}{"runtime": map[string]interface{}{"gc_percent": 20}},
+			},
+			&inputFleetServer{Server: &configuration.FleetServerConfig{Host: "0.0.0.0", Port: 8220}},
+		},
+		expect: map[string]interface{}{
+			"cache": map[string]interface{}{"max_cost": 419430400},
+			"server": map[string]interface{}{
+				"host":    "0.0.0.0",
+				"port":    8220,
+				"runtime": map[string]interface{}{"gc_percent": 20},
+			},
+		},
+	}, {
+		name: "replace values that are not maps",
+		input: []interface{}{
+			map[string]interface{}{"server": map[string]interface{}{"host": "localhost"}},
+			map[string]interface{}{"server": map[string]interface{}{"host": "0.0.0.0"}},
+		},
+		expect: map[string]interface{}{
+			"server": map[string]interface{}{"host": "0.0.0.0"},
+		},
+	}, {
+		name: "keep maps in lists as map[string]interface{}",
+		input: []interface{}{
+			map[string]interface{}{"hosts": []interface{}{map[string]interface{}{"url": "localhost:9200"}}},
+		},
+		expect: map[string]interface{}{
+			"hosts": []interface{}{map[string]interface{}{"url": "localhost:9200"}},
+		},
+	}}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			res, err := toMapStr(tc.input...)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expect, res)
+		})
+	}
+}
+
 func TestInjectFleetConfigComponentModifier(t *testing.T) {
 	fleetConfig := &configuration.FleetAgentConfig{
 		Enabled: true,
