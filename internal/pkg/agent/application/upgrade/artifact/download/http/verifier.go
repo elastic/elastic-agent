@@ -48,7 +48,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 		return nil, errors.New("expecting PGP key received none", errors.TypeSecurity)
 	}
 
-	client, err := config.HTTPTransportSettings.Client(
+	client, err := config.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)
@@ -73,7 +73,7 @@ func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte) (*Veri
 
 func (v *Verifier) Reload(c *artifact.Config) error {
 	// reload client
-	client, err := c.HTTPTransportSettings.Client(
+	client, err := c.Client(
 		httpcommon.WithAPMHTTPInstrumentation(),
 		httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 			return download.WithHeaders(rt, download.Headers)

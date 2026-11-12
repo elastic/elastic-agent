@@ -81,7 +81,7 @@ func (v *Verifier) Verify(ctx context.Context, a artifact.Artifact, version agtv
 	if err = v.verifyAsc(filename, artifactPath, skipDefaultPgp, pgpBytes...); err != nil {
 		var invalidSignatureErr *download.InvalidSignatureError
 		if errors.As(err, &invalidSignatureErr) {
-			if err := os.Remove(artifactPath + ".asc"); err != nil {
+			if err := os.Remove(artifactPath + ".asc"); err != nil { //nolint:gosec // G703: target is an agent-controlled path, not user input
 				v.log.Warnf("failed clean up after signature verification: failed to remove %q: %v",
 					artifactPath+".asc", err)
 			}
@@ -129,7 +129,7 @@ func (v *Verifier) verifyAsc(filename, fullPath string, skipDefaultKey bool, pgp
 func (v *Verifier) getPublicAsc(filename string) ([]byte, error) {
 	fullPath := filepath.Join(getDropPath(v.config), filename+ascSuffix)
 
-	b, err := os.ReadFile(fullPath)
+	b, err := os.ReadFile(fullPath) //nolint:gosec // G703: target is an agent-controlled path, not user input
 	if err != nil {
 		return nil, errors.New(err, fmt.Sprintf("fetching asc file from '%s'", fullPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, fullPath))
 	}

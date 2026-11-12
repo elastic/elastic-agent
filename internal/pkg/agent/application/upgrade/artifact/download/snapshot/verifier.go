@@ -30,7 +30,7 @@ func (v *Verifier) Name() string {
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
 func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
-	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
+	client, err := config.Client(httpcommon.WithAPMHTTPInstrumentation())
 	if err != nil {
 		return nil, err
 	}

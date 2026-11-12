@@ -668,7 +668,7 @@ type mockDaemon struct {
 }
 
 func (s *mockDaemon) Start(opt ...grpc.ServerOption) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
+	lis, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", fmt.Sprintf(":%d", s.port))
 	if err != nil {
 		return err
 	}

@@ -221,7 +221,7 @@ func setSource(val interface{}, cfg map[string]interface{}) error {
 		valField := resVal.Field(i)
 		valType := valField.Type()
 		switch valType.Kind() {
-		case reflect.Ptr:
+		case reflect.Pointer:
 			cfgDict, ok := cfgVal.(map[string]interface{})
 			if ok && hasSourceField(valType.Elem()) {
 				err := setSource(valField.Interface(), cfgDict)
