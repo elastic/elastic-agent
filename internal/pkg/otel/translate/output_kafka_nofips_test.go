@@ -7,10 +7,13 @@
 package translate
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent-libs/logp"
@@ -26,6 +29,10 @@ auth:
     client_id: my-client
     client_secret: my-secret
     token_url: https://example.com/oauth2/token
+    timeout: 10s
+    endpoint_params:
+      foo: bar,join
+      new: info
 `
 	expectedMap := map[string]any{
 		"brokers":   []string{"kafka1:9092"},
@@ -57,7 +64,10 @@ auth:
 				"sizer":         "items",
 				"min_size":      1600,
 			},
-			"queue_size": 3200,
+			"enabled":           true,
+			"queue_size":        3200,
+			"block_on_overflow": true,
+			"wait_for_result":   true,
 		},
 		"timeout":      10 * time.Second,
 		"dial_timeout": 30 * time.Second,
@@ -78,7 +88,25 @@ auth:
 	require.NoError(t, err, "error translating kafka to kafka exporter")
 	require.Equal(t, expectedMap, gotMap)
 	require.Nil(t, processorCfg)
-	require.Contains(t, extensionCfg, "oauth2client/_agent-component/default")
+	require.Equal(t, map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+		"client_id":     "my-client",
+		"client_secret": "my-secret",
+		"token_url":     "https://example.com/oauth2/token",
+		"timeout":       "10s",
+		"endpoint_params": map[string]any{
+			"foo": "bar,join",
+			"new": "info",
+		},
+	}, extensionCfg["oauth2client/_agent-component/default"])
+
+	oauth2Cfg, ok := oauth2clientauthextension.NewFactory().CreateDefaultConfig().(*oauth2clientauthextension.Config)
+	require.True(t, ok)
+	extCfgMap, ok := extensionCfg["oauth2client/_agent-component/default"].(map[string]any)
+	require.True(t, ok)
+	require.NoError(t, confmap.NewFromStringMap(extCfgMap).Unmarshal(oauth2Cfg))
+	require.Equal(t, 10*time.Second, oauth2Cfg.Timeout)
+	require.Equal(t, 5*time.Minute, oauth2Cfg.ExpiryBuffer)
+	require.Equal(t, url.Values{"foo": {"bar", "join"}, "new": {"info"}}, oauth2Cfg.EndpointParams)
 }
 
 func TestKafkaOAuthRequiresOauthConfig(t *testing.T) {
