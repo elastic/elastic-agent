@@ -8,6 +8,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+<<<<<<< HEAD
+=======
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+>>>>>>> a27db1e (Fix upgrade watcher double counting restart (#17938))
 	"testing"
 	"time"
 
@@ -240,6 +247,49 @@ func TestWatcher_PIDChangeSuccess(t *testing.T) {
 			return
 		}
 	}
+}
+
+func TestWatcher_RestartCount(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	errCh := make(chan error, 10)
+	logger, _ := loggertest.New("watcher")
+	w := NewAgentWatcher(errCh, logger, 1*time.Millisecond)
+
+	var calls atomic.Int32
+	mockHandler := func(srv cproto.ElasticAgentControl_StateWatchServer) error {
+		call := calls.Add(1)
+		if err := srv.Send(&cproto.StateResponse{
+			Info:    &cproto.StateAgentInfo{Pid: call},
+			State:   cproto.State_HEALTHY,
+			Message: "healthy",
+		}); err != nil {
+			return err
+		}
+		if call < 3 {
+			return fmt.Errorf("forced restart")
+		}
+		<-ctx.Done()
+		return nil
+	}
+	md := &mockDaemon{watch: mockHandler}
+	require.NoError(t, md.Start())
+	defer md.Stop()
+
+	w.agentClient = md.Client()
+	go w.Run(ctx)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.GreaterOrEqual(c, calls.Load(), int32(3))
+	}, 3*time.Second, 5*time.Millisecond)
+
+	select {
+	case err := <-errCh:
+		require.NoError(t, err, "two restarts within grace must not be reported as lost connection")
+	case <-time.After(500 * time.Millisecond):
+	}
+	assert.Equal(t, int32(statusLossesAllowed), w.lostCounter.Load())
 }
 
 // TestWatcher_GracefulShutdownWithPreloadedLostCounter is a regression test
