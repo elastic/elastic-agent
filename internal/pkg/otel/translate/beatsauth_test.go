@@ -607,7 +607,6 @@ func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exp
 
 	f := elasticsearchexporter.NewFactory()
 	cfg := f.CreateDefaultConfig().(*elasticsearchexporter.Config)
-	cfg.Mapping.Mode = "bodymap" //nolint:staticcheck // we need it for testing
 
 	esConf := confmap.NewFromStringMap(exporterCfg)
 

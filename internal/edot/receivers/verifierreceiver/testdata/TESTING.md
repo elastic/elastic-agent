@@ -347,8 +347,6 @@ processors:
 exporters:
   elasticsearch/otel:
     endpoints: ["http://localhost:9200"]
-    mapping:
-      mode: otel
 
 service:
   pipelines:
