@@ -351,7 +351,7 @@ func getCollectorConfigForComponent(
 	}
 
 	// This is a special case for failover connectors when using ES output type.
-	connectorsConfig, connectorPipelinesConfig, err := getFailoverConnectorConfig(pipelineID.Signal(), comp.OutputName, translated.Connectors)
+	connectorsConfig, connectorPipelinesConfig, err := getFailoverConnectorConfig(pipelineID.Signal(), comp.OutputName, translated.Connectors, translated.Exporters)
 	if err != nil {
 		return nil, err
 	}
@@ -450,8 +450,8 @@ func getCollectorConfigForComponent(
 // getFailoverConnectorConfig builds the pipelines for the failover connectors. Each exporter
 // gets its own pipeline, named _agent-component/<output name>/<priority>.
 // Connectors and their pipelines are scoped to the output, so all components using the output share
-// them and produce the same config. It returns the connectors config and the pipelines config.
-func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, connectors map[string]any) (map[string]any, map[string]any, error) {
+// them and produce the same config.
+func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, connectors map[string]any, exporters map[string]any) (map[string]any, map[string]any, error) {
 	if len(connectors) == 0 {
 		return nil, nil, nil
 	}
@@ -467,8 +467,19 @@ func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, conne
 		if !ok {
 			return nil, nil, fmt.Errorf("connector %s has no priority_levels", connectorKey)
 		}
+		var sendingQueue any
 		pipelineLevels := make([][]string, 0, len(exporterKeys))
 		for i, exporterKey := range exporterKeys {
+			exporterCfg, ok := exporters[exporterKey].(map[string]any)
+			if !ok {
+				return nil, nil, fmt.Errorf("exporter %s referenced by connector %s not found", exporterKey, connectorKey)
+			}
+			if i == 0 {
+				sendingQueue = exporterCfg["sending_queue"]
+			}
+			// Disable sending queue on the exporter, it will be moved to the connector.
+			exporterCfg["sending_queue"] = map[string]any{"enabled": false}
+
 			exporterPipelineID := pipeline.NewIDWithName(signal, fmt.Sprintf("%s%s/%d", OtelNamePrefix, EncodeNameSegment(outputName), i+1)).String()
 			pipelinesConfig[exporterPipelineID] = map[string][]string{
 				"receivers": {connectorKey},
@@ -479,6 +490,9 @@ func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, conne
 
 		outputConnectorCfg := maps.Clone(connectorCfg)
 		outputConnectorCfg["priority_levels"] = pipelineLevels
+		if sendingQueue != nil {
+			outputConnectorCfg["sending_queue"] = sendingQueue
+		}
 		connectorsConfig[connectorKey] = outputConnectorCfg
 	}
 	return connectorsConfig, pipelinesConfig, nil

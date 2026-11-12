@@ -5036,6 +5036,73 @@ func TestUnitToExporterConfig(t *testing.T) {
 	}
 }
 
+func TestFailoverOtelOverride(t *testing.T) {
+	esExporterType := otelcomponent.MustNewType("elasticsearch")
+	unit := component.Unit{
+		ID:   "filestream-default",
+		Type: client.UnitTypeOutput,
+		Config: component.MustExpectedConfig(map[string]any{
+			"type":        "elasticsearch",
+			"hosts":       []any{"es1:9200", "es2:9200"},
+			"api_key":     "test-key",
+			"loadbalance": false,
+			"otel": map[string]any{
+				"exporter": map[string]any{
+					"sending_queue": map[string]any{
+						"queue_size": 12345,
+						"batch": map[string]any{
+							"max_size": 2000,
+						},
+					},
+				},
+			},
+		}),
+	}
+
+	translated, _, err := unitToExporterConfig(unit, "default", esExporterType, logp.NewNopLogger())
+	require.NoError(t, err)
+	connectors, _, err := getFailoverConnectorConfig(pipeline.SignalLogs, "default", translated.Connectors, translated.Exporters)
+	require.NoError(t, err)
+
+	require.Len(t, translated.Exporters, 2)
+	for i, endpoint := range []string{"http://es1:9200", "http://es2:9200"} {
+		exporterID := getFailoverExporterID(esExporterType, "default", i+1).String()
+		exporterCfg, ok := translated.Exporters[exporterID].(map[string]any)
+		require.True(t, ok, "missing exporter %s", exporterID)
+		assert.Equal(t, []string{endpoint}, exporterCfg["endpoints"])
+		assert.Equal(t, map[string]any{"enabled": false}, exporterCfg["sending_queue"],
+			"exporter %s should keep its sending queue disabled", exporterID)
+	}
+
+	assert.Equal(t, map[string]any{
+		"failover/_agent-component/default": map[string]any{
+			"priority_levels": [][]string{
+				{"logs/_agent-component/default/1"},
+				{"logs/_agent-component/default/2"},
+			},
+			"retry_interval": 60 * time.Second,
+			"sending_queue": map[string]any{
+				"batch": map[string]any{
+					"flush_timeout": "10s",
+					"max_size":      float64(2000), // from override
+					"min_size":      1600,
+					"sizer":         "items",
+				},
+				"block_on_overflow": true,
+				"enabled":           true,
+				"num_consumers":     2,
+				"queue_size":        float64(12345), // from override
+				"wait_for_result":   true,
+			},
+			"condition": map[string]any{
+				"error": map[string]any{
+					"contains": []string{"failed to execute the request"},
+				},
+			},
+		},
+	}, connectors)
+}
+
 func TestLogLevelConversion(t *testing.T) {
 	tests := []struct {
 		name    string

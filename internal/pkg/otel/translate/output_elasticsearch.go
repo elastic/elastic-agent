@@ -370,14 +370,14 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (T
 }
 
 // getFailoverConfig splits an exporter config with multiple endpoints into one exporter per endpoint and a
-// The sending queue moves from the exporters to the connector
+// failover connector. Each exporter keeps the full sending queue so that otel overrides can be applied to it;
+// getFailoverConnectorConfig moves the queue onto the connector afterwards.
 func getFailoverConfig(exporterType otelcomponent.Type, outputName string, exporterCfg map[string]any, endpoints []string, retryInterval time.Duration) (exporters map[string]any, connectors map[string]any) {
 	exporters = make(map[string]any, len(endpoints))
 	priorityLevels := make([]string, 0, len(endpoints))
 	for i, endpoint := range endpoints {
 		cfg := koanfmaps.Copy(exporterCfg)
 		cfg["endpoints"] = []string{endpoint}
-		cfg["sending_queue"] = map[string]any{"enabled": false}
 
 		exporterID := getFailoverExporterID(exporterType, outputName, i+1).String()
 		exporters[exporterID] = cfg
@@ -394,7 +394,6 @@ func getFailoverConfig(exporterType otelcomponent.Type, outputName string, expor
 			"priority_levels": priorityLevels,
 			// how often the connector tries to move back to a higher priority endpoint
 			"retry_interval": retryInterval,
-			"sending_queue":  exporterCfg["sending_queue"],
 			"condition": map[string]any{
 				"error": map[string]any{
 					"contains": []string{failoverConnectionErrorMessage},

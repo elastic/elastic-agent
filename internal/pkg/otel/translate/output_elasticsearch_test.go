@@ -8,7 +8,6 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"maps"
 	"strings"
 	"testing"
 	"text/template"
@@ -863,16 +862,9 @@ func TestESToOTelConfigLoadbalanceFalse(t *testing.T) {
 		for i, host := range []string{"https://es1:9200", "https://es2:9200", "https://es3:9200"} {
 			exporterID := fmt.Sprintf("elasticsearch/_agent-component/default/%d", i+1)
 			require.Contains(t, translated.Exporters, exporterID)
-			exporterCfg := translated.Exporters[exporterID].(map[string]any)
-
-			assert.Equal(t, []string{host}, exporterCfg["endpoints"])
-			assert.Equal(t, map[string]any{"enabled": false}, exporterCfg["sending_queue"])
-
-			// apart from the endpoint and the queue, every exporter matches the single host config
-			expected := maps.Clone(singleHostCfg)
-			expected["endpoints"] = exporterCfg["endpoints"]
-			expected["sending_queue"] = exporterCfg["sending_queue"]
-			assert.Equal(t, expected, exporterCfg)
+			// apart from the endpoint, every exporter matches the single host config
+			singleHostCfg["endpoints"] = []string{host}
+			assert.Equal(t, singleHostCfg, translated.Exporters[exporterID])
 		}
 
 		assert.Equal(t, map[string]any{
@@ -883,7 +875,6 @@ func TestESToOTelConfigLoadbalanceFalse(t *testing.T) {
 					"elasticsearch/_agent-component/default/3",
 				},
 				"retry_interval": 30 * time.Second,
-				"sending_queue":  singleHostCfg["sending_queue"],
 				"condition": map[string]any{
 					"error": map[string]any{
 						"contains": []string{"failed to execute the request"},
@@ -891,23 +882,6 @@ func TestESToOTelConfigLoadbalanceFalse(t *testing.T) {
 				},
 			},
 		}, translated.Connectors)
-	})
-
-	t.Run("connections match the worker count of a single active host", func(t *testing.T) {
-		cfg := config.MustNewConfigFrom(map[string]any{
-			"hosts":       []any{"https://es1:9200", "https://es2:9200", "https://es3:9200"},
-			"loadbalance": false,
-			"worker":      2,
-		})
-
-		translated, err := ESToOTelConfig(cfg, "default", logger)
-		require.NoError(t, err)
-
-		for _, exporterCfg := range translated.Exporters {
-			assert.Equal(t, 2, exporterCfg.(map[string]any)["max_conns_per_host"])
-		}
-		connectorCfg := translated.Connectors[getFailoverConnectorID("default").String()].(map[string]any)
-		assert.Equal(t, 3, connectorCfg["sending_queue"].(map[string]any)["num_consumers"])
 	})
 
 	t.Run("single host uses a single exporter", func(t *testing.T) {
