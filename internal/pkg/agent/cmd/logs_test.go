@@ -8,11 +8,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -739,4 +742,89 @@ func TestCobraCmd(t *testing.T) {
 		t.Errorf("expecting at least %d log lines, got %d instead", expectedLines, count)
 		t.Logf("Log lines:\n%s", strings.Join(lines, "\n"))
 	}
+}
+
+// TestLogsCmdWithoutEventLogsDirectory runs the logs command for an Agent that is not running and has not written an
+// event, so the events directory does not exist, and checks that the command keeps following the logs. It must not
+// depend on the text of the error of a missing directory or on the separator of the path, which differ between
+// operating systems: Windows reports a missing file differently from Linux.
+func TestLogsCmdWithoutEventLogsDirectory(t *testing.T) {
+	const marker = "marker-line"
+	streams, _, out, _ := cli.NewTestingIOStreams()
+	cmd := newLogsCommandWithArgs(nil, streams)
+	require.NoError(t, cmd.Flags().Set("follow", "true"))
+	cmd.SetContext(t.Context())
+
+	logsDir := t.TempDir()
+	createFileContent(t, logsDir, "elastic-agent-20260101.ndjson", bytes.NewBufferString(marker+"\n"))
+	// the directory name alone, so the check must not rely on the parent path
+	eventLogsDir := filepath.Join(t.TempDir(), "events")
+
+	var cmdErr error
+	returned := make(chan struct{})
+	go func() {
+		defer close(returned)
+		cmdErr = logsCmd(streams, cmd, logsDir, eventLogsDir)
+	}()
+	// The context of the test is done just before the cleanup, which stops the command. Wait for it, so that it does
+	// not use the directories when they are removed.
+	t.Cleanup(func() { <-returned })
+
+	// Following, the command only returns when it fails or when the context is done, so any return before that is
+	// a failure. Without --follow it would return as soon as the logs are printed.
+	failIfReturned := func(wait time.Duration) {
+		t.Helper()
+		select {
+		case <-returned:
+			t.Fatalf("the command returned while it must follow the logs: %v", cmdErr)
+		case <-time.After(wait):
+		}
+	}
+
+	// Wait until the command prints the logs: it is following them.
+	deadline := time.Now().Add(30 * time.Second)
+	for !strings.Contains(out.String(), marker) {
+		require.True(t, time.Now().Before(deadline), "the command did not print the logs")
+		failIfReturned(10 * time.Millisecond)
+	}
+	// The events part starts next to the logs part and a failure of it returns within microseconds, give it the time.
+	failIfReturned(500 * time.Millisecond)
+}
+
+func TestIsMissingDir(t *testing.T) {
+	dir := filepath.Join("data", "logs", "events")
+	wrap := func(err error) error {
+		return fmt.Errorf("failed to fetch log filenames: failed to list logs directory: %w", err)
+	}
+
+	tests := map[string]struct {
+		err  error
+		want bool
+	}{
+		"missing directory, ENOENT":       {err: wrap(&fs.PathError{Op: "open", Path: dir, Err: syscall.ENOENT}), want: true},
+		"missing directory, ErrNotExist":  {err: wrap(&fs.PathError{Op: "open", Path: dir, Err: fs.ErrNotExist}), want: true},
+		"missing directory, unclean path": {err: wrap(&fs.PathError{Op: "open", Path: dir + string(filepath.Separator), Err: fs.ErrNotExist}), want: true},
+		"missing log file in directory":   {err: wrap(&fs.PathError{Op: "open", Path: filepath.Join(dir, "elastic-agent-1.ndjson"), Err: fs.ErrNotExist}), want: false},
+		"other directory":                 {err: wrap(&fs.PathError{Op: "open", Path: "other", Err: fs.ErrNotExist}), want: false},
+		"permission denied":               {err: wrap(&fs.PathError{Op: "open", Path: dir, Err: fs.ErrPermission}), want: false},
+		"not a path error":                {err: errors.New("boom"), want: false},
+		"nil":                             {err: nil, want: false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, isMissingDir(tc.err, dir))
+		})
+	}
+}
+
+// TestIsMissingDirDirectoryCreatedAfterError covers the start of the Agent: the error of a missing directory is
+// returned, the Agent creates the directory when it logs the first event, and only then the error is classified.
+func TestIsMissingDirDirectoryCreatedAfterError(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "events")
+	_, err := getLogFilenames(dir)
+	require.Error(t, err)
+
+	require.NoError(t, os.Mkdir(dir, 0o755))
+
+	assert.True(t, isMissingDir(err, dir), "the missing directory must be tolerated after it was created")
 }
