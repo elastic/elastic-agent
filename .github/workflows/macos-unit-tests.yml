@@ -27,7 +27,8 @@ jobs:
         mage_target: ["test:unit", "test:unitEdot"]
     name: macos-unit-tests (${{ matrix.os }}, ${{ matrix.mage_target }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # Leaves room after the test step's own timeout to save the Go cache.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,9 +36,34 @@ jobs:
           # pkg/testing/tools/git TestGetReleaseBranches test require full git history
           fetch-depth: 0
 
+      # The Go cache is managed explicitly below instead of by setup-go, so that:
+      # - each mage target gets its own cache (setup-go uses one key for the
+      #   whole matrix row, so only the first target to finish got its build
+      #   outputs cached),
+      # - a go.sum change falls back to an older cache via restore-keys
+      #   instead of starting cold,
+      # - only pushes save caches; pull requests restore from their base branch.
       - uses: actions/setup-go@v7
         with:
           go-version-file: .go-version
+          cache: false
+
+      - name: Get Go cache paths
+        id: go-paths
+        run: |
+          echo "gocache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          echo "gomodcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Go cache
+        id: go-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ${{ steps.go-paths.outputs.gocache }}
+            ${{ steps.go-paths.outputs.gomodcache }}
+          key: macos-unit-go-${{ runner.os }}-${{ runner.arch }}-${{ matrix.mage_target }}-${{ hashFiles('.go-version') }}-${{ hashFiles('go.sum', 'internal/edot/go.sum') }}
+          restore-keys: |
+            macos-unit-go-${{ runner.os }}-${{ runner.arch }}-${{ matrix.mage_target }}-${{ hashFiles('.go-version') }}-
 
       - name: Install make
         run: |
@@ -48,4 +74,19 @@ jobs:
         run: make mage
 
       - name: mage ${{ matrix.mage_target }}
+        # Shorter than the job timeout so a slow cold-cache run still reaches
+        # the save step below, and the next run starts warm.
+        timeout-minutes: 55
         run: RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}
+
+      # Saves even when tests fail or time out: a partial Go build cache is
+      # still valid and speeds up the next run. Skipped on an exact cache hit,
+      # because a cache key can't be overwritten.
+      - name: Save Go cache
+        if: ${{ always() && github.event_name == 'push' && steps.go-cache.outcome == 'success' && steps.go-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ${{ steps.go-paths.outputs.gocache }}
+            ${{ steps.go-paths.outputs.gomodcache }}
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
