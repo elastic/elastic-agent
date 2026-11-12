@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -149,6 +149,7 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 
 	initResp, err := client.Do(req)
 	require.NoError(runner.T(), err)
+	defer initResp.Body.Close()
 	require.Equal(runner.T(), http.StatusOK, initResp.StatusCode)
 
 	// use the fleet override API to change the port that we're running on.
@@ -188,6 +189,7 @@ func (runner *MonitoringTextRunner) TestMonitoringLiveness() {
 
 	initResp, err = client.Do(req)
 	require.NoError(runner.T(), err)
+	defer initResp.Body.Close()
 	require.Equal(runner.T(), http.StatusOK, initResp.StatusCode)
 }
 

@@ -9,7 +9,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/beats/v7/pkg/file"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/perms"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -57,7 +57,7 @@ func (d *DiskStore) Delete() error {
 func (d *DiskStore) Save(in io.Reader) error {
 	tmpFile := d.target + ".tmp"
 
-	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask)
+	fd, err := os.OpenFile(tmpFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, permMask) //nolint:gosec // G703: target is an agent-controlled path, not user input
 	if err != nil {
 		return errors.New(err,
 			fmt.Sprintf("could not save to %s", tmpFile),
