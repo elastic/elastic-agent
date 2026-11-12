@@ -2998,6 +2998,33 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	})
 }
 
+func TestExporterIDToOutputNameLookup(t *testing.T) {
+	cfg := confmap.NewFromStringMap(map[string]any{
+		"exporters": map[string]any{
+			"elasticsearch/_agent-component/default/1":  map[string]any{},
+			"elasticsearch/_agent-component/default/2":  map[string]any{},
+			"elasticsearch/_agent-component/monitoring": map[string]any{},
+		},
+		"connectors": map[string]any{
+			"failover/_agent-component/default": map[string]any{},
+		},
+	})
+	components := []component.Component{
+		{ID: "filestream-default", OutputType: "elasticsearch", OutputName: "default"},
+		{ID: "system/metrics-default", OutputType: "elasticsearch", OutputName: "default"},
+		{ID: "filestream-monitoring", OutputType: "elasticsearch", OutputName: "monitoring"},
+	}
+
+	lookup, err := exporterIDToOutputNameLookup(cfg, components)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{
+		"elasticsearch/_agent-component/default/1":  "elasticsearch-default",
+		"elasticsearch/_agent-component/default/2":  "elasticsearch-default",
+		"failover/_agent-component/default":         "elasticsearch-default",
+		"elasticsearch/_agent-component/monitoring": "elasticsearch-monitoring",
+	}, lookup)
+}
+
 func TestMonitoringReceiverFileExporter(t *testing.T) {
 	receiverName := "internal-telemetry-monitoring"
 	// The file exporter is on the metrics pipeline, which always exists.

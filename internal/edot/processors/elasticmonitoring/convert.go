@@ -5,7 +5,9 @@
 package elasticmonitoringprocessor
 
 import (
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/collector/component"
@@ -86,6 +88,18 @@ var exporterMetricNames = map[string]string{
 	otelFlushedBytesKey:         otelFlushedBytesKey,
 }
 
+// failoverConnectorMetricNames is the subset of exporterMetricNames tracked for
+// failover connectors. The connector owns the queue of an output that fails over
+// between hosts, but the documents it sends are already counted by the exporters
+// behind it, so only queue metrics are taken from it.
+var failoverConnectorMetricNames = map[string]string{
+	otelQueueSizeKey:            otelQueueSizeKey,
+	otelQueueCapacityKey:        otelQueueCapacityKey,
+	otelEnqueueFailedLogsKey:    otelEnqueueFailedLogsKey,
+	otelEnqueueFailedSpansKey:   otelEnqueueFailedSpansKey,
+	otelEnqueueFailedMetricsKey: otelEnqueueFailedMetricsKey,
+}
+
 // exporterMetrics accumulates raw values for a single exporter, keyed by
 // canonical source metric name, along with the latest data-point timestamp
 // seen. The timestamp is propagated to every output data point so downstream
@@ -98,8 +112,8 @@ type exporterMetrics struct {
 // addMetric accumulates a metric's integer data points into em; all currently
 // tracked exporter metrics are integer sums or gauges. Queue capacity is a
 // point-in-time value and is overwritten rather than summed.
-func (em *exporterMetrics) addMetric(m pmetric.Metric) {
-	name, tracked := exporterMetricNames[m.Name()]
+func (em *exporterMetrics) addMetric(m pmetric.Metric, metricNames map[string]string) {
+	name, tracked := metricNames[m.Name()]
 	if !tracked {
 		return
 	}
@@ -215,30 +229,49 @@ func addDataPointValue(target, dp pmetric.NumberDataPoint) {
 	}
 }
 
-// collectExporterMetrics builds a map from elasticsearch exporter component ID
-// to its accumulated exporterMetrics from the given pmetric.Metrics.
+// collectExporterMetrics builds a map from elasticsearch exporter and failover
+// connector component ID to its accumulated exporterMetrics from the given pmetric.Metrics.
 func collectExporterMetrics(md pmetric.Metrics) map[string]*exporterMetrics {
-	const elasticsearchPrefix = "elasticsearch/"
+	const (
+		elasticsearchPrefix = "elasticsearch/"
+		failoverPrefix      = "failover/"
+	)
 	exporters := map[string]*exporterMetrics{}
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
 		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
 			sm := rm.ScopeMetrics().At(j)
-			exporterID := componentIDForScope(sm, "exporter")
-			if !strings.HasPrefix(exporterID, elasticsearchPrefix) {
+			var componentID string
+			var metricNames map[string]string
+			if id := componentIDForScope(sm, "exporter"); strings.HasPrefix(id, elasticsearchPrefix) {
+				componentID, metricNames = id, exporterMetricNames
+			} else if id := componentIDForScope(sm, "connector"); strings.HasPrefix(id, failoverPrefix) {
+				componentID, metricNames = id, failoverConnectorMetricNames
+			} else {
 				continue
 			}
-			em, exists := exporters[exporterID]
+			em, exists := exporters[componentID]
 			if !exists {
 				em = &exporterMetrics{values: map[string]int64{}}
-				exporters[exporterID] = em
+				exporters[componentID] = em
 			}
 			for k := 0; k < sm.Metrics().Len(); k++ {
-				em.addMetric(sm.Metrics().At(k))
+				em.addMetric(sm.Metrics().At(k), metricNames)
 			}
 		}
 	}
 	return exporters
+}
+
+// merge adds the values of other into em and keeps the latest timestamp. Unlike
+// addMetric, queue capacity is summed: each merged component has its own queue.
+func (em *exporterMetrics) merge(other *exporterMetrics) {
+	for name, value := range other.values {
+		em.values[name] += value
+	}
+	if other.timestamp > em.timestamp {
+		em.timestamp = other.timestamp
+	}
 }
 
 // baseComponentID strips the per-container stream ID suffix from an agent
@@ -351,15 +384,25 @@ func appendExporterMetrics(sm pmetric.ScopeMetrics, em *exporterMetrics) {
 	}
 }
 
-// buildExporterMetrics appends one ResourceMetrics per elasticsearch exporter to out.
+// buildExporterMetrics appends one ResourceMetrics per output to out. The metrics of
+// all exporters and failover connectors that ExporterNames maps to the same name are
+// merged, so an output that fails over between hosts is reported as a single output.
 func buildExporterMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
+	byComponent := map[string]*exporterMetrics{}
 	for exporterID, metrics := range collectExporterMetrics(md) {
 		componentID, ok := cfg.ExporterNames[exporterID]
 		if !ok {
 			logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporterID))
 			componentID = exporterID
 		}
-		appendExporterMetrics(newEventScope(out, res, internaltelemetry.EventTypeExporter, componentID), metrics)
+		if merged, exists := byComponent[componentID]; exists {
+			merged.merge(metrics)
+		} else {
+			byComponent[componentID] = metrics
+		}
+	}
+	for _, componentID := range slices.Sorted(maps.Keys(byComponent)) {
+		appendExporterMetrics(newEventScope(out, res, internaltelemetry.EventTypeExporter, componentID), byComponent[componentID])
 	}
 }
 

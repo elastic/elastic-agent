@@ -187,6 +187,46 @@ func findMetricValue(t *testing.T, out pmetric.Metrics, idx int, name string) an
 	return nil
 }
 
+func TestBuildExporterMetricsMergesFailoverOutput(t *testing.T) {
+	const exporterScopeName = "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
+	md, sm1 := newMetricsWithExporterScope("elasticsearch/_agent-component/default/1")
+	appendSumInt(sm1, otelSentLogsKey, 90)
+	appendSumInt(sm1, otelFailedLogsKey, 2)
+	appendSumInt(sm1, otelBulkRequestsKey, 3)
+
+	sm2 := appendScopeToMetrics(md, exporterScopeName,
+		otelComponentKindKey, "exporter",
+		otelComponentIDKey, "elasticsearch/_agent-component/default/2")
+	appendSumInt(sm2, otelSentLogsKey, 10)
+	appendSumInt(sm2, otelBulkRequestsKey, 1)
+
+	connector := appendScopeToMetrics(md, "github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector",
+		otelComponentKindKey, "connector",
+		otelComponentIDKey, "failover/_agent-component/default")
+	appendGaugeInt(connector, otelQueueSizeKey, 40)
+	appendGaugeInt(connector, otelQueueCapacityKey, 3200)
+	appendSumInt(connector, otelEnqueueFailedLogsKey, 5)
+	// already counted by the exporters behind the connector
+	appendSumInt(connector, otelSentLogsKey, 100)
+
+	cfg := &Config{ExporterNames: map[string]string{
+		"elasticsearch/_agent-component/default/1": "elasticsearch-default",
+		"elasticsearch/_agent-component/default/2": "elasticsearch-default",
+		"failover/_agent-component/default":        "elasticsearch-default",
+	}}
+	out := pmetric.NewMetrics()
+	buildExporterMetrics(zap.NewNop(), cfg, pcommon.NewResource(), md, out)
+
+	require.Equal(t, 1, out.ResourceMetrics().Len(), "failover exporters and connector should be reported as one output")
+	idx := findEvent(out, "elasticsearch-default", "")
+	require.Equal(t, 0, idx)
+	assert.Equal(t, int64(100), findMetricValue(t, out, idx, beatsOutputEventsAckedKey))
+	assert.Equal(t, int64(7), findMetricValue(t, out, idx, beatsOutputEventsDroppedKey), "send failures plus enqueue failures")
+	assert.Equal(t, int64(4), findMetricValue(t, out, idx, beatsOutputEventsBatchesKey))
+	assert.Equal(t, int64(40), findMetricValue(t, out, idx, beatsQueueFilledEventsKey))
+	assert.Equal(t, int64(3200), findMetricValue(t, out, idx, beatsQueueMaxEventsKey))
+}
+
 func TestBuildExporterMetrics(t *testing.T) {
 	const exporterID = "elasticsearch/_agent-component/monitoring"
 	md, sm := newMetricsWithExporterScope(exporterID)

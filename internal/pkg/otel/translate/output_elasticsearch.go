@@ -389,7 +389,7 @@ func getFailoverConfig(exporterType otelcomponent.Type, outputName string, expor
 	}
 
 	connectors = map[string]any{
-		getFailoverConnectorID(outputName).String(): map[string]any{
+		GetFailoverConnectorID(outputName).String(): map[string]any{
 			// one exporter ID per level, replaced with the pipelines feeding them by getFailoverConnectorConfig
 			"priority_levels": priorityLevels,
 			// how often the connector tries to move back to a higher priority endpoint
@@ -410,8 +410,8 @@ func getFailoverExporterID(exporterType otelcomponent.Type, outputName string, n
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
-// getFailoverConnectorID returns the id of the failover connector for the given output name.
-func getFailoverConnectorID(outputName string) otelcomponent.ID {
+// GetFailoverConnectorID returns the id of the failover connector for the given output name.
+func GetFailoverConnectorID(outputName string) otelcomponent.ID {
 	connectorName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("failover"), connectorName)
 }
