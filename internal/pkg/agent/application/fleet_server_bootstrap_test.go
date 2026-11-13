@@ -187,6 +187,24 @@ func TestToMapStr(t *testing.T) {
 			"server": map[string]interface{}{"host": "0.0.0.0"},
 		},
 	}, {
+		name: "replace a map with a value that is not a map",
+		input: []interface{}{
+			map[string]interface{}{"server": map[string]interface{}{"host": "localhost"}},
+			map[string]interface{}{"server": "0.0.0.0"},
+		},
+		expect: map[string]interface{}{
+			"server": "0.0.0.0",
+		},
+	}, {
+		name: "replace a value that is not a map with a map",
+		input: []interface{}{
+			map[string]interface{}{"server": "0.0.0.0"},
+			map[string]interface{}{"server": map[string]interface{}{"host": "localhost"}},
+		},
+		expect: map[string]interface{}{
+			"server": map[string]interface{}{"host": "localhost"},
+		},
+	}, {
 		name: "keep maps in lists as map[string]interface{}",
 		input: []interface{}{
 			map[string]interface{}{"hosts": []interface{}{map[string]interface{}{"url": "localhost:9200"}}},
