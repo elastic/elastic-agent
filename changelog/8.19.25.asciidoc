@@ -23,7 +23,7 @@ Review important information about the  8.19.25 release.
 
 
 
-* Update OTel Collector components to v0.164.x. https://github.com/elastic/elastic-agent/pull/17825[#17825] https://github.com/elastic/elastic-agent/pull/17951[#17951] https://github.com/elastic/elastic-agent/pull/17957[#17957] https://github.com/elastic/elastic-agent/pull/17938[#17938] https://github.com/elastic/elastic-agent/pull/17966[#17966] https://github.com/elastic/elastic-agent/pull/17983[#17983] https://github.com/elastic/elastic-agent/issues/17028[#17028]
+* Update OTel Collector components to v0.164.x. https://github.com/elastic/elastic-agent/pull/17668[#17668] 
 
 
 
@@ -35,7 +35,7 @@ Review important information about the  8.19.25 release.
 
 
 
-* Guard against malformed health status payload and nil event panic in OTel collector. https://github.com/elastic/elastic-agent/pull/17825[#17825] https://github.com/elastic/elastic-agent/pull/17951[#17951] https://github.com/elastic/elastic-agent/pull/17957[#17957] https://github.com/elastic/elastic-agent/pull/17938[#17938] https://github.com/elastic/elastic-agent/pull/17966[#17966] https://github.com/elastic/elastic-agent/pull/17983[#17983] https://github.com/elastic/elastic-agent/issues/17028[#17028]
+* Guard against malformed health status payload and nil event panic in OTel collector. https://github.com/elastic/elastic-agent/pull/17208[#17208] https://github.com/elastic/elastic-agent/issues/17067[#17067]
 * Report service component start failures as degraded, and as failed when they persist. https://github.com/elastic/elastic-agent/pull/17524[#17524] https://github.com/elastic/elastic-agent/issues/16305[#16305]
 
 // end 8.19.25 relnotes

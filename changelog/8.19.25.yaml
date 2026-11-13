@@ -6,14 +6,9 @@ entries:
         Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17825
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17957
-        - https://github.com/elastic/elastic-agent/pull/17938
-        - https://github.com/elastic/elastic-agent/pull/17966
-        - https://github.com/elastic/elastic-agent/pull/17983
+        - https://github.com/elastic/elastic-agent/pull/17208
       issue:
-        - https://github.com/elastic/elastic-agent/issues/17028
+        - https://github.com/elastic/elastic-agent/issues/17067
       impact: ""
       action: ""
       timestamp: 1791989613
@@ -39,14 +34,8 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17825
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17957
-        - https://github.com/elastic/elastic-agent/pull/17938
-        - https://github.com/elastic/elastic-agent/pull/17966
-        - https://github.com/elastic/elastic-agent/pull/17983
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/17028
+        - https://github.com/elastic/elastic-agent/pull/17668
+      issue: []
       impact: ""
       action: ""
       timestamp: 1793281480
