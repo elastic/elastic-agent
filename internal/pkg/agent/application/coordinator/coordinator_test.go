@@ -20,7 +20,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +30,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"

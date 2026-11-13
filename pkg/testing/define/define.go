@@ -23,7 +23,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/elastic-agent/pkg/utils"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v9"

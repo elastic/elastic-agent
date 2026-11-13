@@ -14,10 +14,9 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261106185606-1d47f32be576
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110104352-97393d2e775c
 	github.com/elastic/cloud-on-k8s/v3 v3.4.1
 	github.com/elastic/elastic-agent-client/v7 v7.18.1
-	github.com/elastic/elastic-agent-libs v0.47.0
 	github.com/elastic/elastic-agent/internal/edot v0.0.0-20251114132921-c463803c5568
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
 	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
@@ -302,6 +301,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.22.2 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
+	github.com/elastic/elastic-agent-libs v0.47.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.15.0 // indirect
 	github.com/elastic/go-elasticsearch/v8 v8.19.7 // indirect
@@ -328,7 +328,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/elastictraceprocessor v0.78.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.78.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.50.0 // indirect
-	github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 // indirect
+	github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.39.1-0.20260819172001-e6e3fd93e4be // indirect

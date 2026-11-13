@@ -26,9 +26,9 @@ import (
 
 	"github.com/google/pprof/profile"
 
+	"github.com/elastic/beats/v7/pkg/mapstr"
+	"github.com/elastic/beats/v7/pkg/redact"
 	agentclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent-libs/redact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	agentruntime "github.com/elastic/elastic-agent/pkg/component/runtime"

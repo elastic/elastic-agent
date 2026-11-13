@@ -11,7 +11,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 

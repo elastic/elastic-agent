@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	c "github.com/elastic/elastic-agent-libs/config"
+	c "github.com/elastic/beats/v7/pkg/config"
 )
 
 const (

@@ -454,8 +454,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261106185606-1d47f32be576 h1:3Iotrn5wYx5L+ay/TEFnAY2py4cv/LErV2YCiYDPImI=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261106185606-1d47f32be576/go.mod h1:8Vj4jPgallY57XMI90/60gxOms91IQNyKjsbfeeRySM=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110104352-97393d2e775c h1:WMq0mWCDnqVr/+ps6NxNfcaG9e29VWpOk9/N0jtnR6Q=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110104352-97393d2e775c/go.mod h1:lCbUpAS+LbsCMx5B/oM5sOyfI1IISuXTRF8KLsP7xzw=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
 github.com/elastic/elastic-agent-client/v7 v7.18.1/go.mod h1:uDpSGZ+YCKgqgtkwCA0qjwX0gU/wmixDsVbPjY3GkPs=
 github.com/elastic/elastic-agent-libs v0.47.0 h1:fltOh0mETIlW3LYExX62iacL63sHXSTfDB/8Qi+wXso=
@@ -530,8 +530,8 @@ github.com/elastic/opentelemetry-collector-components/processor/lsmintervalproce
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.78.0/go.mod h1:cNvllSJUV1Kw4N5mTDnePQk1HpCRpLVQd28IiwHhyAg=
 github.com/elastic/opentelemetry-lib v0.50.0 h1:lJfTTem4DGbwGmBEpjJ1/P3GW3y51oIa6rMIx9bOp0Q=
 github.com/elastic/opentelemetry-lib v0.50.0/go.mod h1:hP9WaRQzxliYvOjjqK3sYea048WDqn9w8msjt/CTAW8=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be h1:AbN9OyZ+o9tNmbY5cEDRrXq4pdCY6thW02NF9CiUJpk=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
 github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1 h1:g7YUigN4dW2+zpdusdTTghZ+5Py3BaUMAStvL8Nk+FY=
 github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1/go.mod h1:thX175TtLTzLj3p7N/Q9IiKZ7NF+p72cvL91emV0hzo=
 github.com/elazarl/goproxy/ext v0.0.0-20240909085733-6741dbfc16a1 h1:XgXwWTQglBILwCpfm8I9xUjPXKOi1EzRzuYzyczU5Z0=
