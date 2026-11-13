@@ -120,6 +120,7 @@ Validate and initialise the defined agent presets
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- include "elasticagent.preset.mutate.unprivileged" (list $ $presetVal) -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $presetVal) -}}
+{{- include "elasticagent.preset.mutate.browsercas" (list $ $presetVal) -}}
 {{- $presetMode := ($presetVal).mode -}}
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- $presetInputs := dig "_inputs" (list) $presetVal -}}
@@ -211,6 +212,24 @@ Mutate an agent preset based on agent.unprivileged
 {{- $_ := set $presetSecurityContextCapabilities "add" $presetSecurityContextCapabilitiesAdd -}}
 {{- else -}}
 {{- $_ := set $presetSecurityContext "runAsUser" 0 }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Mutate an agent preset to mount the Secret in agent.browserCAs and point ELASTIC_AGENT_BROWSER_CA at it,
+so that the complete image variants import its CAs into the browser trust store
+*/}}
+{{- define "elasticagent.preset.mutate.browsercas" -}}
+{{- $ := index . 0 -}}
+{{- $preset := index . 1 -}}
+{{- with ($.Values.agent.browserCAs).secretName -}}
+{{- $mountPath := "/etc/elastic-agent/browser-cas" -}}
+{{- $volume := dict "name" "browser-cas" "secret" (dict "secretName" .) -}}
+{{- $volumeMount := dict "name" "browser-cas" "mountPath" $mountPath "readOnly" true -}}
+{{- $env := dict "name" "ELASTIC_AGENT_BROWSER_CA" "value" $mountPath -}}
+{{- include "elasticagent.preset.mutate.volumes" (list $preset (dict "extraVolumes" (list $volume))) -}}
+{{- include "elasticagent.preset.mutate.volumemounts" (list $preset (dict "extraVolumeMounts" (list $volumeMount))) -}}
+{{- include "elasticagent.preset.mutate.envs" (list $preset (dict "extraEnvs" (list $env))) -}}
 {{- end -}}
 {{- end -}}
 

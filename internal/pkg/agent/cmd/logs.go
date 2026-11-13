@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,7 +22,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
@@ -226,7 +227,7 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir s
 			for !done {
 				err := printLogs(cmd.Context(), streams.Out, eventLogsDir, lines, follow, filter, modifier)
 				if err != nil {
-					if !strings.Contains(err.Error(), "logs/events: no such file or directory") {
+					if !isMissingDir(err, eventLogsDir) {
 						errChan <- fmt.Errorf("failed to get event logs: %w", err)
 						return
 					}
@@ -243,6 +244,17 @@ func logsCmd(streams *cli.IOStreams, cmd *cobra.Command, logsDir, eventLogsDir s
 	}
 
 	return nil
+}
+
+// isMissingDir reports whether err was caused by the directory dir not existing. The error is classified, not the
+// directory checked, so a directory created after the failed listing does not turn the error into a failure. The path
+// is compared so that a missing log file inside the directory is not mistaken for a missing directory.
+func isMissingDir(err error, dir string) bool {
+	var pathErr *fs.PathError
+	if !errors.As(err, &pathErr) || !errors.Is(pathErr, fs.ErrNotExist) {
+		return false
+	}
+	return filepath.Clean(pathErr.Path) == filepath.Clean(dir)
 }
 
 // printLogs prints the last `lines` number of log lines from the log files in `dir`
