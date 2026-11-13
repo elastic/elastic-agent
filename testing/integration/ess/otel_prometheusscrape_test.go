@@ -84,9 +84,6 @@ exporters:
     target_info:
       enabled: false
     send_metadata: false
-    # Do not queue, so that failures show up right away in the logs.
-    sending_queue:
-      enabled: false
 
 service:
   pipelines:
