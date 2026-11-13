@@ -23,6 +23,52 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Events are dropped with HTTP 413 errors on the OTel runtime
+
+**Applies to: {{agent}} 9.5.0 and later**
+
+On October 28, 2026, a known issue was discovered where {{agent}} drops events when a bulk request to {{es}} is too large. {{es}}, or a proxy in front of it, rejects the request with `413 Request Entity Too Large`, and the OTel runtime drops the whole batch. The OTel runtime is the default for Filebeat inputs in {{agent}} 9.5. The process runtime, which was the default before, splits the batch and retries it, so no data is lost.
+
+Events from other inputs that use the same output and are in the same batch are dropped too. This mostly happens with inputs that send very large documents, such as Active Directory Entity Analytics. Lowering `bulk_max_size` does not help if single documents are large.
+
+**Symptoms**
+
+- The agent logs show `flush failed (413)` and `Exporting failed. Dropping data`.
+- Data is missing in {{es}}.
+- {{fleet}} might show the agent as **Degraded** with `Elasticsearch request failed: 413 Request Entity Too Large`. The status goes back to **Healthy** after the next successful request, so do not rely on it.
+
+**Workaround**
+
+Switch Filebeat to the process runtime. This applies to all Filebeat inputs in the agent policy.
+
+For {{fleet}}-managed agents:
+
+1. In {{kib}}, go to **Fleet > Agent policies** and open the policy of the affected agent.
+
+2. On the **Settings** tab, expand **Advanced settings** and find **Advanced internal YAML settings**.
+
+3. Enter the following, then select **Save changes**:
+
+    ```yaml
+    runtime:
+      filebeat:
+        default: process
+    ```
+
+    If the field already has content, add these lines to it instead of replacing it.
+
+For standalone agents, add this to `elastic-agent.yml`:
+
+```yaml
+agent:
+  internal.runtime.filebeat.default: process
+```
+
+Events that were already dropped cannot be recovered. After you upgrade to a version with the fix, remove this setting.
+
+For more information, check [Issue #17612](https://github.com/elastic/elastic-agent/issues/17612).
+:::
+
 :::{dropdown} Elastic Agent crash-loop when a remote Elasticsearch monitoring output is configured.
 
 **Applies to: {{agent}} 9.4.6, 9.5.3**
