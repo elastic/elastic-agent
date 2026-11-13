@@ -77,7 +77,7 @@ jobs:
         # Shorter than the job timeout so a slow cold-cache run still reaches
         # the save step below, and the next run starts warm.
         timeout-minutes: 55
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}
+        run: RACE_DETECTOR=true mage ${{ matrix.mage_target }}
 
       # Saves even when tests fail or time out: a partial Go build cache is
       # still valid and speeds up the next run. Skipped on an exact cache hit,
