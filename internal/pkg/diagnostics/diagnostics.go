@@ -37,7 +37,7 @@ const (
 	// ContentTypeDirectory should be used to indicate that a directory should be made in the resulting bundle
 	ContentTypeDirectory  = "directory"
 	agentName             = "elastic-agent"
-	redactionMarkerPrefix = "__mark_redact_"
+	RedactionMarkerPrefix = "__mark_redact_"
 	redactionRouteKey     = "routekey"
 )
 
@@ -355,7 +355,7 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 func RedactOpts(w io.Writer) []redact.RedactOption {
 	return []redact.RedactOption{
 		redact.WithErrorOutput(w),
-		redact.WithMarkerPrefix(redactionMarkerPrefix),
+		redact.WithMarkerPrefix(RedactionMarkerPrefix),
 		redact.WithIgnoreKeys(redactionRouteKey),
 		redact.WithHeaderValueKeys(redactionHeaderValueKeys...),
 	}
@@ -682,7 +682,7 @@ func addSecretMarkers(cfg *config.Config, secretPaths []string) error {
 		parentPath := sp[:lastPathSep]
 		keyName := sp[lastPathSep+1:]
 
-		secretKeyName := redactionMarkerPrefix + keyName
+		secretKeyName := RedactionMarkerPrefix + keyName
 		secretKeyPath := parentPath + "." + secretKeyName
 
 		if err := cfg.Agent.SetBool(secretKeyPath, -1, true, ucfg.PathSep(".")); err != nil {

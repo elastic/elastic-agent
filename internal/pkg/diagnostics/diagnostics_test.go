@@ -306,7 +306,7 @@ func TestRedactWithMarkers(t *testing.T) {
 					map[string]any{
 						"type":                              "test_input",
 						"redactKey":                         "secretValue",
-						redactionMarkerPrefix + "redactKey": true,
+						RedactionMarkerPrefix + "redactKey": true,
 					},
 				},
 				"outputs": map[string]any{
@@ -314,7 +314,7 @@ func TestRedactWithMarkers(t *testing.T) {
 						"type":                            "elasticsearch",
 						"api_key":                         "secretKey",
 						"redactOtherKey":                  "secretOutputValue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 			},
@@ -352,7 +352,7 @@ func TestRedactWithMarkers(t *testing.T) {
 											"set": map[string]any{
 												"target":                        "header.Authorization",
 												"value":                         "SSWS this-should-be-redacted",
-												redactionMarkerPrefix + "value": true,
+												RedactionMarkerPrefix + "value": true,
 											},
 										},
 										map[string]any{
@@ -370,7 +370,7 @@ func TestRedactWithMarkers(t *testing.T) {
 										"string_value": "mock_stream_config_name",
 									},
 								},
-								redactionMarkerPrefix + "mock_stream_config": true,
+								RedactionMarkerPrefix + "mock_stream_config": true,
 							},
 						},
 					},
@@ -1104,14 +1104,14 @@ func TestAddRedactionMarkers(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":                            "elasticsearch",
 						"api_key":                         "apikeyvalue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":                           "example",
 						"secret":                         "secretvalue",
-						redactionMarkerPrefix + "secret": true,
+						RedactionMarkerPrefix + "secret": true,
 					},
 				},
 			},
@@ -1147,14 +1147,14 @@ func TestAddRedactionMarkers(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":                            "elasticsearch",
 						"api_key":                         "apikeyvalue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":                           "example",
 						"secret":                         "secretvalue",
-						redactionMarkerPrefix + "secret": true,
+						RedactionMarkerPrefix + "secret": true,
 					},
 				},
 			},
@@ -1191,14 +1191,14 @@ func TestAddRedactionMarkers(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":                            "elasticsearch",
 						"api_key":                         "apikeyvalue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":                           "example",
 						"secret":                         "secretvalue",
-						redactionMarkerPrefix + "secret": true,
+						RedactionMarkerPrefix + "secret": true,
 					},
 				},
 			},
