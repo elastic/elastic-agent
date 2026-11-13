@@ -962,8 +962,6 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case strings.HasPrefix(extensionKey, "extension:oauth2client"):
-					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
 
