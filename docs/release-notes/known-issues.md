@@ -43,7 +43,7 @@ Switch Filebeat to the process runtime. This applies to all Filebeat inputs in t
 
 For {{fleet}}-managed agents:
 
-1. In {{kib}}, go to **Fleet > Agent policies** and open the policy of the affected agent.
+1. In {{kib}}, go to **Fleet → Agent policies** and open the policy of the affected agent.
 
 2. On the **Settings** tab, expand **Advanced settings** and find **Advanced internal YAML settings**.
 
