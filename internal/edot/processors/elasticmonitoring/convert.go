@@ -419,9 +419,7 @@ func appendExporterMetrics(sm pmetric.ScopeMetrics, em *exporterMetrics) {
 	}
 }
 
-// buildExporterMetrics appends one ResourceMetrics per output to out. The metrics of
-// all exporters and failover connectors that ExporterNames maps to the same name are
-// merged, so an output that fails over between hosts is reported as a single output.
+// buildExporterMetrics appends one ResourceMetrics per output to out. Exporters/connectors with same output name are summed;
 func buildExporterMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
 	byComponent := map[string]*exporterMetrics{}
 	connectors := map[string]*exporterMetrics{}

@@ -449,8 +449,6 @@ func getCollectorConfigForComponent(
 
 // getFailoverConnectorConfig builds the pipelines for the failover connectors. Each exporter
 // gets its own pipeline, named _agent-component/<output name>/<priority>.
-// Connectors and their pipelines are scoped to the output, so all components using the output share
-// them and produce the same config.
 func getFailoverConnectorConfig(signal pipeline.Signal, outputName string, connectors map[string]any, exporters map[string]any) (map[string]any, map[string]any, error) {
 	if len(connectors) == 0 {
 		return nil, nil, nil
