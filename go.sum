@@ -228,8 +228,8 @@ github.com/elastic/gosigar v0.14.4 h1:7NRnWJDFjEKpOjnHhtzrPGZWr9EMrYFsLjF4q0Czos
 github.com/elastic/gosigar v0.14.4/go.mod h1:tx91Eb3YgFk6y++h88fRAnxic3Si1ZDHooqnJU/hqo8=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb h1:/c+ogW0DBBDchutsS6+GZBpCIwtVdJvr2l7tvI9CHdU=
 github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb/go.mod h1:cXqWcLnmu5y4QveTb2hjk7rgzkHMuZsqeXtbJpNAcu0=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be h1:AbN9OyZ+o9tNmbY5cEDRrXq4pdCY6thW02NF9CiUJpk=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
 github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=
 github.com/elazarl/goproxy v1.7.2/go.mod h1:82vkLNir0ALaW14Rc399OTTjyNREgmdL2cVoIbS6XaE=
 github.com/emicklei/go-restful/v3 v3.13.0 h1:C4Bl2xDndpU6nJ4bc1jXd+uTmYPVUwkD6bFY/oTyCes=

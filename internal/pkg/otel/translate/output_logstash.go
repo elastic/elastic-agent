@@ -9,8 +9,8 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/logstash"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
 
 type logstashOutputConfig struct {
@@ -32,8 +32,8 @@ func LogstashToOTelConfig(output *config.C, _ string, logger *logp.Logger) (map[
 	// Certificate hot-reload was introduced after this branch was cut. Disable it
 	// by default so it does not land silently in a patch release. Operators who
 	// want it can set ssl.certificate_reload.enabled: true in their config.
-	if logstashConfig.Config.TLS != nil && logstashConfig.Config.TLS.CertificateReload.Enabled == nil {
-		logstashConfig.Config.TLS.CertificateReload.Enabled = new(false)
+	if logstashConfig.TLS != nil && logstashConfig.TLS.CertificateReload.Enabled == nil {
+		logstashConfig.TLS.CertificateReload.Enabled = new(false)
 	}
 
 	// convert logstash config into a map

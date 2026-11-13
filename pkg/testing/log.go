@@ -10,7 +10,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
 
 // Logger is log interface that matches *testing.T.
@@ -113,9 +113,10 @@ func getLevel(evt map[string]interface{}, key string) logp.Level {
 }
 
 func unmarshalLevel(lvl *logp.Level, val string) error {
-	if val == "" {
+	switch val {
+	case "":
 		return errors.New("empty val")
-	} else if val == "trace" {
+	case "trace":
 		// logp doesn't handle trace level we cast to debug
 		*lvl = logp.DebugLevel
 		return nil

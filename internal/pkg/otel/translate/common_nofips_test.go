@@ -12,9 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 )
 
 func TestTLSCommonToOTel_EncryptedPrivateKey_CipherSuites(t *testing.T) {
@@ -58,7 +58,7 @@ ssl:
 	got, err := TLSToOTel(tlsCfg, logptest.NewTestingLogger(t, ""))
 	require.NoError(t, err)
 
-	assert.Equal(t, map[string]any{
+	assert.Equal(t, map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
 		"ca_pem": `-----BEGIN CERTIFICATE-----
 MIIDzTCCArWgAwIBAgIURzQp9/bWT37HJX71yfGEO0xrs2wwDQYJKoZIhvcNAQEL
 BQAwdjELMAkGA1UEBhMCVVMxDzANBgNVBAgMBkFsYXNrYTETMBEGA1UEBwwKR2xl
