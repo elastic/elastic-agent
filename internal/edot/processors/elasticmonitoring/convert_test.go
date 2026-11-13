@@ -189,25 +189,31 @@ func findMetricValue(t *testing.T, out pmetric.Metrics, idx int, name string) an
 }
 
 func TestBuildExporterMetricsMergesFailoverOutput(t *testing.T) {
+	// The first host is down: all 103 documents sent to it fail. The second host
+	// delivers 100 of them, rejects 3 and still has 2 more in flight.
 	md, sm1 := newMetricsWithExporterScope("elasticsearch/_agent-component/default/1")
-	appendSumInt(sm1, otelSentLogsKey, 90)
-	appendSumInt(sm1, otelFailedLogsKey, 2)
-	appendSumInt(sm1, otelBulkRequestsKey, 3)
+	appendSumInt(sm1, otelFailedLogsKey, 103)
+	appendSumInt(sm1, otelDocsProcessedKey, 103)
+	appendSumInt(sm1, otelBulkRequestsKey, 2)
+	appendSumInt(sm1, otelFlushedBytesKey, 1000)
 
 	sm2 := appendScopeToMetrics(md, esExporterScopeName,
 		otelComponentKindKey, "exporter",
 		otelComponentIDKey, "elasticsearch/_agent-component/default/2")
-	appendSumInt(sm2, otelSentLogsKey, 10)
-	appendSumInt(sm2, otelBulkRequestsKey, 1)
+	appendSumInt(sm2, otelSentLogsKey, 100)
+	appendSumInt(sm2, otelFailedLogsKey, 3)
+	appendSumInt(sm2, otelDocsProcessedKey, 105)
+	appendSumInt(sm2, otelBulkRequestsKey, 2)
+	appendSumInt(sm2, otelFlushedBytesKey, 1000)
 
 	connector := appendScopeToMetrics(md, failoverConnectorScopeName,
 		otelComponentKindKey, "connector",
 		otelComponentIDKey, "failover/_agent-component/default")
 	appendGaugeInt(connector, otelQueueSizeKey, 40)
 	appendGaugeInt(connector, otelQueueCapacityKey, 3200)
-	appendSumInt(connector, otelEnqueueFailedLogsKey, 5)
-	// already counted by the exporters behind the connector
 	appendSumInt(connector, otelSentLogsKey, 100)
+	appendSumInt(connector, otelFailedLogsKey, 3)
+	appendSumInt(connector, otelEnqueueFailedLogsKey, 5)
 
 	cfg := &Config{ExporterNames: map[string]string{
 		"elasticsearch/_agent-component/default/1": "elasticsearch-default",
@@ -221,8 +227,12 @@ func TestBuildExporterMetricsMergesFailoverOutput(t *testing.T) {
 	idx := findEvent(out, "elasticsearch-default", "")
 	require.Equal(t, 0, idx)
 	assert.Equal(t, int64(100), findMetricValue(t, out, idx, beatsOutputEventsAckedKey))
-	assert.Equal(t, int64(7), findMetricValue(t, out, idx, beatsOutputEventsDroppedKey), "send failures plus enqueue failures")
+	assert.Equal(t, int64(8), findMetricValue(t, out, idx, beatsOutputEventsDroppedKey),
+		"only documents no host accepted plus enqueue failures, not failed attempts on the first host")
+	assert.Equal(t, int64(2), findMetricValue(t, out, idx, beatsOutputEventsActiveKey))
+	assert.Equal(t, int64(110), findMetricValue(t, out, idx, beatsOutputEventsTotalKey), "acked + dropped + active")
 	assert.Equal(t, int64(4), findMetricValue(t, out, idx, beatsOutputEventsBatchesKey))
+	assert.Equal(t, int64(2000), findMetricValue(t, out, idx, beatsOutputWriteBytesKey))
 	assert.Equal(t, int64(40), findMetricValue(t, out, idx, beatsQueueFilledEventsKey))
 	assert.Equal(t, int64(3200), findMetricValue(t, out, idx, beatsQueueMaxEventsKey))
 }

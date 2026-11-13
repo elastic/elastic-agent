@@ -296,6 +296,12 @@ service:
 	require.Equal(t, float64(3200), ev["beat.stats.libbeat.pipeline.queue.max_events"], "queue capacity should come from the failover connector")
 	require.Greater(t, ev["beat.stats.libbeat.output.events.acked"], float64(0))
 	require.Greater(t, ev["beat.stats.libbeat.output.write.bytes"], float64(0))
+	require.Equal(t, float64(0), ev["beat.stats.libbeat.output.events.dropped"],
+		"documents that failed on the first host and were delivered by the second are not counted as dropped")
+	require.Equal(t,
+		ev["beat.stats.libbeat.output.events.acked"].(float64)+ev["beat.stats.libbeat.output.events.active"].(float64),
+		ev["beat.stats.libbeat.output.events.total"],
+		"failed attempts on the first host should not inflate the total")
 
 	mu.Lock()
 	defer mu.Unlock()

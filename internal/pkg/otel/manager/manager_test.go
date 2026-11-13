@@ -3080,7 +3080,7 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 
 	t.Run("with OTel monitoring output failing over between hosts", func(t *testing.T) {
 		// A monitoring output with multiple hosts and loadbalance: false is translated into
-		// one exporter per host behind a failover connector. The internal telemetry logs
+		// a failover connector that routes to one exporter per host. The internal telemetry logs
 		// pipeline must export to that connector so monitoring events keep the queue and
 		// fail over, and all of them must be reported as the single monitoring output.
 		monitoringComp := component.Component{
