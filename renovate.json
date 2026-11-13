@@ -268,7 +268,7 @@
       "prConcurrentLimit": 5
     },
     {
-      "description": "Distributed oblt-aw client triggers \u2014 pins owned by distribute-client-workflow",
+      "description": "Distributed oblt-aw client triggers — pins owned by distribute-client-workflow",
       "enabled": false,
       "matchFileNames": [
         ".github/workflows/trigger-*-aw-*.yml"
