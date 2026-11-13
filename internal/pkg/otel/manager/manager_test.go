@@ -1843,6 +1843,14 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					"pipeline:logs": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extension:oauth2client/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
 				},
 			},
 			expectedComponentStates: []runtime.ComponentComponentState{
