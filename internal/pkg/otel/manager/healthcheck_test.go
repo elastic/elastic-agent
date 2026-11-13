@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componentstatus"
+	"go.opentelemetry.io/collector/config/confighttp"
 	"go.opentelemetry.io/collector/confmap"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
@@ -405,5 +406,53 @@ func TestInjectHealthCheckV2Extension(t *testing.T) {
 		assert.Equal(t, "zpages", extSlice[0])
 		assert.Equal(t, "pprof", extSlice[1])
 		assert.Equal(t, testExtensionID, extSlice[2])
+	})
+
+	t.Run("injected http config unmarshals into confighttp.ServerConfig with keepalives enabled", func(t *testing.T) {
+		conf := confmap.New()
+		require.NoError(
+			t,
+			injectHealthCheckV2Extension(conf, testExtensionID, testPort),
+			"injecting healthcheckv2 extension must succeed",
+		)
+
+		httpConf, err := conf.Sub(
+			fmt.Sprintf("extensions::%s::http", testExtensionID),
+		)
+		require.NoError(t, err, "extracting http sub-config must succeed")
+
+		// Mirror healthcheckv2extension's HTTPConfig struct (squash-embedded
+		// confighttp.ServerConfig + status/config PathConfig sections) so
+		// strict confmap decoding catches removed/unknown confighttp keys.
+		type pathCfg struct {
+			Enabled           bool   `mapstructure:"enabled"`
+			Path              string `mapstructure:"path"`
+			IncludeAttributes bool   `mapstructure:"include_attributes"`
+		}
+		type hcHTTPConfig struct {
+			ServerConfig confighttp.ServerConfig `mapstructure:",squash"`
+			Status       pathCfg                 `mapstructure:"status"`
+			Config       pathCfg                 `mapstructure:"config"`
+		}
+
+		decoded := hcHTTPConfig{
+			ServerConfig: confighttp.NewDefaultServerConfig(),
+		}
+		require.NoError(
+			t,
+			httpConf.Unmarshal(&decoded),
+			"injected http config must unmarshal without invalid keys",
+		)
+		assert.Equal(
+			t,
+			fmt.Sprintf("localhost:%d", testPort),
+			decoded.ServerConfig.NetAddr.Endpoint,
+			"endpoint must match injected port",
+		)
+		assert.True(
+			t,
+			decoded.ServerConfig.Keepalive.HasValue(),
+			"keepalives must remain enabled by default",
+		)
 	})
 }

@@ -47,8 +47,8 @@ require (
 	github.com/moby/moby/client v0.6.2
 	github.com/oklog/ulid/v2 v2.1.2
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.165.1
-	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.164.1
-	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.164.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension v0.165.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status v0.165.1
 	github.com/openshift/api v0.0.0-20261102174502-e51674a80650
 	github.com/otiai10/copy v1.14.1
 	github.com/rs/zerolog v1.35.1
@@ -65,6 +65,7 @@ require (
 	go.elastic.co/ecszap v1.0.3
 	go.opentelemetry.io/collector/component/componentstatus v0.165.0
 	go.opentelemetry.io/collector/component/componenttest v0.165.0
+	go.opentelemetry.io/collector/config/confighttp v1.71.0
 	go.opentelemetry.io/collector/config/configtls v1.71.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.165.0
 	go.opentelemetry.io/collector/extension/extensioncapabilities v0.165.0
@@ -330,7 +331,6 @@ require (
 	go.opentelemetry.io/collector/client v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configauth v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configcompression v1.71.0 // indirect
-	go.opentelemetry.io/collector/config/confighttp v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configmiddleware v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/confignet v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configopaque v1.71.0 // indirect
