@@ -30,6 +30,7 @@ import (
 	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/features"
@@ -755,6 +756,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 
 	// translate the configuration
 	unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
+	removeRedactionMarkers(unitConfigMap)
 	outputCfgC, err := config.NewConfigFrom(unitConfigMap)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
@@ -822,6 +824,25 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	}
 
 	return exporterConfig, queueSettings, extensionConfig, processorConfig, nil
+}
+
+// removeRedactionMarkers deletes the keys the coordinator adds next to secrets for diagnostics
+// redaction. Collector components reject unknown keys, so these must not reach their configs.
+func removeRedactionMarkers(v any) {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, child := range t {
+			if strings.HasPrefix(k, diagnostics.RedactionMarkerPrefix) {
+				delete(t, k)
+				continue
+			}
+			removeRedactionMarkers(child)
+		}
+	case []any:
+		for _, child := range t {
+			removeRedactionMarkers(child)
+		}
+	}
 }
 
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
