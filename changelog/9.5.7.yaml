@@ -1,0 +1,116 @@
+version: 9.5.7
+entries:
+    - kind: bug-fix
+      summary: Guard against malformed health status payload and nil event panic in OTel collector
+      description: |
+        Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17848
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17893
+        - https://github.com/elastic/elastic-agent/pull/17982
+        - https://github.com/elastic/elastic-agent/pull/17895
+        - https://github.com/elastic/elastic-agent/pull/17966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17717
+        - https://github.com/elastic/elastic-agent/issues/17894
+      impact: ""
+      action: ""
+      timestamp: 1791989613
+      file:
+        name: 1791989613-fix-otel-malformed-health-status-panic.yaml
+        checksum: 4c4c274a659bb72c36ff14ac216082902552cf4e
+    - kind: bug-fix
+      summary: Load the EDOT .NET plugin in kube-stack auto-instrumentation
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17848
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17893
+        - https://github.com/elastic/elastic-agent/pull/17982
+        - https://github.com/elastic/elastic-agent/pull/17895
+        - https://github.com/elastic/elastic-agent/pull/17966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17717
+        - https://github.com/elastic/elastic-agent/issues/17894
+      impact: ""
+      action: ""
+      timestamp: 1792652202
+      file:
+        name: 1792652202-Load-the-EDOT-.NET-plugin-in-kube-stack-auto-instrumentation.yaml
+        checksum: 5ed8c8efe7a5036b801f9222d8b3e3644d5015b2
+    - kind: bug-fix
+      summary: report service component start failures as degraded, and as failed when they persist
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17524
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16305
+      impact: ""
+      action: ""
+      timestamp: 1793003532
+      file:
+        name: 1793003532-report-service-component-start-failures-as-failed-while-retrying.yaml
+        checksum: 956413c6f09ebbac012858cc0147c797e697ac96
+    - kind: feature
+      summary: Support Packetbeat on Windows ARM64
+      description: The Elastic Agent package for Windows ARM64 includes the Npcap installer and can capture network traffic on Windows ARM64 hosts.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17848
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17893
+        - https://github.com/elastic/elastic-agent/pull/17982
+        - https://github.com/elastic/elastic-agent/pull/17895
+        - https://github.com/elastic/elastic-agent/pull/17966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17717
+        - https://github.com/elastic/elastic-agent/issues/17894
+      impact: ""
+      action: ""
+      timestamp: 1793268852
+      file:
+        name: 1793268852-support-packetbeat-on-windows-arm64.yaml
+        checksum: 15f08c92c5bb9236861bde6e825a2d63a2381498
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.164.x
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17848
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17893
+        - https://github.com/elastic/elastic-agent/pull/17982
+        - https://github.com/elastic/elastic-agent/pull/17895
+        - https://github.com/elastic/elastic-agent/pull/17966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17717
+        - https://github.com/elastic/elastic-agent/issues/17894
+      impact: ""
+      action: ""
+      timestamp: 1793281480
+      file:
+        name: 1793281480-update-otel-components-to-v0.164.x.yaml
+        checksum: ecd9ad6eeb80bad607b84b717ed953d275f5ac42
+    - kind: bug-fix
+      summary: Fix components and units that are removed and quickly re-added by a policy change staying stopped until the agent restarts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17848
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17893
+        - https://github.com/elastic/elastic-agent/pull/17982
+        - https://github.com/elastic/elastic-agent/pull/17895
+        - https://github.com/elastic/elastic-agent/pull/17966
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17714
+      impact: ""
+      action: ""
+      timestamp: 1793388219
+      file:
+        name: 1793388219-fix-components-readded-by-next-policy-change.yaml
+        checksum: 15db661ed949484a2c1db203f59a53b058a64dce
