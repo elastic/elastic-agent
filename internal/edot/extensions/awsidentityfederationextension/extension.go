@@ -16,8 +16,8 @@ import (
 	"go.opentelemetry.io/collector/extension"
 	"go.uber.org/zap"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/x-pack/libbeat/common/identityfederation"
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 const (
