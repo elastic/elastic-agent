@@ -740,12 +740,15 @@ func injectMonitoringReceiver(
 	// named "monitoring" that the internal telemetry pipeline can share.
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
-	monitoringExporterFound := false
-	if config.IsSet("exporters") {
-		for exporter := range config.Get("exporters").(map[string]any) {
-			if exporter == exporterID {
-				monitoringExporterFound = true
-			}
+	failoverConnectorID := translate.GetFailoverConnectorID(componentmonitoring.MonitoringOutput).String()
+	exporters, _ := config.Get("exporters").(map[string]any)
+	connectors, _ := config.Get("connectors").(map[string]any)
+	monitoringExporterFound := true
+	if _, found := exporters[exporterID]; !found {
+		if _, found := connectors[failoverConnectorID]; found {
+			exporterID = failoverConnectorID
+		} else {
+			monitoringExporterFound = false
 		}
 	}
 

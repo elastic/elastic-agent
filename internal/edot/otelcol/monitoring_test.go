@@ -8,9 +8,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"text/template"
 	"time"
@@ -155,6 +157,150 @@ service:
 	}
 
 	require.Empty(t, cmp.Diff(expected, ev), "metrics do not match expected values")
+}
+
+// TestMonitoringReceiverFailoverOutput runs the internal telemetry pipeline the agent
+// generates when the monitoring output has multiple hosts and loadbalance: false.
+// The first host is unreachable, so events must fail over to the
+// second one, and the exporters and connector must be reported as a single output.
+func TestMonitoringReceiverFailoverOutput(t *testing.T) {
+	cfg := `receivers:
+  elasticmonitoringreceiver/_agent-component/internal-telemetry-monitoring:
+    interval: 1s
+processors:
+  elasticmonitoringprocessor/_agent-component/internal-telemetry-monitoring:
+    exporter_names:
+      elasticsearch/_agent-component/monitoring/1: elasticsearch-monitoring
+      elasticsearch/_agent-component/monitoring/2: elasticsearch-monitoring
+      failover/_agent-component/monitoring: elasticsearch-monitoring
+connectors:
+  elasticmonitoringconnector/_agent-component/internal-telemetry-monitoring: {}
+  failover/_agent-component/monitoring:
+    priority_levels:
+      - [logs/_agent-component/monitoring/1]
+      - [logs/_agent-component/monitoring/2]
+    retry_interval: 1m0s
+    condition:
+      error:
+        contains: [failed to execute the request]
+    sending_queue:
+      batch:
+        flush_timeout: 1s
+        max_size: 1600
+        min_size: 0
+        sizer: items
+      block_on_overflow: true
+      enabled: true
+      num_consumers: 1
+      queue_size: 3200
+      wait_for_result: true
+exporters:
+  elasticsearch/_agent-component/monitoring/1:
+    endpoints:
+      - {{.UnreachableEndpoint}}
+    retry:
+      enabled: false
+    sending_queue:
+      enabled: false
+  elasticsearch/_agent-component/monitoring/2:
+    endpoints:
+      - {{.ESEndpoint}}
+    retry:
+      enabled: false
+    sending_queue:
+      enabled: false
+
+service:
+  pipelines:
+    metrics/_agent-component/internal-telemetry-monitoring:
+      receivers: [elasticmonitoringreceiver/_agent-component/internal-telemetry-monitoring]
+      processors: [elasticmonitoringprocessor/_agent-component/internal-telemetry-monitoring]
+      exporters: [elasticmonitoringconnector/_agent-component/internal-telemetry-monitoring]
+    logs/_agent-component/internal-telemetry-monitoring:
+      receivers: [elasticmonitoringconnector/_agent-component/internal-telemetry-monitoring]
+      exporters: [failover/_agent-component/monitoring]
+    logs/_agent-component/monitoring/1:
+      receivers: [failover/_agent-component/monitoring]
+      exporters: [elasticsearch/_agent-component/monitoring/1]
+    logs/_agent-component/monitoring/2:
+      receivers: [failover/_agent-component/monitoring]
+      exporters: [elasticsearch/_agent-component/monitoring/2]
+`
+
+	// Nothing listens on this port, so the first priority level fails with a connection error.
+	listener, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	unreachableEndpoint := "http://" + listener.Addr().String()
+	require.NoError(t, listener.Close())
+
+	monitoringReceived := make(chan mapstr.M, 1)
+	var mu sync.Mutex
+	componentIDs := map[string]struct{}{}
+	esURL := startMockESDeterministic(t, func(action api.Action, event []byte) int {
+		var curEvent mapstr.M
+		require.NoError(t, json.Unmarshal(event, &curEvent))
+		curEvent = curEvent.Flatten()
+		compID, _ := curEvent["component.id"].(string)
+		mu.Lock()
+		componentIDs[compID] = struct{}{}
+		mu.Unlock()
+		// The first event is reported before anything has been sent, so wait for one that
+		// includes the documents delivered through the second priority level.
+		if acked, _ := curEvent["beat.stats.libbeat.output.events.acked"].(float64); acked > 0 {
+			select {
+			case monitoringReceived <- curEvent:
+			default:
+			}
+		}
+		return http.StatusOK
+	})
+
+	configParams := struct {
+		ESEndpoint          string
+		UnreachableEndpoint string
+	}{
+		ESEndpoint:          esURL,
+		UnreachableEndpoint: unreachableEndpoint,
+	}
+
+	var configBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("config").Parse(cfg)).Execute(&configBuffer, configParams),
+	)
+
+	settings := NewSettings("test", []string{"yaml:" + configBuffer.String()}, WithComponents(components.Default()))
+
+	featuregate.GlobalRegistry().Set("telemetry.newPipelineTelemetry", true)
+	collector, err := otelcol.NewCollector(*settings)
+	require.NoError(t, err)
+	require.NotNil(t, collector)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	wg := startCollector(ctx, t, collector, "")
+	defer func() {
+		cancel()
+		collector.Shutdown()
+		wg.Wait()
+	}()
+
+	var ev mapstr.M
+	select {
+	case ev = <-monitoringReceived:
+	case <-time.After(30 * time.Second):
+		t.Fatal("timeout waiting for a monitoring event delivered through the failover connector")
+	}
+
+	require.Equal(t, "elasticsearch-monitoring", ev["component.id"])
+	require.Equal(t, float64(3200), ev["beat.stats.libbeat.pipeline.queue.max_events"], "queue capacity should come from the failover connector")
+	require.Greater(t, ev["beat.stats.libbeat.output.events.acked"], float64(0))
+	require.Greater(t, ev["beat.stats.libbeat.output.write.bytes"], float64(0))
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.Equal(t, map[string]struct{}{"elasticsearch-monitoring": {}}, componentIDs,
+		"the exporters and the failover connector should be reported as one output")
 }
 
 func TestMonitoringReceiverRequestLevelErrors(t *testing.T) {

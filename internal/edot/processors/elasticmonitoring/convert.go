@@ -389,11 +389,11 @@ func appendExporterMetrics(sm pmetric.ScopeMetrics, em *exporterMetrics) {
 // merged, so an output that fails over between hosts is reported as a single output.
 func buildExporterMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
 	byComponent := map[string]*exporterMetrics{}
-	for exporterID, metrics := range collectExporterMetrics(md) {
-		componentID, ok := cfg.ExporterNames[exporterID]
+	for otelComponentID, metrics := range collectExporterMetrics(md) {
+		componentID, ok := cfg.ExporterNames[otelComponentID]
 		if !ok {
-			logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporterID))
-			componentID = exporterID
+			logger.Warn("Could not match OTel component to an Elastic Agent output, reporting its metrics under the OTel component ID", zap.String("otel_component_id", otelComponentID))
+			componentID = otelComponentID
 		}
 		if merged, exists := byComponent[componentID]; exists {
 			merged.merge(metrics)

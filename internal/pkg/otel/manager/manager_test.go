@@ -8,6 +8,7 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
@@ -3075,6 +3076,105 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 			logsExporters,
 			"logs pipeline should export to the elasticsearch monitoring exporter",
 		)
+	})
+
+	t.Run("with OTel monitoring output failing over between hosts", func(t *testing.T) {
+		// A monitoring output with multiple hosts and loadbalance: false is translated into
+		// one exporter per host behind a failover connector. The internal telemetry logs
+		// pipeline must export to that connector so monitoring events keep the queue and
+		// fail over, and all of them must be reported as the single monitoring output.
+		monitoringComp := component.Component{
+			ID:         "filestream-monitoring",
+			InputType:  "filestream",
+			OutputType: "elasticsearch",
+			OutputName: componentmonitoring.MonitoringOutput,
+			InputSpec: &component.InputRuntimeSpec{
+				BinaryName: "elastic-otel-collector",
+				Spec: component.InputSpec{
+					Command: &component.CommandSpec{Args: []string{"filebeat"}},
+				},
+			},
+			Units: []component.Unit{
+				{
+					ID:   "filestream-monitoring-input",
+					Type: client.UnitTypeInput,
+					Config: component.MustExpectedConfig(map[string]any{
+						"id":         "filestream-monitoring-agent",
+						"use_output": componentmonitoring.MonitoringOutput,
+						"streams": []any{
+							map[string]any{
+								"id":    "filestream-monitoring-agent",
+								"paths": []any{"/var/log/elastic-agent/*.ndjson"},
+							},
+						},
+					}),
+				},
+				{
+					ID:   "filestream-monitoring-output",
+					Type: client.UnitTypeOutput,
+					Config: component.MustExpectedConfig(map[string]any{
+						"type":        "elasticsearch",
+						"hosts":       []any{"localhost:9200", "localhost:9201"},
+						"loadbalance": false,
+						"username":    "elastic",
+						"password":    "password",
+					}),
+				},
+			},
+		}
+		components := []component.Component{monitoringComp}
+
+		cfg, err := translate.GetOtelConfig(&component.Model{Components: components}, logp.NewNopLogger())
+		require.NoError(t, err, "translating the monitoring component should succeed")
+		require.NoError(t, injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, components, logp.NewNopLogger()))
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+
+		exporter1 := "elasticsearch/" + translate.OtelNamePrefix + "monitoring/1"
+		exporter2 := "elasticsearch/" + translate.OtelNamePrefix + "monitoring/2"
+		failoverConnectorName := "failover/" + translate.OtelNamePrefix + "monitoring"
+		assert.Equal(t, []string{"http://localhost:9200"}, result["exporters."+exporter1+".endpoints"])
+		assert.Equal(t, []string{"http://localhost:9201"}, result["exporters."+exporter2+".endpoints"])
+		assert.Nil(t, result["exporters.elasticsearch/"+translate.OtelNamePrefix+"monitoring"],
+			"no single exporter should exist for an output failing over between hosts")
+
+		pipelinesJSON, err := json.Marshal(cfg.Get("service::pipelines"))
+		require.NoError(t, err)
+		var pipelines map[string]map[string][]string
+		require.NoError(t, json.Unmarshal(pipelinesJSON, &pipelines))
+		assert.Equal(t, map[string]map[string][]string{
+			metricsPipelineName: {
+				"receivers":  {elasticMonitoringReceiverName + "/" + translate.OtelNamePrefix + receiverName},
+				"processors": {elasticMonitoringProcessorName + "/" + translate.OtelNamePrefix + receiverName},
+				"exporters":  {fileExporterName, connectorName},
+			},
+			logsPipelineName: {
+				"receivers":  {connectorName},
+				"processors": {"beat/" + translate.OtelNamePrefix + receiverName},
+				"exporters":  {failoverConnectorName},
+			},
+			"logs/" + translate.OtelNamePrefix + "filestream-monitoring": {
+				"receivers":  {"filebeatreceiver/" + translate.OtelNamePrefix + "filestream-monitoring/input-filestream-monitoring-agent"},
+				"processors": {"beat/" + translate.OtelNamePrefix + "filestream-monitoring"},
+				"exporters":  {failoverConnectorName},
+			},
+			"logs/" + translate.OtelNamePrefix + "monitoring/1": {
+				"receivers": {failoverConnectorName},
+				"exporters": {exporter1},
+			},
+			"logs/" + translate.OtelNamePrefix + "monitoring/2": {
+				"receivers": {failoverConnectorName},
+				"exporters": {exporter2},
+			},
+		}, pipelines)
+
+		processorName := elasticMonitoringProcessorName + "/" + translate.OtelNamePrefix + receiverName
+		processorCfg := cfg.Get("processors::" + processorName).(map[string]any)
+		assert.Equal(t, map[string]string{
+			exporter1:             "elasticsearch-monitoring",
+			exporter2:             "elasticsearch-monitoring",
+			failoverConnectorName: "elasticsearch-monitoring",
+		}, processorCfg["exporter_names"],
+			"the per-host exporters and the failover connector should be reported as one output")
 	})
 
 	t.Run("without OTel monitoring exporter", func(t *testing.T) {
