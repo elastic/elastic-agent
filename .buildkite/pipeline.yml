@@ -177,34 +177,8 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-<<<<<<< HEAD
   # Skipping due to Orka provider slowness
   # Looking at a permanent solution in https://github.com/elastic/elastic-agent/pull/17290
-=======
-      - label: "Unit tests - fips140=only Windows 2022"
-        key: "unit-tests-win2022-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-        agents:
-          provider: "gcp"
-          image: "${IMAGE_WIN_2022}"
-          machineType: "n2-standard-8"
-          disk_size: 200
-          disk_type: "pd-ssd"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
->>>>>>> bc80a8d (bk: stop uploading unused coverage artifacts (#17848))
   # Unit tests of the EDOT Collector module, selected by GO_MODULE_DIR.
   # internal/edot is a separate Go module, so its unit tests are not reached by
   # `mage test:unit`. They run here on their own agents: running them alongside
@@ -420,32 +394,6 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-<<<<<<< HEAD
-=======
-      - label: "Unit tests - fips140=only Windows 11 arm64"
-        key: "unit-tests-win11-arm64-fips140-only"
-        command: .buildkite/scripts/steps/unit-tests.ps1
-        env:
-          FIPS: "true"
-        artifact_paths:
-          - "build/TEST-*.html"
-          - "build/TEST-*.xml"
-          - "build/diagnostics/*"
-        agents:
-          provider: "azure"
-          image: "${IMAGE_WIN_11_ARM64}"
-          imageVersion: "${IMAGE_WIN_11_ARM64_VERSION}"
-          vmSize: "Standard_D8ps_v6"
-          diskSizeGb: "256"
-        retry:
-          automatic:
-            limit: 1
-          manual:
-            allowed: true
-        plugins:
-          - *google_oidc_plugin
-
->>>>>>> bc80a8d (bk: stop uploading unused coverage artifacts (#17848))
   - label: ":junit: Junit annotate"
     agents:
       # requires at least "bash", "curl" and "git"
