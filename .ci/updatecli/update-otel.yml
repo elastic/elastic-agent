@@ -69,7 +69,6 @@ actions:
     kind: github/pullrequest
     scmid: default
     spec:
-      automerge: false
       labels:
       - automation
       - skip-changelog
