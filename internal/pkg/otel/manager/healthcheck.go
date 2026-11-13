@@ -82,8 +82,7 @@ func injectHealthCheckV2Extension(conf *confmap.Conf, healthCheckExtensionID str
 					"recovery_duration":          healthCheckRecoveryDuration,
 				},
 				"http": map[string]interface{}{
-					"endpoint":            fmt.Sprintf("localhost:%d", httpHealthCheckPort),
-					"keep_alives_enabled": true,
+					"endpoint": fmt.Sprintf("localhost:%d", httpHealthCheckPort),
 					"status": map[string]interface{}{
 						"enabled":            healthCheckHealthStatusEnabled,
 						"path":               healthCheckHealthStatusPath,

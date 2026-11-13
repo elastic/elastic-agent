@@ -3004,6 +3004,167 @@ agent.grpc:
 	cancel()
 }
 
+// TestOtelElasticsearchStorageWithElasticsearchAuth verifies that the
+// elasticsearch_storage extension persists the cel input state in
+// Elasticsearch when authenticating through the elasticsearchauth extension.
+func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+
+	// Unique input ID: it names the agentless-state-<id> index, so concurrent
+	// runs against the same stack do not observe each other's state.
+	inputID := "cel-esauth-" + strings.ReplaceAll(uuid.Must(uuid.NewV4()).String(), "-", "")
+	stateIndex := "agentless-state-" + inputID
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		InputID    string
+		PathHome   string
+	}
+
+	otelConfigTemplate := `
+extensions:
+  elasticsearchauth/state:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+  elasticsearch_storage:
+    auth:
+      authenticator: elasticsearchauth/state
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: cel
+          id: {{.InputID}}
+          enabled: true
+          interval: 1s
+          resource.url: http://unused.invalid
+          state:
+            cursor:
+              sequence: 0
+          program: |
+            {
+              "events": [{
+                "message": "cel-state-test",
+                "sequence": state.cursor.sequence
+              }],
+              "cursor": {
+                "sequence": int(state.cursor.sequence) + 1
+              }
+            }
+    queue.mem.flush.timeout: 0s
+    setup.template.enabled: false
+    storage: elasticsearch_storage
+    path.home: {{.PathHome}}
+exporters:
+  debug:
+service:
+  extensions:
+    - elasticsearchauth/state
+    - elasticsearch_storage
+  pipelines:
+    logs:
+      receivers:
+        - filebeatreceiver
+      exporters:
+        - debug
+  telemetry:
+    metrics:
+      level: none
+`
+	var otelConfigBuffer bytes.Buffer
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				InputID:    inputID,
+				PathHome:   fixture.WorkDir(),
+			}))
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	require.NoError(t, fixture.Prepare(ctx))
+	require.NoError(t, fixture.Configure(ctx, otelConfigBuffer.Bytes()))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command")
+
+	// The state store is only enabled for the listed input types.
+	cmd.Env = append(os.Environ(), "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES=cel")
+
+	output := &strings.Builder{}
+	cmd.Stderr = output
+	cmd.Stdout = output
+
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() {
+		cancel()
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		if err := fixture.IsHealthy(ctx); err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second, "agent did not become healthy")
+
+	// Wait for the CEL input's incremented cursor to be persisted in
+	// Elasticsearch through the elasticsearchauth authenticator.
+	require.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetAllLogsForIndexWithContext(findCtx, info.ESClient, stateIndex)
+			if !assert.NoError(ct, err, "searching %s", stateIndex) {
+				return
+			}
+			if !assert.GreaterOrEqual(ct, docs.Hits.Total.Value, 1, "expected state document in %s", stateIndex) {
+				return
+			}
+			v, ok := docs.Hits.Hits[0].Source["v"].(map[string]any)
+			if !assert.True(ct, ok, "expected state document 'v' object in %s", stateIndex) {
+				return
+			}
+			cursor, ok := v["cursor"].(map[string]any)
+			if !assert.True(ct, ok, "expected state document 'v.cursor' object in %s", stateIndex) {
+				return
+			}
+			seq, ok := cursor["sequence"].(float64)
+			if !assert.True(ct, ok, "expected numeric 'v.cursor.sequence' in %s", stateIndex) {
+				return
+			}
+			assert.GreaterOrEqual(ct, seq, float64(1), "expected incremented cursor sequence in %s", stateIndex)
+		},
+		1*time.Minute, 1*time.Second, "expected incremented cursor state in %s", stateIndex)
+
+	cancel()
+}
+
 // httpJSONCursorMockServer is a test HTTP server for the httpjson input that
 // tracks the "since" cursor parameter across requests and restarts.
 type httpJSONCursorMockServer struct {
