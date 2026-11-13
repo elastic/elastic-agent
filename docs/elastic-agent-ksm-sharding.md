@@ -73,7 +73,7 @@ Follow steps of [KSM Autosharding with Side Container](./manifests/kustomize-aut
 
 - [+] Simplicity. Only one policy is required for all KSM shards. Easy solution to scale
 - [+] Localhost communication between KSM and Elastic Agent
-- [-] Users need to patch the Statefuleset of KSM in order to create Elastic Agent as side container
+- [-] Users need to patch the StatefulSet of KSM in order to create Elastic Agent as side container
 
 ### 2. Elastic Agent Deployment with `hostNetwork:false`
 

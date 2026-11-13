@@ -30,7 +30,7 @@ The supported types of outputs are:
 | outputs.{name}.url | string | `""` | url of the output [required for types `ESPlainAuthBasic` and `ESPlainAuthAPI`] |
 | outputs.{name}.username | string | `""` | the username to use to authenticate with the output [required for type `ESPlainAuthBasic`] |
 | outputs.{name}.password | string | `""` | the password to use to authenticate with the output [required for type `ESPlainAuthBasic`] |
-| outputs.{name}.api_key | string | `""` | the API key use to authenticate with the output [required for type `ESPlainAuthAPI`] |
+| outputs.{name}.api_key | string | `""` | the API key used to authenticate with the output [required for type `ESPlainAuthAPI`] |
 | outputs.{name}.secretName | string | `""` | the k8s secret to mount output connection details [required for types `ESSecretAuthBasic` and `ESSecretAuthAPI`] |
 | outputs.{name}.name | string | `""` | name to reference an Elasticsearch cluster managed by ECK [required for type `ESECKRef`] |
 
@@ -107,7 +107,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.state.enabled | bool | `true` | integration global switch to enable state streams based on kube-state-metrics. Note that setting this to `false` results in overriding and *disabling all* the respective state streams |
 | kubernetes.state.agentAsSidecar.enabled | bool | `false` | enable [ksm autosharding](https://github.com/kubernetes/kube-state-metrics?tab=readme-ov-file#automated-sharding) and deploy elastic-agent as a sidecar container. If `kube-state-metrics.enabled` is set to `false` this has no effect. |
 | kubernetes.state.agentAsSidecar.resources | object | `{"limits":{"memory":"800Mi"},"requests":{"cpu":"100m","memory":"400Mi"}}` | resources of the elastic-agent sidecar if `agentAsSidecar.enabled` is set to `true` |
-| kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. This used only when `kube-state-metrics.enabled` is set to `false`. |
+| kubernetes.state.host | string | `"kube-state-metrics:8080"` | host of the kube-state-metrics service. This is used only when `kube-state-metrics.enabled` is set to `false`. |
 | kubernetes.state.vars | object | `{}` | state streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`. Please note that colliding vars also defined in respective state streams will *not* be overridden. |
 | kubernetes.metrics.enabled | bool | `true` | integration global switch to enable metric streams based on kubelet. Note that setting this to false results in overriding and *disabling all* the respective metric streams |
 | kubernetes.metrics.vars | object | `{}` | metric streams variables such as `add_metadata`, `hosts`, `period`, `bearer_token_file`, `ssl.verification_mode`. Please note that colliding vars also defined in respective metric streams will *not* be overridden. |

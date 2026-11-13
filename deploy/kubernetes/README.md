@@ -20,7 +20,7 @@ Agent Scenario | Description
 ---- | ----
 [Elastic Agent managed - Default ](./elastic-agent-kustomize/default/elastic-agent-managed/) | Default Elastic Agent managed by Fleet setup. Kube-state-metrics (KSM) is installed automatically.
 [Elastic Agent standalone Default ](./elastic-agent-kustomize/default/elastic-agent-standalone/) | Default Standalone Elastic Agent setup. Kube-state-metrics (KSM) is installed automatically.
-[Elastic Agent managed - With KSM in autosharding configuration ](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with KMS in [autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
+[Elastic Agent managed - With KSM in autosharding configuration ](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-managed/) | Elastic Agent managed by Fleet setup with KSM in [autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 [Elastic Agent standalone - With KSM in autosharding configuration](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/) | Standalone Elastic Agent setup with KSM in [autosharding configuration](https://github.com/kubernetes/kube-state-metrics#automated-sharding)
 
 How to choose the appropriate scenario:
@@ -47,7 +47,7 @@ kubectl apply -k .
 
 The suggested method of running Elastic Agent in large Kubernetes clusters is to install Elastic Agent as a sidecar container with KSM in order to collect the KSM metrics. As a Kubernetes cluster becomes larger, we need to increase the number of KSM shards and also need to have a dedicated Elastic Agent in order to collect from the specific shard's endpoint. Those are installed as part of a [Statefulset](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-statefulset-configmap.yaml).
 
-In more details, the Statefulset acts as a patch of the current KSM Statefuleset pod, meaning that it is responsible to install Elastic Agent with kube-state-metrics datastream configuration as a second container within the same pod. The KSM and Elastic Agent will share the same localhost network to communicate.  The Kubernetes provider is disabled (`providers.kubernetes.enabled: false`).
+In more details, the Statefulset acts as a patch of the current KSM StatefulSet pod, meaning that it is responsible to install Elastic Agent with kube-state-metrics datastream configuration as a second container within the same pod. The KSM and Elastic Agent will share the same localhost network to communicate.  The Kubernetes provider is disabled (`providers.kubernetes.enabled: false`).
 
 Apart from the KSM metrics, the rest of the metrics are collected from Elastic Agents deployed as [daemonsets](./elastic-agent-kustomize/ksm-autosharding/elastic-agent-standalone/base/elastic-agent-standalone-ksm-daemonset-configmap.yaml)
 

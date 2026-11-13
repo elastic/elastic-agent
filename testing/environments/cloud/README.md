@@ -4,7 +4,7 @@ Elastic employees can create an Elastic Cloud deployment with a locally
 built Elastic Agent, by pushing images to an internal Docker repository. The images will be 
 based on the SNAPSHOT images with the version defined in `version/version.go`.
 
-Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
+A prerequisite to running the following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
 
 Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
 

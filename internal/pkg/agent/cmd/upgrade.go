@@ -88,7 +88,7 @@ func newUpgradeCommandWithArgs(args []string, streams *cli.IOStreams) *cobra.Com
 
 func newListRollbacksCmd(_ []string, streams *cli.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list-rollbacks <version>",
+		Use:   "list-rollbacks",
 		Short: "Lists the available rollbacks present on disk",
 		Long:  "This command lists the details about other agent installs present on disk, displaying versions that can be used with 'elastic-agent upgrade --rollback'.",
 		Args:  cobra.NoArgs,
