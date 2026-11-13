@@ -71,6 +71,10 @@ renames the outer input id. The stream id of the single input would then be dupl
       dataset: kubernetes.container_logs
       type: logs
     prospector.scanner.symlinks: {{ dig "vars" "symlinks" true .Values.kubernetes.containers.logs }}
+    {{- with (dig "vars" "read_until_eof" dict .Values.kubernetes.containers.logs) }}
+    read_until_eof:
+      {{- . | toYaml | nindent 6 }}
+    {{- end }}
     parsers:
       - container:
           stream: {{ dig "vars" "containerParserStream" "all" .Values.kubernetes.containers.logs }}
