@@ -288,10 +288,9 @@ func (em *exporterMetrics) sum(names ...string) int64 {
 	return total
 }
 
-// replaceWithFailoverConnector replaces the values of the exporters a failover connector
-// routes to with the connector's own. Docs processed is rewritten to the documents the connector finished plus
-// those still in flight at the exporters, so that total and active are not inflated by failed attempts
-// on a host that another host then delivered.
+// replaceWithFailoverConnector overwrites em's values with those the failover connector
+// also reports. Docs processed is recomputed so failed attempts on one host don't
+// inflate total and active events.
 func (em *exporterMetrics) replaceWithFailoverConnector(connector *exporterMetrics) {
 	if docsProcessed, ok := em.values[otelDocsProcessedKey]; ok {
 		inFlight := docsProcessed - em.sum(otelSentLogsKey, otelSentSpansKey, otelSentMetricsKey) -
