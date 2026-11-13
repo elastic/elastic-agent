@@ -4,7 +4,7 @@ The Elastic-Agent process defines two log outputs:
    collected in the diagnostics. It's configuration is **hardcoded**.
    This output always logs to files in
    `data/elastic-agent-<hash>/logs` and uses the default configuration
-   defined in `elastic-agent-libs/logp`.
+   defined in the Beats `pkg/logp` package.
  - The "default" logger that is the user-configurable logger, it logs
    to the Elastic-Agent's root folder, it can also be configured to
    log to `stderr`. When running in a container environment, it

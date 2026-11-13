@@ -10,7 +10,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/transport/dialer"
+	"github.com/elastic/beats/v7/pkg/transport/dialer"
 )
 
 type hostData struct {
