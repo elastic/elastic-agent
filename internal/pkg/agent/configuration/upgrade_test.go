@@ -30,6 +30,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -49,6 +50,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -70,6 +72,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -87,6 +90,7 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          8 * time.Hour,
 					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   defaultLogsRetentionDuration,
 				},
 			},
 		},
@@ -104,6 +108,43 @@ func TestParseUpgradeConfig(t *testing.T) {
 				Rollback: &UpgradeRollbackConfig{
 					Window:          defaultRollbackWindowDuration,
 					CleanupInterval: 1 * time.Minute,
+					LogsRetention:   defaultLogsRetentionDuration,
+				},
+			},
+		},
+		"logs_retention": {
+			cfg: map[string]any{
+				"rollback.logs_retention": "48h",
+			},
+			expected: UpgradeConfig{
+				Watcher: &UpgradeWatcherConfig{
+					GracePeriod: defaultGracePeriodDuration,
+					ErrorCheck: UpgradeWatcherCheckConfig{
+						Interval: defaultStatusCheckInterval,
+					},
+				},
+				Rollback: &UpgradeRollbackConfig{
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   48 * time.Hour,
+				},
+			},
+		},
+		"logs_retention_disabled": {
+			cfg: map[string]any{
+				"rollback.logs_retention": "0s",
+			},
+			expected: UpgradeConfig{
+				Watcher: &UpgradeWatcherConfig{
+					GracePeriod: defaultGracePeriodDuration,
+					ErrorCheck: UpgradeWatcherCheckConfig{
+						Interval: defaultStatusCheckInterval,
+					},
+				},
+				Rollback: &UpgradeRollbackConfig{
+					Window:          defaultRollbackWindowDuration,
+					CleanupInterval: defaultRollbackCleanupInterval,
+					LogsRetention:   0,
 				},
 			},
 		},

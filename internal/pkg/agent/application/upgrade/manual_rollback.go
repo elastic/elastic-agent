@@ -50,7 +50,7 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 		// If upgrade marker is available, we need to gracefully stop any watcher process, read the available rollbacks from
 		// the TTL registry and then proceed with rollback
 		updateMarkerExistsBeforeRollback = true
-		watcherExecutable, versionedHomeToRollbackTo, err = rollbackWithExistingMarker(ctx, u.log, u.watcherHelper, u.availableRollbacksSource, topDir, now, version, action)
+		watcherExecutable, versionedHomeToRollbackTo, err = rollbackWithExistingMarker(ctx, u.log, u.watcherHelper, u.availableRollbacksSource, topDir, version, action)
 	}
 
 	if err != nil {
@@ -81,11 +81,11 @@ func (u *Upgrader) rollbackToPreviousVersion(ctx context.Context, topDir string,
 	return nil, nil
 }
 
-// findRollbackTarget returns the versionedHome and TTLMarker for the first unexpired entry
-// matching version, or ("", zero, false) if none is found.
-func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, version string) (string, ttl.TTLMarker, bool) {
+// findRollbackTarget returns the versionedHome and TTLMarker for the first entry matching version,
+// or ("", zero, false) if none is found. rollbacks must be the available rollbacks (see ttl.ReadOnlySource).
+func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, version string) (string, ttl.TTLMarker, bool) {
 	for versionedHome, marker := range rollbacks {
-		if marker.Version == version && now.Before(marker.ValidUntil) {
+		if marker.Version == version {
 			return versionedHome, marker, true
 		}
 	}
@@ -94,12 +94,12 @@ func findRollbackTarget(rollbacks map[string]ttl.TTLMarker, now time.Time, versi
 
 func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, rollbackVersion string, markUpgrade markUpgradeFunc, action *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the available installs
-	availableRollbacks, _, err := source.GetAll()
+	availableRollbacks, err := source.GetAvailableRollbacks()
 	if err != nil {
 		return "", "", fmt.Errorf("retrieving available rollbacks: %w", err)
 	}
 
-	targetInstall, targetTTLMarker, found := findRollbackTarget(availableRollbacks, now, rollbackVersion)
+	targetInstall, targetTTLMarker, found := findRollbackTarget(availableRollbacks, rollbackVersion)
 	if !found {
 		return "", "", fmt.Errorf("version %q not listed among the available rollbacks: %w", rollbackVersion, ErrNoRollbacksAvailable)
 	}
@@ -151,7 +151,7 @@ func rollbackUsingAgentInstalls(log *logger.Logger, watcherHelper WatcherHelper,
 	return watcherExecutable, targetInstall, nil
 }
 
-func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, now time.Time, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
+func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcherHelper WatcherHelper, source ttl.ReadOnlySource, topDir string, version string, _ *fleetapi.ActionUpgrade) (string, string, error) {
 	// read the upgrade marker
 	updateMarker, err := LoadMarker(paths.DataFrom(topDir))
 	if err != nil {
@@ -172,12 +172,12 @@ func rollbackWithExistingMarker(ctx context.Context, log *logger.Logger, watcher
 	var selectedRollbackVersionedHome string
 
 	err = withTakeOverWatcher(ctx, log, topDir, watcherHelper, func() error {
-		rollbacks, _, err := source.GetAll()
+		rollbacks, err := source.GetAvailableRollbacks()
 		if err != nil {
 			return fmt.Errorf("reading TTL markers: %w", err)
 		}
 		var found bool
-		selectedRollbackVersionedHome, _, found = findRollbackTarget(rollbacks, now, version)
+		selectedRollbackVersionedHome, _, found = findRollbackTarget(rollbacks, version)
 		if !found {
 			return fmt.Errorf("version %q not listed among the available rollbacks: %w", version, ErrNoRollbacksAvailable)
 		}
@@ -302,10 +302,16 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // Directories referenced by an active upgrade marker are preserved even if the marker has no Details set — Details can be nil for a marker written by an older agent or a pre-unpack marker written before an upgrade begins, both of which may indicate an upgrade in progress.
 // The remaining TTL entries are returned so the caller can schedule the next cleanup.
 func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
-	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
-	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, cleanupOpts{
+	return cleanAvailableRollbacksWithOpts(log, source, topDir, currentHomeRelPath, now, filter, cleanupOpts{
 		requireMarkerDetails: false, // lenient: nil-Details markers may indicate an upgrade in progress and still protect directories
 	})
+}
+
+// cleanAvailableRollbacksWithOpts is CleanAvailableRollbacks with the cleanup options of the caller, for example to
+// strip the homes kept for diagnostics.
+func cleanAvailableRollbacksWithOpts(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter, opts cleanupOpts) (map[string]ttl.TTLMarker, error) {
+	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
+	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, opts)
 }
 
 func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, minInterval time.Duration) {
@@ -334,8 +340,16 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 }
 
 func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, now time.Time, minInterval time.Duration) time.Time {
-	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
+	rollbacksAfterCleanup, err := cleanAvailableRollbacksWithOpts(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks, cleanupOpts{
+		requireMarkerDetails: false,
+		stripDiagnostics:     true,
+	})
 	if err != nil {
+		if isOnly(err, errStripIncomplete) {
+			// not critical, the next run retries
+			log.Warnf("could not strip every retained diagnostics home: %s, rescheduling cleanup in %s", err.Error(), minInterval)
+			return now.Add(minInterval)
+		}
 		if !errors.Is(err, errCleanupDegraded) {
 			log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)
 			return now.Add(minInterval)

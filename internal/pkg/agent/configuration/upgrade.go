@@ -23,6 +23,10 @@ const (
 
 	// defaultRollbackCleanupInterval represents the interval between runs to cleanup available rollbacks
 	defaultRollbackCleanupInterval = 10 * time.Minute
+
+	// defaultLogsRetentionDuration is for how long the logs of an upgrade that failed and was rolled back are kept.
+	// The next upgrade removes them earlier.
+	defaultLogsRetentionDuration = 30 * 24 * time.Hour // 30 days
 )
 
 // UpgradeConfig is the configuration related to Agent upgrades.
@@ -42,6 +46,9 @@ type UpgradeWatcherCheckConfig struct {
 type UpgradeRollbackConfig struct {
 	Window          time.Duration `yaml:"window" config:"window" json:"window"`
 	CleanupInterval time.Duration `yaml:"cleanup_interval" config:"cleanup_interval" json:"cleanup_interval"`
+	// LogsRetention is for how long the logs of an upgrade that failed and was rolled back are kept to troubleshoot
+	// it. The next upgrade removes them earlier. A value of 0 or less does not keep them, which is not recommended.
+	LogsRetention time.Duration `yaml:"logs_retention" config:"logs_retention" json:"logs_retention"`
 }
 
 func DefaultUpgradeConfig() *UpgradeConfig {
@@ -55,6 +62,7 @@ func DefaultUpgradeConfig() *UpgradeConfig {
 		Rollback: &UpgradeRollbackConfig{
 			Window:          defaultRollbackWindowDuration,
 			CleanupInterval: defaultRollbackCleanupInterval,
+			LogsRetention:   defaultLogsRetentionDuration,
 		},
 	}
 }
