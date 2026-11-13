@@ -6,15 +6,9 @@ entries:
         Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17848
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17893
-        - https://github.com/elastic/elastic-agent/pull/17982
-        - https://github.com/elastic/elastic-agent/pull/17895
-        - https://github.com/elastic/elastic-agent/pull/17966
+        - https://github.com/elastic/elastic-agent/pull/17208
       issue:
-        - https://github.com/elastic/elastic-agent/issues/17717
-        - https://github.com/elastic/elastic-agent/issues/17894
+        - https://github.com/elastic/elastic-agent/issues/17067
       impact: ""
       action: ""
       timestamp: 1791989613
@@ -26,15 +20,7 @@ entries:
       description: ""
       component: edot-collector
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17848
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17893
-        - https://github.com/elastic/elastic-agent/pull/17982
-        - https://github.com/elastic/elastic-agent/pull/17895
-        - https://github.com/elastic/elastic-agent/pull/17966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/17717
-        - https://github.com/elastic/elastic-agent/issues/17894
+        - https://github.com/elastic/elastic-agent/pull/17451
       impact: ""
       action: ""
       timestamp: 1792652202
@@ -60,15 +46,9 @@ entries:
       description: The Elastic Agent package for Windows ARM64 includes the Npcap installer and can capture network traffic on Windows ARM64 hosts.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17848
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17893
-        - https://github.com/elastic/elastic-agent/pull/17982
-        - https://github.com/elastic/elastic-agent/pull/17895
-        - https://github.com/elastic/elastic-agent/pull/17966
+        - https://github.com/elastic/elastic-agent/pull/17663
       issue:
-        - https://github.com/elastic/elastic-agent/issues/17717
-        - https://github.com/elastic/elastic-agent/issues/17894
+        - https://github.com/elastic/elastic-agent/issues/17044
       impact: ""
       action: ""
       timestamp: 1793268852
@@ -80,15 +60,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17848
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17893
-        - https://github.com/elastic/elastic-agent/pull/17982
-        - https://github.com/elastic/elastic-agent/pull/17895
-        - https://github.com/elastic/elastic-agent/pull/17966
-      issue:
-        - https://github.com/elastic/elastic-agent/issues/17717
-        - https://github.com/elastic/elastic-agent/issues/17894
+        - https://github.com/elastic/elastic-agent/pull/17668
       impact: ""
       action: ""
       timestamp: 1793281480
@@ -100,12 +72,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17848
-        - https://github.com/elastic/elastic-agent/pull/17951
-        - https://github.com/elastic/elastic-agent/pull/17893
-        - https://github.com/elastic/elastic-agent/pull/17982
-        - https://github.com/elastic/elastic-agent/pull/17895
-        - https://github.com/elastic/elastic-agent/pull/17966
+        - https://github.com/elastic/elastic-agent/pull/17715
       issue:
         - https://github.com/elastic/elastic-agent/issues/17714
       impact: ""
