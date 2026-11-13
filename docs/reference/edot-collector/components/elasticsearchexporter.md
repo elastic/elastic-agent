@@ -149,7 +149,7 @@ The exporter uses the `otel` mapping mode by default. In this mode, the {{es}} E
 :::{note}
 The exporter supports other mapping modes (`ecs`, `bodymap`, `none`, `raw`), but using these modes is not officially supported by {{agent}}. To select the mapping mode of a request, use the `X-Elastic-Mapping-Mode` client metadata key or the `elastic.mapping.mode` scope attribute. Use `mapping::allowed_modes` to restrict the modes that can be selected.
 
-{applies_to}`stack: removed 9.7` The `mapping::mode` setting is removed. If your configuration sets it, remove the setting, otherwise the Collector fails to start.
+{applies_to}`stack: removed 9.7` The `mapping::mode` setting is removed. If your configuration sets it, remove the setting. Otherwise, the Collector fails to start.
 :::
 
 ## Document routing
