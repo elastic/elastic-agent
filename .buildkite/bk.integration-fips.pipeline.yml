@@ -76,10 +76,10 @@ steps:
           TF_VAR_docker_images_name_suffix: "-fips"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-amd64-fips'
+          buildkite-agent artifact download "build/distributions/elastic-agent-*-linux-x86_64*" . --step 'packaging-amd64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -111,10 +111,10 @@ steps:
           TF_VAR_docker_images_name_suffix: "-fips"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
-          buildkite-agent artifact download build/distributions/** . --step 'packaging-arm64-fips'
+          buildkite-agent artifact download "build/distributions/elastic-agent-*-linux-arm64*" . --step 'packaging-arm64-fips'
           .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
@@ -144,7 +144,7 @@ steps:
         command: |
           .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
         artifact_paths:
-          - build/**
+          - build/*
           - build/diagnostics/**
         retry:
           automatic:
