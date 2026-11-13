@@ -28,7 +28,7 @@ summary: Support loadbalance false for the Elasticsearch output in the OTel runt
 
 # REQUIRED for all kinds
 # Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc.
-component: all
+component: elastic-agent
 
 # AUTOMATED
 # OPTIONAL to manually add other PR URLs

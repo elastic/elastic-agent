@@ -147,8 +147,6 @@ var defaultOptions = esToOTelOptions{
 func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (TranslatedOutput, error) {
 	escfg := defaultOptions
 
-	originalOutput := output
-
 	// check for unsupported config
 	err := checkUnsupportedConfig(output)
 	if err != nil {
@@ -222,19 +220,6 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (T
 		queueSize = getQueueSize(logger, output)
 		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
 			logger.Infof("queue.mem.events (%d) is below the suggested minimum for %d connection(s); consider setting queue.mem.events: %d", queueSize, maxConns, suggested)
-		}
-	}
-
-	// unitToExporterConfig promotes the effective output queue into the receiver
-	// configuration after translation. Preserve that write-back while keeping
-	// Cloud ID resolution isolated from the policy-derived output config.
-	if output.HasField("queue") {
-		queueConfig, err := output.Child("queue", -1)
-		if err != nil {
-			return TranslatedOutput{}, fmt.Errorf("failed reading effective output queue config: %w", err)
-		}
-		if err := originalOutput.SetChild("queue", -1, queueConfig); err != nil {
-			return TranslatedOutput{}, fmt.Errorf("failed updating effective output queue config: %w", err)
 		}
 	}
 
