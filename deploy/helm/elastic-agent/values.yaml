@@ -577,6 +577,9 @@ agent:
     #    initContainers: []
     #    extraContainers: []
     #    resources: {}
+    #    startupProbe: {}
+    #    livenessProbe: {}
+    #    readinessProbe: {}
     #    securityContext: {}
     #    nodeSelector: {}
     #    tolerations: []
