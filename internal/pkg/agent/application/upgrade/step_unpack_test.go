@@ -388,7 +388,10 @@ func TestUpgrader_unpackTarGz(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
-			got, err := untar(log, archiveFile, testDataDir, tt.flavor, tt.copy, tt.mkdirAll, tt.openFile)
+			metadata, err := getPackageMetadataFromTar(archiveFile)
+			require.NoError(t, err, "reading metadata of test archive failed")
+
+			got, err := untar(log, archiveFile, testDataDir, tt.flavor, metadata, tt.copy, tt.mkdirAll, tt.openFile)
 			if tt.expectedError != nil {
 				assert.ErrorIsf(t, err, tt.expectedError, "untar(%v, %v, %v)", tt.args.version, archiveFile, testDataDir)
 				return
@@ -578,7 +581,10 @@ func TestUpgrader_unpackZip(t *testing.T) {
 			archiveFile, err := tt.args.archiveGenerator(t, tt.args.archiveFiles)
 			require.NoError(t, err, "creation of test archive file failed")
 
-			got, err := unzip(log, archiveFile, testDataDir, tt.flavor, tt.copy, tt.mkdirAll, tt.openFile)
+			metadata, err := getPackageMetadataFromZip(archiveFile)
+			require.NoError(t, err, "reading metadata of test archive failed")
+
+			got, err := unzip(log, archiveFile, testDataDir, tt.flavor, metadata, tt.copy, tt.mkdirAll, tt.openFile)
 			if tt.expectedError != nil {
 				assert.ErrorIs(t, err, tt.expectedError, "error mismatch")
 				return
@@ -793,7 +799,7 @@ func TestUnpack(t *testing.T) {
 	log, _ := loggertest.New("TestUnpack")
 
 	unarchiveSetup := func(unpackResult UnpackResult, err error) unarchiveFunc {
-		return func(log *logger.Logger, archivePath, dataDir string, flavor string, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
+		return func(log *logger.Logger, archivePath, dataDir string, flavor string, metadata packageMetadata, copy copyFunc, mkdirAll mkdirAllFunc, openFile openFileFunc) (UnpackResult, error) {
 			return unpackResult, err
 		}
 	}
@@ -828,7 +834,7 @@ func TestUnpack(t *testing.T) {
 			unpacker := newUnpacker(log)
 			unpacker.untar = test.unarchiveFunc
 			unpacker.unzip = test.unarchiveFunc
-			unpackResult, unpackErr := unpacker.unpack("mockVersion", "mockArchivePath", "mockDataDir", "mockFlavor")
+			unpackResult, unpackErr := unpacker.unpack("mockVersion", "mockArchivePath", "mockDataDir", "mockFlavor", packageMetadata{hash: "abcdef"})
 			assert.Equal(t, test.expectedUnpackResult, unpackResult)
 			assert.Equal(t, test.expectedErr, unpackErr)
 		})
