@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -86,19 +87,20 @@ func TestAddToBucket(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			b := newRateLimiter(tc.dropRate, tc.bucketSize)
+			// Use a fake clock so runner scheduling cannot refill the bucket.
+			synctest.Test(t, func(t *testing.T) {
+				b := newRateLimiter(tc.dropRate, tc.bucketSize)
 
-			blocked := false
-			// Advance time explicitly so runner scheduling cannot refill the bucket.
-			now := time.Now()
+				blocked := false
 
-			for i := 0; i < tc.add; i++ {
-				t.Logf("%v : add 1 element when there are %f tokens available", now, b.TokensAt(now))
-				wasBlocked := !b.AllowN(now, 1)
-				blocked = blocked || wasBlocked
-				now = now.Add(tc.addInterval)
-			}
-			require.Equal(t, tc.shouldBlock, blocked)
+				for i := 0; i < tc.add; i++ {
+					t.Logf("%v : add 1 element when there are %f tokens available", time.Now(), b.Tokens())
+					wasBlocked := !b.Allow()
+					blocked = blocked || wasBlocked
+					time.Sleep(tc.addInterval)
+				}
+				require.Equal(t, tc.shouldBlock, blocked)
+			})
 		})
 	}
 }
