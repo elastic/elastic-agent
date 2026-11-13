@@ -553,7 +553,7 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", home)
 		t.Setenv(browserUserEnv, cur.Username)
 
-		got, o, setHome := browserHome(&testLog{})
+		got, o, setHome := browserHome(&testLog{}, true)
 
 		assert.Equal(t, home, got, "browser home")
 		assert.Nil(t, o, "only root changes the owner")
@@ -564,7 +564,7 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", "/proc")
 		t.Setenv(browserUserEnv, cur.Username)
 
-		got, o, setHome := browserHome(&testLog{})
+		got, o, setHome := browserHome(&testLog{}, true)
 
 		assert.Equal(t, cur.HomeDir, got, "browser home")
 		assert.Nil(t, o, "only root changes the owner")
@@ -576,7 +576,7 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", "/proc")
 		t.Setenv(browserUserEnv, "")
 
-		got, _, setHome := browserHome(&testLog{})
+		got, _, setHome := browserHome(&testLog{}, true)
 
 		assert.Equal(t, "/proc", got, "browser home")
 		assert.False(t, setHome, "HOME must not change")

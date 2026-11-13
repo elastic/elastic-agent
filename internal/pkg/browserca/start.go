@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
@@ -30,49 +31,79 @@ type Config struct {
 	CertificateReload tlscommon.CertificateReload `config:"certificate_reload" yaml:"certificate_reload,omitempty" json:"certificate_reload,omitempty"`
 }
 
-// Start imports the configured CAs into the browser's trust store and, unless
-// certificate_reload is disabled, keeps it in sync until ctx is done. A store left
-// by a previous run is cleaned up even when no CA is configured any more. It does
-// nothing outside Linux, when there are neither configured paths nor a store, or
-// without certutil. Configured paths are watched even if they do not exist yet.
-// It never returns an error: a failure only logs a warning, so it can't stop the
-// agent from starting.
-//
-// It must run before the agent starts the browser, because it may change HOME.
-func Start(ctx context.Context, log *logger.Logger, cfg Config) {
+// Start imports configured CAs before browsers start and keeps the store in sync.
+// It returns a HOME override for browser components only, or an empty string to
+// inherit the existing environment. It never changes the Agent environment.
+// Startup waits at most reconcileTimeout, even if filesystem I/O stalls. A single
+// worker owns setup and polling so stalled I/O cannot accumulate workers or races.
+func Start(ctx context.Context, log *logger.Logger, cfg Config) string {
 	if runtime.GOOS != "linux" {
-		return
+		return ""
 	}
-	m := &manager{paths: cfg.CertificateAuthorities, log: log}
-	var setHome bool
-	m.home, m.owner, setHome = browserHome(log)
-	if len(m.paths) == 0 && !m.hasDB() {
-		return
-	}
-	certutil, err := exec.LookPath("certutil")
-	if err != nil {
-		if files, _ := m.files(); len(files) > 0 {
-			log.Warnf("certutil not found, the custom CAs for browser monitors are not imported")
-		}
-		return
-	}
-	if setHome {
-		_ = os.Setenv("HOME", m.home)
-	}
-	m.certs = execRunner(certutil, m.owner)
+	return start(ctx, log, cfg, reconcileTimeout)
+}
 
-	reload := cfg.CertificateReload.IsEnabled()
-	err = m.reconcile(ctx)
-	if err != nil {
-		if reload {
-			log.Warnf("custom CA certificates not imported, will retry: %v", err)
-		} else {
+func start(ctx context.Context, log logs, cfg Config, timeout time.Duration) string {
+	initialCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	ready := make(chan string)
+	go func() {
+		m := &manager{paths: cfg.CertificateAuthorities, log: log}
+		var setHome bool
+		m.home, m.owner, setHome = browserHome(log, len(m.paths) > 0)
+		if len(m.paths) == 0 && !m.hasDB() {
+			close(ready)
+			return
+		}
+		certutil, err := exec.LookPath("certutil")
+		if err != nil {
+			if len(m.paths) > 0 {
+				log.Warnf("certutil not found, the custom CAs for browser monitors are not imported")
+			}
+			close(ready)
+			return
+		}
+		m.certs = execRunner(certutil, m.owner)
+		if setHome {
+			// Do not continue with a fallback that the caller never received.
+			select {
+			case ready <- m.home:
+			case <-initialCtx.Done():
+				close(ready)
+				return
+			}
+		}
+		if len(m.paths) == 0 {
+			// Listing does not need ownership changes. As root, it must also work
+			// for a database left root-owned by a previous Agent run.
+			m.inspect = execRunner(certutil, nil)
+		}
+		err = m.reconcile(initialCtx)
+		if err != nil {
 			log.Warnf("custom CA certificates not imported: %v", err)
 		}
-	}
-	// Without configured paths there is nothing to watch, only a failed cleanup to retry.
-	if reload && (len(m.paths) > 0 || err != nil) {
-		go m.run(ctx, cfg.reloadInterval(log))
+		reload := cfg.CertificateReload.IsEnabled() && (len(m.paths) > 0 || err != nil)
+		var interval time.Duration
+		if reload {
+			interval = cfg.reloadInterval(log)
+		}
+		close(ready)
+		if reload {
+			m.run(ctx, interval)
+		}
+	}()
+	var home string
+	for {
+		select {
+		case resolved, ok := <-ready:
+			if !ok {
+				return home
+			}
+			home = resolved
+		case <-initialCtx.Done():
+			log.Warnf("browser CA startup did not finish within its time budget: %v", initialCtx.Err())
+			return home
+		}
 	}
 }
 
@@ -90,7 +121,7 @@ func (cfg Config) reloadInterval(log logs) time.Duration {
 }
 
 func exists(path string) bool {
-	_, err := os.Stat(path)
+	_, err := os.Stat(path) //nolint:gosec // Configured CA locations and browser homes are intentional; this only checks existence.
 	return err == nil
 }
 
@@ -101,14 +132,15 @@ func exists(path string) bool {
 // the database goes there and is given to that user. Otherwise the browser uses
 // HOME, unless HOME isn't writable (arbitrary UIDs on OpenShift get "/"): then HOME
 // must be changed to that user's home, which the browser inherits when it starts.
-func browserHome(log logs) (string, *owner, bool) {
+func browserHome(log logs, configured bool) (string, *owner, bool) {
 	home := os.Getenv("HOME")
 	isRoot := os.Geteuid() == 0
-	if !isRoot && writable(home) {
+	// Without configured CAs, locate an existing store without a write probe.
+	if !isRoot && ((configured && writable(home)) || (!configured && exists(filepath.Join(home, ".pki", "nssdb", "cert9.db")))) {
 		return home, nil, false
 	}
 	userHome, o, err := lookupBrowserUser(os.Getenv(browserUserEnv))
-	if err != nil {
+	if err != nil && configured {
 		log.Warnf("the browser may not read the custom CAs: %v", err)
 	}
 	if userHome == "" {
@@ -117,7 +149,7 @@ func browserHome(log logs) (string, *owner, bool) {
 	if isRoot {
 		return userHome, o, false
 	}
-	return userHome, nil, true
+	return userHome, nil, configured
 }
 
 func writable(dir string) bool {

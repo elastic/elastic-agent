@@ -18,6 +18,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -32,6 +33,13 @@ const (
 	// defaultInterval is how often the CAs are checked for changes when
 	// certificate_reload.reload_interval is not set.
 	defaultInterval = 30 * time.Second
+
+	// Bound each command, reconciliation, and startup wait independently.
+	commandTimeout      = 5 * time.Second
+	reconcileTimeout    = 30 * time.Second
+	maxCAFileBytes      = 4 << 20
+	maxCATotalBytes     = 16 << 20
+	maxDirectoryEntries = 4096
 
 	// nicknamePrefix marks the certificates managed here, so others in the database are left alone.
 	nicknamePrefix = "custom-ca-"
@@ -50,14 +58,21 @@ type runner func(ctx context.Context, stdin []byte, args ...string) ([]byte, err
 // gets the access to the database that the browser has.
 func execRunner(path string, o *owner) runner {
 	return func(ctx context.Context, stdin []byte, args ...string) ([]byte, error) {
+		ctx, cancel := context.WithTimeout(ctx, commandTimeout)
+		defer cancel()
 		cmd := exec.CommandContext(ctx, path, args...)
+		// Bound waiting for inherited pipes if a child outlives certutil.
+		cmd.WaitDelay = time.Second
 		cmd.Stdin = bytes.NewReader(stdin)
 		if o != nil {
 			runAs(cmd, o)
 		}
 		out, err := cmd.CombinedOutput()
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
 		if err != nil {
-			return out, fmt.Errorf("certutil %s: %w: %s", args[0], err, bytes.TrimSpace(out))
+			return out, fmt.Errorf("certutil %s: %w: %s", args[0], err, bytes.TrimSpace(out[:min(len(out), 4096)]))
 		}
 		return out, nil
 	}
@@ -74,10 +89,11 @@ type manager struct {
 	// paths are PEM files, or directories whose *.crt and *.pem files are read.
 	paths []string
 	// home is the browser's home directory; the database is <home>/.pki/nssdb.
-	home  string
-	certs runner
-	owner *owner // if set, owns the database; certs runs as it too
-	log   logs
+	home    string
+	certs   runner
+	inspect runner // read-only listing for unconfigured cleanup, before ownership repair
+	owner   *owner // if set, owns the database; certs runs as it too
+	log     logs
 
 	// applied holds the certificates of the last successful sync, nil until one
 	// succeeds and after one fails, so that the next check reconciles again.
@@ -91,10 +107,14 @@ func (m *manager) dbDir() string {
 // files returns the PEM files in the configured paths, sorted and without duplicates.
 // A path that doesn't exist has no CA, but any other error is returned: a CA that is
 // configured but can't be listed must not be removed.
-func (m *manager) files() ([]string, error) {
+func (m *manager) files(ctx context.Context) ([]string, error) {
 	var files []string
+	entriesLeft := maxDirectoryEntries
 	var errs []error
 	for _, p := range m.paths {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		// Stat follows symlinks, which is how Kubernetes mounts Secrets.
 		info, err := os.Stat(p)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -105,14 +125,19 @@ func (m *manager) files() ([]string, error) {
 			continue
 		}
 		if !info.IsDir() {
+			if !info.Mode().IsRegular() {
+				errs = append(errs, fmt.Errorf("CA path %s is not a regular file", p))
+				continue
+			}
 			files = append(files, p)
 			continue
 		}
-		entries, err := os.ReadDir(p)
+		entries, err := readDirectory(p, entriesLeft)
 		if err != nil {
 			errs = append(errs, err)
 			continue
 		}
+		entriesLeft -= len(entries)
 		for _, e := range entries {
 			if ext := filepath.Ext(e.Name()); ext != ".crt" && ext != ".pem" {
 				continue
@@ -126,6 +151,8 @@ func (m *manager) files() ([]string, error) {
 				errs = append(errs, err)
 			case info.Mode().IsRegular():
 				files = append(files, f)
+			case !info.IsDir():
+				errs = append(errs, fmt.Errorf("CA path %s is not a regular file", f))
 			}
 		}
 	}
@@ -133,22 +160,71 @@ func (m *manager) files() ([]string, error) {
 	return slices.Compact(files), errors.Join(errs...)
 }
 
+// readDirectory bounds allocation even for directories full of unrelated files.
+func readDirectory(path string, limit int) ([]os.DirEntry, error) {
+	// A directory discovered earlier can also be replaced by a FIFO.
+	f, err := openCAFile(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	entries, err := f.ReadDir(limit + 1)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	if len(entries) > limit {
+		return nil, fmt.Errorf("CA directories contain more than %d entries", maxDirectoryEntries)
+	}
+	return entries, nil
+}
+
+func readCAFile(path string, limit int64) ([]byte, error) {
+	// Nonblocking open prevents a regular-file-to-FIFO swap from blocking open.
+	// Check the opened descriptor as well as discovery's Stat result.
+	f, err := openCAFile(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("CA path %s is not a regular file", path)
+	}
+	if info.Size() > limit {
+		return nil, fmt.Errorf("CA file %s exceeds remaining byte limit %d", path, limit)
+	}
+	data, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("CA file %s exceeds remaining byte limit %d", path, limit)
+	}
+	return data, nil
+}
+
 // certificates decodes the configured CAs, keyed by nickname. The nickname derives
 // from the decoded certificate, so reformatting a PEM or listing a CA twice never
 // renames or drops it.
-func (m *manager) certificates() (map[string][]byte, error) {
-	files, err := m.files()
+func (m *manager) certificates(ctx context.Context) (map[string][]byte, error) {
+	files, err := m.files(ctx)
 	if err != nil {
 		return nil, err
 	}
 	want := map[string][]byte{}
-	var errs []error
+	var total int64
 	for _, f := range files {
-		data, err := os.ReadFile(f)
-		if err != nil {
-			errs = append(errs, err)
-			continue
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
+		data, err := readCAFile(f, min(maxCAFileBytes, maxCATotalBytes-total))
+		if err != nil {
+			return nil, err
+		}
+		total += int64(len(data))
 		for rest := data; len(rest) > 0; {
 			var block *pem.Block
 			block, rest = pem.Decode(rest)
@@ -167,7 +243,7 @@ func (m *manager) certificates() (map[string][]byte, error) {
 			want[nicknamePrefix+hex.EncodeToString(sum[:8])] = block.Bytes
 		}
 	}
-	return want, errors.Join(errs...)
+	return want, nil
 }
 
 // reconcile makes the database hold exactly the configured certificates. It does
@@ -176,7 +252,21 @@ func (m *manager) certificates() (map[string][]byte, error) {
 // may exist empty (e.g. an empty Secret), and the agent's home must then stay as is.
 // On error the change stays pending and the next call retries it.
 func (m *manager) reconcile(ctx context.Context) error {
-	want, err := m.certificates()
+	ctx, cancel := context.WithTimeout(ctx, reconcileTimeout)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if m.inspect != nil {
+		out, err := m.inspect(ctx, nil, "-L", "-d", "sql:"+m.dbDir())
+		if err != nil {
+			return fmt.Errorf("inspecting previous browser CAs: %w", err)
+		}
+		if len(managedCertificates(out)) == 0 {
+			return nil
+		}
+	}
+	want, err := m.certificates(ctx)
 	if err != nil {
 		// Leave the database alone until every CA file can be listed and read: syncing a
 		// partial set would remove the CAs of the files that can't be.
@@ -207,6 +297,9 @@ func (m *manager) hasDB() bool {
 // managed ones it no longer wants. Certificates already in the database are never
 // touched, so running browsers see no gap.
 func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := m.prepareDBDir(); err != nil {
 		return err
 	}
@@ -223,16 +316,14 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 	if err != nil {
 		return fmt.Errorf("reading NSS database (corrupt?): %w", err)
 	}
-	existing := map[string]bool{}
-	for _, line := range strings.Split(string(out), "\n") {
-		if fields := strings.Fields(line); len(fields) > 0 && strings.HasPrefix(fields[0], nicknamePrefix) {
-			existing[fields[0]] = true
-		}
-	}
+	existing := managedCertificates(out)
 
 	var errs []error
 	var added, removed int
 	for nick, der := range want {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if existing[nick] {
 			continue
 		}
@@ -244,7 +335,14 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 		}
 		added++
 	}
+	// Do not remove old trust after a failed import, including a timed-out command.
+	if err := errors.Join(errs...); err != nil {
+		return err
+	}
 	for nick := range existing {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if _, ok := want[nick]; ok {
 			continue
 		}
@@ -264,30 +362,44 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 	return nil
 }
 
-// prepareDBDir creates the database directory and, when the browser runs as another
-// user, gives it .pki: the agent may have taken ownership of its home at startup. It
-// works through a Root anchored at the home, so that a symlink in .pki, which the
-// browser user controls, can't lead it anywhere else. certutil then runs as that user.
+func managedCertificates(out []byte) map[string]bool {
+	existing := map[string]bool{}
+	for _, line := range strings.Split(string(out), "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && strings.HasPrefix(fields[0], nicknamePrefix) {
+			existing[fields[0]] = true
+		}
+	}
+
+	return existing
+}
+
+// prepareDBDir repairs only NSS's directories and known database files. It never
+// walks .pki: unrelated files keep their owners. All operations remain anchored
+// at the browser home; final-component symlinks are rejected before repair.
 func (m *manager) prepareDBDir() error {
 	root, err := os.OpenRoot(m.home)
 	if err != nil {
 		return fmt.Errorf("opening the browser home: %w", err)
 	}
 	defer root.Close()
-	if err := root.MkdirAll(filepath.Join(".pki", "nssdb"), 0o700); err != nil {
-		return fmt.Errorf("creating the database directory: %w", err)
+	for _, dir := range []string{".pki", filepath.Join(".pki", "nssdb")} {
+		if err := root.Mkdir(dir, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
+			return fmt.Errorf("creating database directory: %w", err)
+		}
+		if m.owner != nil {
+			if err := chownDatabasePath(root, dir, m.owner, true); err != nil {
+				return fmt.Errorf("changing database directory owner: %w", err)
+			}
+		}
 	}
 	if m.owner == nil {
 		return nil
 	}
-	err = fs.WalkDir(root.FS(), ".pki", func(path string, _ fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, name := range []string{"cert9.db", "key4.db", "pkcs11.txt", "cert9.db-journal", "cert9.db-wal", "cert9.db-shm", "key4.db-journal", "key4.db-wal", "key4.db-shm"} {
+		err := chownDatabasePath(root, filepath.Join(".pki", "nssdb", name), m.owner, false)
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("changing database file owner: %w", err)
 		}
-		return root.Lchown(path, int(m.owner.uid), int(m.owner.gid))
-	})
-	if err != nil {
-		return fmt.Errorf("changing the database owner: %w", err)
 	}
 	return nil
 }
