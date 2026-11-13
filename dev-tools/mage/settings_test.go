@@ -827,6 +827,24 @@ func TestLoadSettings(t *testing.T) {
 		assert.True(t, settings.Packaging.KeepArchive)
 	})
 
+	t.Run("loads BEATS_SHA from env", func(t *testing.T) {
+		sha := "af9b5959de09cf9be798da654828504ea2c6b649"
+		t.Setenv("BEATS_SHA", sha)
+
+		settings, err := LoadSettings()
+
+		require.NoError(t, err)
+		assert.Equal(t, sha, settings.Packaging.BeatsSHA)
+	})
+
+	t.Run("rejects BEATS_SHA that is not a full commit SHA", func(t *testing.T) {
+		t.Setenv("BEATS_SHA", "af9b5959de09")
+
+		_, err := LoadSettings()
+
+		require.ErrorContains(t, err, "BEATS_SHA")
+	})
+
 	t.Run("does not apply .package-version overrides by default", func(t *testing.T) {
 		settings, err := LoadSettings()
 		require.NoError(t, err)
