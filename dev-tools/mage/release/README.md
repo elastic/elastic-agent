@@ -16,7 +16,7 @@ mage env settings. Root mage targets call package functions directly.
 
 **Workflows supported:**
 1. **Major/Minor Release (feature-freeze)** — Creates release branch + 2 grouped PRs (next-patch bumps belong to the patch workflow)
-2. **Patch Release** — Creates 2 grouped PRs on the release branch (docs before build; next-patch version + Helm/K8s manifests after release)
+2. **Patch Release** — Opens one post-release version bump PR to `CURRENT_RELEASE` (`NEW_VERSION`), including Helm/K8s manifests. Docs stay off this path
 
 Release notes are handled separately via `.github/workflows/release-notes.yml`.
 
@@ -39,9 +39,10 @@ export DRY_RUN=true
 mage release:runMajorMinor
 ```
 
-### Patch (`runPatch`) — 2 PRs
+### Patch (`runPatch`) — 1 PR (bump to CURRENT_RELEASE)
 
 ```bash
+# CURRENT_RELEASE is the version to land; release branch must be at previous patch
 export CURRENT_RELEASE="9.4.3"
 export DRY_RUN=true
 
@@ -86,7 +87,7 @@ configurable via environment variables.
 
 Workflows read and update `version/version.go` (`const defaultBeatVersion = "…"`).
 Feature freeze requires `CURRENT_RELEASE` to match that file on `BASE_BRANCH`.
-Patch releases require it to match on the release branch.
+Patch releases require the release branch to be at the previous patch; `CURRENT_RELEASE` is the version to land.
 
 ### EnsureIssueTracker
 

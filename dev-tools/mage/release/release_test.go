@@ -631,14 +631,19 @@ const Agent = defaultBeatVersion
 }
 
 func TestPatchPRBodies(t *testing.T) {
-	body := patchBeforeBuildPRBody("9.7.1")
-	if !strings.Contains(body, "9.7.1") {
-		t.Errorf("patchBeforeBuildPRBody() = %q, want version", body)
+	cfg := &ReleaseConfig{
+		CurrentRelease: "9.7.1",
+		LatestRelease:  "9.7.0",
+		ReleaseBranch:  "9.7",
 	}
-	if !strings.Contains(body, "before the final Release build") {
-		t.Errorf("patchBeforeBuildPRBody() = %q, want merge guidance", body)
+	body := patchVersionBumpBody(cfg)
+	if !strings.Contains(body, "to 9.7.1") {
+		t.Errorf("patchVersionBumpBody() = %q, want landing version", body)
 	}
-	if !strings.Contains(body, "Does **not** bump version/version.go") {
-		t.Errorf("patchBeforeBuildPRBody() = %q, want version.go not bumped note", body)
+	if !strings.Contains(body, "merge promptly") {
+		t.Errorf("patchVersionBumpBody() = %q, want merge guidance", body)
+	}
+	if strings.Contains(body, "Merge after the release of") {
+		t.Errorf("patchVersionBumpBody() = %q, must not park with Merge-after-release wording", body)
 	}
 }
