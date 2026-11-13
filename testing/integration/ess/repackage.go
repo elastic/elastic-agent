@@ -10,7 +10,6 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"errors"
 	"io"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/klauspost/pgzip"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -75,8 +75,8 @@ func repackageArchive(t *testing.T, srcPackage string, newVersionBuildMetadata s
 }
 
 func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {
-	oldTopDirectoryName := strings.TrimRight(filepath.Base(srcPackagePath), ".tar.gz")
-	newTopDirectoryName := strings.TrimRight(filepath.Base(newPackagePath), ".tar.gz")
+	oldTopDirectoryName := strings.TrimSuffix(filepath.Base(srcPackagePath), ".tar.gz")
+	newTopDirectoryName := strings.TrimSuffix(filepath.Base(newPackagePath), ".tar.gz")
 
 	// Open the source package and create readers
 	srcPackageFile, err := os.Open(srcPackagePath)
@@ -88,9 +88,13 @@ func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath str
 		}
 	}(srcPackageFile)
 
-	gzReader, err := gzip.NewReader(srcPackageFile)
+	// pgzip for both directions: the package is ~1.3 GB uncompressed and the
+	// stdlib gzip writer alone takes ~30 s per repackaging; pgzip compresses
+	// the blocks in parallel in ~5 s, and the result is a regular gzip stream
+	// that the agent's standard reader consumes.
+	gzReader, err := pgzip.NewReader(srcPackageFile)
 	require.NoErrorf(t, err, "error creating gzip reader for file %q", srcPackagePath)
-	defer func(gzReader *gzip.Reader) {
+	defer func(gzReader *pgzip.Reader) {
 		err := gzReader.Close()
 		if err != nil {
 			assert.Failf(t, "error closing gzip reader for source file %q: %v", srcPackagePath, err)
@@ -109,8 +113,8 @@ func repackageTarArchive(t *testing.T, srcPackagePath string, newPackagePath str
 		}
 	}(newPackageFile)
 
-	gzWriter := gzip.NewWriter(newPackageFile)
-	defer func(gzWriter *gzip.Writer) {
+	gzWriter := pgzip.NewWriter(newPackageFile)
+	defer func(gzWriter *pgzip.Writer) {
 		err := gzWriter.Close()
 		if err != nil {
 			assert.Failf(t, "error closing gzip writer for file %q: %v", newPackagePath, err)
@@ -185,8 +189,8 @@ func writeModifiedTarHeader(t *testing.T, writer *tar.Writer, header *tar.Header
 }
 
 func repackageZipArchive(t *testing.T, srcPackagePath string, newPackagePath string, newVersion *version.ParsedSemVer) {
-	oldTopDirectoryName := strings.TrimRight(filepath.Base(srcPackagePath), ".zip")
-	newTopDirectoryName := strings.TrimRight(filepath.Base(newPackagePath), ".zip")
+	oldTopDirectoryName := strings.TrimSuffix(filepath.Base(srcPackagePath), ".zip")
+	newTopDirectoryName := strings.TrimSuffix(filepath.Base(newPackagePath), ".zip")
 
 	// Open the source package and create readers
 	zipReader, err := zip.OpenReader(srcPackagePath)
@@ -257,7 +261,7 @@ func hackZipPackage(t *testing.T, reader *zip.ReadCloser, writer *zip.Writer, ol
 			fileContentReader, err := zippedFile.Open()
 			require.NoErrorf(t, err, "error opening zip file content reader for %+v", zippedFileHeader)
 			// copy body
-			_, err = io.Copy(fileContentWriter, fileContentReader)
+			_, err = io.Copy(fileContentWriter, fileContentReader) //nolint:gosec // G110: repackaging a trusted test artifact
 			require.NoErrorf(t, err, "error writing file content for %+v", zippedFileHeader)
 
 			// we need to close the file content reader

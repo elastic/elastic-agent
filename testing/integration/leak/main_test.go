@@ -8,10 +8,12 @@ package leak
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"testing"
 
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 
 	// import order matters, keep it here
@@ -32,6 +34,12 @@ func TestMain(m *testing.M) {
 	}
 
 	runExitCode := m.Run()
+
+	// The fixtures extract each agent package once per process and hardlink
+	// the binaries into their work directories; drop that shared tree now.
+	if err := atesting.RemoveExtractCache(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to remove the fixture extraction cache: %v\n", err)
+	}
 
 	if define.AutoDiscover {
 		discoveredTests, err := define.DumpAutodiscoveryYAML()
