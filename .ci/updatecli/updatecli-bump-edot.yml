@@ -20,7 +20,6 @@ actions:
     kind: github/pullrequest
     scmid: elastic-agent
     spec:
-      automerge: false
       labels:
         - automation
         - dependencies
