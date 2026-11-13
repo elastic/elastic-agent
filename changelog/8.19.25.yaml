@@ -1,0 +1,55 @@
+version: 8.19.25
+entries:
+    - kind: bug-fix
+      summary: Guard against malformed health status payload and nil event panic in OTel collector
+      description: |
+        Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17825
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17957
+        - https://github.com/elastic/elastic-agent/pull/17938
+        - https://github.com/elastic/elastic-agent/pull/17966
+        - https://github.com/elastic/elastic-agent/pull/17983
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17028
+      impact: ""
+      action: ""
+      timestamp: 1791989613
+      file:
+        name: 1791989613-fix-otel-malformed-health-status-panic.yaml
+        checksum: 4c4c274a659bb72c36ff14ac216082902552cf4e
+    - kind: bug-fix
+      summary: report service component start failures as degraded, and as failed when they persist
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17524
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16305
+      impact: ""
+      action: ""
+      timestamp: 1793003532
+      file:
+        name: 1793003532-report-service-component-start-failures-as-failed-while-retrying.yaml
+        checksum: 956413c6f09ebbac012858cc0147c797e697ac96
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.164.x
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17825
+        - https://github.com/elastic/elastic-agent/pull/17951
+        - https://github.com/elastic/elastic-agent/pull/17957
+        - https://github.com/elastic/elastic-agent/pull/17938
+        - https://github.com/elastic/elastic-agent/pull/17966
+        - https://github.com/elastic/elastic-agent/pull/17983
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17028
+      impact: ""
+      action: ""
+      timestamp: 1793281480
+      file:
+        name: 1793281480-update-otel-components-to-v0.164.x.yaml
+        checksum: ecd9ad6eeb80bad607b84b717ed953d275f5ac42
