@@ -625,7 +625,7 @@ func TestCreateComponentFilter(t *testing.T) {
 func generateLines(prefix string, start, end int) string {
 	b := strings.Builder{}
 	for i := start; i <= end; i++ {
-		b.WriteString(fmt.Sprintf("%s: %d\n", prefix, i))
+		fmt.Fprintf(&b, "%s: %d\n", prefix, i)
 	}
 	return b.String()
 }
