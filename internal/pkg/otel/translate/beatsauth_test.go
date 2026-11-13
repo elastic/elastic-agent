@@ -37,12 +37,12 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap/zaptest"
 
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/testing/proxytest"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommontest"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/beats/v7/x-pack/otel/oteltest"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/testing/proxytest"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
 	agentComponent "github.com/elastic/elastic-agent/pkg/component"
 	mockes "github.com/elastic/mock-es/pkg/api"
 )
@@ -251,7 +251,7 @@ func TestCATrustedFingerPrint(t *testing.T) {
 }
 
 // tests verification mode
-// The test scenarios are taken from https://github.com/elastic/elastic-agent-libs/blob/main/transport/tlscommon/tls_config_test.go#L495
+// The test scenarios are taken from TestVerificationMode in https://github.com/elastic/beats/blob/main/pkg/transport/tlscommon/tls_config_test.go
 func TestVerificationMode(t *testing.T) {
 	testcases := map[string]struct {
 		verificationMode string

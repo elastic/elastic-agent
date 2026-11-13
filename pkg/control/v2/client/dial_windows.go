@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
+	"github.com/elastic/beats/v7/pkg/api/npipe"
 )
 
 func dialContext(ctx context.Context, address string, maxMsgSize int, opts ...grpc.DialOption) (*grpc.ClientConn, error) {

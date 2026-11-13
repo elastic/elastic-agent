@@ -589,8 +589,8 @@ github.com/elastic/opentelemetry-lib v0.50.0 h1:lJfTTem4DGbwGmBEpjJ1/P3GW3y51oIa
 github.com/elastic/opentelemetry-lib v0.50.0/go.mod h1:hP9WaRQzxliYvOjjqK3sYea048WDqn9w8msjt/CTAW8=
 github.com/elastic/proxy-connect-dialer-go v0.1.1 h1:kmSFbqC+j6yVlxwPixI/7aTpdp+FH16Oaau1bcClpjI=
 github.com/elastic/proxy-connect-dialer-go v0.1.1/go.mod h1:YYlk9leuhkB2h7STwiNOGa1UkZWalY70jnIF8Ec3Sks=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be h1:AbN9OyZ+o9tNmbY5cEDRrXq4pdCY6thW02NF9CiUJpk=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
 github.com/elastic/tk-btf v0.3.0 h1:8WL1GsVAsxfJzkUGqyzEg6raeVR0c7I966l1M/mOJmU=
 github.com/elastic/tk-btf v0.3.0/go.mod h1:yxzXvfHaTMgtpasIzrSn1wPeKKjNyiL/UUc7LRBis2A=
 github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb h1:8SvKmGOYyxKi6jB0nvV1lpxEHfIS6tQ40x1BXBhKMsE=
