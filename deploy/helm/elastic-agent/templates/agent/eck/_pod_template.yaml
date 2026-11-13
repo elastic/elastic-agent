@@ -97,6 +97,18 @@ template:
         resources:
           {{- . | toYaml | nindent 10 }}
         {{- end }}
+        {{- with ($presetVal).startupProbe }}
+        startupProbe:
+          {{- . | toYaml | nindent 10 }}
+        {{- end }}
+        {{- with ($presetVal).livenessProbe }}
+        livenessProbe:
+          {{- . | toYaml | nindent 10 }}
+        {{- end }}
+        {{- with ($presetVal).readinessProbe }}
+        readinessProbe:
+          {{- . | toYaml | nindent 10 }}
+        {{- end }}
         {{- with ($presetVal).ports }}
         ports:
         {{- range $idx, $port := . }}
