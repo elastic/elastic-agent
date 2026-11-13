@@ -26,6 +26,7 @@ common:
 
 steps:
   - input: "Build parameters"
+    if: 'build.env("DRA_WORKFLOW") == null || build.env("DRA_VERSION") == null'
     fields:
       - text: "MANIFEST_URL"
         key: "MANIFEST_URL"
@@ -176,54 +177,37 @@ steps:
         plugins:
           - *google_oidc_plugin
 
-  - label: ":elastic-stack: Publishing to DRA"
+  - label: ":elastic-stack: DRA Prep elastic-agent-package"
+    # skip for IAR — IAR uses the legacy publish path below
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
-    key: dra-publish
+    key: dra-prep
     depends_on: package
+    # publish only from main and release branches, never from PRs or manually
+    # forced feature-branch builds
+    command: ".buildkite/scripts/stage-agent-package-artifacts.sh"
     agents:
-      provider: "gcp"
-      image: "${IMAGE_UBUNTU_2404_X86_64}"
+      image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
+      cpu: "2"
+      memory: "4Gi"
+      ephemeralStorage: "20Gi"
     env:
       DRA_PROJECT_ID: "elastic-agent-package"
-      DRA_PROJECT_ARTIFACT_ID: "agent-package"
-    command: |
-      echo "+++ Restoring Artifacts"
-      buildkite-agent artifact download "build/**/*" .
-
-      echo "+++ Changing permissions for the release manager"
-      sudo chmod -R a+r build/distributions/
-      sudo chown -R :1000 build/distributions/
-      ls -lahR build/
-
-      echo "+++ Running DRA publish step"
-      if [[ -z "$${MANIFEST_URL}" ]]; then
-        export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
-      fi
-      if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
-        export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
-      fi
-      if [[ -z "$${DRA_DRY_RUN}" ]]; then
-        DRA_DRY_RUN=$(buildkite-agent meta-data get DRA_DRY_RUN --default "")
-        export DRA_DRY_RUN
-      fi
-      if [[ -z "$${DRA_VERSION}" ]]; then
-        DRA_VERSION=$(buildkite-agent meta-data get DRA_VERSION --default "")
-        export DRA_VERSION
-      fi
-      if [[ -z "$${DRA_WORKFLOW}" ]]; then
-        DRA_WORKFLOW=$(buildkite-agent meta-data get DRA_WORKFLOW --default "")
-        export DRA_WORKFLOW
-      fi
-      if [[ -z "$${MANIFEST_URL}" ]]; then
-        # Triggered from a PR with no manifest URL. The build in that case is always a snapshot build.
-        # Ensure that the BEAT_VERSION that is passed to the DRA publish script is a SNAPSHOT version.
-        if [[ "${BEAT_VERSION}" != *-SNAPSHOT ]]; then
-          BEAT_VERSION="${BEAT_VERSION}-SNAPSHOT"
-        fi
-      fi
-      .buildkite/scripts/steps/dra-publish.sh
     plugins:
       - *google_oidc_plugin
+      - elastic/dra-prep#v0.1.7:
+          product_id: "elastic-agent-package"
+          stack_version: "${DRA_VERSION}-SNAPSHOT"
+          workflow: "${DRA_WORKFLOW}"
+
+  - label: ":pipeline: DRA processing for elastic-agent-package / ${DRA_VERSION} / ${DRA_WORKFLOW}"
+    trigger: "unified-release-dra-processing"
+    depends_on: "dra-prep"
+    if: build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+\$/)
+    build:
+      env:
+        DRA_PRODUCT_ID: "elastic-agent-package"
+        DRA_STACK_VERSION: "${DRA_VERSION}-SNAPSHOT"
+        DRA_WORKFLOW: "${DRA_WORKFLOW}"
 
   - label: "Publishing via BK API for Independent Agent Release"
     if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == "independent-agent-release-staging"

@@ -1,0 +1,13 @@
+# Dependent products for elastic-agent-package.
+# Used by the DRA dependency poller to determine when to trigger a new build,
+# and passed as --dependency flags to dractl prep.
+dependencies:
+  - beats
+  - apm-server
+  - fleet-server
+  - cloud-defend
+  - cloudbeat
+  - elastic-agent-core
+  - prodfiler
+  - endpoint-dev
+  - connectors
