@@ -117,6 +117,10 @@ func SetupFlags() {
 	})
 }
 
+// FlavorFileName is the name of the file in the top directory that records the
+// flavor the agent was installed with.
+const FlavorFileName = ".flavor"
+
 // Top returns the top directory for Elastic Agent, all the versioned
 // home directories live under this top-level/data/elastic-agent-${hash}
 func Top() string {

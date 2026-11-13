@@ -2,6 +2,8 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
+//go:build !edr
+
 // Package include registers all the composable providers with the composable
 // registry. It exists as a single place that explicitly wires up every
 // provider, replacing the previous pattern of each provider package
