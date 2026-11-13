@@ -14,7 +14,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v93/github"
 )
 
 func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {

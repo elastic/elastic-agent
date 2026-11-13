@@ -29,7 +29,7 @@ import (
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/elastic/elastic-agent/dev-tools/mage/pkgcommon"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"

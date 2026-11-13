@@ -35,7 +35,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.22.1
-	github.com/google/go-github/v68 v68.0.0
+	github.com/google/go-github/v93 v93.0.0
 	github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b
 	github.com/gorilla/mux v1.8.1
 	github.com/jedib0t/go-pretty/v6 v6.8.3
@@ -73,7 +73,7 @@ require (
 	go.opentelemetry.io/collector/pipeline v1.70.0
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.uber.org/zap v1.28.0
-	go.yaml.in/yaml/v3 v3.0.6
+	go.yaml.in/yaml/v4 v4.0.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/mod v0.42.0
 	golang.org/x/net v0.62.0
@@ -388,6 +388,7 @@ require (
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	golang.org/x/telemetry v0.0.0-20261009151841-97e8ea77aa2a // indirect
 	golang.org/x/tools v0.52.0 // indirect

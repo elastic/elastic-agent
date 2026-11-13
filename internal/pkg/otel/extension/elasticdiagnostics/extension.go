@@ -23,7 +23,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/extension/extensioncapabilities"
 	"go.uber.org/zap"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/elastic/beats/v7/pkg/logp"
