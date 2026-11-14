@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -99,7 +99,7 @@ func TestFetchVerify(t *testing.T) {
 	require.NoError(t, err)
 	asc, err := os.ReadFile(filepath.Join(dropPath, filename+".asc"))
 	require.NoErrorf(t, err, "could not open .asc for copy")
-	err = os.WriteFile(ascTargetFilePath, asc, 0o600)
+	err = os.WriteFile(ascTargetFilePath, asc, 0o600) //nolint:gosec // G703: test-controlled temporary path
 	require.NoErrorf(t, err, "could not save .asc (%q) to target path (%q)",
 		filepath.Join(dropPath, filename+".asc"), ascTargetFilePath)
 
@@ -190,7 +190,7 @@ func prepareFetchVerifyTests(
 	}
 
 	corruptedHash := append([]byte{1, 2, 3, 4, 5, 6}, hashContent[6:]...)
-	return os.WriteFile(hashTargetFilePath, corruptedHash, 0666)
+	return os.WriteFile(hashTargetFilePath, corruptedHash, 0666) //nolint:gosec // G703: test-controlled temporary path
 }
 
 func TestVerify(t *testing.T) {

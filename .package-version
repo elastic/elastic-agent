@@ -1,9 +1,9 @@
 {
-  "version": "9.5.6-SNAPSHOT",
-  "build_id": "9.5.6-40b73061",
-  "manifest_url": "https://snapshots.elastic.co/9.5.6-40b73061/manifest-9.5.6-SNAPSHOT.json",
-  "summary_url": "https://snapshots.elastic.co/9.5.6-40b73061/summary-9.5.6-SNAPSHOT.html",
-  "core_version": "9.5.6",
-  "stack_version": "9.5.6",
-  "stack_build_id": ""
+  "version": "9.5.7-SNAPSHOT",
+  "build_id": "9.5.7-6446358d",
+  "manifest_url": "https://snapshots.elastic.co/9.5.7-6446358d/manifest-9.5.7-SNAPSHOT.json",
+  "summary_url": "https://snapshots.elastic.co/9.5.7-6446358d/summary-9.5.7-SNAPSHOT.html",
+  "core_version": "9.5.7",
+  "stack_version": "9.5.7-SNAPSHOT",
+  "stack_build_id": "9.5.7-6446358d-SNAPSHOT"
 }

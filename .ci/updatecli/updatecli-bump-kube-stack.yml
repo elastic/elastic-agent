@@ -13,7 +13,6 @@ scms:
       commitusingapi: true
       branch: '{{ .scm.branch }}'
       force: false
-      singleBranch: true
 
 
 actions:
@@ -21,7 +20,6 @@ actions:
     kind: github/pullrequest
     scmid: elastic-agent
     spec:
-      automerge: false
       labels:
         - backport-active-9
         - dependencies

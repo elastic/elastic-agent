@@ -30,11 +30,11 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/logp"
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/logp"
+	monitoringLib "github.com/elastic/beats/v7/pkg/monitoring"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -986,7 +986,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	}
 
 	// ensure that the internal logger directory exists
-	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	loggerPath := paths.BuildLogs()
 	if err := os.MkdirAll(loggerPath, logsPathPerms); err != nil {
 		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
 	}

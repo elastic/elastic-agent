@@ -31,10 +31,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/beats/v7/pkg/logp"
+	monitoringLib "github.com/elastic/beats/v7/pkg/monitoring"
+	"github.com/elastic/beats/v7/pkg/service"
 	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
-	"github.com/elastic/elastic-agent-libs/logp"
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
@@ -598,7 +598,7 @@ func reexecPath() (string, error) {
 // --path.logs location when that flag was explicitly set on the CLI. This ensures
 // the flag takes precedence over yaml settings such as agent.logging.to_stderr.
 // The internal file output (consumed by diagnostics) is always written to
-// paths.Home() and is unaffected.
+// paths.BuildLogs() and is unaffected.
 // See https://github.com/elastic/elastic-agent/issues/13320
 func customLogsPathCfgOverride(cfg *config.Config) error {
 	if !paths.IsCustomLogsPath() {

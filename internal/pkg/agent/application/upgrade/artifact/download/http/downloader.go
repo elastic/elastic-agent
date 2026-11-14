@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	downloadErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
@@ -185,7 +185,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 		return "", err
 	}
 
-	req, err := http.NewRequest("GET", sourceURI, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURI, nil)
 	if err != nil {
 		return "", errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
@@ -202,7 +202,7 @@ func (e *Downloader) downloadFile(ctx context.Context, artifactName, filename, f
 	}
 	defer destinationFile.Close()
 
-	resp, err := e.client.Do(req.WithContext(ctx))
+	resp, err := e.client.Do(req)
 	if err != nil {
 		// return path, file already exists and needs to be cleaned up
 		return fullPath, errors.New(err, "fetching package failed", errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
