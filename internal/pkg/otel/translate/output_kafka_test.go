@@ -362,12 +362,12 @@ ssl:
 `,
 		},
 		{
-			"ca_sha_256 is set",
+			"ca_sha256 is set",
 			`
 hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 ssl:
-  ca_sha_256:  sha256
+  ca_sha256:  sha256
 `,
 		},
 	}

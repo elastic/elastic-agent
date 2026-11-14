@@ -240,8 +240,8 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 	} else if value, err := cfg.Child("ssl", -1); err == nil {
 		if value.HasField("ca_trusted_fingerprint") {
 			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
-		} else if value.HasField("ca_sha_256") {
-			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
+		} else if value.HasField("ca_sha256") {
+			return fmt.Errorf("ca_sha256 is currently not supported: %w", errors.ErrUnsupported)
 		}
 	} else if cfg.HasField("kerberos") {
 		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
