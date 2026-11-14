@@ -199,6 +199,7 @@ LOOP:
 			// we don't want a disconnect and a reconnect to be counted with
 			// the connectCounter that is tracked with the lostCounter
 			ch.connectCounter.Store(0)
+			ch.lastPid = -1
 
 			// failure is tracked only for the life of the connection to
 			// the watch streaming protocol. either an error that last longer
