@@ -176,14 +176,8 @@ max_message_bytes: 1000000`,
 				"logs": map[string]any{
 					"encoding": "raw",
 				},
-<<<<<<< HEAD
-				"timeout": 10 * time.Second,
-=======
 				"timeout":      10 * time.Second,
 				"dial_timeout": 30 * time.Second,
-				"record_partitioner": map[string]any{
-					"extension": "kafkapartitioner/_agent-component/default",
-				},
 			},
 		},
 		{
@@ -227,10 +221,6 @@ broker_timeout: 20s`,
 				},
 				"timeout":      20 * time.Second,
 				"dial_timeout": 5 * time.Second,
-				"record_partitioner": map[string]any{
-					"extension": "kafkapartitioner/_agent-component/default",
-				},
->>>>>>> ef5f29e (Support Kafka output timeout in OTel runtime (#17087))
 			},
 		},
 	}
