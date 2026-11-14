@@ -1167,6 +1167,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"brokers":              []string{"127.0.0.1:9022"},
 						"topic_from_attribute": "topic",
 						"client_id":            "beats",
+						"dial_timeout":         30 * time.Second,
 						"metadata": map[string]any{
 							"refresh_interval": 10 * time.Minute,
 						},
@@ -1283,8 +1284,9 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers":   []string{"127.0.0.1:9022"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9022"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "static-topic",
 							"encoding": "raw",
@@ -1394,8 +1396,9 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers":   []string{"127.0.0.1:9022"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9022"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "static-topic",
 							"encoding": "raw",
@@ -1543,8 +1546,9 @@ func TestGetOtelConfig(t *testing.T) {
 			expectedConfig: confmap.NewFromStringMap(map[string]any{
 				"exporters": map[string]any{
 					"kafka/_agent-component/default": map[string]any{
-						"brokers":   []string{"127.0.0.1:9022"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9022"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "static-topic",
 							"encoding": "raw",
@@ -1583,8 +1587,9 @@ func TestGetOtelConfig(t *testing.T) {
 						},
 					},
 					"kafka/_agent-component/monitoring": map[string]any{
-						"brokers":   []string{"127.0.0.1:9023"},
-						"client_id": "beats",
+						"brokers":      []string{"127.0.0.1:9023"},
+						"client_id":    "beats",
+						"dial_timeout": 30 * time.Second,
 						"logs": map[string]any{
 							"topic":    "monitoring-topic",
 							"encoding": "raw",
@@ -3995,8 +4000,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			exporterType: kafkaExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"brokers":   []string{"127.0.0.1:9092"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9092"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "my-topic",
 					"encoding": "raw",
@@ -4062,8 +4068,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			exporterType: kafkaExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"brokers":   []string{"127.0.0.1:9092"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9092"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "my-topic",
 					"encoding": "raw",
@@ -4128,8 +4135,9 @@ func TestUnitToExporterConfig(t *testing.T) {
 			exporterType: kafkaExporterType,
 			outputName:   "default",
 			expectedExporterCfg: map[string]any{
-				"brokers":   []string{"127.0.0.1:9092"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9092"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "my-topic",
 					"encoding": "raw",
