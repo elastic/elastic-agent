@@ -67,7 +67,10 @@ headers:
 					"min_size":      1600,
 					"sizer":         "items",
 				},
-				"queue_size": 3200,
+				"enabled":           true,
+				"queue_size":        3200,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
 			},
 			"timeout": 10 * time.Second,
 			"record_headers": []map[string]any{
@@ -122,7 +125,10 @@ max_message_bytes: 1000000`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"auth": map[string]any{
@@ -169,7 +175,10 @@ max_message_bytes: 1000000`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"logs": map[string]any{
 					"encoding": "raw",
@@ -362,12 +371,12 @@ ssl:
 `,
 		},
 		{
-			"ca_sha_256 is set",
+			"ca_sha256 is set",
 			`
 hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 ssl:
-  ca_sha_256:  sha256
+  ca_sha256:  sha256
 `,
 		},
 	}

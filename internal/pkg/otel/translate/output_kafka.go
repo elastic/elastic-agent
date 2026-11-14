@@ -54,13 +54,16 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		"client_id":        kConfig.ClientID,
 		"protocol_version": string(kConfig.Version),
 		"sending_queue": map[string]any{
+			"enabled": true,
 			"batch": map[string]any{
 				"max_size":      kConfig.BulkMaxSize,
 				"flush_timeout": getFlushTimeout(logger, config),
 				"min_size":      min(getFlushMinEvents(logger, config), kConfig.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
 				"sizer":         "items",
 			},
-			"queue_size": getQueueSize(logger, config),
+			"queue_size":        getQueueSize(logger, config),
+			"block_on_overflow": true,
+			"wait_for_result":   true,
 		},
 		"producer": map[string]any{
 			"compression":       kConfig.Compression,
@@ -240,8 +243,8 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 	} else if value, err := cfg.Child("ssl", -1); err == nil {
 		if value.HasField("ca_trusted_fingerprint") {
 			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
-		} else if value.HasField("ca_sha_256") {
-			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
+		} else if value.HasField("ca_sha256") {
+			return fmt.Errorf("ca_sha256 is currently not supported: %w", errors.ErrUnsupported)
 		}
 	} else if cfg.HasField("kerberos") {
 		return fmt.Errorf("kerberos is currently not supported: %w", errors.ErrUnsupported)
