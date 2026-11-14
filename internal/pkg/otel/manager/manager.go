@@ -685,18 +685,32 @@ func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, ag
 // exporterIDToOutputNameLookup compiles the mapping from raw collector
 // exporter IDs to the policy output names that generated them, so internal
 // telemetry monitoring can associate metrics with the user-defined name.
-func exporterIDToOutputNameLookup(components []component.Component) (map[string]string, error) {
+// An output that fails over between hosts has one exporter per host, named
+// <exporter id>/<priority>, and a failover connector that owns its queue; all of
+// them map to the output name so the output is reported as a single output.
+func exporterIDToOutputNameLookup(config *confmap.Conf, components []component.Component) (map[string]string, error) {
+	exporters, _ := config.Get("exporters").(map[string]any)
+	connectors, _ := config.Get("connectors").(map[string]any)
 	lookup := map[string]string{}
 	for _, comp := range components {
 		exporterType, err := translate.OutputTypeToExporterType(comp.OutputType)
 		if err != nil {
 			return nil, err
 		}
-		exporterID := translate.GetExporterID(exporterType, comp.OutputName)
+		baseID := translate.GetExporterID(exporterType, comp.OutputName).String()
+		name := fmt.Sprintf("%v-%v", exporterType, comp.OutputName)
 		// There may be collisions since multiple components can be generated
 		// from the same output, but this is fine since they will all have
 		// the same name as well.
-		lookup[exporterID.String()] = fmt.Sprintf("%v-%v", exporterType, comp.OutputName)
+		for exporterID := range exporters {
+			if exporterID == baseID || strings.HasPrefix(exporterID, baseID+"/") {
+				lookup[exporterID] = name
+			}
+		}
+		connectorID := translate.GetFailoverConnectorID(comp.OutputName).String()
+		if _, found := connectors[connectorID]; found {
+			lookup[connectorID] = name
+		}
 	}
 	return lookup, nil
 }
@@ -726,16 +740,19 @@ func injectMonitoringReceiver(
 	// named "monitoring" that the internal telemetry pipeline can share.
 	exporterType := otelcomponent.MustNewType("elasticsearch")
 	exporterID := translate.GetExporterID(exporterType, componentmonitoring.MonitoringOutput).String()
-	monitoringExporterFound := false
-	if config.IsSet("exporters") {
-		for exporter := range config.Get("exporters").(map[string]any) {
-			if exporter == exporterID {
-				monitoringExporterFound = true
-			}
+	failoverConnectorID := translate.GetFailoverConnectorID(componentmonitoring.MonitoringOutput).String()
+	exporters, _ := config.Get("exporters").(map[string]any)
+	connectors, _ := config.Get("connectors").(map[string]any)
+	monitoringExporterFound := true
+	if _, found := exporters[exporterID]; !found {
+		if _, found := connectors[failoverConnectorID]; found {
+			exporterID = failoverConnectorID
+		} else {
+			monitoringExporterFound = false
 		}
 	}
 
-	outputNameLookup, err := exporterIDToOutputNameLookup(components)
+	outputNameLookup, err := exporterIDToOutputNameLookup(config, components)
 	if err != nil {
 		return fmt.Errorf("couldn't map exporter IDs to output names: %w", err)
 	}

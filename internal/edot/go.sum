@@ -1155,6 +1155,8 @@ github.com/open-telemetry/opamp-go v0.25.0 h1:UXXSQBtXWxa1ClY85caMrsdiry9dnCZn+L
 github.com/open-telemetry/opamp-go v0.25.0/go.mod h1:xgYySBY286Bei9/0gFH0X+l6h51fQnvZcLvglDQf9DI=
 github.com/open-telemetry/opentelemetry-collector-contrib/config/configdbauth v0.164.1 h1:WHB9Axy4+MeX9j5tP6viKnfJ4breD3hGHnPAarfyjAU=
 github.com/open-telemetry/opentelemetry-collector-contrib/config/configdbauth v0.164.1/go.mod h1:v3hCETzdSvlesHUeKq9sA86MqEPCgEx5tCFd6Qu5kDE=
+github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector v0.164.1 h1:N+tI1v2dIofOSHTrhjk+Ipj716zrFMHwFvWNbLxn6Mw=
+github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector v0.164.1/go.mod h1:TjuXKa/AvKa4x1GvO/6JvYmHoD0V0vxz3YboIuIMgpw=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.164.1 h1:ZBWPXBV0scL8WsGhNK1uDb0qXIeKKNGnzHk03hM8eac=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.164.1/go.mod h1:F84vZZ355eDpN2XyojOCpbocZOLZw8o2JExGENqICRI=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.164.1 h1:CoYnFfCDQKSdwGravFQWghS3a60u4J6spRdr7b/Ud5Q=

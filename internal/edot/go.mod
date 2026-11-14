@@ -27,6 +27,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.78.0
 	github.com/elastic/opentelemetry-collector-components/receiver/prometheusscrapereceiver v0.78.0
 	github.com/gofrs/uuid/v5 v5.5.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/connector/failoverconnector v0.164.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.164.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.164.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.164.1
