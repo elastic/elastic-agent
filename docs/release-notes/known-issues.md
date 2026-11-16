@@ -155,7 +155,7 @@ Agents using policies created before osquery_manager 1.30 added the `query_profi
 
 Pin Osquerybeat back to the process runtime on the {{fleet}} agent policy using the `osquery_manager` integration:
 
-1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy.
+1. In {{kib}}, go to **Fleet → Agent policies** and open the agent policy.
 
 2. On the **Settings** tab, expand **Advanced settings** and locate **Advanced internal YAML settings**.
 
