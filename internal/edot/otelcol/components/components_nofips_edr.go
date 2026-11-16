@@ -24,7 +24,7 @@ func addNonFipsReceivers(receivers []receiver.Factory) []receiver.Factory {
 }
 
 // addNonFipsExporters is a no-op for the EDR flavor: the kafka exporter
-// is not included in the EDR flavor build.
+// is registered directly in the EDR default component set.
 func addNonFipsExporters(exporters []exporter.Factory) []exporter.Factory {
 	return exporters
 }

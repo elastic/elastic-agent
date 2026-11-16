@@ -24,29 +24,20 @@ import (
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
-	"go.opentelemetry.io/collector/processor/batchprocessor"
-	"go.opentelemetry.io/collector/processor/memorylimiterprocessor"
-
 	"github.com/elastic/beats/v7/x-pack/otel/processor/beatprocessor"
 
 	// Exporters:
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
-	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter"
-	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
-	"go.opentelemetry.io/collector/exporter/otlpexporter"
-	otlphttpexporter "go.opentelemetry.io/collector/exporter/otlphttpexporter"
+	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter"
+	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 
 	"github.com/elastic/beats/v7/x-pack/otel/exporter/logstashexporter"
 
 	// Extensions:
-	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/cgroupruntimeextension"
-	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckextension"
 	healthcheckv2extension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/healthcheckv2extension"
-	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
-	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
-	"go.opentelemetry.io/collector/extension/memorylimiterextension"
 
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
+	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
 	// Connectors:
@@ -96,11 +87,8 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			return otelcol.Factories{}, err
 		}
 
-		// Processors — only the components required for beats receiver pipelines
-		// and basic collector safety; all policy-facing processors are excluded
+		// Processors — only the beat processor used by beats receiver pipelines
 		factories.Processors, err = otelcol.MakeFactoryMap[processor.Factory](
-			batchprocessor.NewFactory(),
-			memorylimiterprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
 		)
 		if err != nil {
@@ -109,14 +97,11 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 
 		// Exporters
 		exporters := []exporter.Factory{
-			otlpexporter.NewFactory(),
-			debugexporter.NewFactory(),
 			elasticsearchexporter.NewFactory(),
-			otlphttpexporter.NewFactory(),
-			nopexporter.NewFactory(),
+			fileexporter.NewFactory(),
+			kafkaexporter.NewFactory(),
 			logstashexporter.NewFactory(),
 		}
-		// kafka exporter is excluded from the EDR flavor build
 		exporters = addNonFipsExporters(exporters)
 		factories.Exporters, err = otelcol.MakeFactoryMap(exporters...)
 		if err != nil {
@@ -132,14 +117,10 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		}
 
 		extensions := []extension.Factory{
-			cgroupruntimeextension.NewFactory(),
 			healthcheckv2extension.NewFactory(),
-			memorylimiterextension.NewFactory(),
-			filestorage.NewFactory(),
-			healthcheckextension.NewFactory(),
-			pprofextension.NewFactory(),
 			beatsauthextension.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			kafkapartitionerextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)
