@@ -349,12 +349,12 @@ func TestSwitchToUnprivilegedDeduplication(t *testing.T) {
 }
 
 // agentLogContains reports whether any of the installed agent's NDJSON log
-// files under <workDir>/data/elastic-agent-*/logs/ contain substr. Errors
+// files under <workDir>/data/logs/<build>/ contain substr. Errors
 // reading individual files are logged and skipped so a transient rotation
 // doesn't fail the assertion.
 func agentLogContains(t *testing.T, f *atesting.Fixture, substr string) bool {
 	t.Helper()
-	pattern := filepath.Join(f.WorkDir(), "data", "elastic-agent-*", "logs", "elastic-agent-*.ndjson")
+	pattern := filepath.Join(f.WorkDir(), "data", "logs", "*", "elastic-agent-*.ndjson")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		t.Logf("agentLogContains: glob %q error: %v", pattern, err)
