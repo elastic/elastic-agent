@@ -10,7 +10,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -44,7 +43,7 @@ func TestBuildLogsCleanupOnStartup(t *testing.T) {
 	require.NoError(t, err)
 
 	esURL := integration.StartMockES(t, 0, 0, 0, 0)
-	logFilepath := path.Join(t.TempDir(), "flog.log")
+	logFilepath := filepath.Join(t.TempDir(), "flog.log")
 	integration.GenerateLogFile(t, logFilepath, time.Millisecond*500, 0)
 	cfg := fmt.Sprintf(eventLogConfig, esURL.String(), logFilepath, logp.InfoLevel.String(), runtimeProcess)
 
@@ -75,53 +74,55 @@ func TestBuildLogsCleanupOnStartup(t *testing.T) {
 	require.Eventually(t, func() bool { return len(runningBuildLogs()) == 1 }, time.Minute, time.Second,
 		"the running build must have exactly one log directory under %s", logsRoot)
 	runningBuild := runningBuildLogs()[0]
-
-	// logs of two previous builds
-	previousBuilds := map[string]time.Duration{
-		"1.0.0-aaaaaa": 2 * time.Hour,
-		"1.0.1-bbbbbb": time.Hour,
+	seed := func(builds map[string]time.Duration) {
+		for name, age := range builds {
+			logFile := filepath.Join(logsRoot, name, "elastic-agent-20200101.ndjson")
+			require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0o755))
+			require.NoError(t, os.WriteFile(logFile, []byte("{}\n"), 0o600))
+			ts := time.Now().Add(-age)
+			require.NoError(t, os.Chtimes(logFile, ts, ts))
+		}
 	}
-	for name, age := range previousBuilds {
-		logFile := filepath.Join(logsRoot, name, "elastic-agent-20200101.ndjson")
-		require.NoError(t, os.MkdirAll(filepath.Dir(logFile), 0o755))
-		require.NoError(t, os.WriteFile(logFile, []byte("{}\n"), 0o600))
-		ts := time.Now().Add(-age)
-		require.NoError(t, os.Chtimes(logFile, ts, ts))
+	removed := func(names ...string) bool {
+		for _, name := range names {
+			if _, err := os.Stat(filepath.Join(logsRoot, name)); !os.IsNotExist(err) {
+				return false
+			}
+		}
+		return true
 	}
 
-	// the cleanup runs on every start: the first one removes the older previous build ...
-	restartAndWait(ctx, t, fixture)
-	assert.NoDirExists(t, filepath.Join(logsRoot, "1.0.0-aaaaaa"), "logs of the older previous build must be removed on startup")
-	assert.DirExists(t, filepath.Join(logsRoot, "1.0.1-bbbbbb"), "logs of the latest previous build must be kept")
+	// logs of three previous builds: only the one written last is kept, whatever the names are, and not just the
+	// oldest one is removed
+	seed(map[string]time.Duration{
+		"1.0.0-aaaaaa": time.Hour,
+		"1.0.1-bbbbbb": 2 * time.Hour,
+		"1.0.2-cccccc": 3 * time.Hour,
+	})
+	triggerRestart(ctx, t, fixture)
+	// the cleanup runs next to the Agent, so wait for its effect
+	require.Eventually(t, func() bool { return removed("1.0.1-bbbbbb", "1.0.2-cccccc") }, 2*time.Minute, time.Second,
+		"logs of the older previous builds must be removed on startup")
+	assert.DirExists(t, filepath.Join(logsRoot, "1.0.0-aaaaaa"), "logs of the latest previous build must be kept")
 	assert.DirExists(t, filepath.Join(logsRoot, runningBuild), "logs of the running build must be kept")
 
-	// ... and the next one keeps the remaining previous build, it is not removed because it is the oldest
-	restartAndWait(ctx, t, fixture)
-	assert.DirExists(t, filepath.Join(logsRoot, "1.0.1-bbbbbb"), "logs of the latest previous build must be kept on every startup")
+	// the cleanup runs on every start: an older build with a greater name is removed, the latest one is still kept
+	seed(map[string]time.Duration{"2.0.0-dddddd": 4 * time.Hour})
+	triggerRestart(ctx, t, fixture)
+	require.Eventually(t, func() bool { return removed("2.0.0-dddddd") }, 2*time.Minute, time.Second,
+		"logs of an older previous build must be removed on every startup")
+	assert.DirExists(t, filepath.Join(logsRoot, "1.0.0-aaaaaa"), "logs of the latest previous build must be kept on every startup")
 	assert.DirExists(t, filepath.Join(logsRoot, runningBuild), "logs of the running build must be kept")
 	assertNoLogsInInstallation(t, fixture.WorkDir())
 }
 
-// restartAndWait restarts the installed Agent and returns once the new process is running, which is after it
-// has cleaned up the build logs: the restart command returns when the restart is triggered, not when it is done.
-// The Agent restarts in place, so its process ID does not change. A start is seen in its log instead, and
-// the control server of the new process answers only after its start up, which includes the cleanup.
-func restartAndWait(ctx context.Context, t *testing.T, fixture *atesting.Fixture) {
+// triggerRestart restarts the installed Agent. The restart command returns when the restart is triggered, not when
+// it is done.
+func triggerRestart(ctx context.Context, t *testing.T, fixture *atesting.Fixture) {
 	t.Helper()
-
-	const startedMessage = "Elastic Agent started"
-	starts := agentLogCount(t, fixture, startedMessage)
 
 	restartOutput, err := fixture.Exec(ctx, []string{"restart"})
 	require.NoErrorf(t, err, "restart failed: %s\noutput:\n%s", err, restartOutput)
-
-	require.Eventually(t, func() bool {
-		return agentLogCount(t, fixture, startedMessage) > starts
-	}, 2*time.Minute, time.Second, "the Agent did not start again")
-	require.Eventually(t, func() bool {
-		_, err := fixture.ExecStatus(ctx, atesting.WithNoRetry())
-		return err == nil
-	}, 2*time.Minute, time.Second, "the Agent did not answer after the restart")
 }
 
 // assertNoLogsInInstallation fails if the installation directories of the Agent installed in topPath have log files.
