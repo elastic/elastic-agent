@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -459,6 +460,29 @@ func PerformUpgrade(
 		}
 	}
 
+	// the upgraded Agent logs to the log directory of its own build, outside of its installation
+	if WritesBuildLogs(endFixture) {
+		topPath := startFixture.WorkDir()
+		buildName := InstalledBuildLogsDirName(topPath, endFixture.Version(), endVersionInfo.Binary)
+		pattern := filepath.Join(topPath, "data", "logs", buildName, "elastic-agent-*.ndjson")
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			return fmt.Errorf("searching the build logs of the upgraded Agent matching %s: %w", pattern, err)
+		}
+		if len(files) == 0 {
+			return fmt.Errorf("no build logs of the upgraded Agent found matching %s", pattern)
+		}
+
+		// and nothing is written to the logs directories of its installation, by the Agent or by a component that
+		// does not use the logs path it is given
+		home := filepath.Join(topPath, "data", "elastic-agent-"+buildName)
+		for _, dir := range []string{filepath.Join(home, "logs"), filepath.Join(home, "components", "logs")} {
+			if err := CheckNoFilesIn(dir); err != nil {
+				return fmt.Errorf("the upgraded Agent wrote to its installation: %w", err)
+			}
+		}
+	}
+
 	if upgradeOpts.PostWatcherSuccessHook != nil {
 		if err := upgradeOpts.PostWatcherSuccessHook(ctx, endFixture); err != nil {
 			return fmt.Errorf("post watcher success hook failed: %w", err)
@@ -468,6 +492,44 @@ func PerformUpgrade(
 	return nil
 }
 
+<<<<<<< HEAD
+=======
+// CheckNoFilesIn returns an error if any file exists below dir. A directory that does not exist has none.
+func CheckNoFilesIn(dir string) error {
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			return fmt.Errorf("unexpected file %s, logs must be written to data/logs/<build>", p)
+		}
+		return nil
+	})
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
+func CheckDiskSpaceReservationsRemoved(topPath, archiveDir string) error {
+	installReservation := filepath.Join(paths.DataFrom(topPath), upgrade.InstallReservationName)
+	archiveReservation := filepath.Join(archiveDir, upgrade.ArchiveReservationName)
+
+	var errs []error
+	if _, err := os.Lstat(installReservation); err == nil {
+		errs = append(errs, fmt.Errorf("disk space reservation file %s was not removed", installReservation))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("failed to check disk space reservation file %s: %w", installReservation, err))
+	}
+	if _, err := os.Lstat(archiveReservation); err == nil {
+		errs = append(errs, fmt.Errorf("disk space reservation file %s was not removed", archiveReservation))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("failed to check disk space reservation file %s: %w", archiveReservation, err))
+	}
+	return errors.Join(errs...)
+}
+
+>>>>>>> d0a250a (Keep Elastic Agent logs outside versioned installation directories (#17802))
 var ErrVerMismatch = errors.New("versions don't match")
 
 func CheckHealthyAndVersion(ctx context.Context, f *atesting.Fixture, versionInfo atesting.AgentBinaryVersion) error {
