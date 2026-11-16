@@ -143,7 +143,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.29.2 // indirect
 	github.com/go-openapi/swag/yamlutils v0.29.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20261105003125-4bf881d7fb0b // indirect
+	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.45.0 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
@@ -160,8 +160,8 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/mileusna/useragent v1.3.5 // indirect
-	github.com/moby/moby/api v1.56.1 // indirect
-	github.com/moby/moby/client v0.6.2 // indirect
+	github.com/moby/moby/api v1.57.0 // indirect
+	github.com/moby/moby/client v0.6.3 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/config/configdbauth v0.164.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/dbauth v0.164.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.164.1 // indirect
