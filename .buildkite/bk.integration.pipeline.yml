@@ -180,14 +180,12 @@ common:
       image: "${IMAGE_UBUNTU_2404_X86_64}"
       diskSizeGb: 80
     command: &k8s_test_command |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     command_retry: &k8s_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
       sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh kubernetes false
     artifact_paths: &k8s_test_artifact_paths
       - build/*
@@ -234,14 +232,12 @@ common:
       image: "${IMAGE_UBUNTU_2404_X86_64}"
       diskSizeGb: 80
     command: &openshift_test_command |
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
     command_retry: &openshift_test_command_with_sleep |
       MIN=0
       MAX=9
       # echo let's avoid running multiple requests at the same time to avoid overwhelming the cluster and causing deployment issues
       sleep $(( MIN + RANDOM % (MAX - MIN + 1) ))
-      buildkite-agent artifact download build/distributions/*-linux-amd64.docker.tar.gz . --step 'packaging-containers-amd64'
       .buildkite/scripts/steps/integration_tests_oblt-cli.sh openshift false
     artifact_paths: &openshift_test_artifact_paths
       - build/*

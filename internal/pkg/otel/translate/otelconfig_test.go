@@ -20,11 +20,11 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -1189,7 +1189,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"logs": map[string]any{
 							"encoding": "raw",
@@ -1310,7 +1313,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1420,7 +1426,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1569,7 +1578,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1607,7 +1619,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -4768,7 +4783,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -4833,7 +4851,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -4897,7 +4918,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{

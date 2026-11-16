@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"

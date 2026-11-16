@@ -20,8 +20,8 @@ import (
 
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 
-	"github.com/elastic/elastic-agent-libs/api"
-	"github.com/elastic/elastic-agent-libs/monitoring"
+	"github.com/elastic/beats/v7/pkg/api"
+	"github.com/elastic/beats/v7/pkg/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"

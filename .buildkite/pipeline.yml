@@ -54,7 +54,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -76,7 +75,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -98,7 +96,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -118,7 +115,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
@@ -139,7 +135,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -161,7 +156,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         env:
           # NOTE: We need to skip token redaction to avoid OIDC token issues. Only for version <= Windows build 17063
           BUILDKITE_AGENT_OIDC_REQUEST_TOKEN_SKIP_TOKEN_REDACTION: "true"
@@ -188,7 +182,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -220,7 +213,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -243,7 +235,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_UBUNTU_2204_X86_64}"
@@ -265,7 +256,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "aws"
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
@@ -288,7 +278,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -313,7 +302,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "gcp"
           image: "${IMAGE_WIN_2022}"
@@ -337,7 +325,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"
@@ -362,7 +349,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_10}"
@@ -389,7 +375,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11}"
@@ -411,7 +396,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"
@@ -435,7 +419,6 @@ steps:
           - "build/TEST-*.html"
           - "build/TEST-*.xml"
           - "build/diagnostics/*"
-          - "coverage-*.out"
         agents:
           provider: "azure"
           image: "${IMAGE_WIN_11_ARM64}"

@@ -24,9 +24,9 @@ import (
 	"go.uber.org/zap"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/useragent"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/useragent"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 
@@ -947,8 +947,6 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 				case extensionKey == "extension:"+m.healthCheckExtComponentID:
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				case strings.HasPrefix(extensionKey, "extension:kafkapartitioner"):
-					delete(extensionsMap.ComponentStatusMap, extensionKey)
-				case strings.HasPrefix(extensionKey, "extension:oauth2client"):
 					delete(extensionsMap.ComponentStatusMap, extensionKey)
 				}
 			}
