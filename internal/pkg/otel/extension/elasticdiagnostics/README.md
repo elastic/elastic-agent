@@ -27,6 +27,7 @@ The extension accepts the `endpoint` as a sole parameter. The endpoint should be
 ### Diagnostic hooks:
 - Individual beats register custom diagnostic hooks and these hooks are called when we run the elastic-agent diagnostics command.
 - Our extension stores these hooks and executes them everytime it gets a "diagnostics" request.
+- Registering a hook again for the same component and filename replaces the earlier one. Beat receivers remove their hooks with `UnregisterDiagnosticHooks` when they shut down.
 
 ### Request/Response format:
 - This extension runs an HTTP server and listens to new requests on `/diagnostics` path.

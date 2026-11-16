@@ -46,6 +46,8 @@ var (
 	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
 	_ otelmanager.DiagnosticExtension = (*diagnosticsExtension)(nil)
 	_ otelmanager.ActionExtension     = (*diagnosticsExtension)(nil)
+	// Beat receivers look for this optional method to remove their hooks on shutdown.
+	_ interface{ UnregisterDiagnosticHooks(string) } = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
@@ -205,27 +207,32 @@ func (d *diagnosticsExtension) NotifyConfigSnapshot(_ context.Context, snapshot 
 }
 
 // RegisterDiagnosticHook API exposes the ability for beat receivers to register their hooks.
+// A hook registered again for the same component and filename replaces the earlier one.
 // NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
 func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, description string, filename string, contentType string, hook func() []byte) {
 	d.hooksMtx.Lock()
 	defer d.hooksMtx.Unlock()
-	if _, ok := d.componentHooks[componentName]; ok {
-		d.componentHooks[componentName] = append(d.componentHooks[componentName], &diagHook{
-			description: description,
-			filename:    filename,
-			contentType: contentType,
-			hook:        hook,
-		})
-	} else {
-		d.componentHooks[componentName] = []*diagHook{
-			{
-				description: description,
-				filename:    filename,
-				contentType: contentType,
-				hook:        hook,
-			},
-		}
+	h := &diagHook{
+		description: description,
+		filename:    filename,
+		contentType: contentType,
+		hook:        hook,
 	}
+	hooks := d.componentHooks[componentName]
+	if i := slices.IndexFunc(hooks, func(e *diagHook) bool { return e.filename == filename }); i >= 0 {
+		hooks[i] = h
+		return
+	}
+	d.componentHooks[componentName] = append(hooks, h)
+}
+
+// UnregisterDiagnosticHooks removes all diagnostic hooks registered for componentName.
+// Beat receivers call it on shutdown so the extension stops referencing them.
+// NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
+func (d *diagnosticsExtension) UnregisterDiagnosticHooks(componentName string) {
+	d.hooksMtx.Lock()
+	defer d.hooksMtx.Unlock()
+	delete(d.componentHooks, componentName)
 }
 
 // RegisterActionHandler API exposes the ability for beat receivers to register a
@@ -371,33 +378,7 @@ func (d *diagnosticsExtension) writeActionError(w http.ResponseWriter, status in
 }
 
 func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	d.hooksMtx.Lock()
-	defer d.hooksMtx.Unlock()
-	componentResults := make([]*proto.ActionDiagnosticUnitResult, 0)
-	for name, hooks := range d.componentHooks {
-		for _, hook := range hooks {
-			componentResults = append(componentResults, &proto.ActionDiagnosticUnitResult{
-				Name:        name,
-				Filename:    hook.filename,
-				ContentType: hook.contentType,
-				Description: hook.description,
-				Content:     hook.hook(),
-				Generated:   timestamppb.Now(),
-			})
-		}
-	}
-
-	globalResults := make([]*proto.ActionDiagnosticUnitResult, 0)
-	for name, hook := range d.globalHooks {
-		globalResults = append(globalResults, &proto.ActionDiagnosticUnitResult{
-			Name:        name,
-			Filename:    hook.filename,
-			ContentType: hook.contentType,
-			Description: hook.description,
-			Content:     hook.hook(),
-			Generated:   timestamppb.Now(),
-		})
-	}
+	componentResults, globalResults := d.runHooks()
 
 	// only add a CPU profile if requested via query parameter.
 	if req.URL.Query().Get("cpu") == "true" {
@@ -441,5 +422,40 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 	}
 	if _, err := w.Write(b); err != nil {
 		d.logger.Error("Failed writing response to client.", zap.Error(err))
+	}
+}
+
+// runHooks runs the hooks without holding hooksMtx, so a slow hook doesn't
+// block receivers that register or unregister hooks.
+func (d *diagnosticsExtension) runHooks() ([]*proto.ActionDiagnosticUnitResult, []*proto.ActionDiagnosticUnitResult) {
+	d.hooksMtx.Lock()
+	componentHooks := make(map[string][]*diagHook, len(d.componentHooks))
+	for name, hooks := range d.componentHooks {
+		componentHooks[name] = slices.Clone(hooks)
+	}
+	d.hooksMtx.Unlock()
+
+	componentResults := make([]*proto.ActionDiagnosticUnitResult, 0)
+	for name, hooks := range componentHooks {
+		for _, hook := range hooks {
+			componentResults = append(componentResults, hook.result(name))
+		}
+	}
+
+	globalResults := make([]*proto.ActionDiagnosticUnitResult, 0)
+	for name, hook := range d.globalHooks {
+		globalResults = append(globalResults, hook.result(name))
+	}
+	return componentResults, globalResults
+}
+
+func (h *diagHook) result(name string) *proto.ActionDiagnosticUnitResult {
+	return &proto.ActionDiagnosticUnitResult{
+		Name:        name,
+		Filename:    h.filename,
+		ContentType: h.contentType,
+		Description: h.description,
+		Content:     h.hook(),
+		Generated:   timestamppb.Now(),
 	}
 }
