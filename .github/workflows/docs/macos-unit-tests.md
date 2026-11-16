@@ -12,7 +12,7 @@ Runs the root and EDOT unit-test Mage targets on the macOS runner for pull reque
 
 ## Purpose
 
-This workflow runs both unit-test targets on macOS with race detection and coverage enabled.
+This workflow runs both unit-test targets on macOS with race detection enabled. Coverage is not collected, because nothing consumes the coverage profile.
 
 ## When it runs
 
@@ -30,7 +30,7 @@ It runs for any pull request, a push to `main`, `8.19`, or `9.*`, or `workflow_d
 | --- | --- |
 | Inputs | Mage target from the matrix. |
 | Permissions | `contents: read`. |
-| Outputs | Test and coverage results; no artifact upload is declared. |
+| Outputs | Test results; no artifact upload is declared. |
 
 ## Operational notes
 
