@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/config/configtelemetry"
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/service"
 	"go.opentelemetry.io/collector/service/telemetry"
 	"go.opentelemetry.io/collector/service/telemetry/otelconftelemetry"
 	otelconf "go.opentelemetry.io/contrib/otelconf/v0.3.0"
@@ -30,6 +31,11 @@ type wrappedFactory struct {
 	telemetry.Factory
 
 	reader atomic.Pointer[sdkmetric.ManualReader]
+
+	// lifecycle is the meter provider for the current service. It is replaced
+	// on every full reload and read by the meter lifecycle extension, which
+	// has no other way to reach the telemetry factory.
+	lifecycle atomic.Pointer[lifecycleMeterProvider]
 }
 
 var ErrNoReader = errors.New("no metrics reader")
@@ -54,6 +60,28 @@ func NewFactory() telemetry.Factory {
 
 	})
 	return globalFactory.Load()
+}
+
+// ComponentStopped releases every meter, instrument and aggregator held for the
+// given component. It is called by the meter lifecycle extension when the
+// collector reports componentstatus.StatusStopped, and is a no-op if no meter
+// provider is live or the component never created a meter.
+func ComponentStopped(ctx context.Context, componentID string) {
+	if f := globalFactory.Load(); f != nil {
+		if lp := f.lifecycle.Load(); lp != nil {
+			lp.ComponentStopped(ctx, componentID)
+		}
+	}
+}
+
+// LiveMeterComponents reports how many components currently hold meters.
+func LiveMeterComponents() int {
+	if f := globalFactory.Load(); f != nil {
+		if lp := f.lifecycle.Load(); lp != nil {
+			return lp.LiveComponents()
+		}
+	}
+	return 0
 }
 
 func ReadMetrics(ctx context.Context) (*metricdata.ResourceMetrics, error) {
@@ -91,8 +119,48 @@ func (wf *wrappedFactory) CreateMeterProvider(
 		return nil, err
 	}
 
+	// Each component gets its own MeterProvider so that everything it created
+	// can be dropped when it stops; see lifecycle.go. The provider is built
+	// first because the readers below register it as their metric Producer.
+	// Per-component MeterProviders have their own pipelines, and views are a
+	// provider-level option, so they need the same views as the base provider
+	// or they would report metrics the telemetry level is meant to drop.
+	// Producer output bypasses the base provider's pipelines entirely, so these
+	// are the only views that apply to component-scoped metrics.
+	// Per-component meter lifecycle only matters under partial receiver reload.
+	// A full reload disposes the Service and with it the MeterProvider, which
+	// already releases every meter a stopped component held, so outside partial
+	// reload this would be a MeterProvider per live component bought for
+	// nothing. Gating here also gives an escape hatch: turning partial reload
+	// off (agent.internal.runtime.otel_partial_config_reload: false) disables
+	// the leak and this mitigation together.
+	var lp *lifecycleMeterProvider
+	if service.ReceiverPartialReloadEnabled() {
+		// Per-component providers have their own pipelines, and views are a
+		// provider-level option, so they need the same views as the base
+		// provider or they would report metrics the telemetry level is meant to
+		// drop. Producer output bypasses the base provider's pipelines
+		// entirely, so these are the only views that apply to component-scoped
+		// metrics.
+		views := make([]sdkmetric.View, 0, len(cfg.Metrics.Views))
+		for _, v := range cfg.Metrics.Views {
+			sv, viewErr := otelconf.NewSDKView(v)
+			if viewErr != nil {
+				return nil, viewErr
+			}
+			views = append(views, sv)
+		}
+		lp = newLifecycleMeterProvider(views)
+	}
+
 	// Create a manual reader that will be invoked to record telemetry state.
-	reader := sdkmetric.NewManualReader()
+	// This reader is constructed here rather than from config, so it takes the
+	// Producer directly; WithMetricProducers below covers the config-built ones.
+	readerOpts := []sdkmetric.ManualReaderOption{}
+	if lp != nil {
+		readerOpts = append(readerOpts, sdkmetric.WithProducer(lp))
+	}
+	reader := sdkmetric.NewManualReader(readerOpts...)
 
 	// Create a meter provider that uses baseline behavior for the provided
 	// configuration, but adding the manual reader after any baseline
@@ -101,16 +169,33 @@ func (wf *wrappedFactory) CreateMeterProvider(
 		Resource:      configFromCommonResource(res, schemaURL),
 		MeterProvider: ptr(cfg.Metrics.MeterProvider),
 	}
-	sdk, err := otelconf.NewSDK(
+	sdkOpts := []otelconf.ConfigurationOption{
 		otelconf.WithOpenTelemetryConfiguration(sdkConf),
 		otelconf.WithMeterProviderOptions(sdkmetric.WithReader(reader)),
-	)
-	if err != nil {
-		return nil, err
+	}
+	if lp != nil {
+		// Component-scoped metrics live in per-component providers
+		// (lifecycle.go) and reach exporters as an external Producer.
+		sdkOpts = append(sdkOpts, otelconf.WithMetricProducers(lp))
+	}
+	sdk, sdkErr := otelconf.NewSDK(sdkOpts...)
+	if sdkErr != nil {
+		return nil, sdkErr
 	}
 	wf.reader.Store(reader)
 
-	return sdk.MeterProvider().(telemetry.MeterProvider), nil
+	base, ok := sdk.MeterProvider().(telemetry.MeterProvider)
+	if !ok {
+		return nil, errors.New("meter provider does not support shutdown")
+	}
+	if lp == nil {
+		wf.lifecycle.Store(nil)
+		return base, nil
+	}
+
+	lp.setBase(base)
+	wf.lifecycle.Store(lp)
+	return lp, nil
 }
 
 // Given a pcommon.Resource and its schema URL, return the resource

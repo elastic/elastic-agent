@@ -27,7 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	testK8s "github.com/elastic/elastic-agent/pkg/testing/kubernetes"
 )

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -23,16 +22,14 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	client, err := github.NewClient(github.WithHTTPClient(server.Client()))
+	baseURL := server.URL + "/"
+	client, err := github.NewClient(
+		github.WithHTTPClient(server.Client()),
+		github.WithURLs(&baseURL, &baseURL),
+	)
 	if err != nil {
 		t.Fatalf("failed to create GitHub client: %v", err)
 	}
-	baseURL, err := url.Parse(server.URL + "/")
-	if err != nil {
-		t.Fatalf("failed to parse test server URL: %v", err)
-	}
-	client.BaseURL = baseURL
-	client.UploadURL = baseURL
 
 	return &GitHubClient{
 		client: client,
@@ -173,7 +170,7 @@ func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
 			}
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/labels/"+mergeLabelFFDay:
 			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(&github.Label{Name: github.Ptr(mergeLabelFFDay)}); err != nil {
+			if err := json.NewEncoder(w).Encode(&github.Label{Name: mergeLabelFFDay}); err != nil {
 				t.Errorf("failed to encode label response: %v", err)
 			}
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/elastic-agent/issues/42/labels":

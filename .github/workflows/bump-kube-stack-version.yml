@@ -31,7 +31,7 @@ jobs:
 
       - uses: elastic/oblt-actions/updatecli/run@v1
         with:
-          command: apply --config .ci/updatecli/updatecli-bump-kube-stack.yml --values .ci/updatecli/values.d/scm.yml
+          command: pipeline apply --config .ci/updatecli/updatecli-bump-kube-stack.yml --values .ci/updatecli/values.d/scm.yml
           version-file: .updatecli-version
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
