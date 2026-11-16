@@ -27,6 +27,7 @@
 core_components:
 
 # Receivers
+  - awscloudwatchreceiver
   - elasticapmintakereceiver
   - filelogreceiver
   - hostmetricsreceiver
@@ -59,6 +60,7 @@ core_components:
   - routingconnector
 
 # Extensions
+  - awscredentialsproviderextension
   - filestorage
   - opampextension
 
