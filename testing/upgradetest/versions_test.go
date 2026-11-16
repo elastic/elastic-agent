@@ -7,11 +7,14 @@ package upgradetest
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
 
@@ -787,3 +790,56 @@ func (f fetcherMock) FetchAgentVersions(ctx context.Context) (version.SortablePa
 func (f fetcherMock) FindLatestSnapshots(ctx context.Context, branches []string) (version.SortableParsedVersions, error) {
 	return f.list, nil
 }
+<<<<<<< HEAD
+=======
+
+func TestSupportsUpgradeSourceOnPlatform(t *testing.T) {
+	tests := []struct {
+		name    string
+		version string
+		goos    string
+		goarch  string
+		want    bool
+	}{
+		{"windows/arm64 before 9.3.0 not supported", "9.2.8", "windows", "arm64", false},
+		{"windows/arm64 9.3.0 supported", "9.3.0", "windows", "arm64", true},
+		{"windows/arm64 after 9.3.0 supported", "9.4.1", "windows", "arm64", true},
+		{"windows/amd64 before 9.3.0 supported", "9.2.8", "windows", "amd64", true},
+		{"linux/arm64 before 9.3.0 supported", "9.2.8", "linux", "arm64", true},
+		{"darwin/arm64 before 9.3.0 supported", "9.2.8", "darwin", "arm64", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			v, err := version.ParseVersion(tc.version)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, SupportsUpgradeSourceOnPlatform(v, tc.goos, tc.goarch))
+		})
+	}
+}
+
+func TestBuildLogsDirName(t *testing.T) {
+	binary := atesting.AgentBinaryVersion{Version: "9.7.0", Commit: "ff76092f1dd1d8e0a1b3c4d5e6f708192a3b4c5d", Snapshot: true}
+
+	assert.Equal(t, "9.7.0-SNAPSHOT-ff7609", BuildLogsDirName("9.7.0-SNAPSHOT", binary))
+	// a repackaged build has its own version, with the build metadata, and the commit of the build it is made from
+	assert.Equal(t, "9.7.0+build202611061200-SNAPSHOT-ff7609", BuildLogsDirName("9.7.0+build202611061200-SNAPSHOT", binary))
+}
+
+func TestInstalledBuildLogsDirName(t *testing.T) {
+	binary := atesting.AgentBinaryVersion{Version: "9.7.0", Commit: "ff76092f1dd1d8e0a1b3c4d5e6f708192a3b4c5d", Snapshot: true}
+
+	t.Run("home directory with a version", func(t *testing.T) {
+		topPath := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data", "elastic-agent-9.7.0-SNAPSHOT-ff7609"), 0o755))
+
+		assert.Equal(t, "9.7.0-SNAPSHOT-ff7609", InstalledBuildLogsDirName(topPath, "9.7.0-SNAPSHOT", binary))
+	})
+
+	t.Run("legacy home directory of an upgrade from an older release", func(t *testing.T) {
+		topPath := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(topPath, "data", "elastic-agent-ff7609"), 0o755))
+
+		assert.Equal(t, "ff7609", InstalledBuildLogsDirName(topPath, "9.7.0-SNAPSHOT", binary))
+	})
+}
+>>>>>>> d0a250a (Keep Elastic Agent logs outside versioned installation directories (#17802))

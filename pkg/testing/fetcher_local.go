@@ -15,6 +15,9 @@ import (
 	semver "github.com/elastic/elastic-agent/pkg/version"
 )
 
+// localFetcherName is the name of the fetcher of a local build.
+const localFetcherName = "local"
+
 type localFetcher struct {
 	dir          string
 	snapshotOnly bool
@@ -50,7 +53,7 @@ func LocalFetcher(dir string, opts ...LocalFetcherOpt) Fetcher {
 
 // Name returns a unique name for the fetcher.
 func (f *localFetcher) Name() string {
-	return "local"
+	return localFetcherName
 }
 
 // Fetch fetches the Elastic Agent and places the resulting binary at the path.
