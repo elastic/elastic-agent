@@ -5,13 +5,14 @@
 package upgrade
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -33,14 +34,15 @@ type buildLogsDir struct {
 // It keeps the directory of the running build (currentDirName) and the inactiveBuildsToKeep most recently
 // written inactive build directories. Everything else that looks like a build directory is removed.
 // Links are never followed: a link in place of a build directory is ignored, one inside a build directory is
-// removed together with it, and a link in place of logsRoot makes the whole cleanup fail.
+// removed together with it, and a link, or anything that is not a directory, in place of logsRoot makes the whole cleanup fail.
 // A directory that cannot be removed does not stop the others; the failures are returned joined. Windows can
 // refuse to remove a file that another process still has open, so the removal is retried for a while. It stops when
 // ctx is done, which is not reported as an error: what is left is removed by the next cleanup.
 func CleanupBuildLogs(ctx context.Context, log *logger.Logger, logsRoot, currentDirName string) error {
-	// a link in place of the logs root could make the cleanup remove directories somewhere else
-	if info, err := os.Lstat(logsRoot); err == nil && info.Mode()&fs.ModeSymlink != 0 {
-		return fmt.Errorf("logs root %q is a symbolic link, not cleaning it", logsRoot)
+	// a link in place of the logs root could make the cleanup remove directories somewhere else, and so could
+	// anything else that is not a plain directory, such as a junction on Windows
+	if info, err := os.Lstat(logsRoot); err == nil && info.Mode().Type() != fs.ModeDir {
+		return fmt.Errorf("logs root %q is not a directory but a link or something else, not cleaning it", logsRoot)
 	}
 
 	entries, err := os.ReadDir(logsRoot)
@@ -64,11 +66,11 @@ func CleanupBuildLogs(ctx context.Context, log *logger.Logger, logsRoot, current
 	}
 
 	// most recently written first, ties broken by path to be deterministic; the first ones are kept
-	sort.Slice(inactive, func(i, j int) bool {
-		if !inactive[i].modTime.Equal(inactive[j].modTime) {
-			return inactive[i].modTime.After(inactive[j].modTime)
+	slices.SortFunc(inactive, func(a, b buildLogsDir) int {
+		if c := b.modTime.Compare(a.modTime); c != 0 {
+			return c
 		}
-		return inactive[i].path > inactive[j].path
+		return cmp.Compare(b.path, a.path)
 	})
 
 	var errs []error

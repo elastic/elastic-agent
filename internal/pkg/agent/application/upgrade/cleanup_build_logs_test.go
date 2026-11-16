@@ -184,6 +184,16 @@ func TestCleanupBuildLogsReportsRemovalErrors(t *testing.T) {
 	assert.DirExists(t, filepath.Join(root, "9.3.2-eeeeee"))
 }
 
+func TestCleanupBuildLogsRejectsALogsRootThatIsNotADirectory(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "logs")
+	require.NoError(t, os.WriteFile(root, []byte("x"), 0o600))
+
+	err := CleanupBuildLogs(t.Context(), newTestLog(t), root, "9.4.0-aaaaaa")
+
+	require.Error(t, err)
+	assert.FileExists(t, root)
+}
+
 func TestCleanupBuildLogsStopsWhenContextIsDone(t *testing.T) {
 	const current = "9.4.0-aaaaaa"
 	root := t.TempDir()
