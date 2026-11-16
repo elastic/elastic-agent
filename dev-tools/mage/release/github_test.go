@@ -23,7 +23,10 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	client := github.NewClient(server.Client())
+	client, err := github.NewClient(github.WithHTTPClient(server.Client()))
+	if err != nil {
+		t.Fatalf("failed to create GitHub client: %v", err)
+	}
 	baseURL, err := url.Parse(server.URL + "/")
 	if err != nil {
 		t.Fatalf("failed to parse test server URL: %v", err)

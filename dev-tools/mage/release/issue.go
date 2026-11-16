@@ -59,7 +59,10 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return fmt.Errorf("GITHUB_TOKEN is required to ensure the release issue tracker")
 	}
 
-	gh := NewGitHubClient(cfg.GitHubToken)
+	gh, err := NewGitHubClient(cfg.GitHubToken)
+	if err != nil {
+		return fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 	owner := cfg.ProjectOwner
 	repo := cfg.ProjectRepo
 

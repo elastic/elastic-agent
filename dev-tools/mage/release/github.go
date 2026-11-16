@@ -37,20 +37,25 @@ type PROptions struct {
 
 // NewGitHubClient creates a new GitHub API client.
 // An empty token uses unauthenticated public API access (sufficient for reading public releases).
-func NewGitHubClient(token string) *GitHubClient {
+func NewGitHubClient(token string) (*GitHubClient, error) {
 	ctx := context.Background()
-	var httpClient *http.Client
+	var opts []github.ClientOptionsFunc
 	if token != "" {
 		ts := oauth2.StaticTokenSource(
 			&oauth2.Token{AccessToken: token},
 		)
-		httpClient = oauth2.NewClient(ctx, ts)
+		opts = append(opts, github.WithHTTPClient(oauth2.NewClient(ctx, ts)))
+	}
+
+	client, err := github.NewClient(opts...)
+	if err != nil {
+		return nil, err
 	}
 
 	return &GitHubClient{
-		client: github.NewClient(httpClient),
+		client: client,
 		ctx:    ctx,
-	}
+	}, nil
 }
 
 // NewGitHubClientFromEnv creates a GitHub client using GITHUB_TOKEN env var.
@@ -59,7 +64,7 @@ func NewGitHubClientFromEnv() (*GitHubClient, error) {
 	if token == "" {
 		return nil, fmt.Errorf("GITHUB_TOKEN environment variable not set")
 	}
-	return NewGitHubClient(token), nil
+	return NewGitHubClient(token)
 }
 
 // CreatePR creates a pull request, or returns an existing open PR with the same head and base.
@@ -76,10 +81,10 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 		return existingPR, nil
 	}
 
-	newPR := &github.NewPullRequest{
+	newPR := github.CreatePullRequest{
 		Title: github.Ptr(opts.Title),
-		Head:  github.Ptr(opts.Head),
-		Base:  github.Ptr(opts.Base),
+		Head:  opts.Head,
+		Base:  opts.Base,
 		Body:  github.Ptr(opts.Body),
 		Draft: github.Ptr(opts.Draft),
 	}
@@ -285,8 +290,8 @@ func (gh *GitHubClient) EnsureLabel(owner, repo, name, color, description string
 		return fmt.Errorf("failed to get label %q: %w", name, err)
 	}
 
-	_, _, err = gh.client.Issues.CreateLabel(gh.ctx, owner, repo, &github.Label{
-		Name:        github.Ptr(name),
+	_, _, err = gh.client.Issues.CreateLabel(gh.ctx, owner, repo, github.CreateIssueLabelRequest{
+		Name:        name,
 		Color:       github.Ptr(color),
 		Description: github.Ptr(description),
 	})
@@ -345,12 +350,12 @@ func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Iss
 
 // CreateIssue creates a repository issue with the given labels.
 func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []string) (*github.Issue, error) {
-	req := &github.IssueRequest{
-		Title: github.Ptr(title),
+	req := github.CreateIssueRequest{
+		Title: title,
 		Body:  github.Ptr(body),
 	}
 	if len(labels) > 0 {
-		req.Labels = &labels
+		req.Labels = labels
 	}
 	issue, _, err := gh.client.Issues.Create(gh.ctx, owner, repo, req)
 	if err != nil {
@@ -361,7 +366,7 @@ func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []st
 
 // UpdateIssueBody replaces the body of an existing issue.
 func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body string) error {
-	_, _, err := gh.client.Issues.Edit(gh.ctx, owner, repo, number, &github.IssueRequest{
+	_, _, err := gh.client.Issues.Update(gh.ctx, owner, repo, number, github.UpdateIssueRequest{
 		Body: github.Ptr(body),
 	})
 	if err != nil {
