@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-package otelcol
+package elasticdiagnostics
 
 import (
 	"context"
@@ -21,14 +21,13 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/exporter"
-	"go.opentelemetry.io/collector/exporter/nopexporter"
+	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/extension"
 	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.opentelemetry.io/collector/receiver"
+	"go.opentelemetry.io/collector/service/telemetry"
 
-	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
 )
@@ -80,14 +79,16 @@ func hookReceiverFactory() receiver.Factory {
 func diagnosticsTestFactories() (otelcol.Factories, error) {
 	var factories otelcol.Factories
 	var err error
-	factories.Telemetry = internaltelemetry.NewFactory()
+	// The service requires a telemetry factory; this one's defaults are a noop
+	// logger, meter and tracer provider, which is all the test needs.
+	factories.Telemetry = telemetry.NewFactory(func() component.Config { return &struct{}{} })
 	if factories.Receivers, err = otelcol.MakeFactoryMap[receiver.Factory](hookReceiverFactory()); err != nil {
 		return otelcol.Factories{}, err
 	}
-	if factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](nopexporter.NewFactory()); err != nil {
+	if factories.Exporters, err = otelcol.MakeFactoryMap[exporter.Factory](exportertest.NewNopFactory()); err != nil {
 		return otelcol.Factories{}, err
 	}
-	if factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](elasticdiagnostics.NewFactory()); err != nil {
+	if factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](NewFactory()); err != nil {
 		return otelcol.Factories{}, err
 	}
 	return factories, nil
@@ -133,7 +134,6 @@ func collectorConfig(receiverID, endpoint string) map[string]any {
 		"extensions": map[string]any{"elastic_diagnostics": map[string]any{"endpoint": endpoint}},
 		"service": map[string]any{
 			"extensions": []any{"elastic_diagnostics"},
-			"telemetry":  map[string]any{"metrics": map[string]any{"level": "none"}},
 			"pipelines": map[string]any{
 				"metrics": map[string]any{
 					"receivers": []any{receiverID},
@@ -144,9 +144,9 @@ func collectorConfig(receiverID, endpoint string) map[string]any {
 	}
 }
 
-// componentDiagnostics asks the extension for diagnostics and returns the
-// component entries as component ID -> content.
-func componentDiagnostics(ctx context.Context, httpClient *http.Client) (map[string]string, error) {
+// componentDiagnosticsOverSocket asks a running extension for diagnostics over
+// its endpoint and returns the component entries as component ID -> content.
+func componentDiagnosticsOverSocket(ctx context.Context, httpClient *http.Client) (map[string]string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost/diagnostics", nil)
 	if err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func componentDiagnostics(ctx context.Context, httpClient *http.Client) (map[str
 	if err != nil {
 		return nil, err
 	}
-	var parsed elasticdiagnostics.Response
+	var parsed Response
 	if err := json.Unmarshal(b, &parsed); err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ func TestDiagnosticHooksDroppedOnPartialReload(t *testing.T) {
 	}}
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		got, err := componentDiagnostics(ctx, httpClient)
+		got, err := componentDiagnosticsOverSocket(ctx, httpClient)
 		require.NoError(collect, err)
 		assert.Equal(collect, map[string]string{"hooktest/a": "hooktest/a"}, got)
 	}, 30*time.Second, 50*time.Millisecond, "the first receiver's hook should be registered")
@@ -237,7 +237,7 @@ func TestDiagnosticHooksDroppedOnPartialReload(t *testing.T) {
 	provider.set(collectorConfig("hooktest/b", endpoint))
 
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
-		got, err := componentDiagnostics(ctx, httpClient)
+		got, err := componentDiagnosticsOverSocket(ctx, httpClient)
 		require.NoError(collect, err)
 		assert.Equal(collect, map[string]string{"hooktest/b": "hooktest/b"}, got,
 			"the stopped receiver's hook should be gone and only the new receiver's hook left")
