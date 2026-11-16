@@ -1903,11 +1903,11 @@ THE SOFTWARE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/moby/moby/api
-Version: v1.56.1
+Version: v1.57.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.56.1/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.57.0/LICENSE:
 
 
                                  Apache License
@@ -2115,11 +2115,11 @@ Contents of probable licence file $GOMODCACHE/github.com/moby/moby/api@v1.56.1/L
 
 --------------------------------------------------------------------------------
 Dependency : github.com/moby/moby/client
-Version: v0.6.2
+Version: v0.6.3
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.6.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/moby/moby/client@v0.6.3/LICENSE:
 
 
                                  Apache License
@@ -84754,11 +84754,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/pprof
-Version: v0.0.0-20261105003125-4bf881d7fb0b
+Version: v0.0.0-20261111200114-fac431ef4d26
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20261105003125-4bf881d7fb0b/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20261111200114-fac431ef4d26/LICENSE:
 
 
                                  Apache License
