@@ -48,7 +48,6 @@ import (
 	// Telemetry:
 	internaltelemetry "github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 	elasticmonitoringreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/elasticmonitoring"
-	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 )
 
 // Default returns the factory function for the EDR flavor EDOT collector
@@ -68,7 +67,6 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 		// Receivers
 		receivers := []receiver.Factory{
 			elasticmonitoringreceiver.NewFactory(),
-			verifierreceiver.NewFactory(),
 			fbreceiver.NewFactoryWithSettings(fbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			mbreceiver.NewFactoryWithSettings(mbreceiver.Settings{Home: paths.Components(), Data: paths.Data()}),
 			nopreceiver.NewFactory(),
