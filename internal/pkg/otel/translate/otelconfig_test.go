@@ -20,11 +20,11 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -1185,7 +1185,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"logs": map[string]any{
 							"encoding": "raw",
@@ -1306,7 +1309,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1416,7 +1422,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1565,7 +1574,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1603,7 +1615,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -4755,7 +4770,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -4820,7 +4838,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -4884,7 +4905,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -5368,4 +5392,49 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 				"receiver %s: hostname should not be present when env var is unset", id)
 		}
 	})
+}
+
+// TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
+// Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
+func TestGetReceiversConfigPathsContract(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-paths-contract-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-paths-contract-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	result, err := getReceiversConfigForComponent(comp, nil, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, result)
+
+	for id, raw := range result {
+		cfg, ok := raw.(map[string]any)
+		require.True(t, ok, "receiver %s: config is not a map", id)
+		assert.Equal(t, map[string]any{
+			"home": paths.Components(),
+			"data": BeatDataPath(comp.ID),
+		}, cfg["path"], "receiver %s: unexpected paths", id)
+	}
 }

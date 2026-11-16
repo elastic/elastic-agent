@@ -31,10 +31,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/beats/v7/pkg/logp"
+	monitoringLib "github.com/elastic/beats/v7/pkg/monitoring"
+	"github.com/elastic/beats/v7/pkg/service"
 	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
-	"github.com/elastic/elastic-agent-libs/logp"
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
@@ -52,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -369,6 +370,15 @@ func runElasticAgent(
 	}
 	cfg := configReloader.Configuration()
 
+	// Browser monitors trust the configured CAs. This must run before any component
+	// starts the browser: it may change HOME, which the browser inherits. It runs
+	// without configuration too, to clean up CAs a previous run imported.
+	var browserCAs browserca.Config
+	if synthetics := cfg.Settings.Synthetics; synthetics != nil {
+		browserCAs = synthetics.Browser
+	}
+	browserca.Start(ctx, l.Named("browserca"), browserCAs)
+
 	logLvl := logger.DefaultLogLevel
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
@@ -599,7 +609,7 @@ func reexecPath() (string, error) {
 // --path.logs location when that flag was explicitly set on the CLI. This ensures
 // the flag takes precedence over yaml settings such as agent.logging.to_stderr.
 // The internal file output (consumed by diagnostics) is always written to
-// paths.Home() and is unaffected.
+// paths.BuildLogs() and is unaffected.
 // See https://github.com/elastic/elastic-agent/issues/13320
 func customLogsPathCfgOverride(cfg *config.Config) error {
 	if !paths.IsCustomLogsPath() {

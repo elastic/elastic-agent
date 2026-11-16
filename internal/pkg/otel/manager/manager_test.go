@@ -31,9 +31,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -975,7 +975,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	m.Update(cfg, nil, logp.InfoLevel, nil)
 
 	// Normal collector logs must appear in the dedicated log file, not in the agent's own log.
-	logFileGlob := filepath.Join(paths.Home(), "logs", CollectorLogFileName+"-*.ndjson")
+	logFileGlob := filepath.Join(paths.BuildLogs(), CollectorLogFileName+"-*.ndjson")
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		matches, globErr := filepath.Glob(logFileGlob)
 		require.NoError(collect, globErr)
@@ -990,7 +990,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	}, time.Second*10, time.Second)
 
 	// Event-tagged lines must be routed to the collector's own events log file.
-	eventLogFileGlob := filepath.Join(paths.Home(), "logs", "events", CollectorLogFileName+"-event-log-*.ndjson")
+	eventLogFileGlob := filepath.Join(paths.BuildLogs(), "events", CollectorLogFileName+"-event-log-*.ndjson")
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		matches, globErr := filepath.Glob(eventLogFileGlob)
 		require.NoError(collect, globErr)
@@ -1843,6 +1843,14 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					"pipeline:logs": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extension:oauth2client/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
+					},
 				},
 			},
 			expectedComponentStates: []runtime.ComponentComponentState{
@@ -2103,6 +2111,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, injectMeterLifecycleExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))
@@ -3072,11 +3081,11 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 		require.NoError(t, err, "injectMonitoringReceiver should succeed")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-		// The file exporter path must be in paths.Home()/logs/ — the same directory
+		// The file exporter path must be in paths.BuildLogs() — the same directory
 		// that MakeInternalFileOutput writes to and that the diagnostics collector walks.
-		expectedPath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+		expectedPath := filepath.Join(paths.BuildLogs(), internalTelemetryDiagnosticsFileName)
 		assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
-			"file exporter path should be in paths.Home()/logs/")
+			"file exporter path should be in paths.BuildLogs()")
 
 		// Records are written as OTLP JSON metrics — format: json uses the same metrics
 		// marshaler as the otlp_encoding extension, without needing a separate extension component.

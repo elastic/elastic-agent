@@ -86,6 +86,7 @@ renames the outer input id. The stream id of the single input would then be dupl
       - add_kubernetes_metadata:
           wait_for_metadata: true
           append_fields: true
+          image_metadata_source: spec
           default_indexers:
             enabled: false
           default_matchers:
