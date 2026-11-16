@@ -64,9 +64,15 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 		return ErrPostExit
 	}
 
+	// This test leaves PerformUpgrade early and relies on the watcher still
+	// running when it triggers the second upgrade below, after the upgraded
+	// agent has become healthy. Give the watcher a longer grace period than
+	// FastWatcherCfg so a slow restart cannot end the watch first.
+	watcherCfg := upgradetest.WatcherCfg(100*time.Second, upgradetest.FastWatcherErrorCheckInterval)
 	err = upgradetest.PerformUpgrade(
 		ctx, startFixture, endFixture, t,
-		upgradetest.WithPostUpgradeHook(postUpgradeHook))
+		upgradetest.WithPostUpgradeHook(postUpgradeHook),
+		upgradetest.WithCustomWatcherConfig(watcherCfg))
 	if !errors.Is(err, ErrPostExit) {
 		require.NoError(t, err)
 	}
@@ -75,7 +81,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 
 	// wait for the agent to be healthy and correct version
 	// before trying to perform another upgrade
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	if err != nil {
 		// agent never got healthy, but we need to ensure the watcher is stopped before continuing (this
 		// prevents this test failure from interfering with another test)
@@ -96,7 +102,7 @@ func TestStandaloneUpgradeFailsWhenUpgradeIsInProgress(t *testing.T) {
 
 	// killTimeout is greater than timeout as the watcher should have been
 	// stopped on its own, and we don't want this test to hide that fact
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 3*time.Minute)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 3*time.Minute)
 	require.NoError(t, err)
 
 	// now that the watcher has stopped lets ensure that it's still the expected

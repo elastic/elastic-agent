@@ -915,9 +915,6 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = upgradetest.ConfigureFastWatcher(ctx, startFixture)
-	require.NoError(t, err, "unable to write fast watcher config")
-
 	t.Log("Installing Elastic Agent...")
 	installOpts := atesting.InstallOpts{
 		Force: true,
@@ -930,8 +927,13 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	t.Logf("Install agent output:\n%s", string(output))
 	require.NoError(t, err)
 
+	// Enrollment replaced elastic-agent.yml, so the fast watcher configuration
+	// has to be written now that the agent is installed and enrolled.
+	err = upgradetest.ConfigureFastWatcherForManagedAgent(ctx, startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
+
 	t.Log("Waiting for Agent to be correct version and healthy...")
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err)
 
 	agentID, err := startFixture.AgentID(ctx)
@@ -1003,14 +1005,14 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	// the new upgrade clears it before handing off to WaitForWatchingState,
 	// which treats any UPG_FAILED as a fatal failure.
 	t.Log("Waiting for second upgrade to start...")
-	err = upgradetest.WaitForUpgradeInProgress(ctx, startFixture, 2*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForUpgradeInProgress(ctx, startFixture, 2*time.Minute, upgradetest.StatusPollInterval)
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgrade to reach watching state...")
-	err = upgradetest.WaitForWatchingState(ctx, startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
+	err = upgradetest.WaitForWatchingState(ctx, startFixture, 15*time.Minute, upgradetest.StatusPollInterval, 2*time.Minute)
 	require.NoError(t, err)
 
-	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgraded Agent status to be online...")
@@ -1026,7 +1028,7 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 	}, time.Minute*5, time.Second)
 
 	t.Log("Waiting for upgrade watcher to finish...")
-	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	err = upgradetest.WaitForNoWatcher(ctx, 2*time.Minute, upgradetest.WatcherPollInterval, 1*time.Minute+15*time.Second)
 	require.NoError(t, err)
 
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, endVersionInfo.Binary)
@@ -1141,9 +1143,6 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = upgradetest.ConfigureFastWatcher(t.Context(), startFixture)
-	require.NoError(t, err, "unable to write fast watcher config")
-
 	t.Log("Installing Elastic Agent...")
 	installOpts := atesting.InstallOpts{
 		Force: true,
@@ -1156,8 +1155,13 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	t.Logf("Install agent output:\n%s", string(output))
 	require.NoError(t, err)
 
+	// Enrollment replaced elastic-agent.yml, so the fast watcher configuration
+	// has to be written now that the agent is installed and enrolled.
+	err = upgradetest.ConfigureFastWatcherForManagedAgent(t.Context(), startFixture)
+	require.NoError(t, err, "unable to write fast watcher config")
+
 	t.Log("Waiting for Agent to be correct version and healthy...")
-	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, startVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, startVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err)
 
 	agentID, err := startFixture.AgentID(t.Context())
@@ -1176,14 +1180,14 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgrade to start...")
-	err = upgradetest.WaitForUpgradeInProgress(t.Context(), startFixture, 2*time.Minute, 10*time.Second)
+	err = upgradetest.WaitForUpgradeInProgress(t.Context(), startFixture, 2*time.Minute, upgradetest.StatusPollInterval)
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgrade to reach watching state...")
-	err = upgradetest.WaitForWatchingState(t.Context(), startFixture, 15*time.Minute, 10*time.Second, 2*time.Minute)
+	err = upgradetest.WaitForWatchingState(t.Context(), startFixture, 15*time.Minute, upgradetest.StatusPollInterval, 2*time.Minute)
 	require.NoError(t, err)
 
-	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, endVersionInfo.Binary, 2*time.Minute, 10*time.Second, t)
+	err = upgradetest.WaitHealthyAndVersion(t.Context(), startFixture, endVersionInfo.Binary, 2*time.Minute, upgradetest.StatusPollInterval, t)
 	require.NoError(t, err)
 
 	t.Log("Waiting for upgraded Agent status to be online...")
@@ -1199,7 +1203,7 @@ func TestFleetDownloadAuthUpgrade(t *testing.T) {
 	}, time.Minute*5, time.Second)
 
 	t.Log("Waiting for upgrade watcher to finish...")
-	err = upgradetest.WaitForNoWatcher(t.Context(), 2*time.Minute, 10*time.Second, 1*time.Minute+15*time.Second)
+	err = upgradetest.WaitForNoWatcher(t.Context(), 2*time.Minute, upgradetest.WatcherPollInterval, 1*time.Minute+15*time.Second)
 	require.NoError(t, err)
 
 	err = upgradetest.CheckHealthyAndVersion(t.Context(), startFixture, endVersionInfo.Binary)
