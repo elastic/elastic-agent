@@ -13,7 +13,5 @@ echo "--- Unit tests (${GO_MODULE_DIR})"
 RACE_DETECTOR=true TEST_COVERAGE=true mage "${MAGE_TARGET}"
 TESTS_EXIT_STATUS=$?
 echo "--- Prepare artifacts"
-# Copy coverage files to build directory so they can be downloaded as artifacts.
-mv "build/TEST-go-${TEST_NAME}.cov" "coverage-${BUILDKITE_JOB_ID:go-unit}.out"
 mv "build/TEST-go-${TEST_NAME}.xml" build/"TEST-${BUILDKITE_JOB_ID:go-unit}.xml"
 exit $TESTS_EXIT_STATUS

@@ -40,7 +40,7 @@ instrumentation:
 
 ### Configuration Files
 
-- **`bump-edot-images.yml`**: Main updatecli configuration that defines sources and targets
+- **`updatecli-bump-edot.yml`**: Main updatecli configuration that defines sources and targets
 - **`values.d/scm.yml`**: Contains SCM configuration values for GitHub authentication and checkout
 
 ### GitHub Workflow
@@ -69,11 +69,11 @@ To test the configuration locally:
 ```bash
 export GITHUB_TOKEN=$(gh auth token)
 export GITHUB_ACTOR=v1v
-updatecli diff \
-    --config .ci/updatecli/bump-edot-images.yml \
+updatecli pipeline diff \
+    --config .ci/updatecli/updatecli-bump-edot.yml \
     --values .ci/updatecli/values.d/scm.yml
 # Apply changes (requires write access to elastic-agent repo)
-updatecli apply \
-    --config .ci/updatecli/bump-edot-images.yml \
+updatecli pipeline apply \
+    --config .ci/updatecli/updatecli-bump-edot.yml \
     --values .ci/updatecli/values.d/scm.yml
 ```
