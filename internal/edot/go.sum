@@ -1211,6 +1211,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextensi
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension v0.164.1/go.mod h1:eDrxAzSVkOQYQC8QK5EoQPFWFeA/TqWVWdkCd9m/NCY=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.164.1 h1:n4uZG0L/IFnfJrMW67vwg/ek9jzGxt+qsGDXYnAK9cg=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension v0.164.1/go.mod h1:kS7RrxxwNkXslJbMCGKpUAqGKV7HcLkiK3myTNSpH4s=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension v0.164.1 h1:DbGczRC3aSgqqa/R/iDtMm2rYyp5bC0z6b3/VrS+km8=
+github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension v0.164.1/go.mod h1:noWA7j3GBa8unE5sfyzfRnNW1udGkB+qZ51UY+ySik0=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.164.1 h1:j1aSaVDk/0YfWH5zb3+97dW2KwtV7I+OLV9bOAz36H4=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage v0.164.1/go.mod h1:tdPI8IcCPP8KLVN48W0rz6ylHvx3s/4J2LugCQ35Zu0=
 github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage v0.164.1 h1:71w7Zg8kG5icDS1nGHD7cuJi+8El2gyD4BM6iISE4OM=
