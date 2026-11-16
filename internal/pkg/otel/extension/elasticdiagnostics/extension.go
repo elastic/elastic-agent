@@ -49,7 +49,7 @@ var (
 	_ otelmanager.ActionExtension     = (*diagnosticsExtension)(nil)
 	// The collector reports a status change for every component it starts and
 	// stops; the extension uses it to drop the hooks of stopped components.
-	_ componentstatus.Watcher = (*diagnosticsExtension)(nil)
+	_ extensioncapabilities.ComponentStatusWatcher = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
@@ -228,7 +228,7 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 	d.componentHooks[componentName] = append(hooks, h)
 }
 
-// ComponentStatusChanged implements componentstatus.Watcher. It drops the
+// Changed implements extensioncapabilities.ComponentStatusWatcher. It drops the
 // diagnostic hooks of a component once that component has stopped, so a
 // receiver torn down by a config reload is no longer referenced by the
 // extension and no longer contributes files to a diagnostics bundle.
@@ -238,7 +238,7 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 // matches the status source here. The collector reports StatusStopped after
 // the component's Shutdown returns, so nothing can register a hook for this
 // generation of the component afterwards.
-func (d *diagnosticsExtension) ComponentStatusChanged(source *componentstatus.InstanceID, event *componentstatus.Event) {
+func (d *diagnosticsExtension) Changed(source *componentstatus.InstanceID, event *componentstatus.Event) {
 	if source == nil || event == nil || event.Status() != componentstatus.StatusStopped {
 		return
 	}
