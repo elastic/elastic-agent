@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -34,8 +35,9 @@ type buildLogsDir struct {
 // Links are never followed: a link in place of a build directory is ignored, one inside a build directory is
 // removed together with it, and a link in place of logsRoot makes the whole cleanup fail.
 // A directory that cannot be removed does not stop the others; the failures are returned joined. Windows can
-// refuse to remove a file that another process still has open, so the removal is retried for a while.
-func CleanupBuildLogs(log *logger.Logger, logsRoot, currentDirName string) error {
+// refuse to remove a file that another process still has open, so the removal is retried for a while. It stops when
+// ctx is done, which is not reported as an error: what is left is removed by the next cleanup.
+func CleanupBuildLogs(ctx context.Context, log *logger.Logger, logsRoot, currentDirName string) error {
 	// a link in place of the logs root could make the cleanup remove directories somewhere else
 	if info, err := os.Lstat(logsRoot); err == nil && info.Mode()&fs.ModeSymlink != 0 {
 		return fmt.Errorf("logs root %q is a symbolic link, not cleaning it", logsRoot)
@@ -71,8 +73,13 @@ func CleanupBuildLogs(log *logger.Logger, logsRoot, currentDirName string) error
 
 	var errs []error
 	for _, d := range inactive[inactiveBuildsToKeep:] {
+		// stop when asked to, what is left is removed by the next cleanup
+		if err := ctx.Err(); err != nil {
+			log.Debugf("Stopped cleaning the build logs: %s", err)
+			break
+		}
 		log.Infof("Removing the logs of the old build %q", d.path)
-		if err := install.RemovePath(log, d.path); err != nil {
+		if err := install.RemovePathContext(ctx, log, d.path); err != nil {
 			errs = append(errs, fmt.Errorf("removing %q: %w", d.path, err))
 		}
 	}

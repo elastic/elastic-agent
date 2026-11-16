@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -137,7 +138,7 @@ func TestCleanupBuildLogs(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(root, f), []byte("x"), 0o600))
 			}
 
-			require.NoError(t, CleanupBuildLogs(newTestLog(t), root, current))
+			require.NoError(t, CleanupBuildLogs(t.Context(), newTestLog(t), root, current))
 
 			for _, name := range tc.kept {
 				assert.DirExists(t, filepath.Join(root, name))
@@ -175,12 +176,31 @@ func TestCleanupBuildLogsReportsRemovalErrors(t *testing.T) {
 	require.NoError(t, os.Chmod(locked, 0o555))
 	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
 
-	err := CleanupBuildLogs(newTestLog(t), root, current)
+	err := CleanupBuildLogs(t.Context(), newTestLog(t), root, current)
 
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "9.3.0-bbbbbb")
 	assert.NoDirExists(t, filepath.Join(root, "9.3.1-cccccc"))
 	assert.DirExists(t, filepath.Join(root, "9.3.2-eeeeee"))
+}
+
+func TestCleanupBuildLogsStopsWhenContextIsDone(t *testing.T) {
+	const current = "9.4.0-aaaaaa"
+	root := t.TempDir()
+	for name, age := range map[string]time.Duration{current: 0, "9.3.0-bbbbbb": 3 * time.Hour, "9.3.1-cccccc": time.Hour} {
+		f := filepath.Join(root, name, "elastic-agent-20260101.ndjson")
+		require.NoError(t, os.MkdirAll(filepath.Dir(f), 0o755))
+		require.NoError(t, os.WriteFile(f, []byte("x"), 0o600))
+		setTime(t, f, age)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := CleanupBuildLogs(ctx, newTestLog(t), root, current)
+
+	assert.NoError(t, err, "stopping is not a failure")
+	assert.DirExists(t, filepath.Join(root, "9.3.0-bbbbbb"), "nothing is removed after the context is done")
+	assert.DirExists(t, filepath.Join(root, "9.3.1-cccccc"))
 }
 
 func TestLastWrite(t *testing.T) {
@@ -296,7 +316,7 @@ func TestCleanupBuildLogsDoesNotFollowLinks(t *testing.T) {
 				}
 			}
 
-			err := CleanupBuildLogs(newTestLog(t), root, current)
+			err := CleanupBuildLogs(t.Context(), newTestLog(t), root, current)
 
 			if tc.wantErr {
 				require.Error(t, err)

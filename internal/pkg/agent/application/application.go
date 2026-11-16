@@ -111,8 +111,6 @@ func New(
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
-	// independent of the installation cleanup above, which does not run for every installed Agent, e.g. DEB and RPM
-	cleanupBuildLogs(log, paths.Top(), paths.BuildLogsDirName())
 	if err := upgrade.CleanupDiskSpaceReservations(cfg.Settings.DownloadConfig.TargetDirectory); err != nil {
 		log.Warnf("Error cleaning upgrade disk space reservations: %s", err)
 	}
@@ -336,14 +334,15 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	}
 }
 
-// cleanupBuildLogs removes the logs of old builds, keeping the running build (currentBuild) and the latest inactive one.
+// CleanupOldBuildLogs removes the logs of old builds, keeping the running build (currentBuild) and the latest inactive one.
 // Containers (unversioned home) keep their existing layout and are skipped.
+// It is meant to run in its own goroutine, because removing files can take a while on Windows. It stops when ctx is done.
 // Errors are non-fatal and retried on the next startup.
-func cleanupBuildLogs(log *logger.Logger, topDir, currentBuild string) {
+func CleanupOldBuildLogs(ctx context.Context, log *logger.Logger, topDir, currentBuild string) {
 	if !paths.IsVersionHome() {
 		return
 	}
-	if err := upgrade.CleanupBuildLogs(log, paths.BuildLogsRoot(topDir), currentBuild); err != nil {
+	if err := upgrade.CleanupBuildLogs(ctx, log, paths.BuildLogsRoot(topDir), currentBuild); err != nil {
 		log.Warnf("Error cleaning build logs: %s", err)
 	}
 }
