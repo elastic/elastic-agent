@@ -8,7 +8,7 @@ import (
 	"context"
 	gohttp "net/http"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/http"
@@ -30,7 +30,7 @@ func (v *Verifier) Name() string {
 // NewVerifier creates a downloader which first checks local directory
 // and then fallbacks to remote if configured.
 func NewVerifier(log *logger.Logger, config *artifact.Config, pgp []byte, versionOverride *agtversion.ParsedSemVer) (download.Verifier, error) {
-	client, err := config.HTTPTransportSettings.Client(httpcommon.WithAPMHTTPInstrumentation())
+	client, err := config.Client(httpcommon.WithAPMHTTPInstrumentation())
 	if err != nil {
 		return nil, err
 	}

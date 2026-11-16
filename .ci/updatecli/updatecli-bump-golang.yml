@@ -14,7 +14,6 @@ scms:
       commitusingapi: true
       branch: '{{ .scm.branch }}'
       submodules: false
-      singleBranch: true
 
 actions:
   elastic-agent:
@@ -22,7 +21,6 @@ actions:
     scmid: githubConfig
     sourceid: latestGoVersion
     spec:
-      automerge: false
       labels:
         - dependencies
         - backport-skip

@@ -24,7 +24,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -1247,9 +1247,9 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
-		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+		if strings.HasPrefix(filename, paths.VersionedHomePrefix) && fi.IsDir() {
 			// Below we exclude the hash suffix (7 characters) of the directory to check the version
-			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
+			if version != "" && filename[:len(filename)-7] != paths.VersionedHomePrefix+version {
 				// version specified but version mismatch. in case of upgrade we have multiple
 				// directories, we don't want first found
 				continue

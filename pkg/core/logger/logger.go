@@ -16,11 +16,11 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/file"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/configure"
-	libpaths "github.com/elastic/elastic-agent-libs/paths"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/file"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/configure"
+	libpaths "github.com/elastic/beats/v7/pkg/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/utils"
@@ -35,9 +35,6 @@ type Level = logp.Level
 
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
-
-// DefaultLogDirectory used in agent and its processes.
-const DefaultLogDirectory = "logs"
 
 // Logger alias ecslog.Logger with Logger.
 type Logger = logp.Logger
@@ -193,7 +190,7 @@ func DefaultEventLoggingConfig() *Config {
 	cfg := logp.DefaultEventConfig(logp.DefaultEnvironment)
 
 	// That's the same path useb by MakeInternalFileOutput
-	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "events")
+	cfg.Files.Path = filepath.Join(paths.BuildLogs(), "events")
 	cfg.Files.Name = agentName + "-event-log"
 
 	root, _ := utils.HasRoot() // error ignored
@@ -212,7 +209,7 @@ func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	// these settings cannot be changed by a user configuration
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
+	filename := filepath.Join(paths.BuildLogs(), cfg.Beat)
 	al := zap.NewAtomicLevelAt(cfg.Level.ZapLevel())
 	internalLevelEnabler = &al // directly persisting struct will panic on accessing unitialized backing pointer
 	permissions := 0600        // default user only

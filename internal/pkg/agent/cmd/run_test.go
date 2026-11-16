@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -223,7 +223,7 @@ func TestApplyCustomLogsPath(t *testing.T) {
 
 			assert.Equal(t, tt.wantToStderr, cfg.Settings.LoggingConfig.ToStderr)
 			assert.Equal(t, tt.wantToFiles, cfg.Settings.LoggingConfig.ToFiles)
-			assert.Equal(t, filepath.Join(paths.Home(), logger.DefaultLogDirectory, "events"), cfg.Settings.EventLoggingConfig.Files.Path)
+			assert.Equal(t, filepath.Join(paths.BuildLogs(), "events"), cfg.Settings.EventLoggingConfig.Files.Path)
 			if tt.wantFilesPath != "" {
 				assert.Equal(t, tt.wantFilesPath, cfg.Settings.LoggingConfig.Files.Path)
 				assert.False(t, cfg.Settings.EventLoggingConfig.ToStderr)

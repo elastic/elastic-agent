@@ -22,7 +22,12 @@ checkout_merge() {
         git=( git -c submodule.recurse=false )
     fi
 
-    "${git[@]}" fetch -v origin "${target_branch}"
+    # Update origin/<target_branch> too: the agent's if_changed resolves the
+    # diff base from it, and fails open (runs every step) when it is missing.
+    # Shallow clones are single-branch (only main is in the fetch refspec), so
+    # a plain "git fetch origin <branch>" only writes FETCH_HEAD for release
+    # branches.
+    "${git[@]}" fetch -v origin "+refs/heads/${target_branch}:refs/remotes/origin/${target_branch}"
     local fetched_sha
     fetched_sha=$(git rev-parse FETCH_HEAD)
 

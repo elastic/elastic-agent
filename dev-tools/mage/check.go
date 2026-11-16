@@ -9,11 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
-	devtools "github.com/elastic/elastic-agent-libs/dev-tools/mage"
 	"github.com/elastic/elastic-agent/dev-tools/mage/gotool"
 )
 
@@ -26,9 +26,47 @@ import (
 func Check() error {
 	fmt.Println(">> check: Checking source code for common problems")
 
-	mg.Deps(GoVet, CheckYAMLNotExecutable, devtools.CheckNoChanges)
+	mg.Deps(GoVet, CheckYAMLNotExecutable, CheckNoChanges)
 
 	return nil
+}
+
+// CheckNoChanges returns an error if any files differ from what is committed.
+// If executed in verbose mode it writes the output of 'git diff' to stdout.
+func CheckNoChanges() error {
+	changes, err := GitDiffIndex()
+	if err != nil {
+		return fmt.Errorf("failed to diff the git index: %w", err)
+	}
+
+	if len(changes) > 0 {
+		if mg.Verbose() {
+			if err := sh.RunV("git", "--no-pager", "diff", "--minimal"); err != nil {
+				return fmt.Errorf("failed to run git diff: %w", err)
+			}
+		}
+
+		return fmt.Errorf("some files are not up-to-date. "+
+			"Usually running 'mage update' or 'mage addLicenseHeaders' "+
+			"fixes the issues. Fix the issues, review and commit the changes. "+
+			"Modified: %v", changes)
+	}
+	return nil
+}
+
+// GitDiffIndex returns a list of files that differ from what is committed.
+// These could be files that were created, deleted, modified, or moved.
+func GitDiffIndex() ([]string, error) {
+	// Ensure the index is updated so that diff-index gives accurate results.
+	if err := sh.Run("git", "update-index", "-q", "--refresh"); err != nil {
+		return nil, err
+	}
+
+	out, err := sh.Output("git", "diff-index", "--name-only", "HEAD", "--", ".")
+	if err != nil {
+		return nil, err
+	}
+	return strings.FieldsFunc(out, func(r rune) bool { return r == '\n' }), nil
 }
 
 // CheckYAMLNotExecutable checks that no .yml or .yaml files are executable.

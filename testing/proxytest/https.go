@@ -18,7 +18,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/beats/v7/pkg/testing/certutil"
 )
 
 func (p *Proxy) serveHTTPS(w http.ResponseWriter, r *http.Request) {
@@ -57,7 +57,7 @@ func (p *Proxy) serveHTTPS(w http.ResponseWriter, r *http.Request) {
 	tlscfg.Certificates = []tls.Certificate{*cert}
 	clientTLSConn := tls.Server(clientCon, tlscfg)
 	defer clientTLSConn.Close()
-	err = clientTLSConn.Handshake()
+	err = clientTLSConn.HandshakeContext(r.Context())
 	if err != nil {
 		p.http500Error(clientCon, "failed TLS handshake with client", err, log)
 		return

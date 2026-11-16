@@ -522,8 +522,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261029231720-f334c6586776 h1:CHCg76ILmJ5OstThg5odUB4PiRdC5PiA1rGx3hcldWw=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261029231720-f334c6586776/go.mod h1:8Vj4jPgallY57XMI90/60gxOms91IQNyKjsbfeeRySM=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110104352-97393d2e775c h1:WMq0mWCDnqVr/+ps6NxNfcaG9e29VWpOk9/N0jtnR6Q=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261110104352-97393d2e775c/go.mod h1:lCbUpAS+LbsCMx5B/oM5sOyfI1IISuXTRF8KLsP7xzw=
 github.com/elastic/cloud-on-k8s/v3 v3.4.1 h1:phOuio2iExpzRK/5VgERH6nByxpURmJGQ7/mOcMStUY=
 github.com/elastic/cloud-on-k8s/v3 v3.4.1/go.mod h1:C0y4c22pL3Lh/Dn/D+l+2OGpUDjRUBs6QuiJ9AWQ15s=
 github.com/elastic/elastic-agent-client/v7 v7.18.1 h1:WnM53JjaukeysrAuiTyrhDPmFxJG07ZAByc2TrkcKcs=
@@ -542,6 +542,8 @@ github.com/elastic/go-docappender/v2 v2.15.0 h1:6b7H4Ct+dfENJ8b9w1AhZ7bWLi0iU/aM
 github.com/elastic/go-docappender/v2 v2.15.0/go.mod h1:VRq9W2+tHEMKp5rCAVQL1Y+Jbi5jgKVG/OWdGaiyPc0=
 github.com/elastic/go-elasticsearch/v8 v8.19.7 h1:fMsWcVgPDJMtyptspSmn4SDHykovo4ppaAbBNLK9mKE=
 github.com/elastic/go-elasticsearch/v8 v8.19.7/go.mod h1:jeWebApE1oFEW/hKZqx/IRYmP/aa2+WMJkOfk+AduSI=
+github.com/elastic/go-elasticsearch/v9 v9.5.2 h1:+SnIMDLdfSSS+hIp2CZDQNUQZKd5JuViG3yGvJkrgA0=
+github.com/elastic/go-elasticsearch/v9 v9.5.2/go.mod h1:EbZnYlTlbhNqRt98YW+QSM2SEKplN5o8J+G6d9STOVo=
 github.com/elastic/go-freelru v0.16.0 h1:gG2HJ1WXN2tNl5/p40JS/l59HjvjRhjyAa+oFTRArYs=
 github.com/elastic/go-freelru v0.16.0/go.mod h1:bSdWT4M0lW79K8QbX6XY2heQYSCqD7THoYf82pT/H3I=
 github.com/elastic/go-grok v0.3.1 h1:WEhUxe2KrwycMnlvMimJXvzRa7DoByJB4PVUIE1ZD/U=
@@ -602,8 +604,8 @@ github.com/elastic/opentelemetry-collector-components/processor/lsmintervalproce
 github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.78.0/go.mod h1:cNvllSJUV1Kw4N5mTDnePQk1HpCRpLVQd28IiwHhyAg=
 github.com/elastic/opentelemetry-lib v0.50.0 h1:lJfTTem4DGbwGmBEpjJ1/P3GW3y51oIa6rMIx9bOp0Q=
 github.com/elastic/opentelemetry-lib v0.50.0/go.mod h1:hP9WaRQzxliYvOjjqK3sYea048WDqn9w8msjt/CTAW8=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603 h1:QFDM5JuLch52FxjHizLP2tiuzfhulUdyOsUe/JuPhrQ=
-github.com/elastic/sarama v1.19.1-0.20260310070522-abae92ca1603/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be h1:AbN9OyZ+o9tNmbY5cEDRrXq4pdCY6thW02NF9CiUJpk=
+github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
 github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=
 github.com/elazarl/goproxy v1.7.2/go.mod h1:82vkLNir0ALaW14Rc399OTTjyNREgmdL2cVoIbS6XaE=
 github.com/elazarl/goproxy/ext v0.0.0-20240909085733-6741dbfc16a1 h1:XgXwWTQglBILwCpfm8I9xUjPXKOi1EzRzuYzyczU5Z0=

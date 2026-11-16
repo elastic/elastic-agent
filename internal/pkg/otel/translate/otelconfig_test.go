@@ -16,10 +16,10 @@ import (
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -1763,5 +1763,50 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, map[string]any{tt.expectedReceiverID.String(): map[string]any{}}, result)
 		})
+	}
+}
+
+// TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
+// Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
+func TestGetReceiversConfigPathsContract(t *testing.T) {
+	comp := &component.Component{
+		ID:        "filestream-paths-contract-test",
+		InputType: "filestream",
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "agentbeat",
+			Spec: component.InputSpec{
+				Name: "filestream",
+				Command: &component.CommandSpec{
+					Args: []string{"filebeat"},
+				},
+			},
+		},
+		Units: []component.Unit{
+			{
+				ID:   "filestream-paths-contract-unit",
+				Type: client.UnitTypeInput,
+				Config: component.MustExpectedConfig(map[string]any{
+					"streams": []any{
+						map[string]any{
+							"id":    "stream-1",
+							"paths": []any{"/var/log/*.log"},
+						},
+					},
+				}),
+			},
+		},
+	}
+
+	result, err := getReceiversConfigForComponent(comp, &info.AgentInfo{}, nil, func(string, string) map[string]any { return nil })
+	require.NoError(t, err)
+	require.NotEmpty(t, result)
+
+	for id, raw := range result {
+		cfg, ok := raw.(map[string]any)
+		require.True(t, ok, "receiver %s: config is not a map", id)
+		assert.Equal(t, map[string]any{
+			"home": paths.Components(),
+			"data": BeatDataPath(comp.ID),
+		}, cfg["path"], "receiver %s: unexpected paths", id)
 	}
 }
