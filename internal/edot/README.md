@@ -141,6 +141,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [oauth2clientauthextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/oauth2clientauthextension/v0.165.1/extension/oauth2clientauthextension/README.md) | v0.165.1 |
 | [opampextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/opampextension/v0.165.1/extension/opampextension/README.md) | v0.165.1 |
 | [pprofextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/pprofextension/v0.165.1/extension/pprofextension/README.md) | v0.165.1 |
+| [sigv4authextension](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/extension/sigv4authextension/v0.165.1/extension/sigv4authextension/README.md) | v0.165.1 |
 
 ### Connectors
 
