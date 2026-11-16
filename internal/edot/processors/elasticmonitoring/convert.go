@@ -5,7 +5,9 @@
 package elasticmonitoringprocessor
 
 import (
+	"maps"
 	"net/url"
+	"slices"
 	"strings"
 
 	"go.opentelemetry.io/collector/component"
@@ -51,6 +53,9 @@ const (
 	otelInputIDKey   = "input_id"
 	otelInputTypeKey = "input_type"
 
+	elasticsearchExporterPrefix = "elasticsearch/"
+	failoverConnectorPrefix     = "failover/"
+
 	// registryBridgeScopeName is the instrumentation scope name used by the
 	// RegistryBridge in beats, which bridges Beats monitoring registries into
 	// OTel async instruments. Metrics from this scope carry a "receiver"
@@ -86,6 +91,24 @@ var exporterMetricNames = map[string]string{
 	otelFlushedBytesKey:         otelFlushedBytesKey,
 }
 
+// failoverConnectorMetricNames is the subset of exporterMetricNames tracked for
+// failover connectors. The connector owns the queue of an output that fails over
+// between hosts and only reports a send failure once no host accepted the data,
+// so these replace the values of the exporters it routes to.
+var failoverConnectorMetricNames = map[string]string{
+	otelQueueSizeKey:            otelQueueSizeKey,
+	otelQueueCapacityKey:        otelQueueCapacityKey,
+	otelSentLogsKey:             otelSentLogsKey,
+	otelSentSpansKey:            otelSentSpansKey,
+	otelSentMetricsKey:          otelSentMetricsKey,
+	otelFailedLogsKey:           otelFailedLogsKey,
+	otelFailedSpansKey:          otelFailedSpansKey,
+	otelFailedMetricsKey:        otelFailedMetricsKey,
+	otelEnqueueFailedLogsKey:    otelEnqueueFailedLogsKey,
+	otelEnqueueFailedSpansKey:   otelEnqueueFailedSpansKey,
+	otelEnqueueFailedMetricsKey: otelEnqueueFailedMetricsKey,
+}
+
 // exporterMetrics accumulates raw values for a single exporter, keyed by
 // canonical source metric name, along with the latest data-point timestamp
 // seen. The timestamp is propagated to every output data point so downstream
@@ -98,8 +121,8 @@ type exporterMetrics struct {
 // addMetric accumulates a metric's integer data points into em; all currently
 // tracked exporter metrics are integer sums or gauges. Queue capacity is a
 // point-in-time value and is overwritten rather than summed.
-func (em *exporterMetrics) addMetric(m pmetric.Metric) {
-	name, tracked := exporterMetricNames[m.Name()]
+func (em *exporterMetrics) addMetric(m pmetric.Metric, metricNames map[string]string) {
+	name, tracked := metricNames[m.Name()]
 	if !tracked {
 		return
 	}
@@ -215,30 +238,75 @@ func addDataPointValue(target, dp pmetric.NumberDataPoint) {
 	}
 }
 
-// collectExporterMetrics builds a map from elasticsearch exporter component ID
-// to its accumulated exporterMetrics from the given pmetric.Metrics.
+// collectExporterMetrics builds a map from elasticsearch exporter and failover
+// connector component ID to its accumulated exporterMetrics from the given pmetric.Metrics.
 func collectExporterMetrics(md pmetric.Metrics) map[string]*exporterMetrics {
-	const elasticsearchPrefix = "elasticsearch/"
 	exporters := map[string]*exporterMetrics{}
 	for i := 0; i < md.ResourceMetrics().Len(); i++ {
 		rm := md.ResourceMetrics().At(i)
 		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
 			sm := rm.ScopeMetrics().At(j)
-			exporterID := componentIDForScope(sm, "exporter")
-			if !strings.HasPrefix(exporterID, elasticsearchPrefix) {
+			var componentID string
+			var metricNames map[string]string
+			if id := componentIDForScope(sm, "exporter"); strings.HasPrefix(id, elasticsearchExporterPrefix) {
+				componentID, metricNames = id, exporterMetricNames
+			} else if id := componentIDForScope(sm, "connector"); strings.HasPrefix(id, failoverConnectorPrefix) {
+				componentID, metricNames = id, failoverConnectorMetricNames
+			} else {
 				continue
 			}
-			em, exists := exporters[exporterID]
+			em, exists := exporters[componentID]
 			if !exists {
 				em = &exporterMetrics{values: map[string]int64{}}
-				exporters[exporterID] = em
+				exporters[componentID] = em
 			}
 			for k := 0; k < sm.Metrics().Len(); k++ {
-				em.addMetric(sm.Metrics().At(k))
+				em.addMetric(sm.Metrics().At(k), metricNames)
 			}
 		}
 	}
 	return exporters
+}
+
+// merge adds the values of other into em and keeps the latest timestamp. Unlike
+// addMetric, queue capacity is summed: each merged component has its own queue.
+func (em *exporterMetrics) merge(other *exporterMetrics) {
+	for name, value := range other.values {
+		em.values[name] += value
+	}
+	if other.timestamp > em.timestamp {
+		em.timestamp = other.timestamp
+	}
+}
+
+// sum returns the total of the given values of em.
+func (em *exporterMetrics) sum(names ...string) int64 {
+	var total int64
+	for _, name := range names {
+		total += em.values[name]
+	}
+	return total
+}
+
+// replaceWithFailoverConnector overwrites em's values with those the failover connector
+// also reports. Docs processed is recomputed so failed attempts on one host don't
+// inflate total and active events.
+func (em *exporterMetrics) replaceWithFailoverConnector(connector *exporterMetrics) {
+	if docsProcessed, ok := em.values[otelDocsProcessedKey]; ok {
+		inFlight := docsProcessed - em.sum(otelSentLogsKey, otelSentSpansKey, otelSentMetricsKey) -
+			em.sum(otelFailedLogsKey, otelFailedSpansKey, otelFailedMetricsKey)
+		em.values[otelDocsProcessedKey] = connector.sum(otelSentLogsKey, otelSentSpansKey, otelSentMetricsKey) +
+			connector.sum(otelFailedLogsKey, otelFailedSpansKey, otelFailedMetricsKey) + inFlight
+	}
+	for name := range failoverConnectorMetricNames {
+		delete(em.values, name)
+		if value, ok := connector.values[name]; ok {
+			em.values[name] = value
+		}
+	}
+	if connector.timestamp > em.timestamp {
+		em.timestamp = connector.timestamp
+	}
 }
 
 // baseComponentID strips the per-container stream ID suffix from an agent
@@ -351,15 +419,38 @@ func appendExporterMetrics(sm pmetric.ScopeMetrics, em *exporterMetrics) {
 	}
 }
 
-// buildExporterMetrics appends one ResourceMetrics per elasticsearch exporter to out.
+// buildExporterMetrics appends one ResourceMetrics per output to out. Exporters/connectors with same output name are summed;
 func buildExporterMetrics(logger *zap.Logger, cfg *Config, res pcommon.Resource, md pmetric.Metrics, out pmetric.Metrics) {
-	for exporterID, metrics := range collectExporterMetrics(md) {
-		componentID, ok := cfg.ExporterNames[exporterID]
+	byComponent := map[string]*exporterMetrics{}
+	connectors := map[string]*exporterMetrics{}
+	for otelComponentID, metrics := range collectExporterMetrics(md) {
+		componentID, ok := cfg.ExporterNames[otelComponentID]
 		if !ok {
-			logger.Warn("Reporting metrics for exporter with no specified component name", zap.String("exporter_id", exporterID))
-			componentID = exporterID
+			logger.Debug("Could not match OTel component to an Elastic Agent output, reporting its metrics under the OTel component ID", zap.String("otel_component_id", otelComponentID))
+			componentID = otelComponentID
 		}
-		appendExporterMetrics(newEventScope(out, res, internaltelemetry.EventTypeExporter, componentID), metrics)
+		group := byComponent
+		// If the component is a failover connector, add it to the connectors map.
+		if strings.HasPrefix(otelComponentID, failoverConnectorPrefix) {
+			group = connectors
+		}
+		if merged, exists := group[componentID]; exists {
+			// Some of the metrics we are merging here will be replaced by [replaceWithFailoverConnector()] below.
+			merged.merge(metrics)
+		} else {
+			group[componentID] = metrics
+		}
+	}
+	for componentID, connector := range connectors {
+		// If the component is an exporter, replace its values with the values of the failover connector.
+		if exporterMetrics, exists := byComponent[componentID]; exists {
+			exporterMetrics.replaceWithFailoverConnector(connector)
+		} else {
+			byComponent[componentID] = connector
+		}
+	}
+	for _, componentID := range slices.Sorted(maps.Keys(byComponent)) {
+		appendExporterMetrics(newEventScope(out, res, internaltelemetry.EventTypeExporter, componentID), byComponent[componentID])
 	}
 }
 

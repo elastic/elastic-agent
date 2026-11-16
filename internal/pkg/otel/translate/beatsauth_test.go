@@ -692,12 +692,17 @@ func getTranslatedConf(t *testing.T, input map[string]any) (map[string]any, map[
 		Config: agentComponent.MustExpectedConfig(input),
 	}
 
-	exporterCfg, _, beatsauthCfg, _, err := unitToExporterConfig(unit, "default", component.MustNewType("elasticsearch"), logp.NewNopLogger())
+	exporterType := component.MustNewType("elasticsearch")
+	translated, _, err := unitToExporterConfig(unit, "default", exporterType, logp.NewNopLogger())
 	if err != nil {
 		t.Fatalf("could not convert given output config to OTel config:%v", err)
 
 	}
-	return exporterCfg, beatsauthCfg
+	exporterCfg, ok := translated.Exporters[GetExporterID(exporterType, "default").String()].(map[string]any)
+	if !ok {
+		t.Fatalf("exporter config not found under the expected exporter ID: %v", translated.Exporters)
+	}
+	return exporterCfg, translated.Extensions
 }
 
 // assertReceivedLogRecord takes a metric reader and asserts if an event has been successfully indexed

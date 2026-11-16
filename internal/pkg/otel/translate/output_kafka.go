@@ -26,15 +26,15 @@ const oauth2ClientExtensionType = "oauth2client"
 
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
-func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
-	extensionCfg = make(map[string]any)
+func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger) (TranslatedOutput, error) {
+	extensionCfg := make(map[string]any)
 	kConfig, err := kafka.ReadConfig(config)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error reading kafka config: %w", err)
+		return TranslatedOutput{}, fmt.Errorf("error reading kafka config: %w", err)
 	}
 
 	if err := checkUnsupportedKafkaConfig(config, logger); err != nil {
-		return nil, nil, nil, err
+		return TranslatedOutput{}, err
 	}
 
 	maxMessageBytes := 1000000
@@ -108,27 +108,27 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 		oauthCfg, err := config.Child("auth", -1)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
+			return TranslatedOutput{}, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
 
 		fields := oauthCfg.GetFields()
 		if len(fields) == 0 {
-			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER")
+			return TranslatedOutput{}, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER")
 		}
 
 		if len(fields) != 1 {
-			return nil, nil, nil, fmt.Errorf("auth must specify a single oauth type, got %v", fields)
+			return TranslatedOutput{}, fmt.Errorf("auth must specify a single oauth type, got %v", fields)
 		}
 
 		switch fields[0] {
 		case oauth2ClientExtensionType:
 			oauth2ClientCfg, err := oauthCfg.Child(oauth2ClientExtensionType, -1)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
+				return TranslatedOutput{}, fmt.Errorf("error translating oauth2client extension config: %w", err)
 			}
 			oauth2ClientExtensionCfg, err := getOauth2ClientExtensionConfig(oauth2ClientCfg, outputName)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
+				return TranslatedOutput{}, fmt.Errorf("error translating oauth2client extension config: %w", err)
 			}
 
 			maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
@@ -137,7 +137,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		// For example, azureauth extension https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension
 
 		default:
-			return nil, nil, nil, fmt.Errorf("unsupported oauth config: %v", fields[0])
+			return TranslatedOutput{}, fmt.Errorf("unsupported oauth config: %v", fields[0])
 		}
 
 	} else if kConfig.Username != "" {
@@ -156,7 +156,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	tlsCfg, err := TLSToOTel(kConfig.TLS, logger)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error translating tls config :%w", err)
+		return TranslatedOutput{}, fmt.Errorf("error translating tls config :%w", err)
 	}
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
@@ -166,7 +166,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	// Set partitioner extension config
 	partitionerExtensionCfg, err := getKafkaPartitionerExtensionConfig(kConfig.Partition, outputName)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("error translating kafka partitioner config: %w", err)
+		return TranslatedOutput{}, fmt.Errorf("error translating kafka partitioner config: %w", err)
 	}
 	kafkaExporter["record_partitioner"] = map[string]any{
 		"extension": getKafkaPartitionerExtensionID(outputName).String(),
@@ -176,21 +176,28 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	// compiles topic and validates against any malformed strings
 	fmtstr, err := fmtstr.CompileEvent(kConfig.Topic)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not parse topic: %w", err)
+		return TranslatedOutput{}, fmt.Errorf("could not parse topic: %w", err)
+	}
+
+	translated := TranslatedOutput{
+		Exporters: map[string]any{
+			GetExporterID(otelcomponent.MustNewType("kafka"), outputName).String(): kafkaExporter,
+		},
+		Extensions: extensionCfg,
 	}
 
 	if !fmtstr.IsConst() {
 		kafkaExporter["topic_from_attribute"] = "topic"
 		processor, err := dynamicTopicSetterProcessor(kConfig.Topic, outputName)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("error translating kafka topic: %w", err)
+			return TranslatedOutput{}, fmt.Errorf("error translating kafka topic: %w", err)
 		}
 		// delete topic set under logs
 		delete(kafkaExporter["logs"].(map[string]any), "topic")
-		return kafkaExporter, processor, extensionCfg, nil
+		translated.Processors = processor
 	}
 
-	return kafkaExporter, nil, extensionCfg, nil
+	return translated, nil
 }
 
 func getKerberosConfig(kConfig *kafka.KafkaConfig) map[string]any {
