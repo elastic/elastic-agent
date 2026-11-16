@@ -66,22 +66,25 @@ require (
 	go.opentelemetry.io/collector/component/componentstatus v0.165.0
 	go.opentelemetry.io/collector/component/componenttest v0.165.0
 	go.opentelemetry.io/collector/config/configtls v1.71.0
+	go.opentelemetry.io/collector/consumer v1.71.0
 	go.opentelemetry.io/collector/exporter/exportertest v0.165.0
 	go.opentelemetry.io/collector/extension/extensioncapabilities v0.165.0
 	go.opentelemetry.io/collector/extension/extensiontest v0.165.0
 	go.opentelemetry.io/collector/pdata v1.71.0
 	go.opentelemetry.io/collector/pipeline v1.71.0
+	go.opentelemetry.io/collector/service v0.165.0
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.6
-	golang.org/x/crypto v0.58.0
+	golang.org/x/crypto v0.59.0
+	golang.org/x/crypto/openpgp v0.1.0-deprecated
 	golang.org/x/mod v0.43.0
 	golang.org/x/net v0.62.0
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
-	golang.org/x/sys v0.49.0
-	golang.org/x/term v0.47.0
-	golang.org/x/text v0.43.0
+	golang.org/x/sys v0.50.0
+	golang.org/x/term v0.48.0
+	golang.org/x/text v0.44.0
 	golang.org/x/time v0.16.0
 	google.golang.org/api v0.312.0
 	google.golang.org/grpc v1.85.0
@@ -112,7 +115,7 @@ require (
 	go.opentelemetry.io/collector/featuregate v1.71.0
 	go.opentelemetry.io/collector/otelcol v0.165.0
 	go.opentelemetry.io/collector/processor v1.71.0 // indirect
-	go.opentelemetry.io/collector/receiver v1.71.0 // indirect
+	go.opentelemetry.io/collector/receiver v1.71.0
 )
 
 require (
@@ -340,7 +343,6 @@ require (
 	go.opentelemetry.io/collector/confmap/xconfmap v0.165.0 // indirect
 	go.opentelemetry.io/collector/connector/connectortest v0.165.0 // indirect
 	go.opentelemetry.io/collector/connector/xconnector v0.165.0 // indirect
-	go.opentelemetry.io/collector/consumer v1.71.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.165.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror/xconsumererror v0.165.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumertest v0.165.0 // indirect
@@ -362,7 +364,6 @@ require (
 	go.opentelemetry.io/collector/processor/xprocessor v0.165.0 // indirect
 	go.opentelemetry.io/collector/receiver/receivertest v0.165.0 // indirect
 	go.opentelemetry.io/collector/receiver/xreceiver v0.165.0 // indirect
-	go.opentelemetry.io/collector/service v0.165.0 // indirect
 	go.opentelemetry.io/collector/service/hostcapabilities v0.165.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 // indirect
 	go.opentelemetry.io/contrib/otelconf v0.27.0 // indirect
