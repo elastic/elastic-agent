@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/extension"
@@ -385,7 +386,17 @@ func staticHook(content string) func() []byte {
 	return func() []byte { return []byte(content) }
 }
 
-func TestDiagnosticHooks_RegisterUnregister(t *testing.T) {
+// reportStopped delivers the status change the collector sends for a receiver
+// that has finished shutting down.
+func reportStopped(d *diagnosticsExtension, componentName string) {
+	id := component.MustNewID(componentName)
+	d.ComponentStatusChanged(
+		componentstatus.NewInstanceID(id, component.KindReceiver),
+		componentstatus.NewEvent(componentstatus.StatusStopped),
+	)
+}
+
+func TestDiagnosticHooks_RemovedWhenComponentStops(t *testing.T) {
 	d := newTestDiagnosticsExtension(t)
 
 	d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", staticHook("comp1 metrics"))
@@ -397,20 +408,28 @@ func TestDiagnosticHooks_RegisterUnregister(t *testing.T) {
 		"comp2/beat_metrics.json":  "comp2 metrics",
 	}, componentDiagnostics(t, d), "all registered hooks should be served")
 
-	d.UnregisterDiagnosticHooks("comp1")
+	// A status change other than Stopped must not remove anything.
+	d.ComponentStatusChanged(
+		componentstatus.NewInstanceID(component.MustNewID("comp1"), component.KindReceiver),
+		componentstatus.NewEvent(componentstatus.StatusStopping),
+	)
+	assert.Len(t, componentDiagnostics(t, d), 3, "only a stopped component should lose its hooks")
+
+	reportStopped(d, "comp1")
 	assert.Equal(t, map[string]string{
 		"comp2/beat_metrics.json": "comp2 metrics",
-	}, componentDiagnostics(t, d), "comp1 hooks should be gone after unregister")
-	assert.NotContains(t, d.componentHooks, "comp1", "unregistered component should not keep an entry")
+	}, componentDiagnostics(t, d), "comp1 hooks should be gone once comp1 stopped")
+	assert.NotContains(t, d.componentHooks, "comp1", "stopped component should not keep an entry")
 
-	d.UnregisterDiagnosticHooks("unknown")
-	assert.Len(t, componentDiagnostics(t, d), 1, "unregistering an unknown component should be a no-op")
+	reportStopped(d, "unknown")
+	d.ComponentStatusChanged(nil, nil)
+	assert.Len(t, componentDiagnostics(t, d), 1, "a status change for an unknown component should be a no-op")
 
 	d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", staticHook("comp1 metrics v2"))
 	assert.Equal(t, map[string]string{
 		"comp1/beat_metrics.json": "comp1 metrics v2",
 		"comp2/beat_metrics.json": "comp2 metrics",
-	}, componentDiagnostics(t, d), "a component should be able to register again after unregister")
+	}, componentDiagnostics(t, d), "a component restarted under the same ID should register again")
 }
 
 func TestDiagnosticHooks_ReRegisterReplaces(t *testing.T) {
@@ -438,7 +457,7 @@ func TestDiagnosticHooks_Concurrent(t *testing.T) {
 			for range 200 {
 				d.RegisterDiagnosticHook(name, "metrics", "beat_metrics.json", "application/json", staticHook(name))
 				d.RegisterDiagnosticHook(name, "inputs", "input_metrics.json", "application/json", staticHook(name))
-				d.UnregisterDiagnosticHooks(name)
+				reportStopped(d, name)
 			}
 		})
 	}
@@ -451,5 +470,5 @@ func TestDiagnosticHooks_Concurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.Empty(t, d.componentHooks, "all hooks should be gone once every component unregistered")
+	assert.Empty(t, d.componentHooks, "all hooks should be gone once every component stopped")
 }

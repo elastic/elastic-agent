@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/extension/extensioncapabilities"
 	"go.uber.org/zap"
@@ -46,8 +47,9 @@ var (
 	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
 	_ otelmanager.DiagnosticExtension = (*diagnosticsExtension)(nil)
 	_ otelmanager.ActionExtension     = (*diagnosticsExtension)(nil)
-	// Beat receivers look for this optional method to remove their hooks on shutdown.
-	_ interface{ UnregisterDiagnosticHooks(string) } = (*diagnosticsExtension)(nil)
+	// The collector reports a status change for every component it starts and
+	// stops; the extension uses it to drop the hooks of stopped components.
+	_ componentstatus.Watcher = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
@@ -226,13 +228,29 @@ func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, desc
 	d.componentHooks[componentName] = append(hooks, h)
 }
 
-// UnregisterDiagnosticHooks removes all diagnostic hooks registered for componentName.
-// Beat receivers call it on shutdown so the extension stops referencing them.
-// NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
-func (d *diagnosticsExtension) UnregisterDiagnosticHooks(componentName string) {
+// ComponentStatusChanged implements componentstatus.Watcher. It drops the
+// diagnostic hooks of a component once that component has stopped, so a
+// receiver torn down by a config reload is no longer referenced by the
+// extension and no longer contributes files to a diagnostics bundle.
+//
+// Hooks are keyed by the OTel component ID the receiver registers under
+// (beat.Info.ComponentID, which is the receiver's own component.ID), so it
+// matches the status source here. The collector reports StatusStopped after
+// the component's Shutdown returns, so nothing can register a hook for this
+// generation of the component afterwards.
+func (d *diagnosticsExtension) ComponentStatusChanged(source *componentstatus.InstanceID, event *componentstatus.Event) {
+	if source == nil || event == nil || event.Status() != componentstatus.StatusStopped {
+		return
+	}
+	componentName := source.ComponentID().String()
 	d.hooksMtx.Lock()
-	defer d.hooksMtx.Unlock()
+	_, had := d.componentHooks[componentName]
 	delete(d.componentHooks, componentName)
+	d.hooksMtx.Unlock()
+	if had {
+		d.logger.Debug("removed diagnostic hooks of stopped component",
+			zap.String("otelcol.component.id", componentName))
+	}
 }
 
 // RegisterActionHandler API exposes the ability for beat receivers to register a
