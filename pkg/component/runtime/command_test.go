@@ -612,6 +612,10 @@ func TestPathArgs(t *testing.T) {
 				if errors.Is(err, component.ErrInputNotSupportedOnPlatform) {
 					continue
 				}
+				var preventedErr *component.ErrInputRuntimeCheckFail
+				if !errors.As(err, &preventedErr) {
+					require.NoErrorf(t, err, "input %s", input)
+				}
 
 				_, hasLogsPath := setting(pathArgs(workDir, spec.BeatName()), "path.logs")
 				assert.Equalf(t, spec.BeatName() != "", hasLogsPath, "input %s", input)
