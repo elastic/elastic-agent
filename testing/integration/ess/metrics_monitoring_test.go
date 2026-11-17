@@ -24,8 +24,8 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
 	otelMonitoring "github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"

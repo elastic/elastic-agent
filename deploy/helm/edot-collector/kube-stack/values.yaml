@@ -633,8 +633,6 @@ collectors:
           # Enable in order to skip the SSL certificate Check
           # tls:
           #   insecure_skip_verify: true
-          mapping:
-            mode: otel
         # [OTLP/HTTP exporter](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter)
         # Elasticsearch exposes OTLP over HTTP only (no gRPC) at <es_endpoint>/_otlp.
         # The exporter appends the signal path (/v1/metrics) to the configured endpoint.
@@ -692,7 +690,7 @@ instrumentation:
   java:
     image: docker.elastic.co/observability/elastic-otel-javaagent:1.14.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.20.0
+    image: docker.elastic.co/observability/elastic-otel-node:1.20.1
   dotnet:
     image: docker.elastic.co/observability/elastic-otel-dotnet:1.7.0
     env:

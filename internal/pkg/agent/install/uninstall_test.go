@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -269,4 +269,31 @@ func TestSkipFleetAuditUnenroll(t *testing.T) {
 		)
 	}
 
+}
+
+func TestRemovePathContext(t *testing.T) {
+	t.Run("removes the path", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "remove-me")
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
+
+		require.NoError(t, RemovePathContext(t.Context(), logp.NewNopLogger(), dir))
+
+		assert.NoDirExists(t, dir)
+	})
+
+	t.Run("a done context stops before removing anything", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "keep-me")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		err := RemovePathContext(ctx, logp.NewNopLogger(), dir)
+
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.DirExists(t, dir)
+	})
+
+	t.Run("a path that does not exist is not an error", func(t *testing.T) {
+		assert.NoError(t, RemovePathContext(t.Context(), logp.NewNopLogger(), filepath.Join(t.TempDir(), "missing")))
+	})
 }

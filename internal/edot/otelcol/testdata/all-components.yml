@@ -40,6 +40,9 @@ extensions:
     client_id: someclientid
     client_secret: someclientsecret
     token_url: https://example.com/oauth2/default/v1/token
+  sigv4auth:
+    region: us-east-1
+    service: aps
 
 processors:
   attributes:
@@ -261,6 +264,7 @@ service:
     - azure_encoding
     - oauth2client
     - awscredentialsprovider
+    - sigv4auth
   pipelines:
     logs:
       exporters:

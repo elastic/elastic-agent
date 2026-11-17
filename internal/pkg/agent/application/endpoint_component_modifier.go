@@ -11,8 +11,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
