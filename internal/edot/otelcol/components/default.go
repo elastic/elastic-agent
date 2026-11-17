@@ -120,11 +120,13 @@ import (
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	opampextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
+	"github.com/elastic/elastic-agent/internal/edot/extensions/awsidentityfederationextension"
 	"github.com/elastic/elastic-agent/internal/edot/extensions/meterlifecycle"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
@@ -296,6 +298,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			healthcheckextension.NewFactory(),
 			bearertokenauthextension.NewFactory(),
 			oauth2clientauthextension.NewFactory(),
+			sigv4authextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),
@@ -310,6 +313,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			azureencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 			awscredentialsproviderextension.NewFactory(),
+			awsidentityfederationextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)

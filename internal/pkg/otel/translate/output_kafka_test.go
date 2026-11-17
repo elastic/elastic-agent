@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
 
 func TestKafkaTranslationLogic(t *testing.T) {
@@ -67,7 +67,10 @@ headers:
 					"min_size":      1600,
 					"sizer":         "items",
 				},
-				"queue_size": 3200,
+				"enabled":           true,
+				"queue_size":        3200,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
 			},
 			"timeout":      10 * time.Second,
 			"dial_timeout": 30 * time.Second,
@@ -126,7 +129,10 @@ max_message_bytes: 1000000`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout":      10 * time.Second,
 				"dial_timeout": 30 * time.Second,
@@ -177,7 +183,10 @@ max_message_bytes: 1000000`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"logs": map[string]any{
 					"encoding": "raw",
@@ -226,7 +235,10 @@ broker_timeout: 20s`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout":      20 * time.Second,
 				"dial_timeout": 5 * time.Second,
@@ -420,12 +432,12 @@ ssl:
 `,
 		},
 		{
-			"ca_sha_256 is set",
+			"ca_sha256 is set",
 			`
 hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 ssl:
-  ca_sha_256:  sha256
+  ca_sha256:  sha256
 `,
 		},
 	}

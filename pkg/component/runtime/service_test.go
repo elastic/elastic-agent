@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
+	"github.com/elastic/beats/v7/pkg/api/npipe"
 
 	"go.uber.org/zap/zapcore"
 
