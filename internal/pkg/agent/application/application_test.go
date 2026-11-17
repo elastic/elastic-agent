@@ -16,6 +16,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -691,4 +692,78 @@ func loadTestConfig(t *testing.T) (startupCfg, cfg *configuration.Configuration)
 	reloader, err := configuration.NewConfigReloader(t.Context(), nil, nil)
 	require.NoError(t, err)
 	return reloader.StartupConfiguration(), reloader.Configuration()
+}
+
+// seedBuildLogs creates the log directory of a build under topDir whose only file was last written age ago.
+func seedBuildLogs(t *testing.T, topDir, name string, age time.Duration) {
+	t.Helper()
+	dir := filepath.Join(paths.BuildLogsRoot(topDir), name)
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	f := filepath.Join(dir, "elastic-agent-1.ndjson")
+	require.NoError(t, os.WriteFile(f, []byte("x"), 0o600))
+	ts := time.Now().Add(-age)
+	require.NoError(t, os.Chtimes(f, ts, ts))
+}
+
+func TestCleanupOldBuildLogs(t *testing.T) {
+	t.Run("keeps the running build and the latest inactive one", func(t *testing.T) {
+		topDir := t.TempDir()
+		// the running build is kept even though it was written the longest ago
+		seedBuildLogs(t, topDir, "9.0.2-cccccc", 3*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.0-aaaaaa", 2*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.1-bbbbbb", time.Hour)
+
+		log, _ := loggertest.New(t.Name())
+		CleanupOldBuildLogs(t.Context(), log, topDir, "9.0.2-cccccc")
+
+		root := paths.BuildLogsRoot(topDir)
+		assert.DirExists(t, filepath.Join(root, "9.0.2-cccccc"))
+		assert.DirExists(t, filepath.Join(root, "9.0.1-bbbbbb"))
+		assert.NoDirExists(t, filepath.Join(root, "9.0.0-aaaaaa"))
+	})
+
+	t.Run("unversioned home keeps all logs", func(t *testing.T) {
+		paths.SetVersionHome(false)
+		t.Cleanup(func() { paths.SetVersionHome(true) })
+		topDir := t.TempDir()
+		seedBuildLogs(t, topDir, "9.0.0-aaaaaa", 2*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.1-bbbbbb", time.Hour)
+
+		log, _ := loggertest.New(t.Name())
+		CleanupOldBuildLogs(t.Context(), log, topDir, "9.0.2-cccccc")
+
+		assert.DirExists(t, filepath.Join(paths.BuildLogsRoot(topDir), "9.0.0-aaaaaa"))
+		assert.DirExists(t, filepath.Join(paths.BuildLogsRoot(topDir), "9.0.1-bbbbbb"))
+	})
+
+	t.Run("stops when the context is done without reporting a failure", func(t *testing.T) {
+		topDir := t.TempDir()
+		seedBuildLogs(t, topDir, "9.0.2-cccccc", 3*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.0-aaaaaa", 2*time.Hour)
+		seedBuildLogs(t, topDir, "9.0.1-bbbbbb", time.Hour)
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		log, obs := loggertest.New(t.Name())
+		CleanupOldBuildLogs(ctx, log, topDir, "9.0.2-cccccc")
+
+		assert.DirExists(t, filepath.Join(paths.BuildLogsRoot(topDir), "9.0.0-aaaaaa"), "nothing is removed once the Agent stops")
+		assert.Zero(t, obs.FilterLevelExact(zapcore.WarnLevel).Len(), "stopping is not a failure: %v", obs.All())
+	})
+
+	t.Run("reports a failure as a warning", func(t *testing.T) {
+		topDir := t.TempDir()
+		outside := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(paths.BuildLogsRoot(topDir), ".."), 0o755))
+		if err := os.Symlink(outside, paths.BuildLogsRoot(topDir)); err != nil {
+			t.Skipf("cannot create symbolic links: %s", err)
+		}
+
+		log, obs := loggertest.New(t.Name())
+		CleanupOldBuildLogs(t.Context(), log, topDir, "9.0.2-cccccc")
+
+		warnings := obs.FilterLevelExact(zapcore.WarnLevel).All()
+		require.Len(t, warnings, 1, "logs: %v", obs.All())
+		assert.Contains(t, warnings[0].Message, "Error cleaning build logs")
+	})
 }

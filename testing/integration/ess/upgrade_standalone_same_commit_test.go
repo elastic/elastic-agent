@@ -40,10 +40,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		t.Skipf("Minimum version for running this test is %q, current version: %q", *upgradetest.Version_8_13_0_SNAPSHOT, currentVersion)
 	}
 
-	unprivilegedAvailable := false
-	if upgradetest.SupportsUnprivileged(currentVersion) {
-		unprivilegedAvailable = true
-	}
+	unprivilegedAvailable := upgradetest.SupportsUnprivileged(currentVersion)
 	unPrivilegedString := "unprivileged"
 	if !unprivilegedAvailable {
 		unPrivilegedString = "privileged"
@@ -67,6 +64,11 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		// `elastic-agent status` returns the running state with no upgrade details. This indicates that
 		// the agent did a nop upgrade.
 		assert.NoError(t, err)
+
+		// the build keeps its log directory, no second one is created
+		buildLogsDirs, err := filepath.Glob(filepath.Join(startFixture.WorkDir(), "data", "logs", "*"))
+		require.NoError(t, err)
+		assert.Len(t, buildLogsDirs, 1)
 	})
 
 	t.Run(fmt.Sprintf("Upgrade on a repackaged version of agent %s (%s)", currentVersion, unPrivilegedString), func(t *testing.T) {
@@ -91,6 +93,7 @@ func TestStandaloneUpgradeSameCommit(t *testing.T) {
 		require.NoErrorf(t, err, "error retrieving start fixture source package")
 
 		versionForFixture, repackagedArchiveFile, err := repackageArchive(t, srcPackage, newVersionBuildMetadata, currentVersion, parsedNewVersion)
+		require.NoError(t, err, "error repackaging the start fixture package")
 
 		newPackageContainingDir := filepath.Dir(repackagedArchiveFile)
 		repackagedLocalFetcher := atesting.LocalFetcher(newPackageContainingDir)

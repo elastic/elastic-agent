@@ -423,12 +423,17 @@ func getReceiversConfigForComponent(
 	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
+	beatPaths := map[string]any{
+		"home": paths.Components(),
+		"data": BeatDataPath(comp.ID),
+	}
+	if paths.IsVersionHome() {
+		// like for beats processes, files the receivers write directly, e.g. request traces, are kept with the logs of this build
+		beatPaths["logs"] = paths.BuildComponentsLogs()
+	}
 	receiverConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
-		"path": map[string]any{
-			"home": paths.Components(),
-			"data": BeatDataPath(comp.ID),
-		},
+		"path": beatPaths,
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
 		"logging": map[string]any{
 			"with_fields": map[string]any{
