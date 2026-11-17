@@ -67,7 +67,8 @@ func setTestTopPath(t testing.TB) {
 
 // noHostInfoAgent is an info.Agent that does not look up host information, so the monitoring
 // templates fall back to os.Hostname. This keeps the tests reliable on macOS, where go-sysinfo's
-// memory lookup, which ECSMetadata calls, has been seen overwriting unrelated memory on the Go heap.
+// memory lookup, which ECSMetadata calls, can overwrite unrelated memory on the Go heap:
+// https://github.com/elastic/go-sysinfo/issues/298
 type noHostInfoAgent struct {
 	info.Agent
 }
