@@ -90,8 +90,12 @@ steps:
         artifact_paths:
           - "build/distributions/**/*"
         plugins:
+          # disable_logout: the plugin's pre-exit logout re-reads the registry hostname from
+          # Vault. Long jobs outlive their Vault token, so the logout 403s and fails the job
+          # after the command already succeeded. CI agents are single-use, so skip the logout.
           - elastic/vault-docker-login#v0.8.1:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+              disable_logout: true
           - *google_oidc_plugin
 
       - label: ":package: FIPS=true Cross Building and package elastic-agent"
@@ -116,8 +120,12 @@ steps:
         artifact_paths:
           - "build/distributions/**/*"
         plugins:
+          # disable_logout: the plugin's pre-exit logout re-reads the registry hostname from
+          # Vault. Long jobs outlive their Vault token, so the logout 403s and fails the job
+          # after the command already succeeded. CI agents are single-use, so skip the logout.
           - elastic/vault-docker-login#v0.8.1:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+              disable_logout: true
           - *google_oidc_plugin
 
       - label: ":package: FIPS=false Package ARM elastic-agent"
