@@ -589,14 +589,10 @@ collectors:
           # Enable in order to skip the SSL certificate Check
           # tls:
           #   insecure_skip_verify: true
-          mapping:
-            mode: otel
         elasticsearch/ecs:
           endpoints:
             - ${env:ELASTIC_ENDPOINT}
           api_key: ${env:ELASTIC_API_KEY}
-          mapping:
-            mode: ecs
       service:
         pipelines:
           metrics:
