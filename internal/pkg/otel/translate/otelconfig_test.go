@@ -541,6 +541,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"path": map[string]any{
 				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), id),
+				"logs": paths.BuildComponentsLogs(),
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
@@ -716,6 +717,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"path": map[string]any{
 				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), compID),
+				"logs": paths.BuildComponentsLogs(),
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
@@ -770,6 +772,7 @@ func TestGetOtelConfig(t *testing.T) {
 		"path": map[string]any{
 			"home": paths.Components(),
 			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+			"logs": paths.BuildComponentsLogs(),
 		},
 		"queue": map[string]any{
 			"mem": map[string]any{
@@ -1077,6 +1080,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1663,6 +1667,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring2"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1862,6 +1867,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1978,6 +1984,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "system-metrics"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -2956,7 +2963,13 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			assert.True(t, ok, "receiver config should be a map")
 
 			// Verify configuration section presence
-			assert.Contains(t, receiverConfig, "path", "path config should be present")
+			// Beat receivers write their files next to the logs of the running build, so the files they write
+			// directly, e.g. request traces, are collected with them.
+			assert.Equal(t, map[string]any{
+				"home": paths.Components(),
+				"data": BeatDataPath(tt.component.ID),
+				"logs": paths.BuildComponentsLogs(),
+			}, receiverConfig["path"])
 			assert.Contains(t, receiverConfig, "logging", "logging config should be present")
 			assert.Contains(t, receiverConfig, tt.expectedBeatName, fmt.Sprintf("%s config should be present", tt.expectedBeatName))
 
@@ -4647,9 +4660,13 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 }
 
-// TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
-// Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
+// TestGetReceiversConfigPathsContract pins the paths of beat receivers in a container, where the home is
+// unversioned: a home and a data path, no logs path. Files receivers write directly therefore resolve to the
+// default logs path. Versioned homes are covered by TestGetReceiversConfigForComponent.
 func TestGetReceiversConfigPathsContract(t *testing.T) {
+	paths.SetVersionHome(false)
+	t.Cleanup(func() { paths.SetVersionHome(true) })
+
 	comp := &component.Component{
 		ID:        "filestream-paths-contract-test",
 		InputType: "filestream",
