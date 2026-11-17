@@ -2920,6 +2920,30 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 	}
 }
 
+// TestGetOtelConfigExtensionsAreSortedAndDeduplicated checks that the extensions of all components end
+// up in one sorted list without duplicates, whatever the order of the components is.
+func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
+	// The first and last components share an output, so they share an extension.
+	compA := testFilebeatComp("filestream-a", "a")
+	compB := testFilebeatComp("filestream-b", "b")
+	compA2 := testFilebeatComp("filestream-a2", "a")
+	expected := []any{"beatsauth/_agent-component/a", "beatsauth/_agent-component/b"}
+
+	for name, components := range map[string][]component.Component{
+		"sorted":   {compA, compB, compA2},
+		"reversed": {compA2, compB, compA},
+		"shuffled": {compB, compA, compA2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			conf, err := GetOtelConfig(&component.Model{Components: components}, logp.NewNopLogger())
+			require.NoError(t, err)
+			require.NotNil(t, conf)
+
+			require.Equal(t, expected, conf.Get("service::extensions"))
+		})
+	}
+}
+
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 	filebeatComp := testFilebeatComp("filestream-default", "default")
 
