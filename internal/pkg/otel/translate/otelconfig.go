@@ -108,7 +108,11 @@ func GetOtelConfig(
 	if len(components) == 0 {
 		return nil, nil
 	}
-	otelConfig := confmap.New()     // base config, nothing here for now
+	// otelConfig is the config of the first component, followed by the merged configs of the rest. Conf.Merge
+	// deep-copies its source and re-flattens its destination, which is expensive for a config with thousands of
+	// receivers, so the first component's config is used as the base instead of being merged into an empty Conf.
+	// It is newly built by getCollectorConfigForComponent, so we own it.
+	var otelConfig *confmap.Conf
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
@@ -123,6 +127,11 @@ func GetOtelConfig(
 				extensionName := extension.(string)
 				extensions[extensionName] = true
 			}
+		}
+
+		if otelConfig == nil {
+			otelConfig = componentConfig
+			continue
 		}
 
 		// the assumption here is that each component will define its own receivers, and the shared exporters
@@ -141,10 +150,14 @@ func GetOtelConfig(
 		for i, ext := range extensionsSlice {
 			untypedExtensions[i] = ext
 		}
-		extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
-		err := otelConfig.Merge(extensionsConf)
-		if err != nil {
-			return nil, fmt.Errorf("error merging otel extensions: %w", err)
+		// A single component already defines its extensions in this order, and merging would copy the whole
+		// config to write the list it already has.
+		if current, _ := otelConfig.Get("service::extensions").([]any); !slices.Equal(current, untypedExtensions) {
+			extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
+			err := otelConfig.Merge(extensionsConf)
+			if err != nil {
+				return nil, fmt.Errorf("error merging otel extensions: %w", err)
+			}
 		}
 	}
 
@@ -387,9 +400,10 @@ func getCollectorConfigForComponent(
 		pipelineID.String(): pipelineConfig,
 	}
 
-	// we need to convert []string to []interface for this to work
+	// we need to convert []string to []interface for this to work. The keys are sorted so the list is
+	// deterministic, and GetOtelConfig can recognize it as already being in its final order.
 	extensionKey := make([]any, 0, len(extensionConfig))
-	for k := range extensionConfig {
+	for _, k := range slices.Sorted(maps.Keys(extensionConfig)) {
 		extensionKey = append(extensionKey, k)
 	}
 
