@@ -502,20 +502,20 @@ steps:
   - label: ":mag: Plugin check"
     if: build.pull_request.id != null
     commands:
-      - .buildkite/scripts/install-gh.sh
       - .buildkite/scripts/plugin-check/generate.sh > plugin-check.yml
       - '[ ! -s plugin-check.yml ] || buildkite-agent pipeline upload plugin-check.yml'
-    env:
-      GH_VERSION: "2.4.0"
     agents:
       provider: "gcp"
       image: "${IMAGE_UBUNTU_2204_X86_64}"
     plugins:
       - *sparse_checkout_plugin
+      - elastic/gh-cli#v0.1.1:
+          version: "2.88.0"
       - elastic/vault-github-token#v0.2.3:
     if_changed:
       include:
         - .buildkite/**/*
+        - catalog-info.yaml
         - renovate.json
 
   # Triggers a dynamic step: Sync K8s
