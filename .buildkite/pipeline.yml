@@ -11,7 +11,7 @@ common:
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
   - sparse_checkout_plugin: &sparse_checkout_plugin
-      sparse-checkout#v1.6.0:
+      sparse-checkout#v1.11.0:
         paths:
         - .buildkite
         - .go-version
@@ -479,7 +479,7 @@ steps:
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package.sh | buildkite-agent pipeline upload
     plugins:
-    - sparse-checkout#v1.6.0:
+    - sparse-checkout#v1.11.0:
         paths:
         - .buildkite
         - .go-version
@@ -504,7 +504,7 @@ steps:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package-iar.sh | buildkite-agent pipeline upload
     plugins:
-    - sparse-checkout#v1.6.0:
+    - sparse-checkout#v1.11.0:
         paths:
         - .buildkite
         - .go-version
@@ -529,7 +529,7 @@ steps:
       - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh
       - .buildkite/scripts/steps/trigger-elastic-agent-package-staging.sh | buildkite-agent pipeline upload
     plugins:
-    - sparse-checkout#v1.6.0:
+    - sparse-checkout#v1.11.0:
         paths:
         - .buildkite
         - .go-version

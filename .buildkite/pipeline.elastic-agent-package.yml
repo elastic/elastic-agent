@@ -19,7 +19,7 @@ common:
   - google_oidc_plugin: &google_oidc_plugin
       # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-gcp-oidc.tf
       # This plugin authenticates to Google Cloud using the OIDC token.
-      elastic/oblt-google-auth#v1.3.1:
+      elastic/oblt-google-auth#v1.3.5:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
@@ -103,12 +103,51 @@ steps:
               - false
               - true
         plugins:
-          - elastic/vault-docker-login#v0.5.2:
+          # disable_logout: the plugin's pre-exit logout re-reads the registry hostname from
+          # Vault. Long jobs outlive their Vault token, so the logout 403s and fails the job
+          # after the command already succeeded. CI agents are single-use, so skip the logout.
+          - elastic/vault-docker-login#v0.8.1:
               secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+              disable_logout: true
           - *google_oidc_plugin
 
+<<<<<<< HEAD
       - label: ":package: FIPS={{matrix.fips}} Package ARM elastic-agent"
         key: package_elastic-agent-arm
+=======
+      - label: ":package: FIPS=true Cross Building and package elastic-agent"
+        key: package_elastic-agent_fips
+        agents:
+          provider: "gcp"
+          machineType: "c2-standard-16"
+          diskSizeGb: 400
+          image: "${IMAGE_UBUNTU_2404_X86_64}"
+        env:
+          PLATFORMS: "linux/amd64 windows/amd64 darwin/amd64"
+          PACKAGES: "all"
+          FIPS: "true"
+        command: |
+          if [[ -z "$${MANIFEST_URL}" ]]; then
+            export MANIFEST_URL=$(buildkite-agent meta-data get MANIFEST_URL --default "")
+          fi
+          if [[ -z "$${MAGEFILE_VERBOSE}" ]]; then
+            export MAGEFILE_VERBOSE=$(buildkite-agent meta-data get MAGEFILE_VERBOSE --default "0")
+          fi
+          .buildkite/scripts/steps/package.sh
+        artifact_paths:
+          - "build/distributions/**/*"
+        plugins:
+          # disable_logout: the plugin's pre-exit logout re-reads the registry hostname from
+          # Vault. Long jobs outlive their Vault token, so the logout 403s and fails the job
+          # after the command already succeeded. CI agents are single-use, so skip the logout.
+          - elastic/vault-docker-login#v0.8.1:
+              secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+              disable_logout: true
+          - *google_oidc_plugin
+
+      - label: ":package: FIPS=false Package ARM elastic-agent"
+        key: package_elastic-agent_arm
+>>>>>>> a9683f0 (Update Buildkite plugins and let Renovate manage them (#18037))
         agents:
           provider: "aws"
           instanceType: "t4g.2xlarge"
