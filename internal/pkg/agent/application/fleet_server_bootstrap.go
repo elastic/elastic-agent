@@ -273,7 +273,7 @@ func fixInputMap(m map[string]interface{}) {
 // match the loading and unloading of the configuration so this ensures that it will match what Fleet Server is
 // expecting.
 func toMapStr(input ...interface{}) (map[string]interface{}, error) {
-	m := map[interface{}]interface{}{}
+	m := map[string]interface{}{}
 	for _, i := range input {
 		im, err := toMapInterface(i)
 		if err != nil {
@@ -281,19 +281,12 @@ func toMapStr(input ...interface{}) (map[string]interface{}, error) {
 		}
 		m = mergeNestedMaps(m, im)
 	}
-	// toMapInterface will set nested maps to a map[interface{}]interface{} which `component.ExpectedConfig` cannot
-	// handle they must be a map[string]interface{}.
-	fm := fixYamlMap(m)
-	r, ok := fm.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expected map[string]interface{}, got %T", fm)
-	}
-	return r, nil
+	return m, nil
 }
 
-// toMapInterface converts the input into a map[interface{}]interface{} using YAML marshall and unmarshall.
-func toMapInterface(input interface{}) (map[interface{}]interface{}, error) {
-	var res map[interface{}]interface{}
+// toMapInterface converts the input into a map[string]interface{} using YAML marshall and unmarshall.
+func toMapInterface(input interface{}) (map[string]interface{}, error) {
+	var res map[string]interface{}
 	raw, err := yaml.Marshal(input)
 	if err != nil {
 		return nil, err
@@ -305,16 +298,16 @@ func toMapInterface(input interface{}) (map[interface{}]interface{}, error) {
 	return res, nil
 }
 
-// mergeNestedMaps merges two map[interface{}]interface{} together deeply.
-func mergeNestedMaps(a, b map[interface{}]interface{}) map[interface{}]interface{} {
-	res := make(map[interface{}]interface{}, len(a))
+// mergeNestedMaps merges two map[string]interface{} together deeply.
+func mergeNestedMaps(a, b map[string]interface{}) map[string]interface{} {
+	res := make(map[string]interface{}, len(a))
 	for k, v := range a {
 		res[k] = v
 	}
 	for k, v := range b {
-		if v, ok := v.(map[interface{}]interface{}); ok {
+		if v, ok := v.(map[string]interface{}); ok {
 			if bv, ok := res[k]; ok {
-				if bv, ok := bv.(map[interface{}]interface{}); ok {
+				if bv, ok := bv.(map[string]interface{}); ok {
 					res[k] = mergeNestedMaps(bv, v)
 					continue
 				}
@@ -323,27 +316,4 @@ func mergeNestedMaps(a, b map[interface{}]interface{}) map[interface{}]interface
 		res[k] = v
 	}
 	return res
-}
-
-// fixYamlMap converts map[interface{}]interface{} into map[string]interface{} through out the entire map.
-func fixYamlMap(input interface{}) interface{} {
-	switch i := input.(type) {
-	case map[string]interface{}:
-		for k, v := range i {
-			i[k] = fixYamlMap(v)
-		}
-	case map[interface{}]interface{}:
-		m := map[string]interface{}{}
-		for k, v := range i {
-			if ks, ok := k.(string); ok {
-				m[ks] = fixYamlMap(v)
-			}
-		}
-		return m
-	case []interface{}:
-		for j, v := range i {
-			i[j] = fixYamlMap(v)
-		}
-	}
-	return input
 }

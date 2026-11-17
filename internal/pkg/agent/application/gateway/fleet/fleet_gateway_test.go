@@ -25,7 +25,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"

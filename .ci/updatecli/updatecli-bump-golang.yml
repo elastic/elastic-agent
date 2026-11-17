@@ -16,7 +16,6 @@ scms:
       branch: '{{ .scm.branch }}'
       force: false
       submodules: false
-      singleBranch: true
 
 actions:
   elastic-agent:
@@ -24,7 +23,6 @@ actions:
     scmid: githubConfig
     sourceid: latestGoVersion
     spec:
-      automerge: false
       labels:
         - automation
         - dependencies

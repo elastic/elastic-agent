@@ -576,6 +576,17 @@
                         }
                     }
                 },
+                "browserCAs": {
+                    "type": "object",
+                    "description": "Certificate authorities that browser monitors trust.",
+                    "additionalProperties": false,
+                    "properties": {
+                        "secretName": {
+                            "type": "string",
+                            "description": "Name of an existing Secret with PEM CA certificates (*.crt or *.pem keys), mounted at /etc/elastic-agent/browser-cas and set as ELASTIC_AGENT_BROWSER_CA. Requires a complete image variant."
+                        }
+                    }
+                },
                 "fleet": {
                     "type": "object",
                     "description": "Elastic-Agent managed configuration.",
@@ -2063,6 +2074,27 @@
                                 "memory": "64Mi"
                             }
                         }
+                    ]
+                },
+                "startupProbe": {
+                    "type": "object",
+                    "description": "Startup probe of the agent container.",
+                    "examples": [
+                        { "httpGet": { "path": "/", "port": 13133 }, "periodSeconds": 10, "failureThreshold": 30 }
+                    ]
+                },
+                "livenessProbe": {
+                    "type": "object",
+                    "description": "Liveness probe of the agent container.",
+                    "examples": [
+                        { "httpGet": { "path": "/", "port": 13133 }, "periodSeconds": 30, "failureThreshold": 3 }
+                    ]
+                },
+                "readinessProbe": {
+                    "type": "object",
+                    "description": "Readiness probe of the agent container.",
+                    "examples": [
+                        { "httpGet": { "path": "/", "port": 13133 }, "periodSeconds": 10 }
                     ]
                 },
                 "securityContext": {

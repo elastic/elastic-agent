@@ -10,7 +10,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/beats/v7/pkg/file"
 )
 
 // FileOwner is the ownership a file should have.

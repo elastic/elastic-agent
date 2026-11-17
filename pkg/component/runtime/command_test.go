@@ -7,9 +7,11 @@ package runtime
 import (
 	"bytes"
 	"encoding/json"
-	"runtime"
+	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -18,9 +20,10 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -71,40 +74,36 @@ func TestHostnameOverrideArgs(t *testing.T) {
 
 func TestAddToBucket(t *testing.T) {
 	testCases := map[string]struct {
-		bucketSize int
-		dropRate   time.Duration
-		add        int
-		// Warning: this sleep duration is not very precise on Windows machines as the system clock ticks only every 15ms
-		addSleep    time.Duration
+		bucketSize  int
+		dropRate    time.Duration
+		add         int
+		addInterval time.Duration
 		shouldBlock bool
 	}{
 		"no error":           {1, 50 * time.Millisecond, 0, 1 * time.Millisecond, false},
 		"error within limit": {1, 50 * time.Millisecond, 1, 1 * time.Millisecond, false},
 		"errors > than limit but across timespans":                {1, 50 * time.Millisecond, 2, 80 * time.Millisecond, false},
 		"errors > than limit within timespans, exact bucket size": {2, 50 * time.Millisecond, 2, 2 * time.Millisecond, false},
-		// These testcases use a longer duration as dropRate to make sure that on Windows machine we don't drop any old events
-		"errors > than limit within timespans, off by one": {2, 150 * time.Millisecond, 3, 2 * time.Millisecond, true},
-		"errors > than limit within timespans":             {2, 150 * time.Millisecond, 4, 2 * time.Millisecond, true},
+		"errors > than limit within timespans, off by one":        {2, 150 * time.Millisecond, 3, 2 * time.Millisecond, true},
+		"errors > than limit within timespans":                    {2, 150 * time.Millisecond, 4, 2 * time.Millisecond, true},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if runtime.GOOS == "windows" {
-				t.Skip("https://github.com/elastic/elastic-agent/issues/3290: Flaky timing on Windows")
-			}
-			b := newRateLimiter(tc.dropRate, tc.bucketSize)
+			// Use a fake clock so runner scheduling cannot refill the bucket.
+			synctest.Test(t, func(t *testing.T) {
+				b := newRateLimiter(tc.dropRate, tc.bucketSize)
 
-			blocked := false
-			b.Allow()
-			<-time.After(tc.dropRate + 20*time.Millisecond) // init ticker
+				blocked := false
 
-			for i := 0; i < tc.add; i++ {
-				t.Logf("%v : add 1 element when there are %f tokens available", time.Now(), b.Tokens())
-				wasBlocked := !b.Allow()
-				blocked = blocked || wasBlocked
-				<-time.After(tc.addSleep)
-			}
-			require.Equal(t, tc.shouldBlock, blocked)
+				for i := 0; i < tc.add; i++ {
+					t.Logf("%v : add 1 element when there are %f tokens available", time.Now(), b.Tokens())
+					wasBlocked := !b.Allow()
+					blocked = blocked || wasBlocked
+					time.Sleep(tc.addInterval)
+				}
+				require.Equal(t, tc.shouldBlock, blocked)
+			})
 		})
 	}
 }
@@ -537,4 +536,93 @@ func TestCreateLogWriterJSONEncoder(t *testing.T) {
 			require.Equal(t, tc.componentID, logged["log.source"])
 		})
 	}
+}
+
+func TestPathArgs(t *testing.T) {
+	t.Cleanup(func() { paths.SetVersionHome(true) })
+	workDir := filepath.Join("run", "comp")
+
+	// setting returns the value of the -E setting with the given key, and whether it is set
+	setting := func(args []string, key string) (string, bool) {
+		for i := 0; i+1 < len(args); i++ {
+			if value, ok := strings.CutPrefix(args[i+1], key+"="); args[i] == "-E" && ok {
+				return value, true
+			}
+		}
+		return "", false
+	}
+
+	t.Run("a beat in a versioned home logs next to the build logs", func(t *testing.T) {
+		paths.SetVersionHome(true)
+
+		args := pathArgs(workDir, "filebeat")
+
+		data, ok := setting(args, "path.data")
+		assert.True(t, ok)
+		assert.Equal(t, workDir, data)
+		logsPath, ok := setting(args, "path.logs")
+		require.True(t, ok)
+		// the component logs live in the build logs directory, outside of the versioned home
+		assert.Equal(t, paths.BuildComponentsLogs(), logsPath)
+		// Fleet integrations resolve "../../logs/<input>/" from the logs path of the input
+		assert.Equal(t, "logs", filepath.Base(logsPath))
+		assert.Equal(t, paths.BuildLogsRoot(paths.Top()), filepath.Dir(filepath.Dir(filepath.Dir(logsPath))))
+	})
+
+	t.Run("a component that is not a beat keeps the default logs path", func(t *testing.T) {
+		paths.SetVersionHome(true)
+
+		args := pathArgs(workDir, "")
+
+		_, ok := setting(args, "path.data")
+		assert.True(t, ok)
+		_, ok = setting(args, "path.logs")
+		assert.False(t, ok)
+	})
+
+	t.Run("unversioned home keeps the default logs path", func(t *testing.T) {
+		paths.SetVersionHome(false)
+
+		args := pathArgs(workDir, "filebeat")
+
+		_, ok := setting(args, "path.data")
+		assert.True(t, ok)
+		_, ok = setting(args, "path.logs")
+		assert.False(t, ok)
+	})
+
+	// only beats get the logs path: the other components, such as fleet-server and the profiling collectors,
+	// are not known to accept it
+	t.Run("only the beats of the specs get the logs path", func(t *testing.T) {
+		paths.SetVersionHome(true)
+
+		withoutLogsPath := map[string]struct{}{}
+		for _, platform := range component.GlobalPlatforms {
+			specs, err := component.LoadRuntimeSpecs(filepath.Join("..", "..", "..", "specs"), component.PlatformDetail{Platform: platform}, component.SkipBinaryCheck())
+			require.NoError(t, err)
+
+			for _, input := range specs.Inputs() {
+				// a spec that is prevented on this machine, such as pf-host-agent for a user that is not root,
+				// is returned together with the error
+				spec, err := specs.GetInput(input)
+				if errors.Is(err, component.ErrInputNotSupportedOnPlatform) {
+					continue
+				}
+				var preventedErr *component.ErrInputRuntimeCheckFail
+				if !errors.As(err, &preventedErr) {
+					require.NoErrorf(t, err, "input %s", input)
+				}
+
+				_, hasLogsPath := setting(pathArgs(workDir, spec.BeatName()), "path.logs")
+				assert.Equalf(t, spec.BeatName() != "", hasLogsPath, "input %s", input)
+				if !hasLogsPath {
+					withoutLogsPath[input] = struct{}{}
+				}
+			}
+		}
+
+		for _, input := range []string{"pf-elastic-collector", "pf-elastic-symbolizer", "pf-host-agent", "fleet-server"} {
+			assert.Containsf(t, withoutLogsPath, input, "input %s must not get the logs path", input)
+		}
+	})
 }

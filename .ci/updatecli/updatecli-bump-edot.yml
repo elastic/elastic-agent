@@ -14,14 +14,12 @@ scms:
       branch: '{{ .scm.branch }}'
       force: false
       submodules: false
-      singleBranch: true
 
 actions:
   elastic-agent:
     kind: github/pullrequest
     scmid: elastic-agent
     spec:
-      automerge: false
       labels:
         - automation
         - dependencies
