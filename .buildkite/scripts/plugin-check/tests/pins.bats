@@ -77,3 +77,28 @@ teardown() { rm -rf "$REPO"; }
   run "$PINS" changed origin/does-not-exist
   [ "$status" -eq 2 ]
 }
+
+@test "suffixed tags keep the whole version" {
+  printf -- '      - elastic/foo#v1.2.3-rc1:\n' > .buildkite/x.yml
+  run "$PINS" list --files .buildkite/x.yml
+  [ "$output" = $'elastic/foo\tv1.2.3-rc1\t.buildkite/x.yml' ]
+}
+
+@test "floating refs used as plugin keys are reported, issue refs and URLs are not" {
+  printf -- '      - elastic/foo#main:\n      - elastic/bar#0a1b2c3d4e5f:\n# see elastic/elastic-agent#18037 and https://github.com/x/y#v1.2.3\nx: "${1#v}"\n' > .buildkite/x.yml
+  run "$PINS" list --files .buildkite/x.yml
+  [[ "$output" == *$'elastic/foo\tmain\t'* ]]
+  [[ "$output" == *$'elastic/bar\t0a1b2c3d4e5f\t'* ]]
+  [ "$(wc -l <<<"$output")" -eq 2 ]
+}
+
+@test "catalog-info.yaml pins are scanned and diffed" {
+  printf -- 'initial_step_plugins:\n  - sparse-checkout#v1.6.0:\n' > catalog-info.yaml
+  git add -A && git commit -qm cat
+  git checkout -q -b pr2
+  sed -i 's/v1.6.0/v1.11.0/' catalog-info.yaml && git commit -qam bump
+  run "$PINS" list
+  [[ "$output" == *$'sparse-checkout\tv1.6.0\tcatalog-info.yaml'* || "$output" == *$'sparse-checkout\tv1.11.0\tcatalog-info.yaml'* ]]
+  run "$PINS" changed main
+  [[ "$output" == *$'sparse-checkout\tv1.11.0\tcatalog-info.yaml'* ]]
+}
