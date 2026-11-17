@@ -178,9 +178,10 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 
 	u.fleetServerURI = c.URI()
 	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
-	u.fleetTransport = c.Transport()
+	transport := c.Transport()
+	u.fleetTransport = transport
 	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
-	u.artifactDownloader.withFleetTransport(c.Transport())
+	u.artifactDownloader.withFleetTransport(transport)
 }
 
 // Reload reloads the artifact configuration for the upgrader.
