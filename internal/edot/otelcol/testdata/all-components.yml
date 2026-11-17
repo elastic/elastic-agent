@@ -34,16 +34,9 @@ extensions:
       access_key_id: tom 
       secret_access_key: tom
       session_token: dG9tCg==
-<<<<<<< HEAD
-=======
-  oauth2client:
-    client_id: someclientid
-    client_secret: someclientsecret
-    token_url: https://example.com/oauth2/default/v1/token
   sigv4auth:
     region: us-east-1
     service: aps
->>>>>>> 0f67383 (Add sigv4auth extension to EDOT Collector (#18021))
 
 processors:
   attributes:

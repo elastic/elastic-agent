@@ -286,11 +286,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			filestorage.NewFactory(),
 			healthcheckextension.NewFactory(),
 			bearertokenauthextension.NewFactory(),
-<<<<<<< HEAD
-=======
-			oauth2clientauthextension.NewFactory(),
 			sigv4authextension.NewFactory(),
->>>>>>> 0f67383 (Add sigv4auth extension to EDOT Collector (#18021))
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),
