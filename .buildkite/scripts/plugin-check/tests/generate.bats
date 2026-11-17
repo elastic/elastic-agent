@@ -65,3 +65,18 @@ bump() {
   run --separate-stderr "$GEN" origin/nope
   [ "$status" -eq 2 ]
 }
+
+@test "works from a shallow single-branch clone with no base argument (real CI checkout)" {
+  ORIGIN="$(mktemp -d)"
+  git clone -q "$REPO" "$ORIGIN/o.git" --bare
+  bump v0.8.1
+  git push -q "$ORIGIN/o.git" pr:pr
+  SHALLOW="$(mktemp -d)"
+  git clone -q --depth 1 --single-branch --branch pr --filter=blob:none "file://$ORIGIN/o.git" "$SHALLOW/w"
+  cd "$SHALLOW/w"
+  [ -f "$(git rev-parse --git-dir)/shallow" ]
+  BUILDKITE_PULL_REQUEST_BASE_BRANCH=main run --separate-stderr "$GEN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"probe vault-docker-login v0.8.1"* ]]
+  rm -rf "$ORIGIN" "$SHALLOW"
+}

@@ -12,6 +12,11 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 base="${1:-}"
 if [[ -z "$base" ]]; then
   branch="${BUILDKITE_PULL_REQUEST_BASE_BRANCH:?BUILDKITE_PULL_REQUEST_BASE_BRANCH or base-ref required}"
+  # The sparse-checkout plugin clones with --depth 1; a merge base needs full history
+  # (cheap: the clone is blobless).
+  if [[ -f "$(git rev-parse --git-dir)/shallow" ]]; then
+    git fetch --unshallow --no-tags origin >&2
+  fi
   git fetch --no-tags origin "+refs/heads/${branch}:refs/remotes/origin/${branch}" >&2
   base="origin/${branch}"
 fi
