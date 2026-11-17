@@ -1,0 +1,9 @@
+  - label: ":mag: probe vault-docker-login __VERSION__"
+    key: "__KEY__"
+    command: 'docker logout docker.elastic.co'
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - __PIN__:
+          secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'

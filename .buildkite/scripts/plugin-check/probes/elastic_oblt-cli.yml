@@ -1,0 +1,9 @@
+  - label: ":mag: probe oblt-cli __VERSION__"
+    key: "__KEY__"
+    command: 'oblt-cli version'
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - __PIN__:
+          version-file: .oblt-cli-version

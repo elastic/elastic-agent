@@ -1,0 +1,12 @@
+# file<TAB>pipeline slug<TAB>covered_by_main<TAB>dry-run env (KEY=VALUE, comma separated)
+# covered_by_main: true = pipeline.yml already triggers it on PRs when this file changes;
+#   main-base-only = same, but only for PRs whose base is main (backport PRs get our dry-run).
+# Deliberately NOT mapped (static tag check + probes only):
+#   pipeline.elastic-agent-binary-dra.yml  4 big packaging builds, YAML `notify` slack can't be
+#     disabled by env, dra-prep is skipped on PRs, and its branch filter may block the trigger.
+#   pipeline.version-bump.yml  no plugins; Slack + release automation, no dry-run.
+#   pipeline.agentless-tests.yaml / pipeline.integration-test-matrix.yml  need an environment.
+#   scripts/upload_dra_staging.sh  step only runs on main/release branches.
+.buildkite/pipeline.elastic-agent-package.yml	elastic-agent-package	true	
+.buildkite/pipeline.agentless-app-release.yaml	agentless-serverless-release	main-base-only	DRY_RUN=true
+.buildkite/pipeline.elastic-agent-helm-charts.yml	elastic-agent-helm-charts	false	SNAPSHOT=true,HELM_REPO_ENV=dev,DRY_RUN=true
