@@ -24,7 +24,6 @@ import (
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
@@ -34,11 +33,29 @@ import (
 // Conf.Merge treats lists, so the merged config has to be correct with it both on and off.
 const mergeAppendGate = "confmap.enableMergeAppendOption"
 
+// setMergeAppendGate sets the gate for the duration of the test and restores its previous value afterwards.
 func setMergeAppendGate(t testing.TB, enabled bool) {
 	t.Helper()
 	registry := featuregate.GlobalRegistry()
+	var previous bool
+	registry.VisitAll(func(gate *featuregate.Gate) {
+		if gate.ID() == mergeAppendGate {
+			previous = gate.IsEnabled()
+		}
+	})
 	require.NoError(t, registry.Set(mergeAppendGate, enabled))
-	t.Cleanup(func() { _ = registry.Set(mergeAppendGate, false) })
+	t.Cleanup(func() { require.NoError(t, registry.Set(mergeAppendGate, previous)) })
+}
+
+// forEachMergeAppendGate runs f with the merge append gate off and on. The agent runs with it on.
+func forEachMergeAppendGate(t *testing.T, f func(t *testing.T, gateEnabled bool)) {
+	t.Helper()
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprintf("merge append gate %t", enabled), func(t *testing.T) {
+			setMergeAppendGate(t, enabled)
+			f(t, enabled)
+		})
+	}
 }
 
 func setTestTopPath(t testing.TB) {
@@ -49,9 +66,8 @@ func setTestTopPath(t testing.TB) {
 }
 
 // noHostInfoAgent is an info.Agent that does not look up host information, so the monitoring
-// templates fall back to os.Hostname. Besides being faster, this keeps the comparison below
-// reliable on macOS, where go-sysinfo's memory lookup, which ECSMetadata calls, has been seen
-// overwriting unrelated strings on the Go heap.
+// templates fall back to os.Hostname. This keeps the tests reliable on macOS, where go-sysinfo's
+// memory lookup, which ECSMetadata calls, has been seen overwriting unrelated memory on the Go heap.
 type noHostInfoAgent struct {
 	info.Agent
 }
@@ -60,206 +76,137 @@ func (noHostInfoAgent) ECSMetadata(*logger.Logger) (*ecsmeta.ECSMeta, error) {
 	return nil, errors.New("host information is not looked up in tests")
 }
 
-// buildMergedConfigSequential is the straightforward way to build the merged config: every piece
-// is merged, in order, into a Conf that starts out empty. That copies the whole config for each
-// piece, which is why buildMergedConfig does not work this way, but it defines the result that
-// buildMergedConfig has to produce.
-func buildMergedConfigSequential(
-	m *OTelManager,
-	cfgUpdate configUpdate,
-	agentInfo info.Agent,
-	logger *logp.Logger,
-) (*confmap.Conf, error) {
-	mergedOtelCfg := confmap.New()
-
-	var componentOtelCfg *confmap.Conf
-	if len(cfgUpdate.components) > 0 {
-		model := &component.Model{Components: cfgUpdate.components}
-		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, logger)
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate otel config: %w", err)
-		}
-	}
-
-	if componentOtelCfg == nil && cfgUpdate.collectorCfg == nil {
-		return nil, nil
-	}
-
-	if componentOtelCfg != nil {
-		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
-			return nil, err
-		}
-		if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
-			return nil, err
-		}
-		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil && mCfg.Enabled && mCfg.MonitorMetrics {
-			if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components, logger); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	if cfgUpdate.collectorCfg != nil {
-		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
-		return nil, err
-	}
-	if err := injectMeterLifecycleExtension(mergedOtelCfg); err != nil {
-		return nil, err
-	}
-	if err := maybeInjectLogLevel(mergedOtelCfg, component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)); err != nil {
-		return nil, err
-	}
-	if err := injectHealthCheckV2Extension(mergedOtelCfg, m.healthCheckExtComponentID, 0); err != nil {
-		return nil, err
-	}
-	if err := addCollectorMetricsReader(mergedOtelCfg, m.collectorMetricsPort); err != nil {
-		return nil, err
-	}
-	return mergedOtelCfg, nil
+// buildTestMergedConfig builds the merged config for update, with the agent log level at warn.
+func buildTestMergedConfig(t *testing.T, update configUpdate) *confmap.Conf {
+	t.Helper()
+	update.agentLogLevel = logp.WarnLevel
+	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888}
+	got, err := m.buildMergedConfig(update, noHostInfoAgent{&info.AgentInfo{}}, logp.NewNopLogger())
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	return got
 }
 
-func TestBuildMergedConfigMatchesSequentialMerge(t *testing.T) {
+// The collector config lists the extension of the component after an extension of its own. The merged
+// list has the extensions of both and the ones the agent adds, in an order that depends on the gate.
+func TestBuildMergedConfigExtensions(t *testing.T) {
+	setTestTopPath(t)
+	expected := map[bool][]any{
+		false: {"zpages", "beatsauth/_agent-component/", "headers_setter/_agent-component/", "elastic_diagnostics", "elastic_meter_lifecycle", "healthcheckv2/test"},
+		true:  {"beatsauth/_agent-component/", "headers_setter/_agent-component/", "zpages", "elastic_diagnostics", "elastic_meter_lifecycle", "healthcheckv2/test"},
+	}
+
+	forEachMergeAppendGate(t, func(t *testing.T, gateEnabled bool) {
+		got := buildTestMergedConfig(t, configUpdate{
+			components: []component.Component{testComponent("default-output")},
+			collectorCfg: confmap.NewFromStringMap(map[string]any{
+				"extensions": map[string]any{"zpages": map[string]any{}},
+				"service":    map[string]any{"extensions": []any{"zpages", "beatsauth/_agent-component/"}},
+			}),
+		})
+
+		assert.Equal(t, expected[gateEnabled], got.Get("service::extensions"))
+	})
+}
+
+func TestBuildMergedConfigKeepsCollectorAndComponentConfigs(t *testing.T) {
 	setTestTopPath(t)
 
+	forEachMergeAppendGate(t, func(t *testing.T, _ bool) {
+		got := buildTestMergedConfig(t, configUpdate{
+			components:   []component.Component{testComponent("default-output")},
+			collectorCfg: confmap.NewFromStringMap(testConfig),
+		})
+
+		receivers, ok := got.Get("receivers").(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, receivers, "nop")
+		assert.Contains(t, receivers, "filebeatreceiver/_agent-component/default-output/filestream-unit-test-1")
+		assert.Contains(t, receivers, "filebeatreceiver/_agent-component/default-output/filestream-unit-test-2")
+
+		exporters, ok := got.Get("exporters").(map[string]any)
+		require.True(t, ok)
+		assert.Contains(t, exporters, "nop")
+		assert.Contains(t, exporters, "elasticsearch/_agent-component/")
+
+		assert.True(t, got.IsSet("service::pipelines::traces"), "pipeline of the collector config")
+		assert.True(t, got.IsSet("service::pipelines::logs/_agent-component/default-output"), "pipeline of the component")
+	})
+}
+
+func TestBuildMergedConfigCollectorTelemetry(t *testing.T) {
+	setTestTopPath(t)
+	components := []component.Component{testComponent("default-output")}
+	consoleReader := map[string]any{"periodic": map[string]any{"exporter": map[string]any{"console": map[string]any{}}}}
+	prometheusReader := map[string]any{"pull": map[string]any{"exporter": map[string]any{"prometheus": map[string]any{
+		"host": "localhost", "port": 8888, "without_scope_info": false,
+	}}}}
+
+	t.Run("the log level and readers of the collector config are kept", func(t *testing.T) {
+		got := buildTestMergedConfig(t, configUpdate{
+			components: components,
+			collectorCfg: confmap.NewFromStringMap(map[string]any{"service": map[string]any{"telemetry": map[string]any{
+				"logs":    map[string]any{"level": "debug"},
+				"metrics": map[string]any{"readers": []any{consoleReader}},
+			}}}),
+		})
+
+		assert.Equal(t, "debug", got.Get("service::telemetry::logs::level"))
+		assert.Equal(t, []any{consoleReader, prometheusReader}, got.Get("service::telemetry::metrics::readers"))
+	})
+
+	t.Run("the agent log level and a reader are added otherwise", func(t *testing.T) {
+		got := buildTestMergedConfig(t, configUpdate{components: components})
+
+		assert.Equal(t, "WARN", got.Get("service::telemetry::logs::level"))
+		assert.Equal(t, []any{prometheusReader}, got.Get("service::telemetry::metrics::readers"))
+	})
+}
+
+func TestBuildMergedConfigMonitoringReceiver(t *testing.T) {
+	setTestTopPath(t)
+	monitoring := &config.MonitoringConfig{Enabled: true, MonitorMetrics: true, MetricsPeriod: time.Minute}
+	const (
+		metricsPipeline = "service::pipelines::metrics/_agent-component/internal-telemetry-monitoring"
+		logsPipeline    = "service::pipelines::logs/_agent-component/internal-telemetry-monitoring"
+		fileExporter    = "file/_agent-component/internal-telemetry-monitoring"
+		connector       = "elasticmonitoringconnector/_agent-component/internal-telemetry-monitoring"
+	)
 	defaultOutputComp := testComponent("default-output")
 	// A component using the monitoring output defines the exporter that the internal telemetry
 	// pipeline shares.
 	monitoringOutputComp := testComponent("monitoring-output")
 	monitoringOutputComp.OutputName = componentmonitoring.MonitoringOutput
 
-	// Take the names the collector config has to collide with from the generated component config.
-	componentCfg, err := translate.GetOtelConfig(&component.Model{Components: []component.Component{defaultOutputComp}}, logp.NewNopLogger())
-	require.NoError(t, err)
-	require.NotNil(t, componentCfg)
-	componentPipelines, ok := componentCfg.Get("service::pipelines").(map[string]any)
-	require.True(t, ok)
-	require.NotEmpty(t, componentPipelines)
-	var componentPipelineID string
-	for id := range componentPipelines {
-		componentPipelineID = id
-	}
-	componentExtensions, ok := componentCfg.Get("service::extensions").([]any)
-	require.True(t, ok)
-	require.NotEmpty(t, componentExtensions)
-
-	// overlappingCollectorCfg shares a pipeline and an extension with the component config, lists
-	// the shared extension after one of its own, and sets collector metrics readers.
-	overlappingCollectorCfg := func() *confmap.Conf {
-		return confmap.NewFromStringMap(map[string]any{
-			"receivers": map[string]any{"nop": map[string]any{}},
-			"exporters": map[string]any{"nop": map[string]any{}},
-			"extensions": map[string]any{
-				"zpages": map[string]any{},
-			},
-			"service": map[string]any{
-				"extensions": []any{"zpages", componentExtensions[0]},
-				"pipelines": map[string]any{
-					componentPipelineID: map[string]any{
-						"receivers": []any{"nop"},
-						"exporters": []any{"nop"},
-					},
-				},
-				"telemetry": map[string]any{
-					"metrics": map[string]any{
-						"readers": []any{
-							map[string]any{"periodic": map[string]any{"exporter": map[string]any{"console": map[string]any{}}}},
-						},
-					},
-				},
-			},
+	t.Run("without a monitoring exporter the metrics only go to a file", func(t *testing.T) {
+		got := buildTestMergedConfig(t, configUpdate{
+			components:    []component.Component{defaultOutputComp},
+			monitoringCfg: monitoring,
 		})
-	}
-	monitoringOn := &config.MonitoringConfig{Enabled: true, MonitorMetrics: true, MetricsPeriod: time.Minute}
 
-	tests := []struct {
-		name         string
-		components   []component.Component
-		collectorCfg func() *confmap.Conf
-		monitoring   *config.MonitoringConfig
-	}{
-		{
-			name:       "components only",
-			components: []component.Component{defaultOutputComp},
-		},
-		{
-			name:         "collector config only",
-			collectorCfg: overlappingCollectorCfg,
-		},
-		{
-			name:         "components and collector config with log level",
-			components:   []component.Component{defaultOutputComp},
-			collectorCfg: func() *confmap.Conf { return confmap.NewFromStringMap(testConfig) },
-		},
-		{
-			name:         "components and collector config without log level",
-			components:   []component.Component{defaultOutputComp},
-			collectorCfg: func() *confmap.Conf { return confmap.NewFromStringMap(testConfigNoLogLevel) },
-		},
-		{
-			name:         "collector config sharing pipeline and extension with the components",
-			components:   []component.Component{defaultOutputComp},
-			collectorCfg: overlappingCollectorCfg,
-		},
-		{
-			name:       "monitoring without a monitoring exporter",
-			components: []component.Component{defaultOutputComp},
-			monitoring: monitoringOn,
-		},
-		{
-			name:         "monitoring with a monitoring exporter and collector config",
-			components:   []component.Component{defaultOutputComp, monitoringOutputComp},
-			collectorCfg: overlappingCollectorCfg,
-			monitoring:   monitoringOn,
-		},
-		{
-			name:         "monitoring disabled",
-			components:   []component.Component{defaultOutputComp, monitoringOutputComp},
-			collectorCfg: overlappingCollectorCfg,
-			monitoring:   &config.MonitoringConfig{Enabled: true, MonitorMetrics: false},
-		},
-	}
+		assert.ElementsMatch(t, []string{fileExporter}, got.Get(metricsPipeline+"::exporters"))
+		assert.False(t, got.IsSet(logsPipeline))
+	})
 
-	for _, gateEnabled := range []bool{false, true} {
-		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%s/merge append gate %t", tt.name, gateEnabled), func(t *testing.T) {
-				setMergeAppendGate(t, gateEnabled)
+	t.Run("with a monitoring exporter the metrics also go to it", func(t *testing.T) {
+		got := buildTestMergedConfig(t, configUpdate{
+			components:    []component.Component{defaultOutputComp, monitoringOutputComp},
+			monitoringCfg: monitoring,
+		})
 
-				newUpdate := func() configUpdate {
-					// Merging may modify its source, so each build gets its own collector config.
-					update := configUpdate{
-						components:    tt.components,
-						monitoringCfg: tt.monitoring,
-						agentLogLevel: logp.WarnLevel,
-					}
-					if tt.collectorCfg != nil {
-						update.collectorCfg = tt.collectorCfg()
-					}
-					return update
-				}
-				m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888}
-				agentInfo := noHostInfoAgent{&info.AgentInfo{}}
+		assert.ElementsMatch(t, []string{fileExporter, connector}, got.Get(metricsPipeline+"::exporters"))
+		assert.ElementsMatch(t, []string{"elasticsearch/_agent-component/monitoring"}, got.Get(logsPipeline+"::exporters"))
+	})
 
-				want, err := buildMergedConfigSequential(m, newUpdate(), agentInfo, logp.NewNopLogger())
-				require.NoError(t, err)
-				got, err := m.buildMergedConfig(newUpdate(), agentInfo, logp.NewNopLogger())
-				require.NoError(t, err)
+	t.Run("nothing is added when metrics monitoring is off", func(t *testing.T) {
+		got := buildTestMergedConfig(t, configUpdate{
+			components:    []component.Component{defaultOutputComp, monitoringOutputComp},
+			monitoringCfg: &config.MonitoringConfig{Enabled: true, MonitorMetrics: false},
+		})
 
-				require.NotNil(t, want)
-				require.NotNil(t, got)
-				assert.Equal(t, want.ToStringMap(), got.ToStringMap())
-				if tt.monitoring == monitoringOn {
-					// Make sure the monitoring receiver is part of what was compared.
-					assert.True(t, got.IsSet("service::pipelines::metrics/"+translate.OtelNamePrefix+"internal-telemetry-monitoring::receivers"))
-				}
-			})
-		}
-	}
+		assert.False(t, got.IsSet(metricsPipeline))
+		assert.False(t, got.IsSet(logsPipeline))
+	})
 }
 
 // testComponentWithInputs returns a filestream component with one input unit, each with one stream, per input.
