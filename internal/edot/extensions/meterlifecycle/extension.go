@@ -23,12 +23,13 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/extension"
+	"go.opentelemetry.io/collector/extension/extensioncapabilities"
 	"go.uber.org/zap"
 
 	"github.com/elastic/elastic-agent/internal/edot/internaltelemetry"
 )
 
-var _ componentstatus.Watcher = (*meterLifecycleExtension)(nil)
+var _ extensioncapabilities.ComponentStatusWatcher = (*meterLifecycleExtension)(nil)
 
 type meterLifecycleExtension struct {
 	logger *zap.Logger
@@ -38,10 +39,11 @@ func (e *meterLifecycleExtension) Start(context.Context, component.Host) error {
 
 func (e *meterLifecycleExtension) Shutdown(context.Context) error { return nil }
 
-// ComponentStatusChanged releases the meters held by a component once it has
-// finished shutting down. The collector reports StatusStopped after the
-// component's own Shutdown returns, so no callback can still be running.
-func (e *meterLifecycleExtension) ComponentStatusChanged(source *componentstatus.InstanceID, event *componentstatus.Event) {
+// Changed implements extensioncapabilities.ComponentStatusWatcher. It releases
+// the meters held by a component once it has finished shutting down. The
+// collector reports StatusStopped after the component's own Shutdown returns,
+// so no callback can still be running.
+func (e *meterLifecycleExtension) Changed(source *componentstatus.InstanceID, event *componentstatus.Event) {
 	if source == nil || event == nil || event.Status() != componentstatus.StatusStopped {
 		return
 	}
