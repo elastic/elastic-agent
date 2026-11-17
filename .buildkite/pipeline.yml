@@ -496,6 +496,28 @@ steps:
           manual:
             allowed: true
 
+  # Verifies changed Buildkite plugin pins (published, non-draft tags), runs a synthetic
+  # probe per changed plugin and dry-runs pipelines not already covered by this build.
+  # See .buildkite/scripts/plugin-check/README.md
+  - label: ":mag: Plugin check"
+    if: build.pull_request.id != null
+    commands:
+      - .buildkite/scripts/install-gh.sh
+      - .buildkite/scripts/plugin-check/generate.sh > plugin-check.yml
+      - '[ ! -s plugin-check.yml ] || buildkite-agent pipeline upload plugin-check.yml'
+    env:
+      GH_VERSION: "2.4.0"
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - *sparse_checkout_plugin
+      - elastic/vault-github-token#v0.2.3:
+    if_changed:
+      include:
+        - .buildkite/**/*
+        - renovate.json
+
   # Triggers a dynamic step: Sync K8s
   # Runs only on main and if k8s files are changed
   - label: "Trigger k8s sync"
