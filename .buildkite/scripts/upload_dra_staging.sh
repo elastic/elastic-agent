@@ -39,7 +39,7 @@ steps:
           lifetime: 10800
           project-id: "elastic-observability-ci"
           project-number: "911195782929"
-      - elastic/dra-prep#v0.1.7:
+      - elastic/dra-prep#v0.1.8:
           product_id: "elastic-agent-core"
           stack_version: "${STACK_VERSION}"
           workflow: "staging"

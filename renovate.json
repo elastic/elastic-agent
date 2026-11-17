@@ -9,7 +9,9 @@
     "gomod",
     "github-actions",
     "pip_requirements",
-    "pre-commit"
+    "pre-commit",
+    "buildkite",
+    "custom.regex"
   ],
   "baseBranchPatterns": [
     "main",
@@ -204,6 +206,53 @@
         "changelog:dependencies"
       ],
       "prConcurrentLimit": 5
+<<<<<<< HEAD
+=======
+    },
+    {
+      "description": "Buildkite plugins: one weekly grouped PR, so a pipeline change is reviewed and rolled back as a unit",
+      "matchManagers": [
+        "buildkite",
+        "custom.regex"
+      ],
+      "groupName": "buildkite-plugins",
+      "schedule": [
+        "on sunday"
+      ],
+      "prConcurrentLimit": 5
+    },
+    {
+      "description": "Disabled: elastic/gcp-secret-manager is pinned to the v1.3.0-elastic fork tag, which has no upstream successor and is not comparable as semver",
+      "matchManagers": [
+        "buildkite",
+        "custom.regex"
+      ],
+      "matchPackageNames": [
+        "/^elastic/gcp-secret-manager/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Distributed oblt-aw client triggers — pins owned by distribute-client-workflow",
+      "enabled": false,
+      "matchFileNames": [
+        ".github/workflows/trigger-*-aw-*.yml"
+      ]
+>>>>>>> a9683f0 (Update Buildkite plugins and let Renovate manage them (#18037))
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Buildkite plugins pinned inside .buildkite shell scripts that upload pipelines dynamically; the buildkite manager only looks at YAML files.",
+      "managerFilePatterns": [
+        "/^\\.buildkite/.+\\.sh$/"
+      ],
+      "matchStrings": [
+        "-\\s+(?<depName>[\\w.-]+/[\\w.-]+)#(?<currentValue>v[^:\\s]+):"
+      ],
+      "datasourceTemplate": "github-tags",
+      "packageNameTemplate": "{{{depName}}}-buildkite-plugin"
     }
   ]
 }
