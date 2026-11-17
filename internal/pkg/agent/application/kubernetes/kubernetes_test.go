@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"

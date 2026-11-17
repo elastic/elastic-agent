@@ -20,15 +20,16 @@ import (
 	"time"
 
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/extension/extensioncapabilities"
 	"go.uber.org/zap"
 	"go.yaml.in/yaml/v3"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/x-pack/otel/otelmanager"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/ipc"
@@ -46,6 +47,9 @@ var (
 	// NOTE: Changing the signature will require changes to libbeat and beatreceivers. Don't remove this.
 	_ otelmanager.DiagnosticExtension = (*diagnosticsExtension)(nil)
 	_ otelmanager.ActionExtension     = (*diagnosticsExtension)(nil)
+	// The collector reports a status change for every component it starts and
+	// stops; the extension uses it to drop the hooks of stopped components.
+	_ extensioncapabilities.ComponentStatusWatcher = (*diagnosticsExtension)(nil)
 )
 
 type diagHook struct {
@@ -205,26 +209,47 @@ func (d *diagnosticsExtension) NotifyConfigSnapshot(_ context.Context, snapshot 
 }
 
 // RegisterDiagnosticHook API exposes the ability for beat receivers to register their hooks.
+// A hook registered again for the same component and filename replaces the earlier one.
 // NOTE: Changing the function signature will require changes to libbeat and beatreceivers. Proceed with caution.
 func (d *diagnosticsExtension) RegisterDiagnosticHook(componentName string, description string, filename string, contentType string, hook func() []byte) {
 	d.hooksMtx.Lock()
 	defer d.hooksMtx.Unlock()
-	if _, ok := d.componentHooks[componentName]; ok {
-		d.componentHooks[componentName] = append(d.componentHooks[componentName], &diagHook{
-			description: description,
-			filename:    filename,
-			contentType: contentType,
-			hook:        hook,
-		})
-	} else {
-		d.componentHooks[componentName] = []*diagHook{
-			{
-				description: description,
-				filename:    filename,
-				contentType: contentType,
-				hook:        hook,
-			},
-		}
+	h := &diagHook{
+		description: description,
+		filename:    filename,
+		contentType: contentType,
+		hook:        hook,
+	}
+	hooks := d.componentHooks[componentName]
+	if i := slices.IndexFunc(hooks, func(e *diagHook) bool { return e.filename == filename }); i >= 0 {
+		hooks[i] = h
+		return
+	}
+	d.componentHooks[componentName] = append(hooks, h)
+}
+
+// Changed implements extensioncapabilities.ComponentStatusWatcher. It drops the
+// diagnostic hooks of a component once that component has stopped, so a
+// receiver torn down by a config reload is no longer referenced by the
+// extension and no longer contributes files to a diagnostics bundle.
+//
+// Hooks are keyed by the OTel component ID the receiver registers under
+// (beat.Info.ComponentID, which is the receiver's own component.ID), so it
+// matches the status source here. The collector reports StatusStopped after
+// the component's Shutdown returns, so nothing can register a hook for this
+// generation of the component afterwards.
+func (d *diagnosticsExtension) Changed(source *componentstatus.InstanceID, event *componentstatus.Event) {
+	if source == nil || event == nil || event.Status() != componentstatus.StatusStopped {
+		return
+	}
+	componentName := source.ComponentID().String()
+	d.hooksMtx.Lock()
+	_, had := d.componentHooks[componentName]
+	delete(d.componentHooks, componentName)
+	d.hooksMtx.Unlock()
+	if had {
+		d.logger.Debug("removed diagnostic hooks of stopped component",
+			zap.String("otelcol.component.id", componentName))
 	}
 }
 
@@ -371,33 +396,7 @@ func (d *diagnosticsExtension) writeActionError(w http.ResponseWriter, status in
 }
 
 func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	d.hooksMtx.Lock()
-	defer d.hooksMtx.Unlock()
-	componentResults := make([]*proto.ActionDiagnosticUnitResult, 0)
-	for name, hooks := range d.componentHooks {
-		for _, hook := range hooks {
-			componentResults = append(componentResults, &proto.ActionDiagnosticUnitResult{
-				Name:        name,
-				Filename:    hook.filename,
-				ContentType: hook.contentType,
-				Description: hook.description,
-				Content:     hook.hook(),
-				Generated:   timestamppb.Now(),
-			})
-		}
-	}
-
-	globalResults := make([]*proto.ActionDiagnosticUnitResult, 0)
-	for name, hook := range d.globalHooks {
-		globalResults = append(globalResults, &proto.ActionDiagnosticUnitResult{
-			Name:        name,
-			Filename:    hook.filename,
-			ContentType: hook.contentType,
-			Description: hook.description,
-			Content:     hook.hook(),
-			Generated:   timestamppb.Now(),
-		})
-	}
+	componentResults, globalResults := d.runHooks()
 
 	// only add a CPU profile if requested via query parameter.
 	if req.URL.Query().Get("cpu") == "true" {
@@ -441,5 +440,40 @@ func (d *diagnosticsExtension) ServeHTTP(w http.ResponseWriter, req *http.Reques
 	}
 	if _, err := w.Write(b); err != nil {
 		d.logger.Error("Failed writing response to client.", zap.Error(err))
+	}
+}
+
+// runHooks runs the hooks without holding hooksMtx, so a slow hook doesn't
+// block receivers that register or unregister hooks.
+func (d *diagnosticsExtension) runHooks() ([]*proto.ActionDiagnosticUnitResult, []*proto.ActionDiagnosticUnitResult) {
+	d.hooksMtx.Lock()
+	componentHooks := make(map[string][]*diagHook, len(d.componentHooks))
+	for name, hooks := range d.componentHooks {
+		componentHooks[name] = slices.Clone(hooks)
+	}
+	d.hooksMtx.Unlock()
+
+	componentResults := make([]*proto.ActionDiagnosticUnitResult, 0)
+	for name, hooks := range componentHooks {
+		for _, hook := range hooks {
+			componentResults = append(componentResults, hook.result(name))
+		}
+	}
+
+	globalResults := make([]*proto.ActionDiagnosticUnitResult, 0)
+	for name, hook := range d.globalHooks {
+		globalResults = append(globalResults, hook.result(name))
+	}
+	return componentResults, globalResults
+}
+
+func (h *diagHook) result(name string) *proto.ActionDiagnosticUnitResult {
+	return &proto.ActionDiagnosticUnitResult{
+		Name:        name,
+		Filename:    h.filename,
+		ContentType: h.contentType,
+		Description: h.description,
+		Content:     h.hook(),
+		Generated:   timestamppb.Now(),
 	}
 }

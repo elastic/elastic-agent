@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/go-ucfg"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
@@ -331,6 +331,19 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
+	}
+}
+
+// CleanupOldBuildLogs removes the logs of old builds, keeping the running build (currentBuild) and the latest inactive one.
+// Containers (unversioned home) keep their existing layout and are skipped.
+// It is meant to run in its own goroutine, because removing files can take a while on Windows. It stops when ctx is done.
+// Errors are non-fatal and retried on the next startup.
+func CleanupOldBuildLogs(ctx context.Context, log *logger.Logger, topDir, currentBuild string) {
+	if !paths.IsVersionHome() {
+		return
+	}
+	if err := upgrade.CleanupBuildLogs(ctx, log, paths.BuildLogsRoot(topDir), currentBuild); err != nil {
+		log.Warnf("Error cleaning build logs: %s", err)
 	}
 }
 

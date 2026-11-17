@@ -20,11 +20,11 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -547,6 +547,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"path": map[string]any{
 				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), id),
+				"logs": paths.BuildComponentsLogs(),
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
@@ -720,6 +721,7 @@ func TestGetOtelConfig(t *testing.T) {
 			"path": map[string]any{
 				"home": paths.Components(),
 				"data": filepath.Join(paths.Run(), compID),
+				"logs": paths.BuildComponentsLogs(),
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
@@ -769,6 +771,7 @@ func TestGetOtelConfig(t *testing.T) {
 		"path": map[string]any{
 			"home": paths.Components(),
 			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+			"logs": paths.BuildComponentsLogs(),
 		},
 		"queue": map[string]any{
 			"mem": map[string]any{
@@ -1075,6 +1078,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1185,7 +1189,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"logs": map[string]any{
 							"encoding": "raw",
@@ -1306,7 +1313,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1416,7 +1426,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1565,7 +1578,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1603,7 +1619,10 @@ func TestGetOtelConfig(t *testing.T) {
 								"sizer":         "items",
 								"min_size":      1600,
 							},
-							"queue_size": 3200,
+							"enabled":           true,
+							"queue_size":        3200,
+							"block_on_overflow": true,
+							"wait_for_result":   true,
 						},
 						"timeout": 10 * time.Second,
 						"record_partitioner": map[string]any{
@@ -1646,6 +1665,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring2"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1843,6 +1863,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -1955,6 +1976,7 @@ func TestGetOtelConfig(t *testing.T) {
 						"path": map[string]any{
 							"home": paths.Components(),
 							"data": filepath.Join(paths.Run(), "system-metrics"),
+							"logs": paths.BuildComponentsLogs(),
 						},
 						"queue": map[string]any{
 							"mem": map[string]any{
@@ -2898,6 +2920,30 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 	}
 }
 
+// TestGetOtelConfigExtensionsAreSortedAndDeduplicated checks that the extensions of all components end
+// up in one sorted list without duplicates, whatever the order of the components is.
+func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
+	// The first and last components share an output, so they share an extension.
+	compA := testFilebeatComp("filestream-a", "a")
+	compB := testFilebeatComp("filestream-b", "b")
+	compA2 := testFilebeatComp("filestream-a2", "a")
+	expected := []any{"beatsauth/_agent-component/a", "beatsauth/_agent-component/b"}
+
+	for name, components := range map[string][]component.Component{
+		"sorted":   {compA, compB, compA2},
+		"reversed": {compA2, compB, compA},
+		"shuffled": {compB, compA, compA2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			conf, err := GetOtelConfig(&component.Model{Components: components}, logp.NewNopLogger())
+			require.NoError(t, err)
+			require.NotNil(t, conf)
+
+			require.Equal(t, expected, conf.Get("service::extensions"))
+		})
+	}
+}
+
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 	filebeatComp := testFilebeatComp("filestream-default", "default")
 
@@ -3570,7 +3616,13 @@ func TestGetReceiversConfigForComponent(t *testing.T) {
 			assert.True(t, ok, "receiver config should be a map")
 
 			// Verify configuration section presence
-			assert.Contains(t, receiverConfig, "path", "path config should be present")
+			// Beat receivers write their files next to the logs of the running build, so the files they write
+			// directly, e.g. request traces, are collected with them.
+			assert.Equal(t, map[string]any{
+				"home": paths.Components(),
+				"data": BeatDataPath(tt.component.ID),
+				"logs": paths.BuildComponentsLogs(),
+			}, receiverConfig["path"])
 			assert.Contains(t, receiverConfig, "logging", "logging config should be present")
 			assert.Contains(t, receiverConfig, tt.expectedBeatName, fmt.Sprintf("%s config should be present", tt.expectedBeatName))
 
@@ -4755,7 +4807,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -4820,7 +4875,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -4884,7 +4942,10 @@ func TestUnitToExporterConfig(t *testing.T) {
 						"min_size":      1600,
 						"sizer":         "items",
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"record_partitioner": map[string]any{
@@ -5370,9 +5431,13 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 }
 
-// TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
-// Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
+// TestGetReceiversConfigPathsContract pins the paths of beat receivers in a container, where the home is
+// unversioned: a home and a data path, no logs path. Files receivers write directly therefore resolve to the
+// default logs path. Versioned homes are covered by TestGetReceiversConfigForComponent.
 func TestGetReceiversConfigPathsContract(t *testing.T) {
+	paths.SetVersionHome(false)
+	t.Cleanup(func() { paths.SetVersionHome(true) })
+
 	comp := &component.Component{
 		ID:        "filestream-paths-contract-test",
 		InputType: "filestream",
