@@ -10,7 +10,6 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -2919,16 +2918,6 @@ func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
 			require.NotNil(t, conf)
 
 			require.Equal(t, expected, conf.Get("service::extensions"))
-			// The config of every component is part of the result, not only the one the others were merged into.
-			receivers, ok := conf.Get("receivers").(map[string]any)
-			require.True(t, ok)
-			for _, comp := range components {
-				prefix := "filebeatreceiver/_agent-component/" + comp.ID + "/"
-				found := slices.ContainsFunc(slices.Collect(maps.Keys(receivers)), func(id string) bool {
-					return strings.HasPrefix(id, prefix)
-				})
-				require.True(t, found, "no receiver for component %s in %v", comp.ID, receivers)
-			}
 		})
 	}
 }

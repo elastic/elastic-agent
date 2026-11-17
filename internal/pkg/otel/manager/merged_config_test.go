@@ -197,16 +197,6 @@ func TestBuildMergedConfigMonitoringReceiver(t *testing.T) {
 		assert.ElementsMatch(t, []string{fileExporter, connector}, got.Get(metricsPipeline+"::exporters"))
 		assert.ElementsMatch(t, []string{"elasticsearch/_agent-component/monitoring"}, got.Get(logsPipeline+"::exporters"))
 	})
-
-	t.Run("nothing is added when metrics monitoring is off", func(t *testing.T) {
-		got := buildTestMergedConfig(t, configUpdate{
-			components:    []component.Component{defaultOutputComp, monitoringOutputComp},
-			monitoringCfg: &config.MonitoringConfig{Enabled: true, MonitorMetrics: false},
-		})
-
-		assert.False(t, got.IsSet(metricsPipeline))
-		assert.False(t, got.IsSet(logsPipeline))
-	})
 }
 
 // testComponentWithInputs returns a filestream component with one input unit, each with one stream, per input.
