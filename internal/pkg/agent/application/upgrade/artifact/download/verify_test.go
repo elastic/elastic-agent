@@ -626,3 +626,30 @@ func TestFetchPGPKeysWithFleetProxy(t *testing.T) {
 	require.Equal(t, [][]byte{fleetPGP}, keys)
 	require.Equal(t, 1, fleetProxyRequests)
 }
+
+func TestFetchPGPKeysNonFleetSource(t *testing.T) {
+	otherPGP := []byte("other-pgp-key")
+	otherServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(otherPGP)
+	}))
+	defer otherServer.Close()
+
+	unusedProxyURL, err := url.Parse("http://127.0.0.1:1")
+	require.NoError(t, err)
+	fleetTransport := httpcommon.HTTPTransportSettings{
+		Proxy: httpcommon.HTTPClientProxySettings{
+			URL: (*httpcommon.ProxyURI)(unusedProxyURL),
+		},
+	}
+
+	log, _ := loggertest.New(t.Name())
+	config := &artifact.Config{
+		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
+			TLS: &tlscommon.Config{VerificationMode: tlscommon.VerifyNone},
+		},
+	}
+	source := PgpSourceURIPrefix + otherServer.URL + "/GPG-KEY-elasticsearch"
+	keys, err := FetchPGPKeys(log, config, nil, true, "https://fleet.example.com:8220", fleetTransport, []string{source})
+	require.NoError(t, err)
+	require.Equal(t, [][]byte{otherPGP}, keys)
+}
