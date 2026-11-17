@@ -11,10 +11,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/google/go-github/v68/github"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
@@ -25,9 +26,7 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 
 	client := github.NewClient(server.Client())
 	baseURL, err := url.Parse(server.URL + "/")
-	if err != nil {
-		t.Fatalf("failed to parse test server URL: %v", err)
-	}
+	require.NoError(t, err)
 	client.BaseURL = baseURL
 	client.UploadURL = baseURL
 
@@ -55,15 +54,13 @@ func TestCreatePRIdempotent(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/pulls":
 			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}); err != nil {
-				t.Errorf("failed to encode PR list response: %v", err)
-			}
+			require.NoError(t, json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/elastic-agent/pulls":
 			createCalls++
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			_, _ = fmt.Fprint(w, `{"message":"Validation Failed","errors":[{"message":"A pull request already exists for elastic:9.5."}]}`)
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	})
@@ -79,27 +76,14 @@ func TestCreatePRIdempotent(t *testing.T) {
 	}
 
 	pr, err := ghClient.CreatePR(opts)
-	if err != nil {
-		t.Fatalf("CreatePR() error = %v", err)
-	}
-
-	if pr.GetNumber() != 42 {
-		t.Errorf("CreatePR() number = %d, want 42", pr.GetNumber())
-	}
-	if createCalls != 0 {
-		t.Errorf("CreatePR() called create API %d times, want 0", createCalls)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 42, pr.GetNumber())
+	require.Equal(t, 0, createCalls)
 
 	pr2, err := ghClient.CreatePR(opts)
-	if err != nil {
-		t.Fatalf("CreatePR() second call error = %v", err)
-	}
-	if pr2.GetNumber() != pr.GetNumber() {
-		t.Errorf("CreatePR() second call number = %d, want %d", pr2.GetNumber(), pr.GetNumber())
-	}
-	if createCalls != 0 {
-		t.Errorf("CreatePR() called create API %d times after second call, want 0", createCalls)
-	}
+	require.NoError(t, err)
+	require.Equal(t, pr.GetNumber(), pr2.GetNumber())
+	require.Equal(t, 0, createCalls)
 }
 
 func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
@@ -113,17 +97,13 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/pulls":
 			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode([]*github.PullRequest{}); err != nil {
-				t.Errorf("failed to encode empty PR list response: %v", err)
-			}
+			require.NoError(t, json.NewEncoder(w).Encode([]*github.PullRequest{}))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/elastic-agent/pulls":
 			createCalls++
 			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(newPR); err != nil {
-				t.Errorf("failed to encode create PR response: %v", err)
-			}
+			require.NoError(t, json.NewEncoder(w).Encode(newPR))
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	})
@@ -137,15 +117,9 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 		Base:  "main",
 		Body:  "body",
 	})
-	if err != nil {
-		t.Fatalf("CreatePR() error = %v", err)
-	}
-	if pr.GetNumber() != 99 {
-		t.Errorf("CreatePR() number = %d, want 99", pr.GetNumber())
-	}
-	if createCalls != 1 {
-		t.Errorf("CreatePR() called create API %d times, want 1", createCalls)
-	}
+	require.NoError(t, err)
+	require.Equal(t, 99, pr.GetNumber())
+	require.Equal(t, 1, createCalls)
 }
 
 func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
@@ -165,19 +139,15 @@ func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/pulls":
 			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}); err != nil {
-				t.Errorf("failed to encode PR list response: %v", err)
-			}
+			require.NoError(t, json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}))
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/labels/"+mergeLabelFFDay:
 			w.Header().Set("Content-Type", "application/json")
-			if err := json.NewEncoder(w).Encode(&github.Label{Name: github.Ptr(mergeLabelFFDay)}); err != nil {
-				t.Errorf("failed to encode label response: %v", err)
-			}
+			require.NoError(t, json.NewEncoder(w).Encode(&github.Label{Name: github.Ptr(mergeLabelFFDay)}))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/elastic-agent/issues/42/labels":
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprint(w, `{"message":"Resource not accessible by integration"}`)
 		default:
-			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			assert.Failf(t, "unexpected request", "%s %s", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}
 	})
@@ -192,10 +162,6 @@ func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
 		Body:   "body",
 		Labels: []string{mergeLabelFFDay},
 	})
-	if err == nil {
-		t.Fatal("CreatePR() should fail when labels cannot be added")
-	}
-	if !strings.Contains(err.Error(), "failed to add labels") {
-		t.Errorf("CreatePR() error = %v, want failed to add labels", err)
-	}
+	require.Error(t, err, "CreatePR() should fail when labels cannot be added")
+	require.ErrorContains(t, err, "failed to add labels")
 }
