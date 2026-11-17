@@ -4445,6 +4445,88 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 	}
 }
 
+// testKafkaComp returns the component of testFilebeatComp with a kafka output that has the given extra options.
+func testKafkaComp(compID string, outputExtra map[string]any) component.Component {
+	comp := testFilebeatComp(compID, "default")
+	comp.OutputType = "kafka"
+	outputCfg := map[string]any{"type": "kafka", "hosts": []any{"localhost:9092"}, "topic": "test"}
+	maps.Copy(outputCfg, outputExtra)
+	for i := range comp.Units {
+		if comp.Units[i].Type == client.UnitTypeOutput {
+			comp.Units[i].Config = component.MustExpectedConfig(outputCfg)
+		}
+	}
+	return comp
+}
+
+// TestVerifyComponentIsOtelSupportedOutputOptions checks that each output option that cannot be translated makes the
+// component unsupported. Only the output is translated to decide this, whatever the inputs are.
+func TestVerifyComponentIsOtelSupportedOutputOptions(t *testing.T) {
+	tests := []struct {
+		name        string
+		component   component.Component
+		expectedErr string
+	}{
+		{
+			name:        "elasticsearch indices",
+			component:   testFilebeatComp("c", "default", map[string]any{"indices": []any{map[string]any{"index": "x"}}}),
+			expectedErr: "indices is currently not supported",
+		},
+		{
+			name:        "elasticsearch allow_older_versions false",
+			component:   testFilebeatComp("c", "default", map[string]any{"allow_older_versions": false}),
+			expectedErr: "allow_older_versions:false is currently not supported",
+		},
+		{
+			name:        "elasticsearch loadbalance false",
+			component:   testFilebeatComp("c", "default", map[string]any{"loadbalance": false}),
+			expectedErr: "loadbalance:false is currently not supported",
+		},
+		{
+			name:        "elasticsearch non_indexable_policy",
+			component:   testFilebeatComp("c", "default", map[string]any{"non_indexable_policy": map[string]any{"action": "drop"}}),
+			expectedErr: "non_indexable_policy is currently not supported",
+		},
+		{
+			name:        "elasticsearch negative max_retries",
+			component:   testFilebeatComp("c", "default", map[string]any{"max_retries": -1}),
+			expectedErr: "max_retries should be non-negative",
+		},
+		{
+			name:        "kafka keep_alive",
+			component:   testKafkaComp("c", map[string]any{"keep_alive": "30s"}),
+			expectedErr: "keep_alive is currently not supported",
+		},
+		{
+			name:        "kafka ca_trusted_fingerprint",
+			component:   testKafkaComp("c", map[string]any{"ssl": map[string]any{"ca_trusted_fingerprint": "abc"}}),
+			expectedErr: "ca_trusted_fingerprint is currently not supported",
+		},
+		{
+			name:        "kafka ca_sha256",
+			component:   testKafkaComp("c", map[string]any{"ssl": map[string]any{"ca_sha256": "abc"}}),
+			expectedErr: "ca_sha256 is currently not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := VerifyComponentIsOtelSupported(&tt.component)
+			require.ErrorIs(t, err, errors.ErrUnsupported)
+			require.ErrorContains(t, err, tt.expectedErr)
+		})
+	}
+
+	t.Run("inputs that cannot be translated do not make the component unsupported", func(t *testing.T) {
+		comp := testFilebeatComp("c", "default")
+		comp.InputSpec = nil // generating the receivers fails, which is reported when the config is generated
+		require.NoError(t, VerifyComponentIsOtelSupported(&comp))
+		_, err := getCollectorConfigForComponent(&comp, logp.NewNopLogger())
+		require.Error(t, err)
+		require.NotErrorIs(t, err, errors.ErrUnsupported)
+	})
+}
+
 func TestVerifyOutputIsOtelSupported(t *testing.T) {
 	tests := []struct {
 		name          string
