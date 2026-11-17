@@ -13,6 +13,8 @@ if [[ -z "${GO_VERSION-""}" ]]; then
     export GO_VERSION=$(cat "${WORKSPACE}/.go-version")
 fi
 
+source "${WORKSPACE}/.buildkite/scripts/setup-cacheprog.sh"
+
 CI_DRA_ROLE_PATH="kv/ci-shared/release/dra-role"
 CI_GCP_OBS_PATH="kv/ci-shared/observability-ingest/cloud/gcp"
 # This key exists for backward compatibility with OGC framework

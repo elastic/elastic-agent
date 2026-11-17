@@ -24,6 +24,11 @@ common:
   - vault_docker_login: &vault_docker_login
       elastic/vault-docker-login#v0.5.2:
         secret_path: 'kv/ci-shared/platform-ingest/elastic_docker_registry'
+  - aws_oidc: &aws_oidc
+      # See https://github.com/elastic/oblt-infra/blob/main/conf/resources/repos/elastic-agent/01-aws-buildkite-oidc.tf
+      # Adding this plugin to a step also enables the S3-backed Go build cache
+      # (GOCACHEPROG), see .buildkite/scripts/setup-cacheprog.sh.
+      elastic/oblt-aws-auth#v0.2.0:
   - sparse_checkout_plugin: &sparse_checkout_plugin
       sparse-checkout#v1.6.0:
         paths:
@@ -63,6 +68,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: windows/amd64: zip"
         key: packaging-windows-amd64
@@ -81,6 +87,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: linux/amd64: rpm,deb"
         key: packaging-linux-amd64-deb-rpm
@@ -99,6 +106,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: amd64: FIPS tar.gz,zip (linux,windows,macos)"
         key: "packaging-amd64-fips"
@@ -118,6 +126,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       # Packaging linux and windows for arm64
       - label: ":package: arm64: zip,tar.gz"
@@ -137,6 +146,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: arm64: FIPS tar.gz,zip (linux,windows,macos)"
         key: "packaging-arm64-fips"
@@ -156,6 +166,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: amd64: Containers"
         key: packaging-containers-amd64
@@ -174,6 +185,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_X86_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
           - *vault_docker_login
 
       - label: ":package: arm64: Containers"
@@ -192,6 +204,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: amd64: FIPS Containers"
         key: packaging-containers-amd64-fips
@@ -212,6 +225,7 @@ steps:
         plugins:
           - *vault_docker_login
           - *google_oidc_plugin
+          - *aws_oidc
 
       - label: ":package: arm64: FIPS Containers"
         key: packaging-containers-arm64-fips
@@ -230,6 +244,7 @@ steps:
           image: "${IMAGE_UBUNTU_2204_ARM_64}"
         plugins:
           - *google_oidc_plugin
+          - *aws_oidc
 
   ## PRs
   - label: "Triggering custom FIPS integration tests"
