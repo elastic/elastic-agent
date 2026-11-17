@@ -1,0 +1,11 @@
+  - label: ":mag: probe oblt-google-auth __VERSION__"
+    key: "__KEY__"
+    command: 'gcloud auth list'
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - __PIN__:
+          lifetime: 600
+          project-id: 'elastic-observability-ci'
+          project-number: '911195782929'

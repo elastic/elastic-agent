@@ -1,0 +1,10 @@
+  - label: ":mag: probe sparse-checkout __VERSION__"
+    key: "__KEY__"
+    command: 'ls .buildkite'
+    agents:
+      provider: "gcp"
+      image: "${IMAGE_UBUNTU_2204_X86_64}"
+    plugins:
+      - __PIN__:
+          paths:
+            - .buildkite
