@@ -850,4 +850,4 @@ replace (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b
 )
 
-replace go.opentelemetry.io/contrib/otelconf => github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317
+replace go.opentelemetry.io/contrib/otelconf => github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261117140130-d3e15f1c55d4
