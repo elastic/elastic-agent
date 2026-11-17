@@ -24,7 +24,7 @@ S
   git config user.email t@t
   git config user.name t
   mkdir -p .buildkite
-  printf -- '- elastic/vault-docker-login#v0.5.2:\n' > .buildkite/pipeline.elastic-agent-binary-dra.yml
+  printf -- '- elastic/vault-docker-login#v0.5.2:\n' > .buildkite/pipeline.elastic-agent-helm-charts.yml
   git add -A && git commit -q -m base
   git checkout -q -b pr
   export BUILDKITE_PULL_REQUEST=7 BUILDKITE_COMMIT=abc BUILDKITE_BRANCH=pr
@@ -33,7 +33,7 @@ S
 teardown() { rm -rf "$REPO" "$GH_STUB_DIR"; }
 
 bump() {
-  sed -i "s/vault-docker-login#v[0-9.]*/vault-docker-login#$1/" .buildkite/pipeline.elastic-agent-binary-dra.yml
+  sed -i "s/vault-docker-login#v[0-9.]*/vault-docker-login#$1/" .buildkite/pipeline.elastic-agent-helm-charts.yml
   git commit -qam bump
 }
 
@@ -43,12 +43,12 @@ bump() {
   [ "$status" -eq 0 ]
   [ "$(grep -c '^steps:' <<<"$output")" -eq 1 ]
   [[ "$output" == *"probe vault-docker-login v0.8.1"* ]]
-  [[ "$output" == *'trigger: "elastic-agent-binary-dra"'* ]]
+  [[ "$output" == *'trigger: "elastic-agent-helm-charts"'* ]]
   [[ "$output" != *"ok elastic/"* ]]   # verification chatter must not pollute the pipeline
 }
 
 @test "no pin change prints nothing and succeeds" {
-  echo "# c" >> .buildkite/pipeline.elastic-agent-binary-dra.yml; git commit -qam c
+  echo "# c" >> .buildkite/pipeline.elastic-agent-helm-charts.yml; git commit -qam c
   run --separate-stderr "$GEN" main
   [ "$status" -eq 0 ]
   [ -z "$output" ]
