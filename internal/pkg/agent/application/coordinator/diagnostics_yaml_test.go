@@ -80,6 +80,20 @@ func TestMarshalPolicyYAMLMatchesYAMLMarshal(t *testing.T) {
 			"multi\nline key":            13,
 			"z" + strings.Repeat(" ", 3): longText,
 		},
+		"merge key": {
+			"inputs": []interface{}{map[string]interface{}{"id": "a"}},
+			"<<":     1,
+			"agent":  map[string]interface{}{"<<": "x"},
+		},
+		"placeholder in another value": {
+			"inputs": []interface{}{map[string]interface{}{"id": "a"}},
+			"a":      "x\ninputs: " + inputsPlaceholder + "\n",
+			"b":      []interface{}{"inputs: " + inputsPlaceholder},
+		},
+		"placeholder as an input": {
+			"inputs": []interface{}{inputsPlaceholder, map[string]interface{}{"id": "a"}},
+			"agent":  "x",
+		},
 		"synthetics-like": syntheticsLikePolicy(50),
 	}
 

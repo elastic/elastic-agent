@@ -15,20 +15,27 @@ import (
 // encodes one at a time.
 const policyInputsKey = "inputs"
 
+// inputsPlaceholder stands in for the top-level "inputs" list while
+// marshalPolicyYAML encodes the rest of the policy. It is a plain scalar, so
+// yaml.v2 emits it unquoted.
+const inputsPlaceholder = "__elastic_agent_computed_config_inputs__"
+
 // marshalPolicyYAML returns the same bytes as yaml.Marshal(policy), but never
-// hands the encoder more than one top-level key, or more than one entry of the
-// top-level "inputs" list, at a time.
+// hands the encoder more than one entry of the top-level "inputs" list at a
+// time.
 //
 // yaml.v2's emitter keeps every event of a document queued until Marshal
 // returns, so encoding a policy with thousands of inputs (for example a
 // Synthetics private location) in one call holds memory many times the size of
 // the output and can get the agent OOM-killed while it collects diagnostics.
 //
-// The output stays byte-identical because yaml.v2 emits each entry of a block
-// mapping or block sequence independently of its siblings. Each input is
-// encoded inside a single-entry "inputs" list, so it is emitted at the same
-// indentation and column as in the full document; this matters because yaml.v2
-// folds long strings at 80 columns.
+// The rest of the policy is encoded in one call with a placeholder in place of
+// the inputs, and the inputs are spliced in where the placeholder lands, so
+// yaml.v2 still decides the key order. The output stays byte-identical because
+// yaml.v2 emits each entry of a block mapping or block sequence independently
+// of its siblings. Each input is encoded inside a single-entry "inputs" list,
+// so it is emitted at the same indentation and column as in the full document;
+// this matters because yaml.v2 folds long strings at 80 columns.
 func marshalPolicyYAML(policy map[string]interface{}) ([]byte, error) {
 	inputs, ok := policy[policyInputsKey].([]interface{})
 	if !ok || len(inputs) == 0 {
@@ -36,69 +43,38 @@ func marshalPolicyYAML(policy map[string]interface{}) ([]byte, error) {
 		return yaml.Marshal(policy)
 	}
 
-	keys, err := yamlKeyOrder(policy)
+	rest := make(map[string]interface{}, len(policy))
+	for k, v := range policy {
+		rest[k] = v
+	}
+	rest[policyInputsKey] = inputsPlaceholder
+	out, err := yaml.Marshal(rest)
 	if err != nil {
 		return nil, err
+	}
+
+	placeholder := []byte(policyInputsKey + ": " + inputsPlaceholder + "\n")
+	at := bytes.Index(out, placeholder)
+	if at < 0 || (at > 0 && out[at-1] != '\n') || bytes.Count(out, placeholder) != 1 {
+		// Another value contains the placeholder text, so where to splice is
+		// ambiguous.
+		return yaml.Marshal(policy)
 	}
 
 	header := []byte(policyInputsKey + ":\n")
 	var buf bytes.Buffer
-	for _, k := range keys {
-		if k != policyInputsKey {
-			out, err := yaml.Marshal(map[string]interface{}{k: policy[k]})
-			if err != nil {
-				return nil, err
-			}
-			buf.Write(out)
-			continue
+	buf.Write(out[:at])
+	buf.Write(header)
+	for i, input := range inputs {
+		in, err := yaml.Marshal(map[string]interface{}{policyInputsKey: []interface{}{input}})
+		if err != nil {
+			return nil, err
 		}
-
-		buf.Write(header)
-		for i, input := range inputs {
-			out, err := yaml.Marshal(map[string]interface{}{policyInputsKey: []interface{}{input}})
-			if err != nil {
-				return nil, err
-			}
-			if !bytes.HasPrefix(out, header) {
-				return nil, fmt.Errorf("unexpected YAML encoding of %s[%d]", policyInputsKey, i)
-			}
-			buf.Write(out[len(header):])
+		if !bytes.HasPrefix(in, header) {
+			return nil, fmt.Errorf("unexpected YAML encoding of %s[%d]", policyInputsKey, i)
 		}
+		buf.Write(in[len(header):])
 	}
+	buf.Write(out[at+len(placeholder):])
 	return buf.Bytes(), nil
-}
-
-// yamlKeyOrder returns the keys of m in the order yaml.Marshal emits them.
-// yaml.v2 sorts map keys with its own unexported ordering, so rather than
-// copying it, encode a map from each key to its index and decode the result in
-// document order.
-func yamlKeyOrder(m map[string]interface{}) ([]string, error) {
-	keys := make([]string, 0, len(m))
-	index := make(map[string]int, len(m))
-	for k := range m {
-		index[k] = len(keys)
-		keys = append(keys, k)
-	}
-
-	out, err := yaml.Marshal(index)
-	if err != nil {
-		return nil, err
-	}
-	var ordered yaml.MapSlice
-	if err := yaml.Unmarshal(out, &ordered); err != nil {
-		return nil, err
-	}
-	if len(ordered) != len(keys) {
-		return nil, fmt.Errorf("decoded %d policy keys, expected %d", len(ordered), len(keys))
-	}
-
-	sorted := make([]string, 0, len(keys))
-	for _, item := range ordered {
-		i, ok := item.Value.(int)
-		if !ok || i < 0 || i >= len(keys) {
-			return nil, fmt.Errorf("unexpected index %v for policy key %v", item.Value, item.Key)
-		}
-		sorted = append(sorted, keys[i])
-	}
-	return sorted, nil
 }
