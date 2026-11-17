@@ -1,0 +1,9 @@
+# file<TAB>pipeline slug<TAB>covered_by_main<TAB>dry-run env (KEY=VALUE, comma separated)
+# covered_by_main=true: pipeline.yml already triggers it on PRs when this file changes.
+# Not listed on purpose: pipeline.version-bump.yml (no plugins; Slack + release automation, no dry-run),
+# pipeline.agentless-tests.yaml / pipeline.integration-test-matrix.yml (need an environment; static+probe only),
+# scripts/upload_dra_staging.sh (non-PR-only step; static+probe only).
+.buildkite/pipeline.elastic-agent-package.yml	elastic-agent-package	true	
+.buildkite/pipeline.agentless-app-release.yaml	agentless-serverless-release	true	
+.buildkite/pipeline.elastic-agent-binary-dra.yml	elastic-agent-binary-dra	false	RUN_SNAPSHOT=true,DRY_RUN=true
+.buildkite/pipeline.elastic-agent-helm-charts.yml	elastic-agent-helm-charts	false	SNAPSHOT=true,HELM_REPO_ENV=dev,DRY_RUN=true
