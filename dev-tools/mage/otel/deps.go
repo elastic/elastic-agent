@@ -82,6 +82,13 @@ func GetOtelDependencies(goModPath string) (*OtelDependencies, error) {
 	}, nil
 }
 
+// nonComponentModules are OTel modules whose path looks like a component's
+// (for example, it contains /extension/) but that hold collector APIs rather than
+// a component, so they don't belong in the list of components.
+var nonComponentModules = map[string]struct{}{
+	"go.opentelemetry.io/collector/extension/extensioncapabilities": {},
+}
+
 type otelDependency struct {
 	ComponentType string
 	Name          string
@@ -98,6 +105,10 @@ func newOtelDependency(r *modfile.Require) *otelDependency {
 	}
 
 	if r.Indirect {
+		return nil
+	}
+
+	if _, ok := nonComponentModules[r.Mod.Path]; ok {
 		return nil
 	}
 
