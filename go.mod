@@ -73,11 +73,8 @@ require (
 	go.opentelemetry.io/collector/extension/extensiontest v0.164.0
 	go.opentelemetry.io/collector/pdata v1.70.0
 	go.opentelemetry.io/collector/pipeline v1.70.0
-<<<<<<< HEAD
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.164.0
-=======
 	go.opentelemetry.io/collector/service v0.164.0
->>>>>>> 599d811 (Drop diagnostic hooks for stopped otel components (#18033))
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.uber.org/zap v1.28.0
 	go.yaml.in/yaml/v3 v3.0.5
