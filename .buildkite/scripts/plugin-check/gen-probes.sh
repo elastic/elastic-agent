@@ -20,7 +20,7 @@ while IFS=$'\t' read -r plugin version _file; do
     echo "plugin-check: no probe for ${plugin}#${version} (static tag check only)" >&2
     continue
   fi
-  key="probe-$(tr -c 'A-Za-z0-9\n' '-' <<<"${plugin}-${version}")"
+  key="probe-$(tr -c 'A-Za-z0-9\n' '-' <<<"${plugin}-${version}")-r${BUILDKITE_RETRY_COUNT:-0}"
   body+="$(sed -e "s|__PIN__|${plugin}#${version}|g" \
     -e "s|__PLUGIN__|${plugin}|g" \
     -e "s|__VERSION__|${version}|g" \

@@ -15,7 +15,7 @@ GEN="${BATS_TEST_DIRNAME}/../gen-probes.sh"
   [ "$status" -eq 0 ]
   [[ "$output" == "steps:"* ]]
   [[ "$output" == *"- elastic/vault-docker-login#v0.8.1:"* ]]
-  [[ "$output" == *'key: "probe-elastic-vault-docker-login-v0-8-1"'* ]]
+  [[ "$output" == *'key: "probe-elastic-vault-docker-login-v0-8-1-r0"'* ]]
   [[ "$output" == *"docker logout docker.elastic.co"* ]]
 }
 
@@ -37,4 +37,9 @@ GEN="${BATS_TEST_DIRNAME}/../gen-probes.sh"
   [ "$status" -eq 0 ]
   [[ "$output" != *__* ]]
   [[ "$output" != *"echo \$"* ]]
+}
+
+@test "probe keys change with the retry count so a retried step can re-upload" {
+  BUILDKITE_RETRY_COUNT=2 run "$GEN" <<<$'sparse-checkout\tv1.11.0\tf.yml'
+  [[ "$output" == *'key: "probe-sparse-checkout-v1-11-0-r2"'* ]]
 }
