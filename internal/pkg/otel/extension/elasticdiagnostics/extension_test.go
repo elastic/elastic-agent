@@ -7,10 +7,13 @@ package elasticdiagnostics
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/extension"
@@ -344,4 +348,127 @@ func TestExtension_Actions(t *testing.T) {
 		defer func() { require.NoError(t, resp.Body.Close()) }()
 		assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 	})
+}
+
+func newTestDiagnosticsExtension(t *testing.T) *diagnosticsExtension {
+	t.Helper()
+	ext, err := newExtension(t.Context(), extension.Settings{
+		TelemetrySettings: component.TelemetrySettings{Logger: zap.NewNop()},
+	}, createDefaultConfig())
+	require.NoError(t, err, "failed to create extension")
+	return ext.(*diagnosticsExtension)
+}
+
+// componentDiagnostics calls ServeHTTP and returns "<component>/<filename>" -> content.
+func componentDiagnostics(t *testing.T, d *diagnosticsExtension) map[string]string {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	d.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/diagnostics", nil))
+	require.Equal(t, http.StatusOK, rec.Code, "unexpected status from ServeHTTP")
+	var resp Response
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp), "failed to decode diagnostics response")
+	got := make(map[string]string, len(resp.ComponentDiagnostics))
+	for _, r := range resp.ComponentDiagnostics {
+		key := r.Name + "/" + r.Filename
+		_, dup := got[key]
+		assert.False(t, dup, "duplicate diagnostics entry %q", key)
+		got[key] = string(r.Content)
+	}
+	return got
+}
+
+// serveDiagnostics calls ServeHTTP without asserting anything, for use outside the test goroutine.
+func serveDiagnostics(ctx context.Context, d *diagnosticsExtension) {
+	d.ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(ctx, http.MethodGet, "/diagnostics", nil))
+}
+
+func staticHook(content string) func() []byte {
+	return func() []byte { return []byte(content) }
+}
+
+// reportStopped delivers the status change the collector sends for a receiver
+// that has finished shutting down.
+func reportStopped(d *diagnosticsExtension, componentName string) {
+	id := component.MustNewID(componentName)
+	d.Changed(
+		componentstatus.NewInstanceID(id, component.KindReceiver),
+		componentstatus.NewEvent(componentstatus.StatusStopped),
+	)
+}
+
+func TestDiagnosticHooks_RemovedWhenComponentStops(t *testing.T) {
+	d := newTestDiagnosticsExtension(t)
+
+	d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", staticHook("comp1 metrics"))
+	d.RegisterDiagnosticHook("comp1", "inputs", "input_metrics.json", "application/json", staticHook("comp1 inputs"))
+	d.RegisterDiagnosticHook("comp2", "metrics", "beat_metrics.json", "application/json", staticHook("comp2 metrics"))
+	assert.Equal(t, map[string]string{
+		"comp1/beat_metrics.json":  "comp1 metrics",
+		"comp1/input_metrics.json": "comp1 inputs",
+		"comp2/beat_metrics.json":  "comp2 metrics",
+	}, componentDiagnostics(t, d), "all registered hooks should be served")
+
+	// A status change other than Stopped must not remove anything.
+	d.Changed(
+		componentstatus.NewInstanceID(component.MustNewID("comp1"), component.KindReceiver),
+		componentstatus.NewEvent(componentstatus.StatusStopping),
+	)
+	assert.Len(t, componentDiagnostics(t, d), 3, "only a stopped component should lose its hooks")
+
+	reportStopped(d, "comp1")
+	assert.Equal(t, map[string]string{
+		"comp2/beat_metrics.json": "comp2 metrics",
+	}, componentDiagnostics(t, d), "comp1 hooks should be gone once comp1 stopped")
+	assert.NotContains(t, d.componentHooks, "comp1", "stopped component should not keep an entry")
+
+	reportStopped(d, "unknown")
+	d.Changed(nil, nil)
+	assert.Len(t, componentDiagnostics(t, d), 1, "a status change for an unknown component should be a no-op")
+
+	d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", staticHook("comp1 metrics v2"))
+	assert.Equal(t, map[string]string{
+		"comp1/beat_metrics.json": "comp1 metrics v2",
+		"comp2/beat_metrics.json": "comp2 metrics",
+	}, componentDiagnostics(t, d), "a component restarted under the same ID should register again")
+}
+
+func TestDiagnosticHooks_ReRegisterReplaces(t *testing.T) {
+	d := newTestDiagnosticsExtension(t)
+
+	for i := range 100 {
+		d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", staticHook(fmt.Sprintf("v%d", i)))
+	}
+	d.RegisterDiagnosticHook("comp1", "inputs", "input_metrics.json", "application/json", staticHook("inputs"))
+
+	assert.Len(t, d.componentHooks["comp1"], 2, "re-registering the same filename should not add hooks")
+	assert.Equal(t, map[string]string{
+		"comp1/beat_metrics.json":  "v99",
+		"comp1/input_metrics.json": "inputs",
+	}, componentDiagnostics(t, d), "the latest registration should win")
+}
+
+func TestDiagnosticHooks_Concurrent(t *testing.T) {
+	d := newTestDiagnosticsExtension(t)
+
+	var wg sync.WaitGroup
+	for w := range 4 {
+		wg.Go(func() {
+			name := fmt.Sprintf("comp%d", w)
+			for range 200 {
+				d.RegisterDiagnosticHook(name, "metrics", "beat_metrics.json", "application/json", staticHook(name))
+				d.RegisterDiagnosticHook(name, "inputs", "input_metrics.json", "application/json", staticHook(name))
+				reportStopped(d, name)
+			}
+		})
+	}
+	for range 2 {
+		wg.Go(func() {
+			for range 50 {
+				serveDiagnostics(t.Context(), d)
+			}
+		})
+	}
+	wg.Wait()
+
+	assert.Empty(t, d.componentHooks, "all hooks should be gone once every component stopped")
 }
