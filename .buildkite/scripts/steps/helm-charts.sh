@@ -6,6 +6,8 @@
 # Required environment variables:
 #  - HELM_REPO_ENV
 #  - SNAPSHOT
+# Optional:
+#  - DRY_RUN=true  package the chart only; skip the GCS upload and the publish trigger.
 
 # shellcheck disable=SC1091
 source .buildkite/scripts/common.sh
@@ -20,6 +22,11 @@ fi
 
 echo "--- mage helm:package"
 mage helm:package
+
+if [[ "${DRY_RUN:-}" == "true" ]]; then
+  echo "--- DRY_RUN=true: chart packaged, skipping GCS upload and publish trigger"
+  exit 0
+fi
 
 echo "--- upload package tests"
 STORAGE=elastic-agent-helm-chart

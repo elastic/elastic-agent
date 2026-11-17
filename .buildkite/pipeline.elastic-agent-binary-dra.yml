@@ -139,6 +139,7 @@ steps:
         env:
           SNAPSHOT: "true"
           HELM_REPO_ENV: "dev"
+          DRY_RUN: "${DRY_RUN:-false}"
 
   - group: ":beats: DRA Elastic-Agent Core Staging :beats:"
     key: "dra-core-staging"
