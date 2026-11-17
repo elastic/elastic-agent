@@ -1,5 +1,9 @@
 ## 9.5.6 [elastic-agent-release-notes-9.5.6]
 
+::::{important} 
+The 9.5.6 release contains fixes for potential security vulnerabilities. For details, go to [security announcements](https://discuss.elastic.co/c/announcements/security-announcements/31).
+::::
+
 ### Features and enhancements [elastic-agent-9.5.6-features-enhancements]
 
 * Add OpenShift support to the Elastic Agent Helm chart. [#17112](https://github.com/elastic/elastic-agent/pull/17112)

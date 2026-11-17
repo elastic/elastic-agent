@@ -16,9 +16,9 @@ import (
 
 	semver "github.com/elastic/elastic-agent/pkg/version"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/configure"
-	libpaths "github.com/elastic/elastic-agent-libs/paths"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/configure"
+	libpaths "github.com/elastic/beats/v7/pkg/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
 
@@ -286,7 +286,7 @@ func watchCmd(log *logp.Logger, topDir string, cfg *configuration.UpgradeWatcher
 	newVersionedHome := marker.VersionedHome
 	if newVersionedHome == "" {
 		// the upgrade marker may have been created by an older version of agent where the versionedHome is always `data/elastic-agent-<shortHash>`
-		newVersionedHome = filepath.Join("data", fmt.Sprintf("elastic-agent-%s", marker.Hash[:6]))
+		newVersionedHome = filepath.Join("data", paths.VersionedHomePrefix+marker.Hash[:6])
 	}
 	// Only newVersionedHome is explicitly kept here; rollback candidates are preserved by
 	// cleanupAgentDirectories reading the TTL registry and retaining unexpired entries.

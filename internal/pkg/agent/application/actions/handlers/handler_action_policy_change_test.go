@@ -24,12 +24,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/testing/certutil"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/testing/certutil"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/actions"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -1371,7 +1371,7 @@ func TestPolicyChangeHandler_handlePolicyChange_LogLevelPersistedToConfig(t *tes
 			require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
 			var got map[string]any
 			require.NoError(t, yaml.Unmarshal(capture.saved, &got))
-			agentSection, ok := got["agent"].(map[any]any)
+			agentSection, ok := got["agent"].(map[string]any)
 			require.True(t, ok, "saved yaml must contain agent section")
 			assert.Equal(t, tt.policyLevel, agentSection["logging.level"], "agent.logging.level should be persisted to fleet.enc")
 
@@ -1419,7 +1419,7 @@ func TestPolicyChangeHandler_handlePolicyChange_TagsAreAppliedAndPersisted(t *te
 	require.NotEmpty(t, capture.saved, "saveConfig should have written to the store")
 	var got map[string]any
 	require.NoError(t, yaml.Unmarshal(capture.saved, &got))
-	agentSection, ok := got["agent"].(map[any]any)
+	agentSection, ok := got["agent"].(map[string]any)
 	require.True(t, ok, "saved yaml must contain agent section")
 
 	tags, ok := agentSection["tags"].([]interface{})
