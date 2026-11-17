@@ -15,6 +15,27 @@ if (-not $TEST_SUDO)
     exit 1
 }
 
+# A matrix variant may carry a shard suffix, "<group>@<i>of<n>" (for example
+# "default@0of2"): the group's tests are then split across n jobs by a stable
+# hash of the test name and this job runs shard i. See the "Test group" section
+# of docs/test-framework-dev-guide.md. The suffix is stripped from the group
+# name passed to -integration.groups and turned into -integration.shard=<i>/<n>;
+# it is kept in the result file names so the shards' reports don't collide.
+$shardArgs = @()
+$shardSuffix = ""
+if ($GROUP_NAME -match '^(?<group>[^@]+)@(?<spec>.+)$')
+{
+    $GROUP_NAME = $Matches['group']
+    $shardSpec = $Matches['spec']
+    if ($shardSpec -notmatch '^(?<index>\d+)of(?<count>\d+)$')
+    {
+        Write-Error "Error: invalid shard suffix '@$shardSpec', expected '<group>@<index>of<count>'"
+        exit 1
+    }
+    $shardArgs = @("-integration.shard=$($Matches['index'])/$($Matches['count'])")
+    $shardSuffix = "-shard$shardSpec"
+}
+
 if (-not $env:TEST_PACKAGE)
 {
     $env:TEST_PACKAGE = "github.com/elastic/elastic-agent/testing/integration"
@@ -83,7 +104,7 @@ if ($TEST_SUDO -eq "true")
 {
     $root_suffix = "_sudo"
 }
-$fully_qualified_group_name = "${GROUP_NAME}${root_suffix}_${osInfo}"
+$fully_qualified_group_name = "${GROUP_NAME}${shardSuffix}${root_suffix}_${osInfo}"
 $outputXML = "build/${fully_qualified_group_name}.integration.xml"
 $outputJSON = "build/${fully_qualified_group_name}.integration.out.json"
 
@@ -91,7 +112,7 @@ $TestsExitCode = 0
 
 try
 {
-    Write-Output "~~~ Integration tests: $GROUP_NAME as user: $env:USERNAME"
+    Write-Output "~~~ Integration tests: $GROUP_NAME $shardArgs as user: $env:USERNAME"
     # -test.timeout=2h0m0s is set because some tests normally take up to 45 minutes.
     # This 2-hour timeout provides enough room for future, potentially longer tests,
     # while still enforcing a reasonable upper limit on total execution time.
@@ -102,7 +123,7 @@ try
         $gotestFlags += "-test.short"
     }
     $fipsFilter = if ($env:FIPS) { $env:FIPS } else { "false" }
-    $gotestArgs = @("-tags=integration", ${gotestFlags}, "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO", "-integration.fips=$fipsFilter")
+    $gotestArgs = @("-tags=integration", ${gotestFlags}, "$env:TEST_PACKAGE", "-v", "-args", "-integration.groups=$GROUP_NAME", "-integration.sudo=$TEST_SUDO", "-integration.fips=$fipsFilter") + $shardArgs
     & gotestsum --no-color -f standard-quiet --junitfile-hide-skipped-tests --junitfile "${outputXML}" --jsonfile "${outputJSON}" -- @gotestArgs
     $TestsExitCode = $LASTEXITCODE
 
