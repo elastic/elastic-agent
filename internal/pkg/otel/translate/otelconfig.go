@@ -423,10 +423,6 @@ func getReceiversConfigForComponent(
 	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
-<<<<<<< HEAD
-	receiverConfig := map[string]any{
-=======
-	// Build the shared receiver config (same for all receivers in this component)
 	beatPaths := map[string]any{
 		"home": paths.Components(),
 		"data": BeatDataPath(comp.ID),
@@ -435,8 +431,7 @@ func getReceiversConfigForComponent(
 		// like for beats processes, files the receivers write directly, e.g. request traces, are kept with the logs of this build
 		beatPaths["logs"] = paths.BuildComponentsLogs()
 	}
-	sharedConfig := map[string]any{
->>>>>>> d0a250a (Keep Elastic Agent logs outside versioned installation directories (#17802))
+	receiverConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
 		"path": beatPaths,
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs

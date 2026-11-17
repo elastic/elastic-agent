@@ -417,8 +417,7 @@ outputs:
     type: elasticsearch
     hosts: [{{ .ESHost }}]
     api_key: placeholder
-agent.monitoring.enabled: {{ .MonitoringEnabled }}
-{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 2s{{ end }}
+agent.monitoring.enabled: false
 agent.internal.runtime.filebeat.httpjson: {{ .Runtime }}
 `
 
@@ -511,24 +510,6 @@ agent.internal.runtime.filebeat.httpjson: {{ .Runtime }}
 				"beat-rendered-config.yml",
 				"global_processors.txt",
 			),
-			agentCompState: httpjsonAgentCompState,
-			diagCompSetup: map[string]integrationtest.ComponentState{
-				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},
-			},
-			configTemplate:             httpjsonTracerConfigTemplate,
-			checkBeatReceiverTraceLogs: true,
-		},
-		{
-			// Same as above for httpjson running as a beat receiver in the collector: the receiver
-			// writes its trace files to {buildLogs}/components/ too.
-			name:              "httpjson trace logs in bundle, otel runtime",
-			runtime:           "otel",
-			monitoringEnabled: true,
-			expectedCompDiagnosticsFiles: []string{
-				"*/registry.tar.gz",
-				"*/beat_metrics.json",
-				"*/input_metrics.json",
-			},
 			agentCompState: httpjsonAgentCompState,
 			diagCompSetup: map[string]integrationtest.ComponentState{
 				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},

@@ -41,14 +41,6 @@ const (
 	stateUnknownMessage = "Unknown"
 )
 
-<<<<<<< HEAD
-=======
-// Environment variables for agentless mode
-const (
-	isAgentlessEnvName          = "ELASTIC_AGENT_IS_AGENTLESS"
-	stateStoreInputTypesEnvName = "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES"
-)
-
 // pathArgs returns the flags that give the component its own data path and, for a Beat, its logs path next to
 // the Agent logs of this build. Components that are not Beats, such as fleet-server and the profiling
 // collectors, and unversioned homes (containers) keep the default logs path.
@@ -60,7 +52,6 @@ func pathArgs(workDir, beatName string) []string {
 	return args
 }
 
->>>>>>> d0a250a (Keep Elastic Agent logs outside versioned installation directories (#17802))
 // hostnameOverrideArgs returns ["--hostname", h] when beatName is a standard
 // libbeat binary that supports the flag and h is non-empty, otherwise nil.
 // Cloudbeat is intentionally excluded from ELASTIC_AGENT_HOSTNAME propagation.

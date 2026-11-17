@@ -397,185 +397,7 @@ func TestGetOtelConfig(t *testing.T) {
 			},
 			"queue": map[string]any{
 				"mem": map[string]any{
-<<<<<<< HEAD
 					"events": uint64(3200),
-=======
-					"events": int64(6400),
-					"flush": map[string]any{
-						"min_events": uint64(1600),
-						"timeout":    "10s",
-					},
-				},
-			},
-			"logging": map[string]any{
-				"with_fields": map[string]any{
-					"component": map[string]any{
-						"binary":  binaryName,
-						"dataset": dataset,
-						"type":    inputType,
-						"id":      id,
-					},
-					"log": map[string]any{
-						"source": id,
-					},
-				},
-			},
-			"http": map[string]any{
-				"enabled": false,
-			},
-			"management.otel.enabled": true,
-		}
-	}
-
-	// expects component id
-	expectedAuditbeatReceiverConfig := func(id string) map[string]any {
-		cfg := beatReceiverBaseConfig(id, "auditbeat", "audit/auditd")
-		cfg["auditbeat"] = map[string]any{
-			"modules": []map[string]any{
-				{
-					"id": "test-1",
-					"data_stream": map[string]any{
-						"dataset": "generic-1",
-					},
-					"audit_rules": "-a exit,always -F arch=b64 -S open",
-					"index":       "logs-generic-1-default",
-					"module":      "auditd",
-					"processors":  defaultInputProcessors("test-1", "generic-1", "logs"),
-				},
-			},
-		}
-		return cfg
-	}
-
-	// expects component id
-	expectedHeartbeatReceiverConfig := func(id string) map[string]any {
-		cfg := beatReceiverBaseConfig(id, "heartbeat", "synthetics/http")
-		cfg["monitor_state"] = map[string]any{
-			"elasticsearch": "beatsauth/_agent-component/default",
-		}
-		cfg["heartbeat"] = map[string]any{
-			"monitors": []map[string]any{
-				{
-					"id": "test-1",
-					"data_stream": map[string]any{
-						"dataset": "generic-1",
-					},
-					"urls":       []any{"https://example.com"},
-					"schedule":   "@every 5s",
-					"index":      "logs-generic-1-default",
-					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
-					"type":       "http",
-				},
-			},
-		}
-		return cfg
-	}
-
-	// expects component id
-	expectedOsquerybeatReceiverConfig := func(id string) map[string]any {
-		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
-		cfg["osquerybeat"] = map[string]any{
-			"inputs": []map[string]any{
-				{
-					"id": "test-1",
-					"data_stream": map[string]any{
-						"dataset": "generic-1",
-					},
-					"query":      "SELECT * FROM processes",
-					"interval":   "3600",
-					"index":      "logs-generic-1-default",
-					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
-					"type":       "osquery",
-				},
-			},
-		}
-		return cfg
-	}
-
-	// expectedOsquerybeatSingleReceiverConfig is the expected config for an osquery component
-	// with single_receiver: true and two streams merged into one receiver.
-	// The osquery_manager.result stream must be first (index 0) so that
-	// osquerybeat assigns its client to it.
-	expectedOsquerybeatSingleReceiverConfig := func(id string) map[string]any {
-		cfg := beatReceiverBaseConfig(id, "osquerybeat", "osquery")
-		cfg["osquerybeat"] = map[string]any{
-			"inputs": []map[string]any{
-				{
-					"id": "results",
-					"data_stream": map[string]any{
-						"dataset":   "osquery_manager.result",
-						"namespace": "default",
-					},
-					"query":      "SELECT * FROM processes",
-					"interval":   "3600",
-					"index":      "logs-osquery_manager.result-default",
-					"processors": defaultInputProcessors("results", "osquery_manager.result", "logs"),
-					"type":       "osquery",
-				},
-				{
-					"id": "action-responses",
-					"data_stream": map[string]any{
-						"dataset":   "osquery_manager.action.responses",
-						"namespace": "default",
-					},
-					"query":      nil,
-					"index":      "logs-osquery_manager.action.responses-default",
-					"processors": defaultInputProcessors("action-responses", "osquery_manager.action.responses", "logs"),
-					"type":       "osquery",
-				},
-			},
-		}
-		return cfg
-	}
-
-	// expects component id
-	expectedPacketbeatReceiverConfig := func(id string) map[string]any {
-		cfg := beatReceiverBaseConfig(id, "packetbeat", "packet")
-		cfg["packetbeat"] = map[string]any{
-			"protocols": []map[string]any{
-				{
-					"id": "test-1",
-					"data_stream": map[string]any{
-						"dataset": "generic-1",
-					},
-					"ports":      []any{float64(443), float64(8443)},
-					"index":      "logs-generic-1-default",
-					"processors": defaultInputProcessors("test-1", "generic-1", "logs"),
-					"type":       "packet",
-				},
-			},
-		}
-		return cfg
-	}
-
-	// expects component id, input id, and dataset
-	expectedFilestreamConfig := func(compID string, inputID string, dataset string) map[string]any {
-		return map[string]any{
-			"filebeat": map[string]any{
-				"inputs": []map[string]any{
-					{
-						"id":   inputID,
-						"type": "filestream",
-						"data_stream": map[string]any{
-							"dataset": dataset,
-						},
-						"paths": []any{
-							"/var/log/*.log",
-						},
-						"index":      fmt.Sprintf("logs-%s-default", dataset),
-						"processors": defaultInputProcessors(inputID, dataset, "logs"),
-					},
-				},
-			},
-			"path": map[string]any{
-				"home": paths.Components(),
-				"data": filepath.Join(paths.Run(), compID),
-				"logs": paths.BuildComponentsLogs(),
-			},
-			"queue": map[string]any{
-				"mem": map[string]any{
-					"events": int64(6400),
->>>>>>> d0a250a (Keep Elastic Agent logs outside versioned installation directories (#17802))
 					"flush": map[string]any{
 						"min_events": uint64(1600),
 						"timeout":    "10s",
@@ -3042,7 +2864,6 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // TestGetReceiversConfigForComponentNoEnabledStreams verifies that a component with no
 // enabled streams (either no input units, or input units with nil config) falls back to
 // a no-op receiver instead of an error, so the pipeline stays valid and the component
@@ -3122,13 +2943,9 @@ func TestGetReceiversConfigForComponentNoEnabledStreams(t *testing.T) {
 	}
 }
 
-// TestGetReceiversConfigPathsContract pins the paths of beat receivers: a home and a data path, no logs path.
-// Files receivers write directly therefore resolve to <components>/logs, which diagnostics collects from.
-=======
 // TestGetReceiversConfigPathsContract pins the paths of beat receivers in a container, where the home is
 // unversioned: a home and a data path, no logs path. Files receivers write directly therefore resolve to the
 // default logs path. Versioned homes are covered by TestGetReceiversConfigForComponent.
->>>>>>> d0a250a (Keep Elastic Agent logs outside versioned installation directories (#17802))
 func TestGetReceiversConfigPathsContract(t *testing.T) {
 	paths.SetVersionHome(false)
 	t.Cleanup(func() { paths.SetVersionHome(true) })
