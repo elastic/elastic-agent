@@ -73,8 +73,6 @@ exporters:
     # tls:
     #   ca_file: "/path/to/elastic-ca.crt"
     #   insecure_skip_verify: true
-    mapping:
-      mode: otel
   # OTLP/HTTP exporter sending metrics to Elasticsearch's native OTLP endpoint.
   # Elasticsearch exposes OTLP over HTTP only (no gRPC) at <es_endpoint>/_otlp.
   # The exporter appends the signal path (/v1/metrics) to the configured endpoint.
