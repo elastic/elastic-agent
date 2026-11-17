@@ -29,17 +29,15 @@ const (
 	ActionTypeDiagnostics          = string(api.REQUESTDIAGNOSTICS)
 	ActionTypeMigrate              = string(api.MIGRATE)
 	ActionTypePrivilegeLevelChange = string(api.PRIVILEGELEVELCHANGE)
-	// ActionTypeRestart is defined locally because the Fleet Server API spec
-	// does not yet expose a RESTART action type. Switch to string(api.RESTART)
-	// once it is added upstream.
-	// TODO: Replace with the real reference once Fleet supports the action.
-	ActionTypeRestart = "RESTART"
+	ActionTypeRestart              = string(api.RESTART)
+	ActionTypeUninstall            = string(api.UNINSTALL)
 )
 
 // Error values that the Action interface can return
 var (
 	ErrNoStartTime  = fmt.Errorf("action has no start time")
 	ErrNoExpiration = fmt.Errorf("action has no expiration")
+	ErrNoCreatedAt  = fmt.Errorf("action has no creation time")
 )
 
 // Action base interface for all the implemented action from the fleet API.
@@ -124,6 +122,8 @@ func NewAction(actionType string) Action {
 		action = &ActionPrivilegeLevelChange{}
 	case ActionTypeRestart:
 		action = &ActionRestart{}
+	case ActionTypeUninstall:
+		action = &ActionUninstall{}
 	default:
 		action = &ActionUnknown{OriginalType: actionType}
 	}
@@ -525,6 +525,114 @@ func (a *ActionRestart) AckEvent(agentID string, ts time.Time) api.AckRequest_Ev
 
 // MarshalMap marshals ActionRestart into a corresponding map.
 func (a *ActionRestart) MarshalMap() (map[string]interface{}, error) {
+	var res map[string]interface{}
+	err := mapstructure.Decode(a, &res)
+	return res, err
+}
+
+// ActionUninstall is a request for the agent to uninstall itself.
+// Unlike an upgrade or restart, the agent cannot acknowledge the action on the
+// next startup because there is none: the uninstall is terminal. Instead the
+// action is acknowledged by the detached uninstaller process at the point of no
+// return (after the agent is effectively uninstalled but before its credentials
+// are removed), and failures before that point are acknowledged with the error
+// set so Fleet learns the uninstall did not complete.
+type ActionUninstall struct {
+	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType       string `json:"type" yaml:"type" mapstructure:"type"`
+	ActionCreatedAt  string `json:"created_at,omitempty" yaml:"created_at,omitempty" mapstructure:"-"`
+	ActionStartTime  string `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
+	ActionExpiration string `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
+	// Signature is the action signature (JSON key "signed"). It is exposed via the
+	// Signed() method so the action satisfies the signed-action contract used by
+	// in-agent signature verification.
+	Signature *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+
+	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+// Signed returns the action signature, allowing the UNINSTALL action's signature
+// to be verified in-agent (see internal/pkg/agent/protection).
+func (a *ActionUninstall) Signed() *Signed {
+	return a.Signature
+}
+
+func (a *ActionUninstall) String() string {
+	var s strings.Builder
+	s.WriteString("id: ")
+	s.WriteString(a.ActionID)
+	s.WriteString(", type: ")
+	s.WriteString(a.ActionType)
+	return s.String()
+}
+
+// Type returns the type of the Action.
+func (a *ActionUninstall) Type() string {
+	return a.ActionType
+}
+
+// ID returns the ID of the Action.
+func (a *ActionUninstall) ID() string {
+	return a.ActionID
+}
+
+// CreatedAt returns the action creation time (set by Fleet) as a UTC time.Time,
+// or ErrNoCreatedAt if it is not set. It is used to anchor the uninstall
+// grace-period window to when the action was created rather than when the agent
+// received it, so delivery latency does not affect the window validation.
+func (a *ActionUninstall) CreatedAt() (time.Time, error) {
+	if a.ActionCreatedAt == "" {
+		return time.Time{}, ErrNoCreatedAt
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionCreatedAt)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+// StartTime returns the start_time as a UTC time.Time or ErrNoStartTime if there is no start time.
+func (a *ActionUninstall) StartTime() (time.Time, error) {
+	if a.ActionStartTime == "" {
+		return time.Time{}, ErrNoStartTime
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionStartTime)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+// Expiration returns the expiration as a UTC time.Time or ErrNoExpiration if there is no expiration.
+func (a *ActionUninstall) Expiration() (time.Time, error) {
+	if a.ActionExpiration == "" {
+		return time.Time{}, ErrNoExpiration
+	}
+	ts, err := time.Parse(time.RFC3339, a.ActionExpiration)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return ts.UTC(), nil
+}
+
+// SetStartTime sets the start_time of the action. UNINSTALL actions are held in
+// the action queue (cancellable, persisted across restarts) until their Fleet-
+// provided start_time is reached; this satisfies the ScheduledAction interface.
+func (a *ActionUninstall) SetStartTime(t time.Time) {
+	a.ActionStartTime = t.Format(time.RFC3339)
+}
+
+func (a *ActionUninstall) AckEvent(agentID string, ts time.Time) api.AckRequest_Events_Item {
+	event := newGenericEvent(a.ActionID, a.ActionType, agentID, ts)
+	if a.Err != nil {
+		errStr := a.Err.Error()
+		event.Error = &errStr
+	}
+	return toGenericAckEvent(event)
+}
+
+// MarshalMap marshals ActionUninstall into a corresponding map.
+func (a *ActionUninstall) MarshalMap() (map[string]interface{}, error) {
 	var res map[string]interface{}
 	err := mapstructure.Decode(a, &res)
 	return res, err
