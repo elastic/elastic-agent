@@ -3922,6 +3922,99 @@ func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
 	assert.Equal(t, "api", inputs[0].config["type"])
 }
 
+func TestRemoveRedactionMarkers(t *testing.T) {
+	cfg := map[string]any{
+		"password":               "secret",
+		"__mark_redact_password": true,
+		"nested": map[string]any{
+			"token":               "secret",
+			"__mark_redact_token": true,
+		},
+		"list": []any{
+			map[string]any{
+				"value":               "secret",
+				"__mark_redact_value": true,
+			},
+			"plain",
+		},
+		"untouched": "value",
+	}
+
+	removeRedactionMarkers(cfg)
+
+	assert.Equal(t, map[string]any{
+		"password": "secret",
+		"nested": map[string]any{
+			"token": "secret",
+		},
+		"list": []any{
+			map[string]any{
+				"value": "secret",
+			},
+			"plain",
+		},
+		"untouched": "value",
+	}, cfg)
+}
+
+func TestGetInputsForUnitRemovesRedactionMarkers(t *testing.T) {
+	t.Run("stream config", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "httpjson-unit",
+			Type: client.UnitTypeInput,
+			Config: component.MustExpectedConfig(map[string]any{
+				"id":   "test",
+				"type": "httpjson",
+				"streams": []any{
+					map[string]any{
+						"id": "test-1",
+						"request": map[string]any{
+							"transforms": []any{
+								map[string]any{
+									"set": map[string]any{
+										"target":              "header.Authorization",
+										"value":               "stream-secret",
+										"__mark_redact_value": true,
+									},
+								},
+							},
+						},
+					},
+				},
+			}),
+		}
+
+		inputs, err := getInputsForUnit(unit, "logs", &component.Component{InputType: "httpjson"}, nil)
+		require.NoError(t, err)
+		require.Len(t, inputs, 1)
+
+		transforms, ok := inputs[0].config["request"].(map[string]any)["transforms"].([]any)
+		require.True(t, ok)
+		set, ok := transforms[0].(map[string]any)["set"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, map[string]any{"target": "header.Authorization", "value": "stream-secret"}, set)
+	})
+
+	t.Run("unit config without streams", func(t *testing.T) {
+		unit := component.Unit{
+			ID:   "filestream-unit",
+			Type: client.UnitTypeInput,
+			Config: component.MustExpectedConfig(map[string]any{
+				"id":                     "test",
+				"type":                   "filestream",
+				"password":               "unit-secret",
+				"__mark_redact_password": true,
+			}),
+		}
+
+		inputs, err := getInputsForUnit(unit, "logs", &component.Component{InputType: "filestream"}, nil)
+		require.NoError(t, err)
+		require.Len(t, inputs, 1)
+		assert.Equal(t, "unit-secret", inputs[0].config["password"])
+		assert.NotContains(t, inputs[0].config, "__mark_redact_password")
+	})
+}
+
 // TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
 // auxiliary Synthetics browser sub-streams, including the malformed-config fallback.
 func TestKeepScheduledMonitors(t *testing.T) {
@@ -5318,6 +5411,20 @@ func TestInjectOsqueryConfig(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("redaction markers are removed from the injected osquery config", func(t *testing.T) {
+		unitWithSecret := component.Unit{
+			Config: component.MustExpectedConfig(map[string]any{
+				"osquery": map[string]any{
+					"options":               map[string]any{"tls_password": "secret"},
+					"__mark_redact_options": true,
+				},
+			}),
+		}
+		got := injectOsqueryConfig([]receiverInput{makeStream("result", true)}, unitWithSecret)
+		require.Len(t, got, 1)
+		assert.Equal(t, map[string]any{"options": map[string]any{"tls_password": "secret"}}, got[0].config["osquery"])
+	})
 }
 
 func TestGetReceiversConfigHostnameOverride(t *testing.T) {
