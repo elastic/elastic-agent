@@ -123,7 +123,7 @@ jobs:
             ## Changes
             - Updates the Elastic Agent component table and OpenTelemetry Collector Builder (OCB) configuration from the latest repository-wide release.
             - Updates sample links from the latest repository-wide release.
-            - Updates gateway configuration links from the latest patch release for each supported minor version.
+            - Updates gateway configuration links from the latest patch release of each minor version that has a gateway sample.
 
             A single run can therefore update links for multiple release versions. See the diff for the exact versions and source tags involved.
 
