@@ -266,8 +266,10 @@ func FetchPGPKeys(log *logger.Logger, config *artifact.Config, defaultPGPKey []b
 			continue
 		}
 
+		c := client
 		if fleetServerURI != "" && strings.HasPrefix(check, PgpSourceURIPrefix+fleetServerURI) {
-			fleetClient, err := fleetTransport.Client(
+			log.Debugf("Fetching PGP key from Fleet Server at %s", strings.TrimPrefix(check, PgpSourceURIPrefix))
+			c, err = fleetTransport.Client(
 				httpcommon.WithAPMHTTPInstrumentation(),
 				httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
 					return WithHeaders(rt, Headers)
@@ -279,19 +281,9 @@ func FetchPGPKeys(log *logger.Logger, config *artifact.Config, defaultPGPKey []b
 			if err != nil {
 				return nil, fmt.Errorf("failed to create HTTP client for fetching PGP key from Fleet Server: %w", err)
 			}
-
-			raw, err := PgpBytesFromSource(log, check, fleetClient)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(raw) > 0 {
-				pgpKeys = append(pgpKeys, raw)
-			}
-			continue
 		}
 
-		raw, err := PgpBytesFromSource(log, check, client)
+		raw, err := PgpBytesFromSource(log, check, c)
 		if err != nil {
 			return nil, err
 		}
