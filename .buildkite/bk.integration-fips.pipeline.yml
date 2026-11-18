@@ -9,20 +9,15 @@ env:
   IMAGE_WIN_2025: "platform-ingest-elastic-agent-windows-2025-1794704524"
   IMAGE_WIN_11_ARM64: "platform-ingest-elastic-agent-windows-11-pro-arm64"
   IMAGE_WIN_11_ARM64_VERSION: "1.0.1794704524"
-  ASDF_TERRAFORM_VERSION: 1.9.2
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
 common:
+  # Still needed by the fips:upgrade-ech-deployment step: that test creates its own
+  # deployments through the Elastic Cloud API instead of using the shared oblt-cli stack.
   #  We are temporarily using the Production CFT environment API key instead of the
   #  Staging GovCloud one.  This is being done until issues with creating deployments in
-  #  Staging GovCloud are fixed.  Once those are fixed, uncomment the `vault_ec_key_staging_frh_gov`
-  #  section and delete the `vault_ec_key_prod` section below.
-#  - vault_ec_key_staging_frh_gov: &vault_ec_key_staging_frh_gov
-#      elastic/vault-secrets#v0.1.1:
-#        path: "kv/ci-shared/platform-ingest/platform-ingest-ec-staging-gov"
-#        field: "apiKey"
-#        env_var: "EC_API_KEY"
+  #  Staging GovCloud are fixed.
   - vault_ec_key_prod: &vault_ec_key_prod
       elastic/vault-secrets#v0.1.1:
         path: "kv/ci-shared/platform-ingest/platform-ingest-ec-prod"
@@ -35,6 +30,11 @@ common:
         lifetime: 10800 # seconds
         project-id: "elastic-observability-ci"
         project-number: "911195782929"
+  - oblt_cli_plugin: &oblt_cli_plugin
+      elastic/oblt-cli#v0.4.5:
+        version-file: .oblt-cli-version
+  - vault_github_token: &vault_github_token
+      elastic/vault-github-token#v0.2.3:
 
 steps:
   - label: Start ESS stack for FIPS integration tests
@@ -44,22 +44,16 @@ steps:
     key: integration-fips-ess
     env:
       FIPS: "true"
-#      EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-#      ESS_REGION: "us-gov-east-1"
-#      TF_VAR_deployment_template_id: "aws-general-purpose"
-      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-      TF_VAR_docker_images_name_suffix: "-fips"
+      INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     command: |
-      source .buildkite/scripts/steps/ess_start.sh
-    artifact_paths:
-      - test_infra/ess/*.tfstate
-      - test_infra/ess/*.lock.hcl
+      .buildkite/scripts/steps/ess_start_oblt-cli.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
       - *google_oidc_plugin
-      - *vault_ec_key_prod
+      - *oblt_cli_plugin
+      - *vault_github_token
 
   - group: "fips:Stateful:Ubuntu"
     key: integration-tests-ubuntu-fips
@@ -71,15 +65,11 @@ steps:
           - packaging-amd64-fips # Reuse artifacts produced in .buildkite/integration.pipeline.yml
         env:
           FIPS: "true"
-#          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-#          ESS_REGION: "us-gov-east-1"
-#          TF_VAR_deployment_template_id: "aws-general-purpose"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-          TF_VAR_docker_images_name_suffix: "-fips"
+          INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download "build/distributions/elastic-agent-*-linux-x86_64*" . --step 'packaging-amd64-fips'
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -92,7 +82,8 @@ steps:
           instanceType: "m5.2xlarge"
         plugins:
           - *google_oidc_plugin
-          - *vault_ec_key_prod
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             sudo:
@@ -106,15 +97,11 @@ steps:
           - packaging-arm64-fips
         env:
           FIPS: "true"
-#          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-#          ESS_REGION: "us-gov-east-1"
-#          TF_VAR_deployment_template_id: "aws-general-purpose"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-          TF_VAR_docker_images_name_suffix: "-fips"
+          INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download "build/distributions/elastic-agent-*-linux-arm64*" . --step 'packaging-arm64-fips'
-          .buildkite/scripts/steps/integration_tests_tf.sh {{matrix.groups}} {{matrix.sudo}}
+          .buildkite/scripts/steps/integration_tests_oblt-cli.sh {{matrix.groups}} {{matrix.sudo}}
         artifact_paths:
           - build/*
           - build/diagnostics/**
@@ -127,7 +114,8 @@ steps:
           instanceType: "m6g.2xlarge"
         plugins:
           - *google_oidc_plugin
-          - *vault_ec_key_prod
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             sudo:
@@ -140,8 +128,6 @@ steps:
         if: build.env("BUILDKITE_PULL_REQUEST") != "false" &&  build.env("GITHUB_PR_LABELS") =~ /.*(Testing:run:TestUpgradeIntegrationsServer).*/
         env:
           FIPS: "true"
-#          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-#          ESS_REGION: "us-gov-east-1"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           .buildkite/scripts/buildkite-integration-tests.sh ech-deployment false
@@ -169,11 +155,7 @@ steps:
           - packaging-amd64-fips
         env:
           FIPS: "true"
-#          EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-#          ESS_REGION: "us-gov-east-1"
-#          TF_VAR_deployment_template_id: "aws-general-purpose"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-          TF_VAR_docker_images_name_suffix: "-fips"
+          INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download "build/distributions/elastic-agent-*-windows-x86_64*" . --step 'packaging-amd64-fips'
@@ -190,7 +172,8 @@ steps:
           image: "${IMAGE_WIN_2025}"
         plugins:
           - *google_oidc_plugin
-          - *vault_ec_key_prod
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             groups:
@@ -201,8 +184,7 @@ steps:
           - packaging-arm64-fips
         env:
           FIPS: "true"
-          TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-          TF_VAR_docker_images_name_suffix: "-fips"
+          INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
         command: |
           buildkite-agent artifact download "build/distributions/elastic-agent-*-windows-arm64*" . --step 'packaging-arm64-fips'
@@ -221,7 +203,8 @@ steps:
           diskSizeGb: "256"
         plugins:
           - *google_oidc_plugin
-          - *vault_ec_key_prod
+          - *oblt_cli_plugin
+          - *vault_github_token
         matrix:
           setup:
             groups:
@@ -233,22 +216,16 @@ steps:
       - integration-tests-windows-fips
     env:
       FIPS: "true"
-#      EC_ENDPOINT: "https://api.staging.elastic-gov.com"
-#      ESS_REGION: "us-gov-east-1"
-#      TF_VAR_deployment_template_id: "aws-general-purpose"
-      TF_VAR_integration_server_docker_image: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
-      TF_VAR_docker_images_name_suffix: "-fips"
+      INTEGRATION_SERVER_DOCKER_IMAGE: "docker.elastic.co/beats-ci/elastic-agent-cloud-fips:git-${BUILDKITE_COMMIT:0:12}"
     allow_dependency_failure: true
-    command: |
-      buildkite-agent artifact download "test_infra/ess/**" . --step "integration-fips-ess"
-      ls -lah test_infra/ess
-      .buildkite/scripts/steps/ess_down.sh
+    command: .buildkite/scripts/steps/ess_cleanup_all.sh
     agents:
       image: "docker.elastic.co/ci-agent-images/platform-ingest/buildkite-agent-beats-ci-with-hooks:0.5"
       useCustomGlobalHooks: true
     plugins:
       - *google_oidc_plugin
-      - *vault_ec_key_prod
+      - *oblt_cli_plugin
+      - *vault_github_token
 
   - label: Aggregate test reports
     depends_on:
