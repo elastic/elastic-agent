@@ -143,7 +143,7 @@ func (r *subprocessExecution) startCollector(
 	collectorArgs = append(collectorArgs, fmt.Sprintf("--config=%s:", stdinGobProviderScheme))
 	// Override the health check endpoint placeholder (port 0) with the actual resolved port.
 	// Uses the OTel collector --set flag to override a specific config value after all config sources are merged.
-	collectorArgs = append(collectorArgs, fmt.Sprintf("--set=extensions::%s::http::endpoint=localhost:%d", r.healthCheckExtensionID, httpHealthCheckPort))
+	collectorArgs = append(collectorArgs, fmt.Sprintf("--set=extensions::%s::http::endpoint=%s:%d", r.healthCheckExtensionID, healthCheckHost, httpHealthCheckPort))
 
 	processInfo, err := process.Start(r.collectorPath,
 		process.WithArgs(collectorArgs),
