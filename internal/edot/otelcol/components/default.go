@@ -120,6 +120,7 @@ import (
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	opampextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
@@ -297,6 +298,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			healthcheckextension.NewFactory(),
 			bearertokenauthextension.NewFactory(),
 			oauth2clientauthextension.NewFactory(),
+			sigv4authextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),

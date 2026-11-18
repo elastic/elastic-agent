@@ -154,11 +154,12 @@ func (wf *wrappedFactory) CreateMeterProvider(
 	}
 
 	// Create a manual reader that will be invoked to record telemetry state.
-	// This reader is constructed here rather than from config, so it takes the
-	// Producer directly; WithMetricProducers below covers the config-built ones.
+	// This reader is constructed here rather than from config, so it takes its
+	// Producer directly; WithMetricProducerFactories below covers the
+	// config-built ones. Nil selectors match this reader's own defaults.
 	readerOpts := []sdkmetric.ManualReaderOption{}
 	if lp != nil {
-		readerOpts = append(readerOpts, sdkmetric.WithProducer(lp))
+		readerOpts = append(readerOpts, sdkmetric.WithProducer(lp.NewProducer(nil, nil)))
 	}
 	reader := sdkmetric.NewManualReader(readerOpts...)
 
@@ -175,8 +176,10 @@ func (wf *wrappedFactory) CreateMeterProvider(
 	}
 	if lp != nil {
 		// Component-scoped metrics live in per-component providers
-		// (lifecycle.go) and reach exporters as an external Producer.
-		sdkOpts = append(sdkOpts, otelconf.WithMetricProducers(lp))
+		// (lifecycle.go) and reach exporters as external Producers. Each
+		// config-built reader gets its own producer, bound to that reader's
+		// temporality and aggregation (elastic/elastic-agent#18047).
+		sdkOpts = append(sdkOpts, otelconf.WithMetricProducerFactories(lp.NewProducer))
 	}
 	sdk, sdkErr := otelconf.NewSDK(sdkOpts...)
 	if sdkErr != nil {
