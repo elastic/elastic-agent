@@ -24,17 +24,14 @@ trap 'kill "${JANITOR_PID}" 2>/dev/null || true' EXIT
 
 export ASDF_MAGE_VERSION="${ASDF_MAGE_VERSION:-1.14.0}"
 
-# The ESS credentials come from the meta-data published by the ESS step: oblt-cli (and its GitHub token) cannot
-# be used here, the token from job start has expired after the long git clone.
-echo "~~~ Loading ESS stack credentials from build meta-data"
-while IFS= read -r key; do
-  name="${key#macos-ess.}"
-  export "${name}=$(buildkite-agent meta-data get "${key}")"
-done < <(buildkite-agent meta-data keys | grep '^macos-ess\.' || true)
-if [[ -z "${ELASTICSEARCH_HOST:-}" ]]; then
-  echo "ELASTICSEARCH_HOST is not set: no ESS credentials in meta-data" >&2
-  exit 1
-fi
+# The checkout skips submodules (see the pipeline): beats is required by go.mod, clone it shallow
+echo "~~~ Cloning the beats submodule (shallow)"
+git submodule sync --recursive
+git submodule update --init --depth 1 --force beats
+
+# ESS credentials via oblt-cli (cluster name from the meta-data of the ESS step), never published as meta-data
+source .buildkite/scripts/steps/ess_oblt-cli.sh
+ess_load_secrets
 
 echo "~~~ Building test binaries"
 mage build:integrationTestBinaries
