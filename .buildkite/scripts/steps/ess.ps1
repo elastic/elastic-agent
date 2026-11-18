@@ -45,10 +45,13 @@ function ess_up {
   if ($isFips) {
       $template = "ess"
       $clusterPrefix = "frs"
+      # Creating a cluster on FRS takes about 20 minutes.
+      $waitMinutes = 40
       $params.Target = "frs"
   } else {
       $template = "ess-ea-it-build-id"
       $clusterPrefix = "hosted"
+      $waitMinutes = 20
       # Snapshot stacks need explicit image tags. Released stacks can be created
       # from StackVersion alone until the next snapshot build is available.
       if ($StackBuildId) {
@@ -67,7 +70,7 @@ function ess_up {
         --parameters-file $paramsPath `
         --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
-        --wait 20
+        --wait $waitMinutes
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
   }
