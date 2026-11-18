@@ -12,13 +12,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 )
 
 func TestMarshalPolicyYAMLMatchesYAMLMarshal(t *testing.T) {
-	longText := strings.Repeat("a long value with spaces that yaml.v2 folds at eighty columns ", 4)
+	longText := strings.Repeat("a long value with spaces that yaml.v3 folds at eighty columns ", 4)
 	multiLine := "line one\n\n  indented line after a blank line\nlast line with trailing spaces  \n"
 
 	testCases := map[string]map[string]interface{}{
