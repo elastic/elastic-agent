@@ -7,8 +7,9 @@ package release
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestApplyVersionReplacements(t *testing.T) {
@@ -95,9 +96,7 @@ curl -sL https://github.com/elastic/elastic-agent/archive/refs/tags/v9.5.0.tar.g
 		t.Run(tt.name, func(t *testing.T) {
 			got := applyVersionReplacements(tt.path, tt.content, tt.newVersion)
 			for _, want := range tt.want {
-				if !strings.Contains(got, want) {
-					t.Errorf("applyVersionReplacements() missing %q in:\n%s", want, got)
-				}
+				require.Contains(t, got, want, "applyVersionReplacements() missing %q", want)
 			}
 		})
 	}
@@ -130,34 +129,22 @@ helm.sh/chart: elastic-agent-9.5.0-SNAPSHOT
 
 	for relPath, content := range files {
 		fullPath := filepath.Join(tmpDir, relPath)
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			t.Fatalf("failed to create dir for %s: %v", relPath, err)
-		}
-		if err := os.WriteFile(fullPath, []byte(content), 0644); err != nil {
-			t.Fatalf("failed to write %s: %v", relPath, err)
-		}
+		require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0755), "failed to create dir for %s", relPath)
+		require.NoError(t, os.WriteFile(fullPath, []byte(content), 0644), "failed to write %s", relPath)
 	}
 
 	originalWd, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(originalWd)
 	}()
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("failed to change to temp directory: %v", err)
-	}
+	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
 
-	if err := UpdateDocs("9.6.0"); err != nil {
-		t.Fatalf("UpdateDocs() error = %v", err)
-	}
+	require.NoError(t, UpdateDocs("9.6.0"), "UpdateDocs() error")
 
 	for relPath := range files {
 		content, err := os.ReadFile(filepath.Join(tmpDir, relPath))
-		if err != nil {
-			t.Fatalf("failed to read %s: %v", relPath, err)
-		}
-		if strings.Contains(string(content), "9.5.0") {
-			t.Errorf("file %s still contains old version 9.5.0:\n%s", relPath, string(content))
-		}
+		require.NoError(t, err, "failed to read %s", relPath)
+		require.NotContains(t, string(content), "9.5.0", "file %s still contains old version 9.5.0:\n%s", relPath, string(content))
 	}
 }
 
@@ -183,9 +170,8 @@ func TestIsReleaseWritablePath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			if got := isReleaseWritablePath(tt.path); got != tt.want {
-				t.Errorf("isReleaseWritablePath(%q) = %v, want %v", tt.path, got, tt.want)
-			}
+			got := isReleaseWritablePath(tt.path)
+			require.Equal(t, tt.want, got, "isReleaseWritablePath(%q)", tt.path)
 		})
 	}
 }
