@@ -19,6 +19,11 @@ import (
 )
 
 func TestStartCollector(t *testing.T) {
+	// The sigv4auth extension resolves AWS credentials when its config is validated.
+	// Provide static ones so the default credential chain doesn't fall back to EC2 IMDS.
+	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key-id")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret-access-key")
+
 	testCases := []struct {
 		configFile           string
 		expectedErrorMessage string

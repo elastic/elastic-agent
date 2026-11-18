@@ -31,10 +31,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/beats/v7/pkg/logp"
+	monitoringLib "github.com/elastic/beats/v7/pkg/monitoring"
+	"github.com/elastic/beats/v7/pkg/service"
 	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
-	"github.com/elastic/elastic-agent-libs/logp"
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
@@ -52,6 +52,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/migration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -369,6 +370,15 @@ func runElasticAgent(
 	}
 	cfg := configReloader.Configuration()
 
+	// Browser monitors trust the configured CAs. This must run before any component
+	// starts the browser: it may change HOME, which the browser inherits. It runs
+	// without configuration too, to clean up CAs a previous run imported.
+	var browserCAs browserca.Config
+	if synthetics := cfg.Settings.Synthetics; synthetics != nil {
+		browserCAs = synthetics.Browser
+	}
+	browserca.Start(ctx, l.Named("browserca"), browserCAs)
+
 	logLvl := logger.DefaultLogLevel
 	if cfg.Settings.LoggingConfig != nil {
 		logLvl = cfg.Settings.LoggingConfig.Level
@@ -528,6 +538,12 @@ func runElasticAgent(
 	} else {
 		l.Warnw("Error calculating relative path for versioned home. Rollback cleanup will not be scheduled ", "topPath", paths.Top(), "homePath", paths.Home(), "error", homePathErr)
 	}
+
+	// Spawn the cleanup of the logs of old builds. It is independent of the rollbacks cleanup, which does not run
+	// for every installed Agent, e.g. DEB and RPM, and stops with the Agent.
+	wg.Go(func() {
+		application.CleanupOldBuildLogs(additionalGoroutinesContext, l, paths.Top(), paths.BuildLogsDirName())
+	})
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)
