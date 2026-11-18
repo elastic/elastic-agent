@@ -6,6 +6,7 @@ package release
 
 import (
 	"context"
+	"encoding/base64"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/stretchr/testify/require"
 )
 
 func createTestRepo(t *testing.T) (*GitRepo, string) {
@@ -24,25 +26,16 @@ func createTestRepo(t *testing.T) (*GitRepo, string) {
 	tmpDir := t.TempDir()
 
 	repo, err := git.PlainInit(tmpDir, false)
-	if err != nil {
-		t.Fatalf("failed to init repo: %v", err)
-	}
+	require.NoError(t, err, "failed to init repo")
 
 	w, err := repo.Worktree()
-	if err != nil {
-		t.Fatalf("failed to get worktree: %v", err)
-	}
+	require.NoError(t, err, "failed to get worktree")
 
 	testFile := filepath.Join(tmpDir, "README.md")
-	err = os.WriteFile(testFile, []byte("# Test Repo"), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(testFile, []byte("# Test Repo"), 0644), "failed to write test file")
 
 	_, err = w.Add("README.md")
-	if err != nil {
-		t.Fatalf("failed to add file: %v", err)
-	}
+	require.NoError(t, err, "failed to add file")
 
 	_, err = w.Commit("Initial commit", &git.CommitOptions{
 		Author: &object.Signature{
@@ -50,22 +43,14 @@ func createTestRepo(t *testing.T) (*GitRepo, string) {
 			Email: "test@example.com",
 		},
 	})
-	if err != nil {
-		t.Fatalf("failed to create initial commit: %v", err)
-	}
+	require.NoError(t, err, "failed to create initial commit")
 
 	headRef, err := repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD")
 
 	mainRef := plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), headRef.Hash())
-	if err := repo.Storer.SetReference(mainRef); err != nil {
-		t.Fatalf("failed to create main branch: %v", err)
-	}
-	if err := w.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("main")}); err != nil {
-		t.Fatalf("failed to checkout main: %v", err)
-	}
+	require.NoError(t, repo.Storer.SetReference(mainRef), "failed to create main branch")
+	require.NoError(t, w.Checkout(&git.CheckoutOptions{Branch: plumbing.NewBranchReferenceName("main")}), "failed to checkout main")
 	_ = repo.Storer.RemoveReference(plumbing.NewBranchReferenceName("master"))
 
 	gitRepo := &GitRepo{repo: repo, path: tmpDir}
@@ -79,9 +64,7 @@ func runGit(t *testing.T, dir string, args ...string) string {
 	cmd := exec.CommandContext(t.Context(), "git", gitArgs...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v in %s failed: %v\n%s", args, dir, err, string(output))
-	}
+	require.NoError(t, err, "git %v in %s failed:\n%s", args, dir, string(output))
 	return string(output)
 }
 
@@ -92,26 +75,18 @@ func createRepoWithSubmodule(t *testing.T) (*GitRepo, string, plumbing.Hash, plu
 	submoduleDir := filepath.Join(rootDir, "submodule")
 	parentDir := filepath.Join(rootDir, "parent")
 
-	if err := os.Mkdir(submoduleDir, 0755); err != nil {
-		t.Fatalf("failed to create submodule dir: %v", err)
-	}
-	if err := os.Mkdir(parentDir, 0755); err != nil {
-		t.Fatalf("failed to create parent dir: %v", err)
-	}
+	require.NoError(t, os.Mkdir(submoduleDir, 0755), "failed to create submodule dir")
+	require.NoError(t, os.Mkdir(parentDir, 0755), "failed to create parent dir")
 
 	runGit(t, submoduleDir, "init")
 	runGit(t, submoduleDir, "config", "user.email", "test@example.com")
 	runGit(t, submoduleDir, "config", "user.name", "Test User")
-	if err := os.WriteFile(filepath.Join(submoduleDir, "README.md"), []byte("v1"), 0644); err != nil {
-		t.Fatalf("failed to write submodule file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(submoduleDir, "README.md"), []byte("v1"), 0644), "failed to write submodule file")
 	runGit(t, submoduleDir, "add", "README.md")
 	runGit(t, submoduleDir, "commit", "-m", "submodule v1")
 	firstCommit := strings.TrimSpace(runGit(t, submoduleDir, "rev-parse", "HEAD"))
 
-	if err := os.WriteFile(filepath.Join(submoduleDir, "README.md"), []byte("v2"), 0644); err != nil {
-		t.Fatalf("failed to update submodule file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(filepath.Join(submoduleDir, "README.md"), []byte("v2"), 0644), "failed to update submodule file")
 	runGit(t, submoduleDir, "add", "README.md")
 	runGit(t, submoduleDir, "commit", "-m", "submodule v2")
 	secondCommit := strings.TrimSpace(runGit(t, submoduleDir, "rev-parse", "HEAD"))
@@ -124,9 +99,7 @@ func createRepoWithSubmodule(t *testing.T) (*GitRepo, string, plumbing.Hash, plu
 	runGit(t, parentDir, "branch", "-M", "main")
 
 	gitRepo, err := OpenRepo(parentDir)
-	if err != nil {
-		t.Fatalf("OpenRepo() error = %v", err)
-	}
+	require.NoError(t, err, "OpenRepo() error")
 
 	firstHash := plumbing.NewHash(firstCommit)
 	secondHash := plumbing.NewHash(secondCommit)
@@ -136,9 +109,7 @@ func createRepoWithSubmodule(t *testing.T) (*GitRepo, string, plumbing.Hash, plu
 func TestSyncSubmodulesNoSubmodules(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
-	if err := gitRepo.SyncSubmodules(); err != nil {
-		t.Fatalf("SyncSubmodules() error = %v", err)
-	}
+	require.NoError(t, gitRepo.SyncSubmodules(), "SyncSubmodules() error")
 }
 
 func TestIsSubmoduleIndexLockError(t *testing.T) {
@@ -166,9 +137,8 @@ func TestIsSubmoduleIndexLockError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isSubmoduleIndexLockError(tt.output); got != tt.want {
-				t.Fatalf("isSubmoduleIndexLockError() = %v, want %v", got, tt.want)
-			}
+			got := isSubmoduleIndexLockError(tt.output)
+			require.Equal(t, tt.want, got, "isSubmoduleIndexLockError()")
 		})
 	}
 }
@@ -177,9 +147,7 @@ func TestSyncSubmodulesRetriesIndexLock(t *testing.T) {
 	gitRepo, parentDir, _, _ := createRepoWithSubmodule(t)
 
 	lockPath := filepath.Join(parentDir, ".git", "modules", "beats", "index.lock")
-	if err := os.WriteFile(lockPath, []byte{}, 0644); err != nil {
-		t.Fatalf("failed to create index.lock: %v", err)
-	}
+	require.NoError(t, os.WriteFile(lockPath, []byte{}, 0644), "failed to create index.lock")
 
 	done := make(chan struct{})
 	go func() {
@@ -188,51 +156,31 @@ func TestSyncSubmodulesRetriesIndexLock(t *testing.T) {
 		_ = os.Remove(lockPath)
 	}()
 
-	if err := gitRepo.SyncSubmodules(); err != nil {
-		t.Fatalf("SyncSubmodules() error = %v", err)
-	}
+	require.NoError(t, gitRepo.SyncSubmodules(), "SyncSubmodules() error")
 	<-done
 }
 
 func TestCheckoutBranchSwitchesSubmodulePins(t *testing.T) {
 	gitRepo, parentDir, v2, v1 := createRepoWithSubmodule(t)
 
-	if err := gitRepo.CreateBranch("9.6"); err != nil {
-		t.Fatalf("CreateBranch(9.6) error = %v", err)
-	}
-	if err := gitRepo.CheckoutBranch("9.6"); err != nil {
-		t.Fatalf("CheckoutBranch(9.6) initial error = %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch("9.6"), "CreateBranch(9.6) error")
+	require.NoError(t, gitRepo.CheckoutBranch("9.6"), "CheckoutBranch(9.6) initial error")
 	runGit(t, filepath.Join(parentDir, "beats"), "checkout", v1.String())
 	runGit(t, parentDir, "add", "beats")
 	runGit(t, parentDir, "commit", "-m", "pin submodule to v1")
 
-	if err := gitRepo.CheckoutBranch("main"); err != nil {
-		t.Fatalf("CheckoutBranch(main) error = %v", err)
-	}
+	require.NoError(t, gitRepo.CheckoutBranch("main"), "CheckoutBranch(main) error")
 	current := strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
-	if current != v2.String() {
-		t.Fatalf("after main checkout submodule = %s, want %s", current, v2.String())
-	}
+	require.Equal(t, v2.String(), current, "after main checkout submodule")
 
-	if err := gitRepo.CheckoutBranch("9.6"); err != nil {
-		t.Fatalf("CheckoutBranch(9.6) error = %v", err)
-	}
+	require.NoError(t, gitRepo.CheckoutBranch("9.6"), "CheckoutBranch(9.6) error")
 	current = strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
-	if current != v1.String() {
-		t.Fatalf("after 9.6 checkout submodule = %s, want %s", current, v1.String())
-	}
+	require.Equal(t, v1.String(), current, "after 9.6 checkout submodule")
 
-	if err := gitRepo.CheckoutBranch("main"); err != nil {
-		t.Fatalf("CheckoutBranch(main) second error = %v", err)
-	}
+	require.NoError(t, gitRepo.CheckoutBranch("main"), "CheckoutBranch(main) second error")
 	current = strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
-	if current != v2.String() {
-		t.Fatalf("after second main checkout submodule = %s, want %s", current, v2.String())
-	}
-	if status := gitStatusPorcelain(t, parentDir); status != "" {
-		t.Fatalf("worktree dirty after branch switches:\n%s", status)
-	}
+	require.Equal(t, v2.String(), current, "after second main checkout submodule")
+	require.Empty(t, gitStatusPorcelain(t, parentDir), "worktree dirty after branch switches:\n%s", gitStatusPorcelain(t, parentDir))
 }
 
 func gitStatusPorcelain(t *testing.T, dir string) string {
@@ -245,44 +193,27 @@ func TestCheckoutBranchResetsDirtySubmodule(t *testing.T) {
 
 	runGit(t, filepath.Join(parentDir, "beats"), "checkout", otherCommit.String())
 
-	if gitStatusPorcelain(t, parentDir) == "" {
-		t.Fatal("test setup invalid: submodule should be dirty before checkout")
-	}
+	require.NotEmpty(t, gitStatusPorcelain(t, parentDir), "test setup invalid: submodule should be dirty before checkout")
 
-	if err := gitRepo.CreateBranch("9.7"); err != nil {
-		t.Fatalf("CreateBranch() error = %v", err)
-	}
-	if err := gitRepo.CheckoutBranch("9.7"); err != nil {
-		t.Fatalf("CheckoutBranch() error = %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch("9.7"), "CreateBranch() error")
+	require.NoError(t, gitRepo.CheckoutBranch("9.7"), "CheckoutBranch() error")
 
-	if gitStatusPorcelain(t, parentDir) != "" {
-		t.Fatalf("CheckoutBranch() should leave a clean worktree, got status:\n%s", gitStatusPorcelain(t, parentDir))
-	}
+	require.Empty(t, gitStatusPorcelain(t, parentDir), "CheckoutBranch() should leave a clean worktree, got status:\n%s", gitStatusPorcelain(t, parentDir))
 
 	currentSubmoduleCommit := strings.TrimSpace(runGit(t, filepath.Join(parentDir, "beats"), "rev-parse", "HEAD"))
-	if currentSubmoduleCommit != pinnedCommit.String() {
-		t.Fatalf("submodule commit = %s, want %s", currentSubmoduleCommit, pinnedCommit.String())
-	}
+	require.Equal(t, pinnedCommit.String(), currentSubmoduleCommit, "submodule commit")
 }
 
 func TestOpenRepo(t *testing.T) {
 	_, tmpDir := createTestRepo(t)
 
 	gitRepo, err := OpenRepo(tmpDir)
-	if err != nil {
-		t.Errorf("OpenRepo() error = %v", err)
-		return
-	}
-
-	if gitRepo == nil || gitRepo.repo == nil {
-		t.Error("OpenRepo() returned nil repo")
-	}
+	require.NoError(t, err, "OpenRepo() error")
+	require.NotNil(t, gitRepo)
+	require.NotNil(t, gitRepo.repo, "OpenRepo() returned nil repo")
 
 	_, err = OpenRepo("/non/existent/path")
-	if err == nil {
-		t.Error("OpenRepo() should fail for non-existent path")
-	}
+	require.Error(t, err, "OpenRepo() should fail for non-existent path")
 }
 
 func TestOpenRepoWithAlternateObjects(t *testing.T) {
@@ -293,12 +224,10 @@ func TestOpenRepoWithAlternateObjects(t *testing.T) {
 		runGit(t, source, "clone", "--no-local", "--reference", source, source, clone)
 
 		repo, err := OpenRepo(clone)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if clean, err := repo.IsClean(); err != nil || !clean {
-			t.Fatalf("IsClean() = %v, %v; want true, nil", clean, err)
-		}
+		require.NoError(t, err)
+		clean, err := repo.IsClean()
+		require.NoError(t, err)
+		require.True(t, clean, "IsClean() = %v, %v; want true, nil", clean, err)
 	}
 	t.Run("reference clone with loose objects", func(t *testing.T) {
 		assertReferenceCloneIsClean(t)
@@ -313,197 +242,167 @@ func TestOpenRepoWithAlternateObjects(t *testing.T) {
 func TestCreateBranch(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
-	err := gitRepo.CreateBranch("9.4")
-	if err != nil {
-		t.Fatalf("CreateBranch() error = %v", err)
-	}
-
-	err = gitRepo.CheckoutBranch("9.4")
-	if err != nil {
-		t.Fatalf("CheckoutBranch() error = %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch("9.4"), "CreateBranch() error")
+	require.NoError(t, gitRepo.CheckoutBranch("9.4"), "CheckoutBranch() error")
 
 	currentBranch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("GetCurrentBranch() error = %v", err)
-	}
-	if currentBranch != "9.4" {
-		t.Errorf("GetCurrentBranch() = %s, want 9.4", currentBranch)
-	}
+	require.NoError(t, err, "GetCurrentBranch() error")
+	require.Equal(t, "9.4", currentBranch)
 }
 
 func TestEnsureBranchFrom(t *testing.T) {
 	gitRepo, tmpDir := createTestRepo(t)
 
-	if err := gitRepo.CreateBranch("feature"); err != nil {
-		t.Fatalf("CreateBranch(feature) error = %v", err)
-	}
-	if err := gitRepo.CheckoutBranch("feature"); err != nil {
-		t.Fatalf("CheckoutBranch(feature) error = %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch("feature"), "CreateBranch(feature) error")
+	require.NoError(t, gitRepo.CheckoutBranch("feature"), "CheckoutBranch(feature) error")
 
 	featureFile := filepath.Join(tmpDir, "feature.txt")
-	if err := os.WriteFile(featureFile, []byte("feature work"), 0644); err != nil {
-		t.Fatalf("failed to write feature file: %v", err)
-	}
-	if _, err := gitRepo.CommitAll("feature commit", "Test Author", "test@example.com"); err != nil {
-		t.Fatalf("CommitAll() error = %v", err)
-	}
+	require.NoError(t, os.WriteFile(featureFile, []byte("feature work"), 0644), "failed to write feature file")
+	_, err := gitRepo.CommitAll("feature commit", "Test Author", "test@example.com")
+	require.NoError(t, err, "CommitAll() error")
 
 	headOnFeature, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD on feature branch: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD on feature branch")
 
-	if err := gitRepo.EnsureBranchFrom("main", "9.5"); err != nil {
-		t.Fatalf("EnsureBranchFrom() error = %v", err)
-	}
+	require.NoError(t, gitRepo.EnsureBranchFrom("main", "9.5"), "EnsureBranchFrom() error")
 
 	headOnRelease, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD on release branch: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD on release branch")
 
 	currentBranch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Fatalf("GetCurrentBranch() error = %v", err)
-	}
-	if currentBranch != "9.5" {
-		t.Errorf("GetCurrentBranch() = %s, want 9.5", currentBranch)
-	}
+	require.NoError(t, err, "GetCurrentBranch() error")
+	require.Equal(t, "9.5", currentBranch)
 
-	if err := gitRepo.CheckoutBranch("main"); err != nil {
-		t.Fatalf("CheckoutBranch(main) error = %v", err)
-	}
+	require.NoError(t, gitRepo.CheckoutBranch("main"), "CheckoutBranch(main) error")
 	headOnMain, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD on main: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD on main")
 
-	if headOnRelease.Hash() != headOnMain.Hash() {
-		t.Error("release branch should be created from main, not from feature branch HEAD")
-	}
-	if headOnFeature.Hash() == headOnMain.Hash() {
-		t.Fatal("test setup invalid: feature branch should have commits ahead of main")
-	}
+	require.Equal(t, headOnMain.Hash(), headOnRelease.Hash(), "release branch should be created from main, not from feature branch HEAD")
+	require.NotEqual(t, headOnMain.Hash(), headOnFeature.Hash(), "test setup invalid: feature branch should have commits ahead of main")
 }
 
 func TestCommitAllWithSubmoduleDirectory(t *testing.T) {
 	gitRepo, tmpDir := createTestRepo(t)
 
 	changeFile := filepath.Join(tmpDir, "change.txt")
-	if err := os.WriteFile(changeFile, []byte("release changes"), 0644); err != nil {
-		t.Fatalf("failed to write change file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(changeFile, []byte("release changes"), 0644), "failed to write change file")
 
 	beatsDir := filepath.Join(tmpDir, "beats")
-	if err := os.Mkdir(beatsDir, 0755); err != nil {
-		t.Fatalf("failed to create beats dir: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(beatsDir, "README.md"), []byte("beats"), 0644); err != nil {
-		t.Fatalf("failed to write beats file: %v", err)
-	}
+	require.NoError(t, os.Mkdir(beatsDir, 0755), "failed to create beats dir")
+	require.NoError(t, os.WriteFile(filepath.Join(beatsDir, "README.md"), []byte("beats"), 0644), "failed to write beats file")
 
 	committed, err := gitRepo.CommitAll("Release commit", "Test Author", "test@example.com")
-	if err != nil {
-		t.Fatalf("CommitAll() error = %v", err)
-	}
-	if !committed {
-		t.Fatal("CommitAll() should report a commit was created")
-	}
+	require.NoError(t, err, "CommitAll() error")
+	require.True(t, committed, "CommitAll() should report a commit was created")
 
 	ref, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD")
 
 	commit, err := gitRepo.repo.CommitObject(ref.Hash())
-	if err != nil {
-		t.Fatalf("failed to get commit: %v", err)
-	}
+	require.NoError(t, err, "failed to get commit")
 
 	tree, err := commit.Tree()
-	if err != nil {
-		t.Fatalf("failed to get tree: %v", err)
-	}
+	require.NoError(t, err, "failed to get tree")
 
-	if _, err := tree.File("change.txt"); err != nil {
-		t.Fatalf("CommitAll() did not commit change.txt: %v", err)
-	}
+	_, err = tree.File("change.txt")
+	require.NoError(t, err, "CommitAll() did not commit change.txt")
 }
 
 func TestCommitAll(t *testing.T) {
 	gitRepo, tmpDir := createTestRepo(t)
 
 	testFile := filepath.Join(tmpDir, "test.txt")
-	err := os.WriteFile(testFile, []byte("test content"), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0644), "failed to write test file")
 
 	committed, err := gitRepo.CommitAll("Test commit", "Test Author", "test@example.com")
-	if err != nil {
-		t.Errorf("CommitAll() error = %v", err)
-		return
-	}
-	if !committed {
-		t.Fatal("CommitAll() should report a commit was created")
-	}
+	require.NoError(t, err, "CommitAll() error")
+	require.True(t, committed, "CommitAll() should report a commit was created")
 
 	ref, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD")
 
 	commit, err := gitRepo.repo.CommitObject(ref.Hash())
-	if err != nil {
-		t.Fatalf("failed to get commit: %v", err)
-	}
-
-	if commit.Message != "Test commit" {
-		t.Errorf("CommitAll() commit message = %s, want %s", commit.Message, "Test commit")
-	}
+	require.NoError(t, err, "failed to get commit")
+	require.Equal(t, "Test commit", commit.Message, "CommitAll() commit message")
 }
 
 func TestGetCurrentBranch(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
 	branch, err := gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Errorf("GetCurrentBranch() error = %v", err)
-		return
-	}
-	if branch != "main" {
-		t.Errorf("GetCurrentBranch() = %s, want main", branch)
-	}
+	require.NoError(t, err, "GetCurrentBranch() error")
+	require.Equal(t, "main", branch)
 
 	testBranch := "test-branch"
-	err = gitRepo.CreateBranch(testBranch)
-	if err != nil {
-		t.Fatalf("CreateBranch() error = %v", err)
-	}
-	err = gitRepo.CheckoutBranch(testBranch)
-	if err != nil {
-		t.Fatalf("CheckoutBranch() error = %v", err)
-	}
+	require.NoError(t, gitRepo.CreateBranch(testBranch), "CreateBranch() error")
+	require.NoError(t, gitRepo.CheckoutBranch(testBranch), "CheckoutBranch() error")
 
 	branch, err = gitRepo.GetCurrentBranch()
-	if err != nil {
-		t.Errorf("GetCurrentBranch() error = %v", err)
-		return
+	require.NoError(t, err, "GetCurrentBranch() error")
+	require.Equal(t, testBranch, branch)
+}
+
+func TestGitHTTPSAuthExtraHeader(t *testing.T) {
+	got := gitHTTPSAuthExtraHeader("test-token")
+	wantPrefix := "Authorization: Basic "
+	require.True(t, strings.HasPrefix(got, wantPrefix), "gitHTTPSAuthExtraHeader() = %q, want prefix %q", got, wantPrefix)
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(got, wantPrefix))
+	require.NoError(t, err)
+	require.Equal(t, "x-access-token:test-token", string(decoded))
+	require.NotContains(t, got, "Bearer")
+}
+
+func TestGitPushEnv(t *testing.T) {
+	env := gitPushEnv([]string{"PATH=/usr/bin"}, "test-token")
+	wantHeader := gitHTTPSAuthExtraHeader("test-token")
+	got := map[string]string{}
+	for _, entry := range env {
+		key, value, ok := strings.Cut(entry, "=")
+		require.True(t, ok, "malformed env entry %q", entry)
+		got[key] = value
 	}
-	if branch != testBranch {
-		t.Errorf("GetCurrentBranch() = %s, want %s", branch, testBranch)
-	}
+	require.Equal(t, "/usr/bin", got["PATH"])
+	require.Equal(t, "0", got["GIT_TERMINAL_PROMPT"])
+	require.Equal(t, "2", got["GIT_CONFIG_COUNT"])
+	require.Equal(t, "http.https://github.com/.extraHeader", got["GIT_CONFIG_KEY_0"])
+	require.Empty(t, got["GIT_CONFIG_VALUE_0"])
+	require.Equal(t, "http.https://github.com/.extraHeader", got["GIT_CONFIG_KEY_1"])
+	require.Equal(t, wantHeader, got["GIT_CONFIG_VALUE_1"])
 }
 
 func TestPushRequiresToken(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
 	err := gitRepo.Push("origin", "")
-	if err == nil {
-		t.Error("Push() should fail without a token, got nil error")
-	}
+	require.Error(t, err, "Push() should fail without a token")
+}
+
+func TestPushRequiresOriginRemote(t *testing.T) {
+	gitRepo, _ := createTestRepo(t)
+
+	err := gitRepo.Push("upstream", "test-token")
+	require.Error(t, err, "Push() should reject non-origin remotes")
+	require.ErrorContains(t, err, "only supports origin")
+}
+
+func TestPushToLocalRemote(t *testing.T) {
+	gitRepo, workDir := createTestRepo(t)
+
+	bareDir := t.TempDir()
+	_, err := git.PlainInit(bareDir, true)
+	require.NoError(t, err)
+	remoteURL := "file://" + bareDir
+	require.NoError(t, gitRepo.SetRemoteURL("origin", remoteURL))
+
+	branch := "release-9.6"
+	require.NoError(t, gitRepo.CreateBranch(branch))
+	require.NoError(t, gitRepo.CheckoutBranch(branch))
+
+	// Token is unused for file:// remotes but required by Push.
+	require.NoError(t, gitRepo.Push("origin", "test-token"))
+
+	remoteHeads := runGit(t, workDir, "ls-remote", "--heads", "origin", branch)
+	require.Contains(t, remoteHeads, "refs/heads/"+branch)
 }
 
 func TestGithubHTTPSPushURL(t *testing.T) {
@@ -547,10 +446,8 @@ func TestGithubHTTPSPushURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, rewritten := githubHTTPSPushURL(tt.in)
-			if got != tt.want || rewritten != tt.rewritten {
-				t.Errorf("githubHTTPSPushURL(%q) = (%q, %v), want (%q, %v)",
-					tt.in, got, rewritten, tt.want, tt.rewritten)
-			}
+			require.Equal(t, tt.want, got, "githubHTTPSPushURL(%q) URL", tt.in)
+			require.Equal(t, tt.rewritten, rewritten, "githubHTTPSPushURL(%q) rewritten", tt.in)
 		})
 	}
 }
@@ -558,111 +455,63 @@ func TestGithubHTTPSPushURL(t *testing.T) {
 func TestEnsureHTTPSRemote(t *testing.T) {
 	t.Run("rewrites ssh to https", func(t *testing.T) {
 		gitRepo, _ := createTestRepo(t)
-		if err := gitRepo.SetRemoteURL("origin", "git@github.com:elastic/elastic-agent.git"); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
-		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
-			t.Fatalf("ensureHTTPSRemote() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@github.com:elastic/elastic-agent.git"), "SetRemoteURL() error")
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"), "ensureHTTPSRemote() error")
 		remote, err := gitRepo.repo.Remote("origin")
-		if err != nil {
-			t.Fatalf("Remote() error = %v", err)
-		}
-		want := "https://github.com/elastic/elastic-agent.git"
-		if got := remote.Config().URLs[0]; got != want {
-			t.Errorf("origin URL = %q, want %q", got, want)
-		}
+		require.NoError(t, err, "Remote() error")
+		require.Equal(t, "https://github.com/elastic/elastic-agent.git", remote.Config().URLs[0], "origin URL")
 	})
 
 	t.Run("leaves https unchanged", func(t *testing.T) {
 		gitRepo, _ := createTestRepo(t)
 		want := "https://github.com/elastic/elastic-agent.git"
-		if err := gitRepo.SetRemoteURL("origin", want); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
-		if err := gitRepo.ensureHTTPSRemote("origin"); err != nil {
-			t.Fatalf("ensureHTTPSRemote() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", want), "SetRemoteURL() error")
+		require.NoError(t, gitRepo.ensureHTTPSRemote("origin"), "ensureHTTPSRemote() error")
 		remote, err := gitRepo.repo.Remote("origin")
-		if err != nil {
-			t.Fatalf("Remote() error = %v", err)
-		}
-		if got := remote.Config().URLs[0]; got != want {
-			t.Errorf("origin URL = %q, want %q", got, want)
-		}
+		require.NoError(t, err, "Remote() error")
+		require.Equal(t, want, remote.Config().URLs[0], "origin URL")
 	})
 
 	t.Run("rejects non-https remote", func(t *testing.T) {
 		gitRepo, _ := createTestRepo(t)
-		if err := gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"); err != nil {
-			t.Fatalf("SetRemoteURL() error = %v", err)
-		}
+		require.NoError(t, gitRepo.SetRemoteURL("origin", "git@gitlab.com:group/repo.git"), "SetRemoteURL() error")
 		err := gitRepo.ensureHTTPSRemote("origin")
-		if err == nil {
-			t.Fatal("ensureHTTPSRemote() expected error for non-HTTPS remote")
-		}
-		if !strings.Contains(err.Error(), "not HTTPS") {
-			t.Errorf("ensureHTTPSRemote() error = %v, want mention of not HTTPS", err)
-		}
+		require.Error(t, err, "ensureHTTPSRemote() expected error for non-HTTPS remote")
+		require.ErrorContains(t, err, "not HTTPS")
 	})
 }
 
 func TestSetRemoteURL(t *testing.T) {
 	gitRepo, _ := createTestRepo(t)
 
-	err := gitRepo.SetRemoteURL("origin", "https://github.com/test/repo.git")
-	if err != nil {
-		t.Errorf("SetRemoteURL() error = %v", err)
-		return
-	}
+	require.NoError(t, gitRepo.SetRemoteURL("origin", "https://github.com/test/repo.git"), "SetRemoteURL() error")
 
 	remote, err := gitRepo.repo.Remote("origin")
-	if err != nil {
-		t.Errorf("Failed to get remote: %v", err)
-		return
-	}
-	if len(remote.Config().URLs) == 0 || remote.Config().URLs[0] != "https://github.com/test/repo.git" {
-		t.Errorf("SetRemoteURL() URL = %v, want https://github.com/test/repo.git", remote.Config().URLs)
-	}
+	require.NoError(t, err, "Failed to get remote")
+	require.NotEmpty(t, remote.Config().URLs)
+	require.Equal(t, "https://github.com/test/repo.git", remote.Config().URLs[0], "SetRemoteURL() URL")
 }
 
 func TestCommitAllIdempotent(t *testing.T) {
 	gitRepo, tmpDir := createTestRepo(t)
 
 	testFile := filepath.Join(tmpDir, "test.txt")
-	err := os.WriteFile(testFile, []byte("test content"), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test file: %v", err)
-	}
+	require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0644), "failed to write test file")
 
 	committed, err := gitRepo.CommitAll("Test commit", "Test Author", "test@example.com")
-	if err != nil {
-		t.Fatalf("CommitAll() first call error = %v", err)
-	}
-	if !committed {
-		t.Fatal("CommitAll() first call should create a commit")
-	}
+	require.NoError(t, err, "CommitAll() first call error")
+	require.True(t, committed, "CommitAll() first call should create a commit")
 
 	headBefore, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD before second commit: %v", err)
-	}
+	require.NoError(t, err, "failed to get HEAD before second commit")
 
 	committed, err = gitRepo.CommitAll("Test commit", "Test Author", "test@example.com")
-	if err != nil {
-		t.Errorf("CommitAll() second call error = %v", err)
-	}
-	if committed {
-		t.Error("CommitAll() is not idempotent - second call created a new commit")
-	}
+	require.NoError(t, err, "CommitAll() second call error")
+	require.False(t, committed, "CommitAll() is not idempotent - second call created a new commit")
 
 	headAfter, err := gitRepo.repo.Head()
-	if err != nil {
-		t.Fatalf("failed to get HEAD after second commit: %v", err)
-	}
-	if headBefore.Hash() != headAfter.Hash() {
-		t.Error("CommitAll() is not idempotent - HEAD changed on second call")
-	}
+	require.NoError(t, err, "failed to get HEAD after second commit")
+	require.Equal(t, headBefore.Hash(), headAfter.Hash(), "CommitAll() is not idempotent - HEAD changed on second call")
 }
 
 func TestHasCommitsAheadOf(t *testing.T) {
@@ -727,23 +576,15 @@ func TestHasCommitsAheadOf(t *testing.T) {
 			tt.setup(t, dir, tt.baseName)
 
 			repo, err := OpenRepo(dir)
-			if err != nil {
-				t.Fatalf("OpenRepo failed: %v", err)
-			}
+			require.NoError(t, err, "OpenRepo failed")
 
 			got, err := repo.HasCommitsAheadOf(tt.baseName)
 			if tt.wantErr {
-				if err == nil {
-					t.Fatal("HasCommitsAheadOf() error = nil, want error")
-				}
+				require.Error(t, err, "HasCommitsAheadOf() error = nil, want error")
 				return
 			}
-			if err != nil {
-				t.Fatalf("HasCommitsAheadOf() unexpected error: %v", err)
-			}
-			if got != tt.want {
-				t.Errorf("HasCommitsAheadOf() = %v, want %v", got, tt.want)
-			}
+			require.NoError(t, err, "HasCommitsAheadOf() unexpected error")
+			require.Equal(t, tt.want, got, "HasCommitsAheadOf()")
 		})
 	}
 }
@@ -768,9 +609,7 @@ func initGitRepoForAheadTest(t *testing.T) string {
 func writeAndCommit(t *testing.T, dir, filename, content, message string) {
 	t.Helper()
 	path := filepath.Join(dir, filename)
-	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
-		t.Fatalf("write %s: %v", filename, err)
-	}
+	require.NoError(t, os.WriteFile(path, []byte(content), 0644), "write %s", filename)
 	runGit(t, dir, "add", filename)
 	runGit(t, dir, "commit", "-m", message)
 }

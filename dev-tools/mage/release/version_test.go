@@ -7,27 +7,21 @@ package release
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 func TestSelectLatestReleaseBefore(t *testing.T) {
 	versions := []string{"9.4.0", "9.4.3", "9.5.0", "v9.3.2", "8.19.1", "not-a-version"}
 	got, err := selectLatestReleaseBefore(versions, "9.5.0")
-	if err != nil {
-		t.Fatalf("selectLatestReleaseBefore() error = %v", err)
-	}
-	if got != "9.4.3" {
-		t.Errorf("selectLatestReleaseBefore() = %s, want 9.4.3", got)
-	}
+	require.NoError(t, err)
+	require.Equal(t, "9.4.3", got)
 }
 
 func TestInferNextProjectMinorVersion(t *testing.T) {
 	parsed, err := devtools.ParseReleaseVersion("9.5.0")
-	if err != nil {
-		t.Fatalf("ParseReleaseVersion() error = %v", err)
-	}
+	require.NoError(t, err)
 	got := devtools.InferNextProjectMinorVersion(parsed)
-	if got != "9.6.0" {
-		t.Errorf("InferNextProjectMinorVersion() = %s, want 9.6.0", got)
-	}
+	require.Equal(t, "9.6.0", got)
 }
