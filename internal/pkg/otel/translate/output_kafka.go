@@ -8,13 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"net/url"
-	"reflect"
 	"strings"
-	"time"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/config/configopaque"
 
 	"github.com/go-viper/mapstructure/v2"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
@@ -390,21 +386,6 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 	return map[string]any{
 		extensionID.String(): oauthMap,
 	}, nil
-}
-
-func auth2MapEncodeHook() mapstructure.DecodeHookFunc {
-	return func(_ reflect.Type, _ reflect.Type, data any) (any, error) {
-		switch v := data.(type) {
-		case time.Duration:
-			return v.String(), nil
-		case configopaque.String:
-			return string(v), nil
-		case url.URL:
-			return v.String(), nil
-		default:
-			return data, nil
-		}
-	}
 }
 
 func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
