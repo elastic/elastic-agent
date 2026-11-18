@@ -281,7 +281,7 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `flush::bytes` | `5000000` | Write buffer flush size limit before compression. A bulk request are sent immediately when its buffer exceeds this limit. This value should be much lower than Elasticsearch's `http.max_content_length` config to avoid HTTP 413 Entity Too Large error. Keep this value under 5 MB. |
 | `flush::interval` | `10s` | Write buffer flush time limit. |
 | `retry::enabled` | `true` | Turns on or off request retry on error. Failed requests are retried with exponential backoff. |
-| `retry::max_requests` | DEPRECATED | Number of HTTP request retries including the initial attempt. If used, `retry::max_retries` is set to `max_requests - 1`. Use `retry::max_retries` instead. |
+| `retry::max_requests` | - | {applies_to}`stack: removed 9.5` Removed in versions 9.5.8, 9.6.1, and later. Number of HTTP request retries including the initial attempt. If set, `retry::max_retries` is set to `max_requests - 1`. Use `retry::max_retries` instead. |
 | `retry::max_retries` | `2` | Number of HTTP request retries. To turn off retries, set `retry::enabled` to `false` instead of setting `max_retries` to `0`. |
 | `retry::initial_interval` | `100ms` | Initial waiting time if an HTTP request failed. |
 | `retry::max_interval` | `1m` | Max waiting time if an HTTP request failed. |
