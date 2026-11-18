@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/go-ucfg"
@@ -3357,7 +3357,7 @@ func gatherDurationFieldPaths(s interface{}, pathSoFar string) []string {
 		}
 		return gatheredPaths
 
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if rv.IsNil() {
 			// Nil pointer, nothing more to do
 			return gatheredPaths

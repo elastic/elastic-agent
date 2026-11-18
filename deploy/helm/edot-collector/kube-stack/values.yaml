@@ -607,8 +607,6 @@ collectors:
           # Enable in order to skip the SSL certificate Check
           # tls:
           #   insecure_skip_verify: true
-          mapping:
-            mode: otel
       extensions:
         cgroup_runtime: {}
         health_check:
@@ -653,9 +651,13 @@ instrumentation:
   java:
     image: docker.elastic.co/observability/elastic-otel-javaagent:1.14.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.20.0
+    image: docker.elastic.co/observability/elastic-otel-node:1.20.1
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:1.6.1
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.7.0
+    env:
+      # The operator does not load the EDOT .NET plugin by default; without it only upstream OpenTelemetry .NET behaviour applies.
+      - name: OTEL_DOTNET_AUTO_PLUGINS
+        value: "Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation"
   python:
     image: docker.elastic.co/observability/elastic-otel-python:1.18.0
   go:

@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -26,7 +26,7 @@ import (
 )
 
 func TestEscapingSecretsInPolicy(t *testing.T) {
-	info := define.Require(t, define.Requirements{
+	info := define.Require(t, define.Requirements{ //nolint:staticcheck // SA4006: false positive, info is unreachable only while the test is skipped
 		Group: integration.Default,
 		Stack: &define.Stack{},
 		Sudo:  true,
@@ -52,6 +52,7 @@ func TestEscapingSecretsInPolicy(t *testing.T) {
 		},
 	}
 	policy, err := info.KibanaClient.CreatePolicy(ctx, policyReq)
+	require.NoError(t, err)
 
 	pkgPolicyReq := kibana.PackagePolicyRequest{
 		Force:     true,

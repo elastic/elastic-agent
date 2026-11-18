@@ -16,7 +16,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/monitoringhelpers"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
@@ -25,9 +25,9 @@ import (
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
+	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
@@ -423,12 +423,17 @@ func getReceiversConfigForComponent(
 	binaryName := comp.BeatName()
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
+	beatPaths := map[string]any{
+		"home": paths.Components(),
+		"data": BeatDataPath(comp.ID),
+	}
+	if paths.IsVersionHome() {
+		// like for beats processes, files the receivers write directly, e.g. request traces, are kept with the logs of this build
+		beatPaths["logs"] = paths.BuildComponentsLogs()
+	}
 	receiverConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
-		"path": map[string]any{
-			"home": paths.Components(),
-			"data": BeatDataPath(comp.ID),
-		},
+		"path": beatPaths,
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
 		"logging": map[string]any{
 			"with_fields": map[string]any{

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -235,9 +236,45 @@ func Logs() string {
 	return logsPath
 }
 
+const logsDirName = "logs"
+
+// buildLogsDirPattern matches the name of a build log directory: [<package-version>-]<commit>, where the
+// package version may carry build metadata (+build...) and the commit has the length of release.ShortCommit.
+// A build without a commit, such as a development build, does not match.
+var buildLogsDirPattern = regexp.MustCompile(fmt.Sprintf(`^(\d+\.\d+\.\d+(\+[0-9A-Za-z.]+)?(-[0-9A-Za-z.]+)*-)?[0-9a-f]{%d}$`, len(release.TrimCommit(strings.Repeat("0", 64)))))
+
+// IsBuildLogsDirName reports whether name looks like the name of the log directory of a build, see BuildLogsDirName.
+func IsBuildLogsDirName(name string) bool {
+	return buildLogsDirPattern.MatchString(name)
+}
+
+// BuildLogsRoot returns the directory that holds the log directory of each build, in the data directory of
+// the Agent installed in topDirPath.
+func BuildLogsRoot(topDirPath string) string {
+	return filepath.Join(DataFrom(topDirPath), logsDirName)
+}
+
+// BuildLogsDirName returns the name of the running build's directory under BuildLogsRoot: the name of its home
+// directory without the prefix, see buildName.
+func BuildLogsDirName() string {
+	return buildName(topPath)
+}
+
 // BuildLogs returns the directory the running build writes its logs to. Unlike Logs(), it is not affected by --path.logs, and diagnostics collects from it.
+// Unversioned homes (containers) keep logs inside the home.
 func BuildLogs() string {
-	return filepath.Join(Home(), "logs")
+	if unversionedHome {
+		return filepath.Join(Home(), logsDirName)
+	}
+	return filepath.Join(BuildLogsRoot(topPath), BuildLogsDirName())
+}
+
+// BuildComponentsLogs returns the logs path of the Beats and beat receivers of the running build. It mirrors the
+// {home}/components/logs of the default layout, and its last element must stay "logs": Fleet integrations point
+// the request tracer files of an input to "../../logs/<input>/", which only resolves inside the logs path of the input
+// when it does.
+func BuildComponentsLogs() string {
+	return filepath.Join(BuildLogs(), "components", logsDirName)
 }
 
 // SetLogs updates the path for the logs.

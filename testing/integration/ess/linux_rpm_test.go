@@ -19,7 +19,7 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -156,6 +156,15 @@ func testRpmLogIngestFleetManagedWithCheck(ctx context.Context, t *testing.T, ag
 	if componentCheck != nil {
 		t.Run("check components set", componentCheck)
 	}
+
+	t.Run("Internal logs are in the build log directory", func(t *testing.T) {
+		basePath := "/"
+		if installOpts.BasePath != "" {
+			basePath = installOpts.BasePath
+		}
+		requireLogFileInDir(t, filepath.Join(basePath, "var/lib/elastic-agent/data/logs", "*", "elastic-agent-*.ndjson"), "internal logs")
+		assertNoLogsInInstallation(t, filepath.Join(basePath, "var/lib/elastic-agent"))
+	})
 
 	t.Run("Monitoring logs are shipped", func(t *testing.T) {
 		integration.TestMonitoringLogsAreShipped(t, ctx, info, agentFixture, policy)

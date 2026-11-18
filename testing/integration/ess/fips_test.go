@@ -18,8 +18,8 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -73,6 +73,7 @@ func ensureFleetServerInDeploymentIsHealthyAndFIPSCapable(t *testing.T, info *de
 
 	// Check that the Fleet Server in the deployment is healthy
 	fleetServerHost, err := fleettools.DefaultURL(t.Context(), info.KibanaClient)
+	require.NoError(t, err)
 	statusUrl, err := url.JoinPath(fleetServerHost, "/api/status")
 	t.Logf("statusUrl = %s", statusUrl)
 	require.NoError(t, err)

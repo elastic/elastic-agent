@@ -16,9 +16,9 @@ import (
 
 	semver "github.com/elastic/elastic-agent/pkg/version"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/configure"
-	libpaths "github.com/elastic/elastic-agent-libs/paths"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/configure"
+	libpaths "github.com/elastic/beats/v7/pkg/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/utils"
 

@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -244,6 +244,12 @@ func (f *Fixture) Version() string {
 // Hash returns the Elastic Agent build commit hash (populated only after the fixture has been prepared/extracted)
 func (f *Fixture) Hash() string {
 	return f.hash
+}
+
+// FetchedFromLocalBuild reports whether the fixture's Elastic Agent comes from a build of the code under test,
+// as opposed to a released or snapshot build from the artifacts repository.
+func (f *Fixture) FetchedFromLocalBuild() bool {
+	return f.fetcher.Name() == localFetcherName
 }
 
 // ShortHash returns the Elastic Agent build commit hash in short form (populated only after the fixture has been prepared/extracted)
