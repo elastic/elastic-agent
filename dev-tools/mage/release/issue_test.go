@@ -154,8 +154,8 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 
 func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.4.1",
-		DryRun:         true,
+		NextRelease: "9.4.1",
+		DryRun:      true,
 	}
 	pr := &github.PullRequest{HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/99")}
 	if err := EnsureReleaseIssueTracker(cfg, []*github.PullRequest{pr}); err != nil {

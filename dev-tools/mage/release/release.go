@@ -19,7 +19,7 @@ import (
 
 // ReadAgentVersion returns defaultBeatVersion from the on-disk version/version.go.
 // It must read the file rather than using the compile-time version.Agent constant:
-// release workflows call CheckoutBranch and then compare CURRENT_RELEASE to the
+// release workflows call CheckoutBranch and then compare NEXT_RELEASE to the
 // version on that branch.
 func ReadAgentVersion() (string, error) {
 	versionFile := "version/version.go"
@@ -339,19 +339,19 @@ var runMageUpdate = func() error {
 
 // PrepareMajorMinorRelease updates version, docs, and mergify for a major/minor release.
 func PrepareMajorMinorRelease(cfg *ReleaseConfig) error {
-	fmt.Printf("=== Preparing Major/Minor Release %s ===\n", cfg.CurrentRelease)
+	fmt.Printf("=== Preparing Major/Minor Release %s ===\n", cfg.NextRelease)
 
-	if err := UpdateVersion(cfg.CurrentRelease); err != nil {
+	if err := UpdateVersion(cfg.NextRelease); err != nil {
 		return err
 	}
 	if err := UpdateDocsWithOptions(DocsUpdateOptions{
 		BaseBranch:     cfg.BaseBranch,
-		CurrentVersion: cfg.CurrentRelease,
+		CurrentVersion: cfg.NextRelease,
 		ReleaseBranch:  cfg.ReleaseBranch,
 	}); err != nil {
 		return err
 	}
-	if err := UpdateMergify(cfg.CurrentRelease); err != nil {
+	if err := UpdateMergify(cfg.NextRelease); err != nil {
 		return err
 	}
 

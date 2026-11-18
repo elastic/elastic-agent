@@ -24,11 +24,11 @@ func EnsureLatestRelease(c *ReleaseConfig) error {
 	if c.LatestRelease != "" {
 		return nil
 	}
-	if c.CurrentRelease == "" {
-		return fmt.Errorf("CurrentRelease is required to resolve LatestRelease")
+	if c.NextRelease == "" {
+		return fmt.Errorf("NextRelease is required to resolve LatestRelease")
 	}
 
-	latest, err := fetchLatestReleaseBefore(c.GitHubToken, releasesLookupOwner, releasesLookupRepo, c.CurrentRelease)
+	latest, err := fetchLatestReleaseBefore(c.GitHubToken, releasesLookupOwner, releasesLookupRepo, c.NextRelease)
 	if err != nil {
 		return fmt.Errorf("failed to resolve LatestRelease from GitHub: %w", err)
 	}
@@ -39,8 +39,8 @@ func EnsureLatestRelease(c *ReleaseConfig) error {
 
 // ValidateReleaseConfig checks if the configuration is valid for release workflows.
 func ValidateReleaseConfig(c *ReleaseConfig) error {
-	if c.CurrentRelease == "" {
-		return fmt.Errorf("CurrentRelease is required")
+	if c.NextRelease == "" {
+		return fmt.Errorf("NextRelease is required")
 	}
 
 	if !c.DryRun && c.GitHubToken == "" {

@@ -596,7 +596,7 @@ const Agent = defaultBeatVersion
 
 	// Test PrepareMajorMinorRelease
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.0",
+		NextRelease:    "9.5.0",
 		BaseBranch:     "main",
 		ReleaseBranch:  "9.5",
 		ProjectOwner:   "elastic",
@@ -632,9 +632,9 @@ const Agent = defaultBeatVersion
 
 func TestPatchPRBodies(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.7.1",
-		LatestRelease:  "9.7.0",
-		ReleaseBranch:  "9.7",
+		NextRelease:   "9.7.1",
+		LatestRelease: "9.7.0",
+		ReleaseBranch: "9.7",
 	}
 	body := patchVersionBumpBody(cfg)
 	if !strings.Contains(body, "to 9.7.1") {

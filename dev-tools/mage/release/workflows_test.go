@@ -58,9 +58,8 @@ const defaultBeatVersion = "9.5.0"
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.5.0",
+		NextRelease:             "9.5.0",
 		LatestRelease:           "9.4.3",
-		NextRelease:             "9.5.1",
 		NextProjectMinorVersion: "9.6.0",
 		NextProjectMinorBranch:  "9.6",
 		BaseBranch:              "main",
@@ -123,7 +122,7 @@ const defaultBeatVersion = "9.5.0"
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "README.md", "/9.5/")
 }
 
-func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
+func TestRunMajorMinorReleaseRejectsMismatchedNextRelease(t *testing.T) {
 	origMageUpdate := runMageUpdate
 	runMageUpdate = func() error { return nil }
 	t.Cleanup(func() { runMageUpdate = origMageUpdate })
@@ -150,9 +149,8 @@ func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.5.0",
+		NextRelease:             "9.5.0",
 		LatestRelease:           "9.4.3",
-		NextRelease:             "9.5.1",
 		NextProjectMinorVersion: "9.6.0",
 		BaseBranch:              "main",
 		ReleaseBranch:           "9.5",
@@ -163,7 +161,7 @@ func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
 
 	err = RunMajorMinorRelease(cfg)
 	if err == nil {
-		t.Fatal("expected RunMajorMinorRelease to fail when CURRENT_RELEASE mismatches main version")
+		t.Fatal("expected RunMajorMinorRelease to fail when NEXT_RELEASE mismatches main version")
 	}
 	if !strings.Contains(err.Error(), "does not match version on main") {
 		t.Fatalf("unexpected error: %v", err)
@@ -172,8 +170,7 @@ func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
 
 func TestMajorMinorPrepLabels(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.5.0",
-		NextRelease:             "9.5.1",
+		NextRelease:             "9.5.0",
 		NextProjectMinorVersion: "9.6.0",
 		ReleaseBranch:           "9.5",
 		BaseBranch:              "main",
@@ -250,9 +247,8 @@ const defaultBeatVersion = "9.5.1"
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.2",
+		NextRelease:    "9.5.2",
 		LatestRelease:  "9.5.1",
-		NextRelease:    "9.5.3",
 		ReleaseBranch:  "9.5",
 		DryRun:         true,
 		GitAuthorName:  "Test User",
@@ -296,7 +292,7 @@ const defaultBeatVersion = "9.5.1"
 	}
 }
 
-func TestRunPatchReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
+func TestRunPatchReleaseRejectsMismatchedNextRelease(t *testing.T) {
 	origMageUpdate := runMageUpdate
 	runMageUpdate = func() error { return nil }
 	t.Cleanup(func() { runMageUpdate = origMageUpdate })
@@ -336,9 +332,8 @@ const defaultBeatVersion = "9.5.1"
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.3",
+		NextRelease:    "9.5.3",
 		LatestRelease:  "9.5.2",
-		NextRelease:    "9.5.4",
 		ReleaseBranch:  "9.5",
 		DryRun:         true,
 		GitAuthorName:  "Test User",
