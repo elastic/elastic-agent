@@ -70,6 +70,7 @@ jobs:
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+<<<<<<< HEAD
           commit-message: "docs: update generated documentation for ${{ steps.get_version.outputs.version }}"
           title: "Update generated documentation for ${{ steps.get_version.outputs.version }}"
           body: |
@@ -85,6 +86,20 @@ jobs:
             - **Source core-components.yaml**: https://github.com/elastic/elastic-agent/blob/${{ steps.get_version.outputs.version }}/internal/pkg/otel/core-components.yaml
             - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ steps.get_version.outputs.version }}
             
+=======
+          commit-message: "docs: update generated documentation for ${{ needs.check-latest.outputs.version }}"
+          title: "Update generated documentation"
+          body: |
+            This PR refreshes generated documentation using released Elastic Agent data.
+
+            ## Changes
+            - Updates the Elastic Agent component table and OpenTelemetry Collector Builder (OCB) configuration from the latest repository-wide release.
+            - Updates sample links from the latest repository-wide release.
+            - Updates gateway configuration links from the latest patch release of each minor version that has a gateway sample.
+
+            A single run can therefore update links for multiple release versions. See the diff for the exact versions and source tags involved.
+
+>>>>>>> 2827af0 (Correct generated documentation PR metadata (#18022))
             cc @elastic/ski-docs
             
             This is an automated PR created by the documentation update workflow.
