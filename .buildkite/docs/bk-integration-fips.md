@@ -31,10 +31,10 @@ flowchart TD
 
 | Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| Start ESS | After both FIPS container package steps | amd64 and arm64 FIPS container packages | Provisions FIPS ESS using [`ess_start.sh`](../scripts/steps/ess_start.sh). |
+| Start ESS | After both FIPS container package steps | amd64 and arm64 FIPS container packages | Provisions a shared FIPS ESS stack on FedRAMP Staging (`Target=frs`) with `oblt-cli`, using [`ess_start_oblt-cli.sh`](../scripts/steps/ess_start_oblt-cli.sh). |
 | Linux tests | After ESS | FIPS amd64 or arm64 packages | Runs the `fleet` group with and without sudo on Ubuntu amd64/arm64; an ECH upgrade test is PR-label-gated. |
 | Windows tests | After ESS | FIPS amd64 or arm64 packages | Runs `fleet` on Windows 2025 amd64 and Windows 11 ARM64 with the Windows FIPS policy enabled. |
-| ESS cleanup | After both test groups, including failures | Linux and Windows groups | Downloads stack state and runs [`ess_down.sh`](../scripts/steps/ess_down.sh). |
+| ESS cleanup | After both test groups, including failures | Linux and Windows groups | Destroys the shared and any orphaned retry clusters using [`ess_cleanup_all.sh`](../scripts/steps/ess_cleanup_all.sh). |
 | Aggregate reports | After test groups, including failures | Linux and Windows groups | Downloads JUnit XML and sends it to the test collector; it is soft-fail. |
 
 ## Inputs, outputs, and access
@@ -42,16 +42,16 @@ flowchart TD
 | Item | Details |
 | --- | --- |
 | Inputs | FIPS package artifacts; `FIPS=true`; test group/sudo matrix values; `GITHUB_PR_LABELS` for the optional ECH test. |
-| Outputs | Integration artifacts, diagnostics under `build/**`, ESS state files, and JUnit annotations. |
-| Permissions | Google OIDC and Vault-backed Elastic Cloud API-key access are configured. |
-| Secrets | The source references a production Elastic Cloud API-key secret and Buildkite analytics token; values are not included. |
+| Outputs | Integration artifacts, diagnostics under `build/**`, and JUnit annotations. |
+| Permissions | Google OIDC and a GitHub token (for `oblt-cli`, which opens the cluster configuration pull request) are configured. The `fips:upgrade-ech-deployment` step additionally uses a Vault-backed Elastic Cloud API key. |
+| Secrets | The upgrade-ech step references a production Elastic Cloud API-key secret, and the aggregate step a Buildkite analytics token; values are not included. |
 
 ## Operational notes
 
-Cleanup allows dependency failures so it can run after failed test groups. Linux and Windows jobs retry once. Commented staging-government settings are not active configuration.
+Cleanup allows dependency failures so it can run after failed test groups. Linux and Windows jobs retry once. The stack is created with the generic `ess` template and `Target=frs`, as described in [Create an ECH cluster on FRS](https://github.com/elastic/observability-test-environments/blob/main/docs/kb/create-ech-cluster-on-frs.md). FRS has limited capacity, so the stack expires after 4 hours and is destroyed by the cleanup step. FRS only offers plain stack versions, so `StackBuildId` is not used.
 
 ## Sources and history
 
 - Pipeline and uploader: [`bk.integration-fips.pipeline.yml`](../bk.integration-fips.pipeline.yml), [`integration.pipeline.yml`](../integration.pipeline.yml)
-- Scripts: [`ess_start.sh`](../scripts/steps/ess_start.sh), [`integration_tests_tf.sh`](../scripts/steps/integration_tests_tf.sh), [`integration_tests_tf_fips.ps1`](../scripts/steps/integration_tests_tf_fips.ps1), [`ess_down.sh`](../scripts/steps/ess_down.sh)
+- Scripts: [`ess_start_oblt-cli.sh`](../scripts/steps/ess_start_oblt-cli.sh), [`ess_oblt-cli.sh`](../scripts/steps/ess_oblt-cli.sh), [`integration_tests_oblt-cli.sh`](../scripts/steps/integration_tests_oblt-cli.sh), [`integration_tests_tf_fips.ps1`](../scripts/steps/integration_tests_tf_fips.ps1), [`ess.ps1`](../scripts/steps/ess.ps1), [`ess_cleanup_all.sh`](../scripts/steps/ess_cleanup_all.sh)
 - Relevant history: [`484f0e97d1`](https://github.com/elastic/elastic-agent/commit/484f0e97d1) adds FIPS integration packaging coverage.
