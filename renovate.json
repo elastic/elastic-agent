@@ -9,7 +9,9 @@
     "gomod",
     "github-actions",
     "pip_requirements",
-    "pre-commit"
+    "pre-commit",
+    "buildkite",
+    "custom.regex"
   ],
   "baseBranchPatterns": [
     "main",
@@ -204,6 +206,20 @@
         "changelog:dependencies"
       ],
       "prConcurrentLimit": 5
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Buildkite plugins pinned inside .buildkite shell scripts that upload pipelines dynamically; the buildkite manager only looks at YAML files.",
+      "managerFilePatterns": [
+        "/^\\.buildkite/.+\\.sh$/"
+      ],
+      "matchStrings": [
+        "-\\s+(?<depName>[\\w.-]+/[\\w.-]+)#(?<currentValue>v[^:\\s]+):"
+      ],
+      "datasourceTemplate": "github-tags",
+      "packageNameTemplate": "{{{depName}}}-buildkite-plugin"
     }
   ]
 }
