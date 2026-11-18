@@ -31,10 +31,10 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/elastic/beats/v7/pkg/logp"
+	monitoringLib "github.com/elastic/beats/v7/pkg/monitoring"
+	"github.com/elastic/beats/v7/pkg/service"
 	"github.com/elastic/beats/v7/pkg/systemmetrics/report"
-	"github.com/elastic/elastic-agent-libs/logp"
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/service"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application"
@@ -538,6 +538,12 @@ func runElasticAgent(
 	} else {
 		l.Warnw("Error calculating relative path for versioned home. Rollback cleanup will not be scheduled ", "topPath", paths.Top(), "homePath", paths.Home(), "error", homePathErr)
 	}
+
+	// Spawn the cleanup of the logs of old builds. It is independent of the rollbacks cleanup, which does not run
+	// for every installed Agent, e.g. DEB and RPM, and stops with the Agent.
+	wg.Go(func() {
+		application.CleanupOldBuildLogs(additionalGoroutinesContext, l, paths.Top(), paths.BuildLogsDirName())
+	})
 
 	// listen for signals
 	signals := make(chan os.Signal, 1)

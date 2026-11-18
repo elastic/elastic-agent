@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/beats/v7/pkg/testing/certutil"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 
@@ -273,7 +273,7 @@ func TestEndpointComponentModifier(t *testing.T) {
 			}`),
 				cfg: map[string]interface{}{
 					"fleet": map[string]interface{}{
-						"ssl": map[string]interface{}{
+						"ssl": map[string]interface{}{ //nolint:gosec // G101: test fixture, not a real credential
 							"key":                 "/path/to/cert",
 							"key_passphrase_path": "/path/to/key_passphrase_path",
 						},
