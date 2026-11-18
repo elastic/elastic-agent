@@ -58,12 +58,8 @@ common:
       elastic/oblt-cli#v0.4.5:
         version-file: .oblt-cli-version
   - vault_github_token: &vault_github_token
-<<<<<<< HEAD
-      elastic/vault-github-token#v0.2.1:
-
-=======
       elastic/vault-github-token#v0.2.3:
->>>>>>> a9683f0 (Update Buildkite plugins and let Renovate manage them (#18037))
+
   # Variants/Groups for the Windows ITs
   - windows_variants: &windows_variants
     - "default"
