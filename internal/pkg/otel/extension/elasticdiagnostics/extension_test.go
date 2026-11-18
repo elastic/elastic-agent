@@ -390,7 +390,7 @@ func staticHook(content string) func() []byte {
 // that has finished shutting down.
 func reportStopped(d *diagnosticsExtension, componentName string) {
 	id := component.MustNewID(componentName)
-	d.ComponentStatusChanged(
+	d.Changed(
 		componentstatus.NewInstanceID(id, component.KindReceiver),
 		componentstatus.NewEvent(componentstatus.StatusStopped),
 	)
@@ -409,7 +409,7 @@ func TestDiagnosticHooks_RemovedWhenComponentStops(t *testing.T) {
 	}, componentDiagnostics(t, d), "all registered hooks should be served")
 
 	// A status change other than Stopped must not remove anything.
-	d.ComponentStatusChanged(
+	d.Changed(
 		componentstatus.NewInstanceID(component.MustNewID("comp1"), component.KindReceiver),
 		componentstatus.NewEvent(componentstatus.StatusStopping),
 	)
@@ -422,7 +422,7 @@ func TestDiagnosticHooks_RemovedWhenComponentStops(t *testing.T) {
 	assert.NotContains(t, d.componentHooks, "comp1", "stopped component should not keep an entry")
 
 	reportStopped(d, "unknown")
-	d.ComponentStatusChanged(nil, nil)
+	d.Changed(nil, nil)
 	assert.Len(t, componentDiagnostics(t, d), 1, "a status change for an unknown component should be a no-op")
 
 	d.RegisterDiagnosticHook("comp1", "metrics", "beat_metrics.json", "application/json", staticHook("comp1 metrics v2"))

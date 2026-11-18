@@ -460,8 +460,6 @@ exporters:
   elasticsearch/otel:
     endpoints: ["${ES_ENDPOINT}"]
     api_key: "${ES_API_KEY}"
-    mapping:
-      mode: otel
 
 service:
   pipelines:

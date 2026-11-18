@@ -73,8 +73,6 @@ exporters:
     # tls:
     #   ca_file: "/path/to/elastic-ca.crt"
     #   insecure_skip_verify: true
-    mapping:
-      mode: otel
 
 service:
   # extensions:
