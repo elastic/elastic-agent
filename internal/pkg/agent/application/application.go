@@ -268,6 +268,7 @@ func New(
 		logLevel,
 		collectorLogger,
 		agentInfo,
+		hostInfo,
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,
 		nil,
