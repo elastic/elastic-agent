@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -149,7 +150,7 @@ func enroll(
 ) error {
 	cmd := fleetapi.NewEnrollCmd(client)
 
-	metadata, err := info.Metadata(ctx, log, nil)
+	metadata, err := info.Metadata(ctx, hostinfo.NewFetcher(log))
 	if err != nil {
 		return fmt.Errorf("acquiring metadata failed: %w", err)
 	}

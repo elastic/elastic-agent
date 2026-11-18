@@ -15,39 +15,23 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 
 	"github.com/elastic/go-sysinfo/types"
 )
 
-// Metadata loads metadata from disk. It takes the host information from hostInfo, or fetches it if hostInfo is nil.
-func Metadata(ctx context.Context, l *logger.Logger, hostInfo *hostinfo.Watcher) (*ecsmeta.ECSMeta, error) {
+// Metadata loads metadata from disk, with the host information from hostInfo.
+func Metadata(ctx context.Context, hostInfo hostinfo.Source) (*ecsmeta.ECSMeta, error) {
 	agentInfo, err := NewAgentInfo(ctx, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new agent info: %w", err)
 	}
 
-	var host hostinfo.Info
-	if hostInfo != nil {
-		host, err = hostInfo.Get(ctx)
-	} else {
-		host, err = hostinfo.Fetch(ctx, l)
-	}
+	host, err := hostInfo.Get(ctx)
 	if err != nil {
 		return nil, errors.New(err, "failed to gather host metadata")
 	}
 
 	return NewECSMetadata(agentInfo, host), nil
-}
-
-// ECSMetadata returns an agent ECS compliant metadata. It fetches the host information, use NewECSMetadata with
-// the host information from a hostinfo.Watcher to avoid that.
-func (i *AgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
-	host, err := hostinfo.Fetch(context.TODO(), l)
-	if err != nil {
-		return nil, err
-	}
-	return NewECSMetadata(i, host), nil
 }
 
 // NewECSMetadata returns the ECS compliant metadata of agent running on host.

@@ -85,6 +85,11 @@ func newTestingClient() *testingClient {
 
 type withGatewayFunc func(*testing.T, coordinator.FleetGateway, *testingClient, *scheduler.Stepper)
 
+// testHostInfo provides fixed host information, so check-ins don't gather it from the test host.
+var testHostInfo = hostinfo.FetchFunc(func(context.Context) (hostinfo.Info, error) {
+	return hostinfo.Info{Hostname: "Test-Host"}, nil
+})
+
 func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGatewayFunc) func(t *testing.T) {
 	return func(t *testing.T) {
 		scheduler := scheduler.NewStepper()
@@ -97,7 +102,7 @@ func withGateway(agentInfo agentInfo, settings *fleetGatewaySettings, fn withGat
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, testHostInfo)
 
 		require.NoError(t, err)
 
@@ -230,7 +235,7 @@ func TestFleetGateway(t *testing.T) {
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, testHostInfo)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -276,7 +281,7 @@ func TestFleetGateway(t *testing.T) {
 		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
 			Duration: d,
 			Backoff:  &backoffSettings{Init: 1 * time.Second, Max: 30 * time.Second},
-		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		}, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, testHostInfo)
 		require.NoError(t, err)
 
 		ch2 := client.Answer(func(_ context.Context, headers http.Header, body io.Reader) (*http.Response, error) {
@@ -329,7 +334,7 @@ func TestFleetGateway(t *testing.T) {
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(stateFetcher), mockRollbacksSrc, testHostInfo)
 
 		require.NoError(t, err)
 
@@ -392,7 +397,7 @@ func TestFleetGateway(t *testing.T) {
 		mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 		mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+		gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, testHostInfo)
 		require.NoError(t, err)
 
 		waitFn := ackSeq(
@@ -447,7 +452,7 @@ func TestFleetGateway(t *testing.T) {
 		gateway, err := newFleetGatewayWithScheduler(log, &fleetGatewaySettings{
 			Duration: 5 * time.Second,
 			Backoff:  &backoffSettings{Init: 10 * time.Millisecond, Max: 30 * time.Second},
-		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher, mockRollbacksSrc)
+		}, agentInfo, client, scheduler, noop.New(), stateStore, stateFetcher, mockRollbacksSrc, testHostInfo)
 		require.NoError(t, err)
 
 		requestSent := make(chan struct{}, 10)
@@ -564,7 +569,7 @@ func TestFleetGatewayCheckinResponseMissingActionsField(t *testing.T) {
 	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
 	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
 
-	gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+	gateway, err := newFleetGatewayWithScheduler(log, settings, agentInfo, client, scheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, testHostInfo)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -1317,7 +1322,7 @@ func TestAvailableRollbacks(t *testing.T) {
 
 			tc.setup(t, mockRollbacksSrc, testClient)
 
-			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc)
+			gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, mockAgentInfo, testClient, stepperScheduler, noop.New(), stateStore, NewCheckinStateFetcher(emptyStateFetcher), mockRollbacksSrc, testHostInfo)
 			require.NoError(t, err, "error creating gateway")
 			checkinResponse, _, err := gateway.execute(t.Context())
 			tc.wantErr(t, err)

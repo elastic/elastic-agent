@@ -173,6 +173,15 @@ type RuntimeManager interface {
 	PerformComponentDiagnostics(ctx context.Context, additionalMetrics []cproto.AdditionalDiagnosticRequest, req ...component.Component) ([]runtime.ComponentDiagnostic, error)
 }
 
+// HostInfoWatcher keeps the agent's host information up to date while it runs.
+type HostInfoWatcher interface {
+	// Run keeps the host information up to date until ctx is done.
+	Run(ctx context.Context) error
+
+	// Get returns the latest host information.
+	Get(ctx context.Context) (hostinfo.Info, error)
+}
+
 // OTelManager provides an interface to run components and plain otel configurations in an otel collector.
 type OTelManager interface {
 	Runner
@@ -339,8 +348,8 @@ type Coordinator struct {
 	agentInfo info.Agent
 	isManaged bool
 
-	// hostInfo is the agent's shared host information. The Coordinator runs it. Can be nil in tests.
-	hostInfo *hostinfo.Watcher
+	// hostInfo is the agent's shared host information. The Coordinator runs it.
+	hostInfo HostInfoWatcher
 
 	initialCfg *configuration.Configuration
 	currentCfg *configuration.Configuration
@@ -557,7 +566,7 @@ func New(
 	otelMgr OTelManager,
 	fleetAcker acker.Acker,
 	initialUpgradeDetails *details.Details,
-	hostInfo *hostinfo.Watcher,
+	hostInfo HostInfoWatcher,
 	modifiers ...component.ComponentsModifier,
 ) *Coordinator {
 	var fleetState cproto.State
@@ -1301,11 +1310,11 @@ func (c *Coordinator) Run(ctx context.Context) error {
 	return err
 }
 
-// ecsMetadata returns the agent's ECS metadata, with the host information from the shared watcher if there is one.
+// ecsMetadata returns the agent's ECS metadata, with the host information from the shared watcher.
 // Called by external goroutines.
 func (c *Coordinator) ecsMetadata(ctx context.Context) (*ecsmeta.ECSMeta, error) {
 	if c.hostInfo == nil {
-		return c.agentInfo.ECSMetadata(c.logger)
+		return nil, errors.New("host information isn't available")
 	}
 	host, err := c.hostInfo.Get(ctx)
 	if err != nil {

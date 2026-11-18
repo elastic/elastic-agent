@@ -96,8 +96,8 @@ type OTelManager struct {
 
 	// Agent info for otel config generation
 	agentInfo info.Agent
-	// hostInfo is the agent's shared host information, used for otel config generation. Can be nil in tests.
-	hostInfo *hostinfo.Watcher
+	// hostInfo provides the host information used for otel config generation.
+	hostInfo hostinfo.Source
 
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
@@ -155,7 +155,7 @@ func NewOTelManager(
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
-	hostInfo *hostinfo.Watcher,
+	hostInfo hostinfo.Source,
 	agentCollectorConfig *configuration.CollectorConfig,
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
@@ -662,13 +662,11 @@ func generateUserAgent(agentInfo info.Agent) string {
 // monitoringHostname returns the hostname for the collector's monitoring events: the agent's hostname, or the OS
 // hostname if the host information isn't available.
 func (m *OTelManager) monitoringHostname(ctx context.Context) string {
-	if m.hostInfo != nil {
-		host, err := m.hostInfo.Get(ctx)
-		if err == nil {
-			return host.Hostname
-		}
-		m.managerLogger.Debugf("Failed to get the host information for monitoring events, using the OS hostname: %v", err)
+	host, err := m.hostInfo.Get(ctx)
+	if err == nil {
+		return host.Hostname
 	}
+	m.managerLogger.Debugf("Failed to get the host information for monitoring events, using the OS hostname: %v", err)
 	name, _ := os.Hostname()
 	return name
 }

@@ -15,26 +15,18 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
-func TestECSMetadata(t *testing.T) {
+func TestNewECSMetadataAgent(t *testing.T) {
 	agentInfo := new(AgentInfo)
 	agentInfo.agentID = "fake-agent-id"
 	agentInfo.logLevelPolicy = "trace"
 	agentInfo.unprivileged = true
 
-	l := testutils.NewErrorLogger(t)
-	metadata, err := agentInfo.ECSMetadata(l)
-	require.NoError(t, err)
-
-	if assert.NotNil(t, metadata.Elastic, "metadata.Elastic must not be nil") {
-		assert.NotNil(t, metadata.Elastic.Agent, "metadata.Elastic.Agent must not be nil")
-	}
-
-	host, err := hostinfo.Fetch(t.Context(), l)
-	require.NoError(t, err)
+	metadata := NewECSMetadata(agentInfo, hostinfo.Info{})
+	require.NotNil(t, metadata.Elastic, "metadata.Elastic must not be nil")
+	require.NotNil(t, metadata.Elastic.Agent, "metadata.Elastic.Agent must not be nil")
 
 	assert.Equal(t, agentInfo.agentID, metadata.Elastic.Agent.ID)
 	assert.Equal(t, release.Version(), metadata.Elastic.Agent.Version)
@@ -45,9 +37,6 @@ func TestECSMetadata(t *testing.T) {
 	assert.Equal(t, agentInfo.logLevelPolicy, metadata.Elastic.Agent.LogLevel)
 	assert.Equal(t, agentInfo.unprivileged, metadata.Elastic.Agent.Unprivileged)
 	assert.Equal(t, release.FIPSDistribution(), metadata.Elastic.Agent.FIPS)
-
-	assert.Equal(t, NewECSMetadata(agentInfo, host).Host, metadata.Host)
-	assert.Equal(t, NewECSMetadata(agentInfo, host).OS, metadata.OS)
 }
 
 func TestNewECSMetadata(t *testing.T) {

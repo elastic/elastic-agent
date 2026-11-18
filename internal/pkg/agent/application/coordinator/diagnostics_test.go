@@ -18,7 +18,9 @@ import (
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/go-sysinfo/types"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -29,7 +31,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
@@ -146,10 +147,27 @@ fleet:
 	assert.YAMLEq(t, expectedCfg, string(result), "local-config diagnostic returned unexpected value")
 }
 
-func TestDiagnosticAgentInfo(t *testing.T) {
-	// Create a coordinator with an info.Agent and ensure its included in diagnostics.
+// agentInfoOutput is the content of the agent-info diagnostic.
+type agentInfoOutput struct {
+	Headers          map[string]string `yaml:"headers"`
+	LogLevelRuntime  string            `yaml:"log_level"`
+	LogLevelPolicy   string            `yaml:"log_level_policy"`
+	LogLevelOverride string            `yaml:"log_level_override"`
+	Tags             []string          `yaml:"tags"`
+	Metadata         *ecsmeta.ECSMeta  `yaml:"metadata"`
+}
 
-	coord := &Coordinator{agentInfo: fakeAgentInfo{
+func TestDiagnosticAgentInfo(t *testing.T) {
+	// Create a coordinator with an info.Agent and host information, and ensure they're included in diagnostics.
+	log, _ := loggertest.New(t.Name())
+	host := hostinfo.Info{
+		Hostname:     "Test-Macbook-Pro.local",
+		Architecture: "arm64",
+		IPs:          []string{"10.0.0.1"},
+		MACs:         []string{"00:00:00:00:00:01"},
+		OS:           types.OSInfo{Name: "macos", Platform: "darwin"},
+	}
+	agentInfo := fakeAgentInfo{
 		agentID: "agent-id",
 		headers: map[string]string{
 			"header1": "value1",
@@ -157,74 +175,47 @@ func TestDiagnosticAgentInfo(t *testing.T) {
 		},
 		LogLevelPolicy:   "info",
 		LogLevelOverride: "trace",
-		meta: &ecsmeta.ECSMeta{
-			Elastic: &ecsmeta.ElasticECSMeta{
-				Agent: &ecsmeta.AgentECSMeta{
-					BuildOriginal: "8.14.0-SNAPSHOT",
-					ID:            "agent-id",
-					LogLevel:      "trace",
-					Snapshot:      true,
-					Version:       "8.14.0",
-					Unprivileged:  true,
-					Upgradeable:   true,
-				},
-			},
-			Host: &ecsmeta.HostECSMeta{
-				Arch:     "arm64",
-				Hostname: "Test-Macbook-Pro.local",
-			},
-			OS: &ecsmeta.SystemECSMeta{
-				Name:     "macos",
-				Platform: "darwin",
-			},
-		},
-	},
+		unprivileged:     true,
+	}
+	coord := &Coordinator{
+		logger:    log,
+		agentInfo: agentInfo,
+		hostInfo: hostinfo.NewWatcherWithFetcher(log, time.Minute, func(context.Context) (hostinfo.Info, error) {
+			return host, nil
+		}),
 		stateBroadcaster: broadcaster.New(State{Tags: []string{"tag1", "tag2"}}, 0, 0),
 	}
-
-	expected := `
-headers:
-  header1: value1
-  header2: value2
-tags:
-  - tag1
-  - tag2
-log_level: trace
-log_level_policy: info
-log_level_override: trace
-metadata:
-  elastic:
-    agent:
-      buildoriginal: "8.14.0-SNAPSHOT"
-      complete: false
-      fips: false
-      id: agent-id
-      loglevel: trace
-      snapshot: true
-      unprivileged: true
-      upgradeable: true
-      version: 8.14.0
-  host:
-    arch: arm64
-    hostname: Test-Macbook-Pro.local
-    name: ""
-    id: ""
-    ip: []
-    mac: []
-  os:
-    family: ""
-    kernel: ""
-    platform: darwin
-    version: ""
-    name: macos
-    fullname: ""
-`
 
 	hook, ok := diagnosticHooksMap(coord)["agent-info"]
 	require.True(t, ok, "diagnostic hooks should have an entry for agent-info")
 
-	result := hook.Hook(context.Background())
-	assert.YAMLEq(t, expected, string(result), "agent-info diagnostic returned unexpected value")
+	var output agentInfoOutput
+	require.NoError(t, yaml.Unmarshal(hook.Hook(t.Context()), &output))
+	assert.Equal(t, map[string]string{"header1": "value1", "header2": "value2"}, output.Headers)
+	assert.Equal(t, []string{"tag1", "tag2"}, output.Tags)
+	assert.Equal(t, "trace", output.LogLevelRuntime)
+	assert.Equal(t, "info", output.LogLevelPolicy)
+	assert.Equal(t, "trace", output.LogLevelOverride)
+	assert.Equal(t, info.NewECSMetadata(agentInfo, host), output.Metadata)
+}
+
+func TestDiagnosticAgentInfoNoHostInfo(t *testing.T) {
+	// Without host information, the agent-info diagnostic has everything else, but no metadata.
+	log, _ := loggertest.New(t.Name())
+	coord := &Coordinator{
+		logger:           log,
+		agentInfo:        fakeAgentInfo{agentID: "agent-id", LogLevelPolicy: "info"},
+		stateBroadcaster: broadcaster.New(State{Tags: []string{"tag1"}}, 0, 0),
+	}
+
+	hook, ok := diagnosticHooksMap(coord)["agent-info"]
+	require.True(t, ok, "diagnostic hooks should have an entry for agent-info")
+
+	var output agentInfoOutput
+	require.NoError(t, yaml.Unmarshal(hook.Hook(t.Context()), &output))
+	assert.Equal(t, "info", output.LogLevelPolicy)
+	assert.Equal(t, []string{"tag1"}, output.Tags)
+	assert.Nil(t, output.Metadata)
 }
 
 func TestDiagnosticAgentInfoSharedHostInfo(t *testing.T) {
@@ -793,7 +784,6 @@ type fakeAgentInfo struct {
 	version          string
 	unprivileged     bool
 	isStandalone     bool
-	meta             *ecsmeta.ECSMeta
 }
 
 func (a fakeAgentInfo) AgentID() string {
@@ -833,10 +823,6 @@ func (a fakeAgentInfo) Unprivileged() bool {
 
 func (a fakeAgentInfo) IsStandalone() bool {
 	return a.isStandalone
-}
-
-func (a fakeAgentInfo) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
-	return a.meta, nil
 }
 
 func (a fakeAgentInfo) ReloadID(ctx context.Context) error { panic("implement me") }

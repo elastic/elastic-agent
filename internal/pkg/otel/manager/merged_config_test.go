@@ -66,7 +66,7 @@ func setTestTopPath(t testing.TB) {
 func buildTestMergedConfig(t *testing.T, update configUpdate) *confmap.Conf {
 	t.Helper()
 	update.agentLogLevel = logp.WarnLevel
-	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888}
+	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888, hostInfo: testHostInfo}
 	got, err := m.buildMergedConfig(t.Context(), update, &info.AgentInfo{}, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, got)
@@ -220,7 +220,7 @@ func BenchmarkBuildMergedConfig(b *testing.B) {
 
 	const inputs = 10_000
 	comp := testComponentWithInputs("bench", inputs)
-	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888}
+	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888, hostInfo: testHostInfo}
 	agentInfo := &info.AgentInfo{}
 	logger := logp.NewNopLogger()
 

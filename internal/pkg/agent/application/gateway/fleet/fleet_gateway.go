@@ -97,9 +97,8 @@ type FleetGateway struct {
 	actionCh           chan []fleetapi.Action
 	rollbackSource     ttl.ReadOnlySource
 	compression        string
-	// hostInfo is the agent's shared host information, used for the metadata sent on check-in. If nil, the host
-	// information is fetched for every check-in.
-	hostInfo *hostinfo.Watcher
+	// hostInfo provides the host information sent on check-in.
+	hostInfo hostinfo.Source
 }
 
 // New creates a new fleet gateway
@@ -112,7 +111,7 @@ func New(
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
 	source ttl.ReadOnlySource,
-	hostInfo *hostinfo.Watcher,
+	hostInfo hostinfo.Source,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -127,12 +126,12 @@ func New(
 		stateStore,
 		stateFetcher,
 		source,
+		hostInfo,
 	)
 	if err != nil {
 		return nil, err
 	}
 	gw.compression = cfg.GetCompression()
-	gw.hostInfo = hostInfo
 	return gw, nil
 }
 
@@ -146,6 +145,7 @@ func newFleetGatewayWithScheduler(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	source ttl.ReadOnlySource,
+	hostInfo hostinfo.Source,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,
@@ -159,6 +159,7 @@ func newFleetGatewayWithScheduler(
 		errCh:          make(chan error),
 		actionCh:       make(chan []fleetapi.Action, 1),
 		rollbackSource: source,
+		hostInfo:       hostInfo,
 	}, nil
 }
 
@@ -394,7 +395,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 }
 
 func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
-	ecsMeta, err := info.Metadata(ctx, f.log, f.hostInfo)
+	ecsMeta, err := info.Metadata(ctx, f.hostInfo)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
 		return nil, 0, err
