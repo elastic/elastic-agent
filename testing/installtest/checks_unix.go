@@ -117,7 +117,7 @@ func checkPlatform(ctx context.Context, _ *atesting.Fixture, topPath string, opt
 		originalUser := os.Getenv("SUDO_USER")
 		if originalUser != "" {
 			// #nosec G204 -- user cannot inject any parameters to this command
-			cmd := exec.CommandContext(ctx, "sudo", "-u", originalUser, shellWrapperName, "status")
+			cmd := exec.CommandContext(ctx, "sudo", "-u", originalUser, shellWrapperName, "status") //nolint:gosec // G702: SUDO_USER is set by sudo, test code
 			output, err := cmd.CombinedOutput()
 			if err == nil {
 				return fmt.Errorf("sudo -u %s elastic-agent didn't fail: got output: %s", originalUser, output)
