@@ -112,7 +112,7 @@ steps:
         DRA_WORKFLOW: "snapshot"
       plugins:
         - *google_oidc_plugin
-        - elastic/dra-prep#v0.1.7:
+        - elastic/dra-prep#v0.1.8:
             product_id: "elastic-agent-core"
             stack_version: "${BEAT_VERSION}-SNAPSHOT"
             workflow: "snapshot"
