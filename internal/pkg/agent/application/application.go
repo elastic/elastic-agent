@@ -109,7 +109,7 @@ func New(
 
 	if upgrade.IsUpgradeable() {
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
-		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
+		normalizeAgentInstalls(ctx, log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
 	if err := upgrade.CleanupDiskSpaceReservations(cfg.Settings.DownloadConfig.TargetDirectory); err != nil {
 		log.Warnf("Error cleaning upgrade disk space reservations: %s", err)
@@ -303,7 +303,7 @@ func New(
 //   - calls CleanAvailableRollbacks to remove expired and orphan installs and sync the TTL registry
 //
 // This function will NOT error out, it will log any errors it encounters as warnings but any error must be treated as non-fatal
-func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
+func normalizeAgentInstalls(ctx context.Context, log *logger.Logger, topDir string, now time.Time, initialUpdateMarker *upgrade.UpdateMarker, rollbackSource ttl.Source) {
 	// Check if we rolled back and update the TTL markers
 	if initialUpdateMarker != nil && initialUpdateMarker.Details != nil && initialUpdateMarker.Details.State == details.StateRollback {
 		// Reset the TTL for the current version if we are coming off a rollback
@@ -328,7 +328,7 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 		log.Warnf("Error calculating home path %q relative to top path %q: %s", absHomePath, topDir, err)
 		return
 	}
-	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
+	_, err = upgrade.CleanAvailableRollbacks(ctx, log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
 	}

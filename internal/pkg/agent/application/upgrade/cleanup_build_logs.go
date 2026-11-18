@@ -81,7 +81,7 @@ func CleanupBuildLogs(ctx context.Context, log *logger.Logger, logsRoot, current
 			break
 		}
 		log.Infof("Removing the logs of the old build %q", d.path)
-		if err := install.RemovePathContext(ctx, log, d.path); err != nil {
+		if err := install.RemovePath(ctx, log, d.path); err != nil {
 			errs = append(errs, fmt.Errorf("removing %q: %w", d.path, err))
 		}
 	}

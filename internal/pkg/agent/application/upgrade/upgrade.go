@@ -382,7 +382,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("calculating home path relative to top, home: %q top: %q : %w", paths.Home(), paths.Top(), err)
 	}
 
-	_, err = CleanAvailableRollbacks(u.log, u.availableRollbacksSource, paths.Top(), currentVersionedHome, time.Now(), CleanupAllRollbacks)
+	_, err = CleanAvailableRollbacks(ctx, u.log, u.availableRollbacksSource, paths.Top(), currentVersionedHome, time.Now(), CleanupAllRollbacks)
 	if err != nil {
 		if !goerrors.Is(err, errCleanupDegraded) {
 			u.log.Warnw("Unable to clean all available rollbacks", "error.message", err)

@@ -1613,7 +1613,7 @@ func createTempDir(t *testing.T) string {
 
 	cleanup := func() {
 		if !t.Failed() {
-			if err := install.RemovePath(logp.NewNopLogger(), tempDir); err != nil {
+			if err := install.RemovePath(context.Background(), logp.NewNopLogger(), tempDir); err != nil {
 				t.Errorf("could not remove temp dir '%s': %s", tempDir, err)
 			}
 		} else {

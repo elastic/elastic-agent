@@ -169,7 +169,7 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	// remove existing directory
 	pt.Describe("Removing install directory")
-	err = RemovePath(log, topPath)
+	err = RemovePath(ctx, log, topPath)
 	if err != nil {
 		pt.Describe("Failed to remove install directory")
 		return aerrors.New(
@@ -296,14 +296,10 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 // failure inside removeBlockingExe (e.g. ERROR_OBJECT_NAME_COLLISION on
 // the rename) is logged and the loop continues, since each retry of
 // os.RemoveAll re-enters removeBlockingExe with a fresh handle.
-func RemovePath(log *logger.Logger, path string) error {
-	return RemovePathContext(context.Background(), log, path)
-}
-
-// RemovePathContext is RemovePath that stops retrying when ctx is done, and returns the error of the context
-// together with the last error of the removal. A removal that is in progress is not interrupted, only the wait
-// before the next try is.
-func RemovePathContext(ctx context.Context, log *logger.Logger, path string) error {
+//
+// It stops retrying when ctx is done, and returns the error of the context together with the last error of
+// the removal. A removal that is in progress is not interrupted, only the wait before the next try is.
+func RemovePath(ctx context.Context, log *logger.Logger, path string) error {
 	const arbitraryTimeout = 60 * time.Second
 	const retryInterval = 500 * time.Millisecond
 	start := time.Now()
@@ -334,9 +330,11 @@ func RemovePathContext(ctx context.Context, log *logger.Logger, path string) err
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)
 }
 
-func RemoveBut(log *logger.Logger, path string, bestEffort bool, exceptions ...string) error {
+// RemoveBut removes everything in path except the entries called like one of exceptions.
+// It stops when ctx is done, see RemovePath.
+func RemoveBut(ctx context.Context, log *logger.Logger, path string, bestEffort bool, exceptions ...string) error {
 	if len(exceptions) == 0 {
-		return RemovePath(log, path)
+		return RemovePath(ctx, log, path)
 	}
 
 	files, err := os.ReadDir(path)
@@ -349,7 +347,12 @@ func RemoveBut(log *logger.Logger, path string, bestEffort bool, exceptions ...s
 			continue
 		}
 
-		err = RemovePath(log, filepath.Join(path, f.Name()))
+		// do not go through the remaining entries once asked to stop, each of them would fail the same way
+		if err = ctx.Err(); err != nil {
+			return fmt.Errorf("stopped removing %q: %w", path, err)
+		}
+
+		err = RemovePath(ctx, log, filepath.Join(path, f.Name()))
 		if !bestEffort && err != nil {
 			return fmt.Errorf("error removing path %s: %w", f.Name(), err)
 		}

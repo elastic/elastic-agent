@@ -1202,7 +1202,7 @@ func TestCleanAvailableRollbacks_AbsentSymlink_NoMarker(t *testing.T) {
 	registry := ttl.NewTTLMarkerRegistry(testLogger, topDir)
 	require.NoError(t, registry.Set(availableRollbacks), "writing TTL registry")
 
-	leftover, err := CleanAvailableRollbacks(testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
+	leftover, err := CleanAvailableRollbacks(t.Context(), testLogger, registry, topDir, relB, now, CleanupExpiredRollbacks)
 
 	// No marker means this is a fresh-volume start, not a degraded state.
 	require.NoError(t, err)
@@ -1264,7 +1264,7 @@ func TestCleanAvailableRollbacks_NilDetailsMarker_LenientMode(t *testing.T) {
 		agentExecutableName += ".exe"
 	}
 
-	_, err := CleanAvailableRollbacks(testLogger, source, topDir, currentVersionedHome, time.Now(), CleanupExpiredRollbacks)
+	_, err := CleanAvailableRollbacks(t.Context(), testLogger, source, topDir, currentVersionedHome, time.Now(), CleanupExpiredRollbacks)
 	require.NoError(t, err)
 
 	// currentVersionedHome is caller-protected.

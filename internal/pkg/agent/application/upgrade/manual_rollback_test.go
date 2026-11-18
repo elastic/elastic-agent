@@ -935,7 +935,7 @@ func TestCleanAvailableRollbacks(t *testing.T) {
 			mockRollbacksSource := ttl.NewMockSource(t)
 
 			tt.setup(t, log, topDir, mockRollbacksSource)
-			got, err := CleanAvailableRollbacks(log, mockRollbacksSource, topDir, tt.args.currentHomeRelPath, time.Now(), tt.args.filter)
+			got, err := CleanAvailableRollbacks(t.Context(), log, mockRollbacksSource, topDir, tt.args.currentHomeRelPath, time.Now(), tt.args.filter)
 			tt.wantErr(t, err)
 			assert.Equal(t, tt.want, got)
 			if tt.postCleanupAssertions != nil {
@@ -1105,7 +1105,7 @@ func TestPerformScheduledCleanup(t *testing.T) {
 			log, _ := loggertest.New(t.Name())
 			source := ttl.NewMockSource(t)
 			tt.setup(t, log, topDir, source)
-			nextRunTime := performScheduledCleanup(log, topDir, tt.args.currentVersionedHome, source, now, tt.args.minInterval)
+			nextRunTime := performScheduledCleanup(t.Context(), log, topDir, tt.args.currentVersionedHome, source, now, tt.args.minInterval)
 			assert.Equal(t, tt.want, nextRunTime)
 			if tt.assertions != nil {
 				tt.assertions(t, topDir, source)

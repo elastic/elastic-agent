@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -211,7 +212,7 @@ func TestCleanupAgentDirectories_AbsentSymlink_NotDegraded(t *testing.T) {
 		source.Set(map[string]ttl.TTLMarker{relHome: wantMarker}),
 		"writing unexpired TTL marker for fixture")
 
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
 	// An absent symlink is not a degraded state — the agent creates it on first
 	// start, after this cleanup pass runs.
 	require.NoError(t, err)
@@ -254,7 +255,7 @@ func TestCleanupAgentDirectories_AbsentSymlink_WithMarker_NotDegraded(t *testing
 	// No symlink. callerProtected covers the live versioned home, so cleanup must
 	// proceed without degrading even when a marker is present.
 	callerProtected := map[string]bool{filepath.Clean(relHome): true}
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: true})
+	leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: true})
 	require.NoError(t, err, "absent symlink with callerProtected must not be treated as degraded")
 
 	// The live versioned home is protected via callerProtected and must be kept.
@@ -274,7 +275,7 @@ func TestCleanupAgentDirectories_AbsentSymlink_OrphansRemoved(t *testing.T) {
 
 	// No symlink, no upgrade marker (upgrade completed and marker was cleaned up).
 	callerProtected := map[string]bool{filepath.Clean(liveHome): true}
-	_, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: false})
+	_, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, callerProtected, cleanupOpts{requireMarkerDetails: false})
 	require.NoError(t, err, "absent symlink with callerProtected must not be treated as degraded")
 
 	assert.DirExists(t, filepath.Join(topDir, liveHome), "live versioned home must be preserved")
@@ -299,7 +300,7 @@ func TestCleanupAgentDirectories_DanglingSymlink_IsDegraded(t *testing.T) {
 	relHome := createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
 	source := ttl.NewTTLMarkerRegistry(log, topDir)
 
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
 	require.Error(t, err)
 	require.ErrorIs(t, err, errCleanupDegraded,
 		"a dangling symlink (present but target absent) must return errCleanupDegraded")
@@ -328,7 +329,7 @@ func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnSymlinkNotReadable(t 
 		source.Set(map[string]ttl.TTLMarker{relHome: wantMarker}),
 		"writing unexpired TTL marker for fixture")
 
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
 	require.Error(t, err)
 	require.ErrorIs(t, err, errCleanupDegraded)
 
@@ -364,7 +365,7 @@ func TestCleanupAgentDirectories_ReturnsDegradedSentinel_OnMarkerErr(t *testing.
 		os.WriteFile(filepath.Join(topDir, "data", markerFilename), []byte("not: valid: yaml: ["), 0o600),
 		"writing malformed upgrade marker")
 
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
 	require.Error(t, err)
 	require.ErrorIs(t, err, errCleanupDegraded)
 
@@ -425,7 +426,7 @@ func TestCleanupAgentDirectories_ReconcilesTTLRegistry(t *testing.T) {
 		expired: expiredMarker,
 	}))
 
-	leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
+	leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{requireMarkerDetails: true})
 	require.NoError(t, err)
 
 	// Expired directory should be removed.
@@ -461,7 +462,7 @@ func TestCleanupAgentDirectories_SetCondition(t *testing.T) {
 		// Remove must be called for the malformed entry only.
 		source.EXPECT().Remove(live).Return(nil)
 
-		_, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{})
+		_, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{})
 		require.NoError(t, err)
 	})
 
@@ -483,7 +484,7 @@ func TestCleanupAgentDirectories_SetCondition(t *testing.T) {
 		)
 		// No Remove or Set calls expected — mock will fail the test if either is called.
 
-		leftover, err := cleanupAgentDirectories(log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{})
+		leftover, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), source, CleanupExpiredRollbacks, nil, cleanupOpts{})
 		require.NoError(t, err)
 		assert.Contains(t, leftover, live)
 	})
@@ -551,5 +552,41 @@ func TestHasOnlyLogs(t *testing.T) {
 	t.Run("ReadDir error returns false", func(t *testing.T) {
 		log, _ := loggertest.New(t.Name())
 		assert.False(t, hasOnlyLogs(log, filepath.Join(t.TempDir(), "nonexistent")))
+	})
+}
+
+func TestCleanupAgentDirectories_StopsWhenContextIsDone(t *testing.T) {
+	setup := func(t *testing.T) (topDir, liveHome, orphanHome string) {
+		topDir = t.TempDir()
+		liveHome = createFakeAgentInstall(t, topDir, "1.0.0", "aaaaaa", true)
+		orphanHome = createFakeAgentInstall(t, topDir, "0.9.0", "bbbbbb", true)
+		return topDir, liveHome, orphanHome
+	}
+
+	t.Run("removes the orphan install while the context is not done", func(t *testing.T) {
+		log, _ := loggertest.New(t.Name())
+		topDir, liveHome, orphanHome := setup(t)
+
+		_, err := cleanupAgentDirectories(t.Context(), log, topDir, time.Now(), ttl.NewTTLMarkerRegistry(log, topDir), CleanupExpiredRollbacks, map[string]bool{liveHome: true}, cleanupOpts{})
+
+		require.NoError(t, err)
+		assert.NoDirExists(t, filepath.Join(topDir, orphanHome))
+		assert.DirExists(t, filepath.Join(topDir, liveHome))
+	})
+
+	t.Run("a done context removes nothing and is not reported as an error", func(t *testing.T) {
+		log, obs := loggertest.New(t.Name())
+		topDir, liveHome, orphanHome := setup(t)
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		_, err := cleanupAgentDirectories(ctx, log, topDir, time.Now(), ttl.NewTTLMarkerRegistry(log, topDir), CleanupExpiredRollbacks, map[string]bool{liveHome: true}, cleanupOpts{})
+
+		// what is left is removed by the next cleanup
+		require.NoError(t, err)
+		assert.DirExists(t, filepath.Join(topDir, orphanHome))
+		assert.DirExists(t, filepath.Join(topDir, liveHome))
+		assert.Empty(t, obs.FilterLevelExact(zapcore.WarnLevel).All())
+		assert.Empty(t, obs.FilterLevelExact(zapcore.ErrorLevel).All())
 	})
 }

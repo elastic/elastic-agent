@@ -416,7 +416,7 @@ func Test_normalizeInstallDescriptorAtStartup(t *testing.T) {
 			logger, _ := loggertest.New(t.Name())
 			tmpDir := t.TempDir()
 			updateMarker, installSource := tt.setup(t, tmpDir)
-			normalizeAgentInstalls(logger, tmpDir, now, updateMarker, installSource)
+			normalizeAgentInstalls(t.Context(), logger, tmpDir, now, updateMarker, installSource)
 			if tt.postNormalizeAssertions != nil {
 				tt.postNormalizeAssertions(t, tmpDir, updateMarker)
 			}

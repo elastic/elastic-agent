@@ -108,6 +108,6 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	_ = progBar.Exit()
 	fmt.Fprintf(streams.Out, "\n%s has been uninstalled.\n", paths.ServiceDisplayName())
 
-	_ = install.RemovePath(log, paths.Top())
+	_ = install.RemovePath(cmd.Context(), log, paths.Top())
 	return nil
 }

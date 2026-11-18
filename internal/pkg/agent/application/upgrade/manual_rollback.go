@@ -301,9 +301,10 @@ func PreserveActiveUpgradeVersions(marker *UpdateMarker, innerFilter RollbackCle
 // Orphan directories (no TTL, no active marker reference) are swept.
 // Directories referenced by an active upgrade marker are preserved even if the marker has no Details set — Details can be nil for a marker written by an older agent or a pre-unpack marker written before an upgrade begins, both of which may indicate an upgrade in progress.
 // The remaining TTL entries are returned so the caller can schedule the next cleanup.
-func CleanAvailableRollbacks(log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
+// It stops removing directories when ctx is done; what is left is removed by the next cleanup.
+func CleanAvailableRollbacks(ctx context.Context, log *logger.Logger, source ttl.Source, topDir string, currentHomeRelPath string, now time.Time, filter RollbackCleanupFilter) (map[string]ttl.TTLMarker, error) {
 	callerProtected := map[string]bool{filepath.Clean(currentHomeRelPath): true}
-	return cleanupAgentDirectories(log, topDir, now, source, filter, callerProtected, cleanupOpts{
+	return cleanupAgentDirectories(ctx, log, topDir, now, source, filter, callerProtected, cleanupOpts{
 		requireMarkerDetails: false, // lenient: nil-Details markers may indicate an upgrade in progress and still protect directories
 	})
 }
@@ -322,7 +323,7 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 			log.Info("context is done, stopping periodically cleaning rollbacks")
 			return
 		case now := <-timer.C:
-			nextRunTime := performScheduledCleanup(log, topDir, currentVersionedHome, source, now, minInterval)
+			nextRunTime := performScheduledCleanup(ctx, log, topDir, currentVersionedHome, source, now, minInterval)
 			nextTimerDuration := time.Until(nextRunTime)
 			if nextTimerDuration < minInterval {
 				nextTimerDuration = minInterval
@@ -333,8 +334,8 @@ func PeriodicallyCleanRollbacks(ctx context.Context, log *logger.Logger, topDir,
 	}
 }
 
-func performScheduledCleanup(log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, now time.Time, minInterval time.Duration) time.Time {
-	rollbacksAfterCleanup, err := CleanAvailableRollbacks(log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
+func performScheduledCleanup(ctx context.Context, log *logger.Logger, topDir, currentVersionedHome string, source ttl.Source, now time.Time, minInterval time.Duration) time.Time {
+	rollbacksAfterCleanup, err := CleanAvailableRollbacks(ctx, log, source, topDir, currentVersionedHome, now, CleanupExpiredRollbacks)
 	if err != nil {
 		if !errors.Is(err, errCleanupDegraded) {
 			log.Errorf("error cleaning up rollbacks: %s, rescheduling cleanup in %s", err.Error(), minInterval)

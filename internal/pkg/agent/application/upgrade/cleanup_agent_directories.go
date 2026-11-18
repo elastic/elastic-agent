@@ -5,6 +5,7 @@
 package upgrade
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -137,6 +138,7 @@ func (dc *dirClassifier) shouldRemove(relPath string) bool {
 // If the symlink or upgrade marker could not be read, the returned error wraps
 // errCleanupDegraded so callers can react conservatively.
 func cleanupAgentDirectories(
+	ctx context.Context,
 	log *logger.Logger,
 	topDir string,
 	now time.Time,
@@ -240,8 +242,17 @@ func cleanupAgentDirectories(
 
 	for _, relPath := range toRemove {
 		hashedDir := filepath.Join(topDir, relPath)
+		// stop when asked to, what is left is removed by the next cleanup
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			log.Debugw("Stopped cleaning up the versioned homes", "error.message", ctxErr.Error())
+			break
+		}
 		log.Infow("Removing hashed data directory", "file.path", hashedDir)
-		if cleanupErr := install.RemoveBut(log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
+		if cleanupErr := install.RemoveBut(ctx, log, hashedDir, true, ignoredDirs...); cleanupErr != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil && errors.Is(cleanupErr, ctxErr) {
+				log.Debugw("Stopped cleaning up the versioned homes", "error.message", cleanupErr.Error())
+				break
+			}
 			if errors.Is(cleanupErr, os.ErrNotExist) {
 				log.Debugw("directory already gone before removal; skipping", "file.path", hashedDir)
 				continue

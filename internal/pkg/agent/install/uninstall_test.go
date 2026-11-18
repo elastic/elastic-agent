@@ -271,12 +271,12 @@ func TestSkipFleetAuditUnenroll(t *testing.T) {
 
 }
 
-func TestRemovePathContext(t *testing.T) {
+func TestRemovePathStopsWithContext(t *testing.T) {
 	t.Run("removes the path", func(t *testing.T) {
 		dir := filepath.Join(t.TempDir(), "remove-me")
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
 
-		require.NoError(t, RemovePathContext(t.Context(), logp.NewNopLogger(), dir))
+		require.NoError(t, RemovePath(t.Context(), logp.NewNopLogger(), dir))
 
 		assert.NoDirExists(t, dir)
 	})
@@ -287,13 +287,45 @@ func TestRemovePathContext(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
-		err := RemovePathContext(ctx, logp.NewNopLogger(), dir)
+		err := RemovePath(ctx, logp.NewNopLogger(), dir)
 
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.DirExists(t, dir)
 	})
 
 	t.Run("a path that does not exist is not an error", func(t *testing.T) {
-		assert.NoError(t, RemovePathContext(t.Context(), logp.NewNopLogger(), filepath.Join(t.TempDir(), "missing")))
+		assert.NoError(t, RemovePath(t.Context(), logp.NewNopLogger(), filepath.Join(t.TempDir(), "missing")))
+	})
+}
+
+func TestRemoveBut(t *testing.T) {
+	setup := func(t *testing.T) string {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "keep", "sub"), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "remove", "sub"), 0o755))
+		return dir
+	}
+
+	t.Run("removes everything but the exceptions", func(t *testing.T) {
+		dir := setup(t)
+
+		require.NoError(t, RemoveBut(t.Context(), logp.NewNopLogger(), dir, false, "keep"))
+
+		assert.DirExists(t, filepath.Join(dir, "keep"))
+		assert.NoDirExists(t, filepath.Join(dir, "remove"))
+	})
+
+	t.Run("a done context removes nothing, with and without exceptions", func(t *testing.T) {
+		for _, exceptions := range [][]string{nil, {"keep"}} {
+			dir := setup(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			err := RemoveBut(ctx, logp.NewNopLogger(), dir, true, exceptions...)
+
+			assert.ErrorIs(t, err, context.Canceled, "exceptions: %v", exceptions)
+			assert.DirExists(t, filepath.Join(dir, "keep"))
+			assert.DirExists(t, filepath.Join(dir, "remove"))
+		}
 	})
 }

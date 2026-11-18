@@ -7,6 +7,7 @@
 package install
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -17,6 +18,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 	"unsafe"
 
 	"github.com/otiai10/copy"
@@ -59,10 +61,57 @@ func TestRemovePath(t *testing.T) {
 	}()
 
 	// Ensure the directory containing the executable can be removed.
-	err = RemovePath(logp.NewNopLogger(), destDir)
+	err = RemovePath(t.Context(), logp.NewNopLogger(), destDir)
 	assert.NoError(t, err)
 	_, err = os.Stat(destDir)
 	assert.ErrorIsf(t, err, fs.ErrNotExist, "path %q still exists after removal", destDir)
+}
+
+// TestRemovePath_StopsRetryingWhenContextIsDone holds a file open without FILE_SHARE_DELETE, so that
+// the removal keeps failing with ERROR_SHARING_VIOLATION and RemovePath keeps retrying, then cancels
+// the context and expects RemovePath to return long before its 60 seconds timeout.
+func TestRemovePath_StopsRetryingWhenContextIsDone(t *testing.T) {
+	dir := t.TempDir()
+	lockedFile := filepath.Join(dir, "locked")
+	require.NoError(t, os.WriteFile(lockedFile, []byte("x"), 0o600))
+
+	name, err := windows.UTF16PtrFromString(lockedFile)
+	require.NoError(t, err)
+	handle, err := windows.CreateFile(name, windows.GENERIC_READ, windows.FILE_SHARE_READ, nil, windows.OPEN_EXISTING, windows.FILE_ATTRIBUTE_NORMAL, 0)
+	require.NoError(t, err)
+	handleClosed := false
+	closeHandle := func() {
+		if !handleClosed {
+			handleClosed = true
+			require.NoError(t, windows.CloseHandle(handle))
+		}
+	}
+	defer closeHandle()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- RemovePath(ctx, logp.NewNopLogger(), dir) }()
+
+	select {
+	case err := <-done:
+		t.Fatalf("RemovePath returned while the file was still locked: %v", err)
+	case <-time.After(time.Second):
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.FileExists(t, lockedFile)
+	case <-time.After(5 * time.Second):
+		t.Fatal("RemovePath did not stop after the context was cancelled")
+	}
+
+	// once nothing holds the file, the removal works
+	closeHandle()
+	require.NoError(t, RemovePath(t.Context(), logp.NewNopLogger(), dir))
+	assert.NoDirExists(t, dir)
 }
 
 // TestRemoveBlockingExe_DeletesRunningExecutable asserts that removeBlockingExe
