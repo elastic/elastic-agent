@@ -599,7 +599,7 @@ func reexecPath() (string, error) {
 // --path.logs location when that flag was explicitly set on the CLI. This ensures
 // the flag takes precedence over yaml settings such as agent.logging.to_stderr.
 // The internal file output (consumed by diagnostics) is always written to
-// paths.Home() and is unaffected.
+// paths.BuildLogs() and is unaffected.
 // See https://github.com/elastic/elastic-agent/issues/13320
 func customLogsPathCfgOverride(cfg *config.Config) error {
 	if !paths.IsCustomLogsPath() {

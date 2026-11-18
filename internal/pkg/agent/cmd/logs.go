@@ -24,7 +24,6 @@ import (
 	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
 const (
@@ -161,7 +160,7 @@ func newWrappedWriter(ctx context.Context, w io.Writer, filter filterFunc, modif
 }
 
 func newLogsCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Command {
-	logsDir := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	logsDir := paths.BuildLogs()
 	eventLogsDir := filepath.Join(logsDir, "events")
 
 	cmd := &cobra.Command{

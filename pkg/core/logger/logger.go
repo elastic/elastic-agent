@@ -37,9 +37,6 @@ type Level = logp.Level
 // DefaultLogLevel used in agent and its processes.
 const DefaultLogLevel = logp.InfoLevel
 
-// DefaultLogDirectory used in agent and its processes.
-const DefaultLogDirectory = "logs"
-
 // Logger alias ecslog.Logger with Logger.
 type Logger = logp.Logger
 
@@ -226,7 +223,7 @@ func DefaultEventLoggingConfig() *Config {
 	cfg := logp.DefaultEventConfig(logp.DefaultEnvironment)
 
 	// That's the same path useb by MakeInternalFileOutput
-	cfg.Files.Path = filepath.Join(paths.Home(), DefaultLogDirectory, "events")
+	cfg.Files.Path = filepath.Join(paths.BuildLogs(), "events")
 	cfg.Files.Name = agentName + "-event-log"
 
 	root, _ := utils.HasRoot() // error ignored
@@ -253,7 +250,7 @@ func MakeInternalFileOutput(cfg *Config) (zapcore.Core, error) {
 func makeFileOutput(cfg *Config, levelEnabler zapcore.LevelEnabler) (zapcore.Core, error) {
 	// defaultCfg is used to set the defaults for the file rotation of the internal logging
 	defaultCfg := logp.DefaultConfig(logp.DefaultEnvironment)
-	filename := filepath.Join(paths.Home(), DefaultLogDirectory, cfg.Beat)
+	filename := filepath.Join(paths.BuildLogs(), cfg.Beat)
 	permissions := 0600        // default user only
 	root, _ := utils.HasRoot() // error ignored
 	if !root {
