@@ -26,7 +26,8 @@ func makeTestFS(t *testing.T, bytes uint64) string {
 	ntfsOverheadMB := uint64(50) + uint64(float64(size)*0.02)
 	totalSize := size + ntfsOverheadMB
 
-	tempDir := t.TempDir()
+	tempDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
 	imagePath := filepath.Join(tempDir, "disk.vhd")
 
 	drive := ""

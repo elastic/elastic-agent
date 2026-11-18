@@ -6,7 +6,11 @@ package host
 
 import (
 	"context"
+	"errors"
+	"runtime"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -14,172 +18,141 @@ import (
 
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
+	"github.com/elastic/elastic-agent/internal/pkg/util"
 	testlogger "github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/go-sysinfo/types"
 )
 
-func TestContextProvider(t *testing.T) {
-	log, err := logger.New("host_test", false)
-	require.NoError(t, err)
-
-	// first call will have idx of 0
-	fetcher := getHostInfo(log)
-	starting, err := fetcher()
-	starting["idx"] = 0
-	require.NoError(t, err)
-
-	const checkInterval = 50 * time.Millisecond
-	const testTimeout = 1 * time.Second
+// startProvider runs a host provider with the given check interval, whose host information has the hostname
+// returned by hostname, and calls onSet whenever it sets the mapping. It returns the comm the provider sets the
+// mapping on, and a function that stops the provider and returns the error it returned.
+func startProvider(t *testing.T, checkInterval time.Duration, hostname func() string, onSet func(map[string]interface{})) (*ctesting.ContextComm, func() error) {
+	log, _ := testlogger.New(t.Name())
 	c, err := config.NewConfigFrom(map[string]interface{}{
 		"check_interval": checkInterval,
 	})
 	require.NoError(t, err)
 	provider, err := ContextProviderBuilder(log, c, true)
 	require.NoError(t, err)
-
-	hostProvider, _ := provider.(*contextProvider)
-	// returnHostMapping is a wrapper around getHostInfo that adds an
-	// idx field to the returned values, incremented each time it is
-	// invoked, starting from 0 on the first call.
-	hostProvider.fetcher = returnHostMapping(log)
+	hostProvider, ok := provider.(*contextProvider)
+	require.True(t, ok)
 	require.Equal(t, checkInterval, hostProvider.CheckInterval)
+	hostProvider.fetcher = func(context.Context) (hostinfo.Info, error) {
+		return hostinfo.Info{Hostname: hostname()}, nil
+	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx, cancel := context.WithCancel(t.Context())
 	comm := ctesting.NewContextComm(ctx)
-	setChan := make(chan map[string]interface{})
-	comm.CallOnSet(func(value map[string]interface{}) {
-		// Forward Set's input to the test channel
-		setChan <- value
+	if onSet != nil {
+		comm.CallOnSet(onSet)
+	}
+	done := make(chan error)
+	go func() { done <- provider.Run(ctx, comm) }()
+	return comm, func() error {
+		cancel()
+		err := <-done
+		require.NoError(t, hostProvider.Close())
+		return err
+	}
+}
+
+func TestContextProvider(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var hostname atomic.Value
+		hostname.Store("Host-0")
+		var sets atomic.Int32
+		comm, stop := startProvider(t, time.Minute, func() string { return hostname.Load().(string) },
+			func(map[string]interface{}) { sets.Add(1) })
+
+		synctest.Wait()
+		assert.Equal(t, "host-0", comm.Current()["name"])
+
+		// The provider sets the mapping again once the host information changed and the check interval passed.
+		hostname.Store("Host-1")
+		time.Sleep(time.Minute)
+		synctest.Wait()
+		assert.Equal(t, "host-1", comm.Current()["name"])
+
+		// The mapping isn't set again if the host information doesn't change.
+		time.Sleep(10 * time.Minute)
+		synctest.Wait()
+		assert.ErrorIs(t, stop(), context.Canceled)
+		assert.EqualValues(t, 2, sets.Load())
 	})
-
-	go func() {
-		_ = provider.Run(ctx, comm)
-	}()
-
-	// wait for it to be called once
-	var current map[string]interface{}
-	select {
-	case current = <-setChan:
-	case <-time.After(testTimeout):
-		require.FailNow(t, "timeout waiting for provider to call Set")
-	}
-
-	starting, err = ctesting.CloneMap(starting)
-	require.NoError(t, err)
-	require.Equal(t, starting, current)
-
-	// wait for it to be called again
-	select {
-	case current = <-setChan:
-	case <-time.After(testTimeout):
-		require.FailNow(t, "timeout waiting for provider to call Set")
-	}
-	cancel()
-
-	// next should have been set idx to 1
-	next, err := fetcher()
-	require.NoError(t, err)
-	next["idx"] = 1
-	next, err = ctesting.CloneMap(next)
-	require.NoError(t, err)
-	assert.Equal(t, next, current)
 }
 
 func TestFQDNFeatureFlagToggle(t *testing.T) {
-	log, err := logger.New("host_test", false)
-	require.NoError(t, err)
+	setFQDN := func(enabled bool) {
+		require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]interface{}{
+			"agent.features.fqdn.enabled": enabled,
+		})))
+	}
+	setFQDN(false)
+	t.Cleanup(func() { setFQDN(false) })
 
-	c, err := config.NewConfigFrom(map[string]interface{}{
-		// Use a long check interval so we can ensure that any
-		// calls to hostProvider.fetcher are not happening due
-		// to the interval timer elapsing. We want such calls
-		// to happen only due to explicit actions in our
-		// test below.
-		"check_interval": 10 * time.Minute,
+	synctest.Test(t, func(t *testing.T) {
+		var hostname atomic.Value
+		hostname.Store("host")
+		start := time.Now()
+		// Use a long check interval so we can ensure that the host information isn't fetched again due to the
+		// interval timer elapsing.
+		comm, stop := startProvider(t, 10*time.Minute, func() string { return hostname.Load().(string) }, nil)
+		synctest.Wait()
+		assert.Equal(t, "host", comm.Current()["name"])
+
+		// Toggling the FQDN feature flag fetches the host information again.
+		hostname.Store("host.example.com")
+		setFQDN(true)
+		synctest.Wait()
+		assert.Equal(t, "host.example.com", comm.Current()["name"])
+		assert.Zero(t, time.Since(start))
+		assert.ErrorIs(t, stop(), context.Canceled)
 	})
-	require.NoError(t, err)
-
-	provider, err := ContextProviderBuilder(log, c, true)
-	require.NoError(t, err)
-
-	hostProvider, ok := provider.(*contextProvider)
-	require.True(t, ok)
-	defer func() {
-		err := hostProvider.Close()
-		require.NoError(t, err)
-	}()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	comm := ctesting.NewContextComm(ctx)
-
-	calledChan := make(chan struct{})
-	const expectedCalledCount = 2
-	// Send to calledChan when called, so we can detect the number
-	// of calls below.
-	hostProvider.fetcher = func() (map[string]interface{}, error) {
-		calledChan <- struct{}{}
-		return nil, nil
-	}
-
-	// Run the provider
-	go func() {
-		err = hostProvider.Run(ctx, comm)
-	}()
-
-	// Trigger the FQDN feature flag callback by
-	// toggling the FQDN feature flag
-	err = features.Apply(config.MustNewConfigFrom(map[string]interface{}{
-		"agent.features.fqdn.enabled": true,
-	}))
-	require.NoError(t, err)
-
-	timeoutChan := time.After(100 * time.Millisecond)
-	calledCount := 0
-waitLoop:
-	// Wait until we get the expected number of calls or the timeout
-	// expires, whichever comes first.
-	for calledCount < expectedCalledCount {
-		select {
-		case <-calledChan:
-			calledCount++
-		case <-timeoutChan:
-			break waitLoop
-		}
-	}
-	require.Equal(t, expectedCalledCount, calledCount)
 }
 
-func returnHostMapping(log *logger.Logger) infoFetcher {
-	i := -1
-	fetcher := getHostInfo(log)
-	return func() (map[string]interface{}, error) {
-		host, err := fetcher()
-		if err != nil {
-			return nil, err
-		}
-		i++
-		host["idx"] = i
-		return host, nil
+func TestContextProviderInitialFetchFails(t *testing.T) {
+	log, _ := testlogger.New(t.Name())
+	provider, err := ContextProviderBuilder(log, nil, true)
+	require.NoError(t, err)
+	fetchErr := errors.New("fetch failed")
+	provider.(*contextProvider).fetcher = func(context.Context) (hostinfo.Info, error) {
+		return hostinfo.Info{}, fetchErr
 	}
+
+	err = provider.Run(t.Context(), ctesting.NewContextComm(t.Context()))
+	assert.ErrorIs(t, err, fetchErr)
 }
 
-func TestGetHostInfoReturnsSomeKeys(t *testing.T) {
+func TestHostMapping(t *testing.T) {
+	info := hostinfo.Info{
+		Hostname:     "My-Host.Example.com",
+		ID:           "host-id",
+		Architecture: "x86_64",
+		IPs:          []string{"10.0.0.1"},
+		MACs:         []string{"00:00:00:00:00:01"},
+		OS:           types.OSInfo{Family: "debian", Platform: "ubuntu", Version: "24.04"},
+	}
+	assert.Equal(t, map[string]interface{}{
+		"id":           "host-id",
+		"name":         "my-host.example.com",
+		"platform":     runtime.GOOS,
+		"architecture": "x86_64",
+		"ip":           []string{"10.0.0.1"},
+		"mac":          []string{"00:00:00:00:00:01"},
+		"os_family":    "debian",
+		"os_platform":  "ubuntu",
+		"os_version":   "24.04",
+	}, hostMapping(info))
+}
+
+func TestHostMappingLowercasesHostnameOverride(t *testing.T) {
+	// Unlike add_host_metadata in Beats, the provider lowercases ELASTIC_AGENT_HOSTNAME, see the hostinfo package
+	// documentation.
+	t.Setenv(util.EnvHostName, "My-Node")
 	l, _ := testlogger.New(t.Name())
-	// this is a simple test to ensure the host provider returns the new keys
-	// needed to add support to Debian 12.
-	osInfo, err := getHostInfo(l)()
-	if err != nil {
-		t.Fatalf("could not get host provider variables: %s", err)
-	}
-
-	expectedKeys := []string{"os_family", "os_platform", "os_version"}
-
-	for _, key := range expectedKeys {
-		if _, exist := osInfo[key]; !exist {
-			t.Errorf("expecting key '%s' from host provider.", key)
-		}
-	}
+	info, err := hostinfo.Fetch(l)
+	require.NoError(t, err)
+	assert.Equal(t, "my-node", hostMapping(info)["name"])
 }

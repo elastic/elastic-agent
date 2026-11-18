@@ -28,7 +28,7 @@ It listens for created `issue_comment` and `pull_request_review_comment` events.
 
 | Item | Details |
 | --- | --- |
-| Permissions | `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `issues: write`, `pull-requests: write`. |
+| Permissions | `actions: read`, `contents: write`, `copilot-requests: write`, `discussions: write`, `id-token: write`, `issues: write`, `pull-requests: write`. |
 | Outputs | The external workflow handles the assistant response and any resulting PR activity. |
 
 ## Operational notes

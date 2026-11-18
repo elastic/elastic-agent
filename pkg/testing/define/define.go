@@ -15,8 +15,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/go-elasticsearch/v9"
 
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	semver "github.com/elastic/elastic-agent/pkg/version"

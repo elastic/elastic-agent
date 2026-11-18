@@ -104,11 +104,16 @@ func (t *CommandLogSpec) InitDefaults() {
 // ServiceTimeoutSpec is the timeout specification for subprocess.
 type ServiceTimeoutSpec struct {
 	Checkin time.Duration `config:"checkin,omitempty" yaml:"checkin,omitempty"`
+
+	// StartFailedAfter is how long the service can keep failing to start before it is
+	// reported as failed instead of degraded.
+	StartFailedAfter time.Duration `config:"start_failed_after,omitempty" yaml:"start_failed_after,omitempty"`
 }
 
 // InitDefaults initialized the defaults for the timeouts.
 func (t *ServiceTimeoutSpec) InitDefaults() {
 	t.Checkin = 30 * time.Second
+	t.StartFailedAfter = 5 * time.Minute
 }
 
 // ServiceSpec is the specification for an input that executes as a service.

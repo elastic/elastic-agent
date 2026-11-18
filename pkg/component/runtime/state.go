@@ -155,6 +155,12 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		touched[key] = true
 		expected, ok := s.expectedUnits[key]
 		if ok {
+			if expected.state == client.UnitStateStopped {
+				// re-added before the component confirmed the stop
+				expected.state = client.UnitStateHealthy
+				expected.configStateIdx++
+				changed = true
+			}
 			if expected.logLevel != unit.LogLevel {
 				expected.logLevel = unit.LogLevel
 				changed = true

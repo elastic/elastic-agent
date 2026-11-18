@@ -24,7 +24,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	internalstatus "github.com/elastic/elastic-agent/internal/pkg/otel/status"
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -408,6 +408,47 @@ func TestRemoveManagedHealthCheckExtensionStatus(t *testing.T) {
 		}
 		removeManagedHealthCheckExtensionStatus(st, "healthcheckv2/missing")
 		assert.Contains(t, extensionsMap.ComponentStatusMap, "extension:other")
+	})
+
+	t.Run("nil_status_is_noop", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			removeManagedHealthCheckExtensionStatus(nil, "healthcheckv2/test")
+		})
+	})
+
+	t.Run("nil_component_status_map_is_noop", func(t *testing.T) {
+		st := &otelstatus.AggregateStatus{
+			Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+			ComponentStatusMap: nil,
+		}
+		assert.NotPanics(t, func() {
+			removeManagedHealthCheckExtensionStatus(st, "healthcheckv2/test")
+		})
+	})
+
+	t.Run("nil_extensions_entry_is_noop", func(t *testing.T) {
+		st := &otelstatus.AggregateStatus{
+			Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+			ComponentStatusMap: map[string]*otelstatus.AggregateStatus{"extensions": nil},
+		}
+		assert.NotPanics(t, func() {
+			removeManagedHealthCheckExtensionStatus(st, "healthcheckv2/test")
+		})
+	})
+
+	t.Run("nil_extensions_component_status_map_is_noop", func(t *testing.T) {
+		st := &otelstatus.AggregateStatus{
+			Event: componentstatus.NewEvent(componentstatus.StatusOK),
+			ComponentStatusMap: map[string]*otelstatus.AggregateStatus{
+				"extensions": {
+					Event:              componentstatus.NewEvent(componentstatus.StatusOK),
+					ComponentStatusMap: nil,
+				},
+			},
+		}
+		assert.NotPanics(t, func() {
+			removeManagedHealthCheckExtensionStatus(st, "healthcheckv2/test")
+		})
 	})
 }
 

@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/require"
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
 
@@ -73,8 +73,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -115,6 +113,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -145,8 +145,6 @@ auth:
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -183,6 +181,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -214,8 +214,6 @@ auth:
 endpoints:
   - http://localhost:9200?somekey=somevalue
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -252,6 +250,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -317,8 +317,6 @@ auth:
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -355,6 +353,8 @@ timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -415,13 +415,13 @@ logs_index: some-index
 password: changeme
 user: elastic
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
 `
 
@@ -514,13 +514,13 @@ sending_queue:
 suppress_conflict_errors: true
 timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
  `,
 			},
@@ -601,8 +601,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -643,6 +641,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -685,8 +685,6 @@ endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -709,6 +707,8 @@ headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -784,6 +784,8 @@ sending_queue:
 suppress_conflict_errors: true
 timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
@@ -793,8 +795,6 @@ compression: none
 {{ end }}
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
 `
 

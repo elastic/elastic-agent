@@ -14,16 +14,11 @@ The collector itself is always a subprocess on current versions (the in-process 
 
 ## Which runtime a beat input gets
 
-There is an ongoing migration from process to otel; defaults differ by agent version (dynamic inputs below are one example), so check the bundle's `version.txt` and read the code at the build's commit when it matters. On main (`DefaultRuntimeConfig`, `pkg/component/component.go`):
+There is an ongoing migration from process to otel; defaults differ by agent version, so check the bundle's `version.txt` and read the code at the build's commit when it matters. The defaults, the override precedence (look for the keys in `computed-config.yaml` / `pre-config.yaml`) and the automatic fallbacks are documented in [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md); `DefaultRuntimeConfig` in `pkg/component/component.go` is authoritative. Agent self-monitoring has its own switch, `agent.monitoring._runtime_experimental` (default `otel`; env `AGENT_MONITORING_RUNTIME_EXPERIMENTAL`).
 
-- `filebeat`, `metricbeat`, `auditbeat`, `osquerybeat`, `packetbeat` inputs default to **otel**; `heartbeat` defaults to **process**. The global default is `process`.
-- Beat receiver behaviour and the settings are documented in [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) (note: its defaults text lags main; `DefaultRuntimeConfig` is authoritative). Agent self-monitoring has its own switch, `agent.monitoring._runtime_experimental` (default `otel`; env `AGENT_MONITORING_RUNTIME_EXPERIMENTAL`).
 - Because heartbeat has no beat-level default, it is exactly the beat that a global `agent.internal.runtime.default: otel` moves — that's what the Fleet runtime-switch tests set (`switchPolicyToOtelRuntime`).
-- Overrides, highest precedence first: an input's own `_runtime_experimental: otel|process` → `agent.internal.runtime.output.<type>` → `agent.internal.runtime.<beat>.<input type>` → `agent.internal.runtime.<beat>.default` → `agent.internal.runtime.default`. Because `<beat>.default` is set to `otel`, setting only the global `default: process` does **not** move those beats back to process. Look for these keys in `computed-config.yaml` / `pre-config.yaml`.
-- **Automatic fallback to process** when the component can't run in otel, logged by the coordinator:
-  - `otel runtime is not supported for component <id>, switching to process runtime, reason: …` — e.g. an unsupported output type (only elasticsearch, logstash, kafka are supported) or unsupported output options (elasticsearch `indices`, `loadbalance: false`, …).
-  - `Component <id> uses dynamic variable providers, switching to <runtime> runtime` (warn) — a component with inputs rendered from a dynamic provider (kubernetes, docker, `local_dynamic`; flagged *dynamic*, always) is moved to another runtime, because every change to it reloads the collector config, which is expensive. Whether this happens depends on the **version**: `agent.internal.runtime.dynamic_inputs` defaults to `process` in 9.3, 9.4 and 9.5 (**on by default**: dynamic components run as beat processes), and is empty on main / 9.6 since #15536 (2026-07-15; dynamic components stay otel). Main's setting is still in flux and is to be decided before the 9.6.0 feature freeze, so treat it as version-dependent, not settled. Resolution is per beat and input type, like `agent.internal.runtime`; `static_variables` can exempt inputs whose variables never change. Read `DefaultRuntimeConfig` at the build's commit, and see [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) §"Dynamic Inputs" (it doesn't state the default).
-  - For monitoring: `otel runtime is not supported for monitoring output, switching to process runtime, reason: …`.
+- Fallbacks to process are logged by the coordinator: `otel runtime is not supported for component <id>, switching to process runtime, reason: …` (also for monitoring: `… for monitoring output …`) and `Component <id> uses dynamic variable providers, switching to <runtime> runtime` (warn).
+- Whether dynamic components move depends on the **version**: `agent.internal.runtime.dynamic_inputs` defaults to `process` in 9.3, 9.4 and 9.5 (dynamic components run as beat processes), and is empty on main / 9.6 since #15536 (2026-07-15; they stay otel). Main's setting is still in flux and is to be decided before the 9.6.0 feature freeze, so treat it as version-dependent. Read `DefaultRuntimeConfig` at the build's commit.
 
 ## Telling the runtime from a bundle
 
@@ -53,15 +48,7 @@ yq -r '.components[] | "\(.id)\t\(.state.version_info.name // "?")\t\(.state.sta
 
 ## Runtime switches
 
-Tests that compare runtimes (`TestBeatsMetrics/otel|process|compare`, `TestMonitoringNoDuplicates`, `TestComponentWorkDir`, …; mostly `testing/integration/ess/beat_receivers_test.go` and the `*_monitoring_test.go` runners) switch a component between runtimes via policy. The old instance must reach STOPPED before the new one starts; the coordinator gives up waiting after `transitionTimeout` (`ProcessStopTimeout` + 3 s, `coordinator.go`) and force-applies. Log lines to look for:
-
-- `Deferring OTel components until process instances stop` / `Deferring runtime components until OTel instances stop`
-- `Component "<id>" stopped, N remaining before deferred update`
-- `All process-to-OTel transitioning components have stopped in the process runtime, applying OTel update …` (and the OTel-to-process mirror)
-- `Runtime transition timeout exceeded, force-applying deferred manager updates` (warn) — the old instance didn't stop in time; suspect it first
-- `Runtime transitions still in progress, queuing new component model` / `All runtime transitions complete, applying queued component model`
-
-Data duplicated or missing around a switch is often the transition itself (both instances briefly shipping, or neither), not a steady-state bug.
+Tests that compare runtimes (`TestBeatsMetrics/otel|process|compare`, `TestMonitoringNoDuplicates`, `TestComponentWorkDir`, …; mostly `testing/integration/ess/beat_receivers_test.go` and the `*_monitoring_test.go` runners) switch a component between runtimes via policy. How the coordinator sequences a switch, and the log lines it emits, is in [docs/hybrid-agent-beats-receivers.md](../../../../docs/hybrid-agent-beats-receivers.md) §"Runtime switches". `Runtime transition timeout exceeded, force-applying deferred manager updates` (warn) means the old instance didn't stop in time; suspect it first. Data duplicated or missing around a switch is often the transition itself, not a steady-state bug.
 
 ## Elastic Endpoint (Elastic Defend)
 

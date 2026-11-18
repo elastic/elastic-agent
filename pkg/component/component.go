@@ -17,9 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
@@ -517,7 +517,8 @@ func (c Component) MarshalYAML() (interface{}, error) {
 	if c.Err != nil {
 		c.ErrMsg = c.Err.Error()
 	}
-	return c, nil
+	type componentAlias Component // alias breaks the MarshalYAML recursion in yaml.v3
+	return componentAlias(c), nil
 }
 
 func (c *Component) MarshalJSON() ([]byte, error) {

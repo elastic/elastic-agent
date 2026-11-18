@@ -21,9 +21,9 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 type esToOTelOptions struct {
@@ -302,6 +302,12 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		"retry":                     getRetryConfig(escfg),
 		"suppress_conflict_errors":  true,
 		"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
+
+		// Work around https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52437:
+		// the startup version probe does not send credentials and reuses retry_on_status, which
+		// includes 401/403 by default. Every probe then retries until its 5s timeout and delays
+		// receiver startup. Remove once the upstream fix is in the version we depend on.
+		"version_detection": map[string]any{"enabled": false},
 	}
 
 	// Compression
@@ -532,7 +538,7 @@ func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 

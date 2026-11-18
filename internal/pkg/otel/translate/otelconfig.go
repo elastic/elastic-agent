@@ -8,24 +8,27 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/pipeline"
 
 	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
+	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
-	"github.com/elastic/elastic-agent-libs/config"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -73,6 +76,9 @@ func ComponentIDFromReceiverName(name string) (string, bool) {
 		return "", false
 	}
 	compID, _, _ := strings.Cut(parts[1], "/")
+	if decoded, err := DecodeNameSegment(compID); err == nil {
+		return decoded, true
+	}
 	return compID, true
 }
 
@@ -102,7 +108,11 @@ func GetOtelConfig(
 	if len(components) == 0 {
 		return nil, nil
 	}
-	otelConfig := confmap.New()     // base config, nothing here for now
+	// otelConfig is the config of the first component, followed by the merged configs of the rest. Conf.Merge
+	// deep-copies its source and re-flattens its destination, which is expensive for a config with thousands of
+	// receivers, so the first component's config is used as the base instead of being merged into an empty Conf.
+	// It is newly built by getCollectorConfigForComponent, so we own it.
+	var otelConfig *confmap.Conf
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
@@ -117,6 +127,11 @@ func GetOtelConfig(
 				extensionName := extension.(string)
 				extensions[extensionName] = true
 			}
+		}
+
+		if otelConfig == nil {
+			otelConfig = componentConfig
+			continue
 		}
 
 		// the assumption here is that each component will define its own receivers, and the shared exporters
@@ -135,10 +150,14 @@ func GetOtelConfig(
 		for i, ext := range extensionsSlice {
 			untypedExtensions[i] = ext
 		}
-		extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
-		err := otelConfig.Merge(extensionsConf)
-		if err != nil {
-			return nil, fmt.Errorf("error merging otel extensions: %w", err)
+		// A single component already defines its extensions in this order, and merging would copy the whole
+		// config to write the list it already has.
+		if current, _ := otelConfig.Get("service::extensions").([]any); !slices.Equal(current, untypedExtensions) {
+			extensionsConf := confmap.NewFromStringMap(map[string]any{"service::extensions": untypedExtensions})
+			err := otelConfig.Merge(extensionsConf)
+			if err != nil {
+				return nil, fmt.Errorf("error merging otel extensions: %w", err)
+			}
 		}
 	}
 
@@ -237,7 +256,7 @@ func getPipelineID(comp *component.Component) (pipeline.ID, error) {
 	if err != nil {
 		return pipeline.ID{}, err
 	}
-	pipelineName := fmt.Sprintf("%s%s", OtelNamePrefix, comp.ID)
+	pipelineName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(comp.ID))
 	return pipeline.NewIDWithName(signal, pipelineName), nil
 }
 
@@ -254,12 +273,41 @@ func GetReceiverID(receiverType otelcomponent.Type, unitID string) otelcomponent
 // Both receiver naming and status lookup must use this function to stay in sync.
 func receiverStreamSuffix(compID, unitID, streamID string) string {
 	inputID := strings.TrimPrefix(unitID, compID+"-")
-	return inputID + "-" + streamID
+	return EncodeNameSegment(inputID) + "-" + EncodeNameSegment(streamID)
+}
+
+// EncodeNameSegment percent-encodes "%", ":" and the characters of s that are not valid in OTel component names.
+func EncodeNameSegment(s string) string {
+	if !strings.ContainsFunc(s, needsEncoding) {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if needsEncoding(r) {
+			for _, c := range []byte(s[i : i+size]) {
+				fmt.Fprintf(&b, "%%%02X", c)
+			}
+		} else {
+			b.WriteString(s[i : i+size])
+		}
+		i += size
+	}
+	return b.String()
+}
+
+func needsEncoding(r rune) bool {
+	return r == '%' || r == ':' || unicode.In(r, unicode.Z, unicode.C, unicode.S)
+}
+
+// DecodeNameSegment reverses EncodeNameSegment.
+func DecodeNameSegment(s string) (string, error) {
+	return url.PathUnescape(s)
 }
 
 // GetExporterID returns the exporter id for the given exporter type and output name.
 func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcomponent.ID {
-	exporterName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	exporterName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(exporterType, exporterName)
 }
 
@@ -268,7 +316,7 @@ func GetExporterID(exporterType otelcomponent.Type, outputName string) otelcompo
 // beatsprocessor implementation shares state internally between instances that
 // end up with identical configuration.
 func GetProcessorID(name string) otelcomponent.ID {
-	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, name)
+	processorName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(name))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("beat"), processorName)
 }
 
@@ -352,9 +400,10 @@ func getCollectorConfigForComponent(
 		pipelineID.String(): pipelineConfig,
 	}
 
-	// we need to convert []string to []interface for this to work
+	// we need to convert []string to []interface for this to work. The keys are sorted so the list is
+	// deterministic, and GetOtelConfig can recognize it as already being in its final order.
 	extensionKey := make([]any, 0, len(extensionConfig))
-	for k := range extensionConfig {
+	for _, k := range slices.Sorted(maps.Keys(extensionConfig)) {
 		extensionKey = append(extensionKey, k)
 	}
 
@@ -429,7 +478,7 @@ func getReceiversConfigForComponent(
 	// collecting no data. The receiver is named after the component so it is unique, and
 	// getComponentState reports the status of every input unit itself.
 	if len(inputs) == 0 {
-		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), comp.ID)
+		receiverID := GetReceiverID(otelcomponent.MustNewType(NoEnabledStreamsReceiverType), EncodeNameSegment(comp.ID))
 		return map[string]any{receiverID.String(): map[string]any{}}, nil
 	}
 
@@ -440,12 +489,17 @@ func getReceiversConfigForComponent(
 	dataset := fmt.Sprintf("elastic_agent.%s", strings.ReplaceAll(strings.ReplaceAll(binaryName, "-", "_"), "/", "_"))
 
 	// Build the shared receiver config (same for all receivers in this component)
+	beatPaths := map[string]any{
+		"home": paths.Components(),
+		"data": BeatDataPath(comp.ID),
+	}
+	if paths.IsVersionHome() {
+		// like for beats processes, files the receivers write directly, e.g. request traces, are kept with the logs of this build
+		beatPaths["logs"] = paths.BuildComponentsLogs()
+	}
 	sharedConfig := map[string]any{
 		// just like we do for beats processes, each receiver needs its own data path
-		"path": map[string]any{
-			"home": paths.Components(),
-			"data": BeatDataPath(comp.ID),
-		},
+		"path": beatPaths,
 		// adds additional context on logs emitted by beatreceivers to uniquely identify per component logs
 		"logging": map[string]any{
 			"with_fields": map[string]any{
@@ -507,7 +561,7 @@ func getReceiversConfigForComponent(
 		for _, ri := range inputs {
 			allInputConfigs = append(allInputConfigs, ri.config)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+SingleReceiverStreamID)
+		receiverID := GetReceiverID(receiverType, EncodeNameSegment(comp.ID)+"/"+SingleReceiverStreamID)
 		receiverConfig := maps.Clone(sharedConfig)
 		receiverConfig[beatName] = map[string]any{
 			beatInputsKey(beatName): allInputConfigs,
@@ -521,7 +575,7 @@ func getReceiversConfigForComponent(
 		if ri.streamID == "" {
 			return nil, fmt.Errorf("input missing stream ID in component %s", comp.ID)
 		}
-		receiverID := GetReceiverID(receiverType, comp.ID+"/"+receiverStreamSuffix(comp.ID, ri.unitID, ri.streamID))
+		receiverID := GetReceiverID(receiverType, EncodeNameSegment(comp.ID)+"/"+receiverStreamSuffix(comp.ID, ri.unitID, ri.streamID))
 
 		// Create a new config map for this receiver, copying shared config entries.
 		// This is a shallow copy — nested map values (path, logging, http) are shared

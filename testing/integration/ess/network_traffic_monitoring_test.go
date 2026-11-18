@@ -22,9 +22,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/mapstr"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -55,10 +55,6 @@ func TestNetworkTraffic(t *testing.T) {
 			{Type: define.Linux},
 			{Type: define.Windows},
 		},
-		// Packetbeat cannot load wpcap.dll on windows/arm64 because npcap is
-		// bundled only in the windows/amd64 package.
-		// TODO: remove this skip when https://github.com/elastic/elastic-agent/issues/17044 is resolved.
-		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 
 	suite.Run(t, &NetworkTrafficRunner{info: info})
