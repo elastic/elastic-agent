@@ -72,6 +72,10 @@ GOTEST_OPTS="-test.shuffle on -test.timeout 2h0m0s"
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
   GOTEST_OPTS="${GOTEST_OPTS} -test.short"
 fi
+# Optional regexp of tests to skip (go test -skip), e.g. known failures of a platform
+if [[ -n "${GOTEST_SKIP:-}" ]]; then
+  GOTEST_OPTS="${GOTEST_OPTS} -test.skip ${GOTEST_SKIP}"
+fi
 GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
 set +e
 AGENT_VERSION="${AGENT_VERSION}" SNAPSHOT=true \
