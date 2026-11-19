@@ -50,6 +50,10 @@ flowchart TD
 
 Cleanup allows dependency failures so it can run after failed test groups. Linux and Windows jobs retry once. The stack is created with the generic `ess` template and `Target=frs`, as described in [Create an ECH cluster on FRS](https://github.com/elastic/observability-test-environments/blob/main/docs/kb/create-ech-cluster-on-frs.md). FRS has limited capacity, so the stack expires after 4 hours and is destroyed by the cleanup step. FRS only offers plain stack versions, so `StackBuildId` is not used.
 
+The previous Terraform path pinned `-fips` Elasticsearch and Kibana images (`elasticsearch-cloud-ess-fips`, `kibana-cloud-fips`) as well as the `elastic-agent-cloud-fips` image. Now only the agent image is set; Elasticsearch and Kibana use what FRS provides. This assumes FRS stacks are FIPS compliant. If they aren't, the FIPS tests run against non-FIPS Elasticsearch and Kibana.
+
+Every start attempt records its cluster under a `fips.retry-cluster-*` metadata key, so a start retry doesn't leave an untracked cluster behind. The cleanup step only tears down: it destroys the shared cluster and every recorded cluster, and it also runs when the start step fails.
+
 ## Sources and history
 
 - Pipeline and uploader: [`bk.integration-fips.pipeline.yml`](../bk.integration-fips.pipeline.yml), [`integration.pipeline.yml`](../integration.pipeline.yml)
