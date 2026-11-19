@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -96,7 +97,7 @@ func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
@@ -177,7 +178,7 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -218,7 +219,7 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -254,7 +255,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -293,7 +294,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -333,7 +334,7 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
