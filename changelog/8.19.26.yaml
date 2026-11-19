@@ -5,7 +5,7 @@ entries:
       description: ""
       component: edot-collector
       pr:
-        - https://github.com/elastic/elastic-agent/pull/18101
+        - https://github.com/elastic/elastic-agent/pull/17451
       issue: []
       impact: ""
       action: ""
@@ -18,7 +18,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/18101
+        - https://github.com/elastic/elastic-agent/pull/17715
       issue:
         - https://github.com/elastic/elastic-agent/issues/17714
       impact: ""
@@ -32,7 +32,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/18101
+        - https://github.com/elastic/elastic-agent/pull/17897
       issue: []
       impact: ""
       action: ""
@@ -45,7 +45,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/18101
+        - https://github.com/elastic/elastic-agent/pull/17938
       issue: []
       impact: ""
       action: ""
