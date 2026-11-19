@@ -2050,3 +2050,98 @@ func TestPolicyChangeNilStateStore(t *testing.T) {
 	require.NoError(t, handler.Handle(context.Background(), action, noopacker.New()))
 	assert.Len(t, ch, 1, "policyChange must be queued when stateStore is nil")
 }
+
+// TestPolicyChangeValidLimitsAccepted makes sure that valid limits values do not cause the policy to be rejected.
+func TestPolicyChangeValidLimitsAccepted(t *testing.T) {
+	log, _ := loggertest.New(t.Name())
+
+	ch := make(chan coordinator.ConfigChange, 1)
+	action := &fleetapi.ActionPolicyChange{
+		ActionID:   "valid-limits",
+		ActionType: "POLICY_CHANGE",
+		Data: fleetapi.ActionPolicyChangeData{Policy: map[string]interface{}{
+			"agent.limits.cpu":          50,
+			"agent.limits.go_max_procs": 2,
+		}},
+	}
+	stateStore := newStateStoreMock()
+	capture := &captureStore{}
+	handler := NewPolicyChangeHandler(log, &info.AgentInfo{}, nil, configuration.DefaultConfiguration(), capture, stateStore, ch, defaultLogLevelSet(t))
+
+	require.NoError(t, handler.Handle(context.Background(), action, noopacker.New()))
+	assert.Len(t, ch, 1, "policyChange must be queued")
+	assert.NotEmpty(t, capture.saved, "fleet.enc must be written")
+	stateStore.AssertExpectations(t)
+}
+
+func TestPolicyChangeInvalidLimitsRejectedBeforePersisting(t *testing.T) {
+	const limitsErr = "failed to validate limits config"
+	const fleetClientErr = "failed to validate Fleet client config"
+
+	tests := []struct {
+		name         string
+		policy       map[string]interface{}
+		setters      []actions.ClientSetter
+		wantErrParts []string
+	}{
+		{
+			name:         "cpu is 0",
+			policy:       map[string]interface{}{"agent.limits.cpu": 0},
+			wantErrParts: []string{limitsErr},
+		},
+		{
+			name:         "cpu is not a number",
+			policy:       map[string]interface{}{"agent.limits.cpu": "abc"},
+			wantErrParts: []string{limitsErr},
+		},
+		{
+			name:         "go_max_procs is not a number",
+			policy:       map[string]interface{}{"agent.limits.go_max_procs": "abc"},
+			wantErrParts: []string{limitsErr},
+		},
+		{
+			// The new Fleet hosts fail validation because the agent has no API key.
+			name: "cpu is invalid and the Fleet client config is invalid",
+			policy: map[string]interface{}{
+				"agent.limits.cpu": 0,
+				"fleet.hosts":      []string{"http://new.fleet.example.com"},
+			},
+			setters:      []actions.ClientSetter{&testSetter{}},
+			wantErrParts: []string{limitsErr, fleetClientErr},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log, _ := loggertest.New(tt.name)
+
+			ch := make(chan coordinator.ConfigChange, 1)
+			tacker := &testAcker{}
+			action := &fleetapi.ActionPolicyChange{
+				ActionID:   "invalid-limits",
+				ActionType: "POLICY_CHANGE",
+				Data:       fleetapi.ActionPolicyChangeData{Policy: tt.policy},
+			}
+
+			// The mocks have no expectations, so any call to them fails the test.
+			agentInfo := info.NewMockAgent(t)
+			logLevelSetter := newMockLogLevelSetter(t)
+			untouchedStateStore := &mockStateStore{}
+			capture := &captureStore{}
+
+			handler := NewPolicyChangeHandler(log, agentInfo, nil, configuration.DefaultConfiguration(), capture, untouchedStateStore, ch, logLevelSetter, tt.setters...)
+			original := configPatchFrom(handler.config)
+
+			err := handler.Handle(context.Background(), action, tacker)
+
+			require.Error(t, err)
+			for _, part := range tt.wantErrParts {
+				assert.ErrorContains(t, err, part)
+			}
+			assert.Nil(t, capture.saved, "fleet.enc must not be written")
+			assert.Empty(t, ch, "policyChange must not be queued")
+			assert.Empty(t, tacker.Items(), "Fleet must not be ACKed")
+			assert.Equal(t, original, configPatchFrom(handler.config), "h.config must be unchanged")
+			untouchedStateStore.AssertExpectations(t)
+		})
+	}
+}

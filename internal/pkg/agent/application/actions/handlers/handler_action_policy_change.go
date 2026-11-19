@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/limits"
 )
 
 // PolicyChangeHandler is a handler for POLICY_CHANGE action.
@@ -256,6 +257,10 @@ func (h *PolicyChangeHandler) handlePolicyChange(ctx context.Context, c *config.
 	loggingConfig, err := validateLoggingConfig(partialCfg)
 	if err != nil {
 		validationErr = goerrors.Join(validationErr, fmt.Errorf("failed to validate logging config: %w", err))
+	}
+	_, err = limits.Parse(c)
+	if err != nil {
+		validationErr = goerrors.Join(validationErr, fmt.Errorf("failed to validate limits config: %w", err))
 	}
 	if validationErr != nil {
 		return validationErr
