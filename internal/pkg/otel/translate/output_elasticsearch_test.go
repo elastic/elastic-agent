@@ -1103,6 +1103,7 @@ func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
 	_, _, extensions, _, err := getExporterConfigForComponent(
 		comp,
 		otelcomponent.MustNewType("elasticsearch"),
+		"",
 		logp.NewNopLogger(),
 	)
 	require.NoError(t, err, "Heartbeat translation must accept transport and TLS settings")

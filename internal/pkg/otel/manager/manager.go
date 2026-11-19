@@ -13,6 +13,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -50,6 +51,10 @@ const (
 
 	// CollectorLogFileName is the base name of the collector subprocess's own log file.
 	CollectorLogFileName = "elastic-otel-collector"
+
+	// elasticsearchAuthExtensionType is the type of the extension Fleet adds to agentless policies to
+	// authenticate the Elasticsearch storage extension.
+	elasticsearchAuthExtensionType = "elasticsearchauth"
 
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
@@ -458,10 +463,11 @@ func (m *OTelManager) buildMergedConfig(
 ) (*confmap.Conf, error) {
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
+	storageAuthenticator := elasticsearchStorageAuthenticator(cfgUpdate.collectorCfg, logger)
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, storageAuthenticator, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -509,6 +515,16 @@ func (m *OTelManager) buildMergedConfig(
 		}
 	}
 
+	// The storage extension of the components references the authenticator, so the collector has to start it
+	// even if the collector config only defines it.
+	if componentOtelCfg != nil && storageAuthenticator != "" {
+		if err := mergeWithExtensions(overlay, confmap.NewFromStringMap(map[string]any{
+			"service::extensions": []any{storageAuthenticator},
+		})); err != nil {
+			return nil, fmt.Errorf("failed to enable the Elasticsearch storage authenticator: %w", err)
+		}
+	}
+
 	if err := injectDiagnosticsExtension(overlay); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
@@ -544,6 +560,36 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 	}
 	return componentOtelCfg, nil
+}
+
+// elasticsearchStorageAuthenticator returns the ID of the elasticsearchauth extension in the collector config,
+// which the Elasticsearch storage extension of the components uses instead of the output's beatsauth extension.
+// Fleet adds it to agentless policies with credentials that can read and update the state, which the output
+// credentials can't do when the output uses the managed _bulk endpoint. It returns an empty ID, so that the
+// storage keeps using beatsauth, when the state store is disabled or there isn't exactly one such extension.
+func elasticsearchStorageAuthenticator(collectorCfg *confmap.Conf, logger *logp.Logger) string {
+	if collectorCfg == nil || !fbfeatures.IsElasticsearchStateStoreEnabled() {
+		return ""
+	}
+	extensions, _ := collectorCfg.Get("extensions").(map[string]any)
+	var ids []string
+	for key := range extensions {
+		var id otelcomponent.ID
+		if err := id.UnmarshalText([]byte(key)); err == nil && id.Type().String() == elasticsearchAuthExtensionType {
+			ids = append(ids, key)
+		}
+	}
+	switch len(ids) {
+	case 0:
+		return ""
+	case 1:
+		return ids[0]
+	default:
+		slices.Sort(ids)
+		logger.Warnf("The collector config has more than one %s extension (%s), the Elasticsearch storage uses the output credentials",
+			elasticsearchAuthExtensionType, strings.Join(ids, ", "))
+		return ""
+	}
 }
 
 // seedOverlay copies the parts of the component config that the steps merging into the overlay read, so that

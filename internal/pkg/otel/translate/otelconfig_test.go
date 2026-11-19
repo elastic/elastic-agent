@@ -2392,7 +2392,7 @@ func TestGetOtelConfig(t *testing.T) {
 				}))
 				require.NoError(t, err)
 			}
-			actualConf, actualError := GetOtelConfig(tt.model, logp.NewNopLogger())
+			actualConf, actualError := GetOtelConfig(tt.model, "", logp.NewNopLogger())
 			if actualConf == nil || tt.expectedConfig == nil {
 				assert.Equal(t, tt.expectedConfig, actualConf)
 			} else { // this gives a nicer diff
@@ -2894,7 +2894,7 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 		},
 	}
 
-	conf, err := GetOtelConfig(model, logp.NewNopLogger())
+	conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 	require.NoError(t, err)
 
 	configMap := conf.ToStringMap()
@@ -2920,6 +2920,28 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 	}
 }
 
+func TestGetOtelConfigElasticsearchStateStoreUsesStorageAuthenticator(t *testing.T) {
+	t.Cleanup(fbfeatures.ReinitForTest)
+	t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "filestream")
+	fbfeatures.ReinitForTest()
+
+	const storageAuthenticator = "elasticsearchauth/fleet"
+	model := &component.Model{
+		Components: []component.Component{
+			testFilebeatComp("filestream-state", "state"),
+		},
+	}
+
+	conf, err := GetOtelConfig(model, storageAuthenticator, logp.NewNopLogger())
+	require.NoError(t, err)
+
+	assert.Equal(t, storageAuthenticator, conf.Get("extensions::"+elasticsearchStateStoreExtensionName+"::auth::authenticator"),
+		"the storage extension must use the authenticator from the policy")
+	assert.True(t, conf.IsSet("extensions::beatsauth/_agent-component/state"), "the exporter still needs its beatsauth extension")
+	assert.Equal(t, "beatsauth/_agent-component/state", conf.Get("exporters::elasticsearch/_agent-component/state::auth::authenticator"),
+		"the exporter must keep using the output credentials")
+}
+
 // TestGetOtelConfigExtensionsAreSortedAndDeduplicated checks that the extensions of all components end
 // up in one sorted list without duplicates, whatever the order of the components is.
 func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
@@ -2935,7 +2957,7 @@ func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
 		"shuffled": {compB, compA, compA2},
 	} {
 		t.Run(name, func(t *testing.T) {
-			conf, err := GetOtelConfig(&component.Model{Components: components}, logp.NewNopLogger())
+			conf, err := GetOtelConfig(&component.Model{Components: components}, "", logp.NewNopLogger())
 			require.NoError(t, err)
 			require.NotNil(t, conf)
 
@@ -2954,7 +2976,7 @@ func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 		})
 
 		model := &component.Model{Components: []component.Component{filebeatComp}}
-		conf, err := GetOtelConfig(model, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 		require.NoError(t, err)
 
 		names := processorNamesFromOtelConfig(t, conf, "filestream-default")
@@ -2972,7 +2994,7 @@ func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 		})
 
 		model := &component.Model{Components: []component.Component{filebeatComp}}
-		conf, err := GetOtelConfig(model, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 		require.NoError(t, err)
 
 		m := conf.ToStringMap()
@@ -2994,7 +3016,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 			"default_processors": map[string]any{"enabled": false},
 		})
 		model := &component.Model{Components: []component.Component{comp}}
-		conf, err := GetOtelConfig(model, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 		require.NoError(t, err)
 
 		m := conf.ToStringMap()
@@ -3014,7 +3036,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 			},
 		})
 		model := &component.Model{Components: []component.Component{comp}}
-		conf, err := GetOtelConfig(model, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 		require.NoError(t, err)
 
 		names := processorNamesFromOtelConfig(t, conf, "filestream-default")
@@ -3033,7 +3055,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 		compB := testFilebeatComp("filestream-outputB", "outputB")
 
 		model := &component.Model{Components: []component.Component{compA, compB}}
-		conf, err := GetOtelConfig(model, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 		require.NoError(t, err)
 
 		namesA := processorNamesFromOtelConfig(t, conf, "filestream-outputA")
@@ -3057,7 +3079,7 @@ func TestGetOtelConfigWithPerOutputDefaultProcessors(t *testing.T) {
 			},
 		})
 		model := &component.Model{Components: []component.Component{comp}}
-		conf, err := GetOtelConfig(model, logp.NewNopLogger())
+		conf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 		require.NoError(t, err)
 
 		names := processorNamesFromOtelConfig(t, conf, "filestream-default")
@@ -4163,7 +4185,7 @@ func TestSpacesInOutputNameAndInputID(t *testing.T) {
 	comp.RuntimeManager = component.OtelRuntimeManager
 	comp.Units[0].ID = "filestream-my output-filestream-Cisco ISE-c3a2b1"
 
-	conf, err := GetOtelConfig(&component.Model{Components: []component.Component{comp}}, logp.NewNopLogger())
+	conf, err := GetOtelConfig(&component.Model{Components: []component.Component{comp}}, "", logp.NewNopLogger())
 	require.NoError(t, err)
 	require.Contains(t, conf.Get("receivers"), "filebeatreceiver/_agent-component/filestream-my%20output/filestream-Cisco%20ISE-c3a2b1-test-1")
 
@@ -5043,7 +5065,7 @@ func TestUnitToExporterConfig(t *testing.T) {
 				fbfeatures.ReinitForTest()
 			}
 
-			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, logger)
+			exportersCfg, queueSettings, extensionCfg, processorConfig, err := unitToExporterConfig(tt.unit, tt.outputName, tt.exporterType, "", logger)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)
