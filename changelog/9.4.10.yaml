@@ -1,0 +1,163 @@
+version: 9.4.10
+entries:
+    - kind: bug-fix
+      summary: Guard against malformed health status payload and nil event panic in OTel collector
+      description: |
+        Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1791989613
+      file:
+        name: 1791989613-fix-otel-malformed-health-status-panic.yaml
+        checksum: 4c4c274a659bb72c36ff14ac216082902552cf4e
+    - kind: bug-fix
+      summary: Load the EDOT .NET plugin in kube-stack auto-instrumentation
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792652202
+      file:
+        name: 1792652202-Load-the-EDOT-.NET-plugin-in-kube-stack-auto-instrumentation.yaml
+        checksum: 5ed8c8efe7a5036b801f9222d8b3e3644d5015b2
+    - kind: bug-fix
+      summary: report service component start failures as degraded, and as failed when they persist
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17524
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16305
+      impact: ""
+      action: ""
+      timestamp: 1793003532
+      file:
+        name: 1793003532-report-service-component-start-failures-as-failed-while-retrying.yaml
+        checksum: 956413c6f09ebbac012858cc0147c797e697ac96
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.164.x
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1793281480
+      file:
+        name: 1793281480-update-otel-components-to-v0.164.x.yaml
+        checksum: ecd9ad6eeb80bad607b84b717ed953d275f5ac42
+    - kind: bug-fix
+      summary: Fix components and units that are removed and quickly re-added by a policy change staying stopped until the agent restarts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17714
+      impact: ""
+      action: ""
+      timestamp: 1793388219
+      file:
+        name: 1793388219-fix-components-readded-by-next-policy-change.yaml
+        checksum: 15db661ed949484a2c1db203f59a53b058a64dce
+    - kind: upgrade
+      summary: Keep Elastic Agent logs in data/logs/<build> instead of data/elastic-agent-<build>/logs, so they are retained on upgrade failure
+      description: The internal logs of the Agent, which diagnostics collects, are now written to data/logs/<build> instead of the logs directory of the installation directory (data/elastic-agent-<build>/logs). Both are inside the installation directory of the Agent, but the new one is not removed with an old build. The logs of the running build and of the latest previous build are kept. Tools that read the logs from the versioned directory need the new path.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17234
+      impact: ""
+      action: ""
+      timestamp: 1793723258
+      file:
+        name: 1793723258-keep-elastic-agent-logs-outside-versioned-installation-directories.yaml
+        checksum: 2994b20cc9e6d218fe9fb183dd0e0ccc4762ca45
+    - kind: bug-fix
+      summary: Fix upgrade watcher double counting restarts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1794381974
+      file:
+        name: 1794381974-fix-upgrade-watcher-double-count.yaml
+        checksum: daad4f78951d2920fd2d4f3cf25cf75020c4c9ff
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.165.x
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1794493710
+      file:
+        name: 1794493710-update-otel-components-to-v0.165.x.yaml
+        checksum: a3dbfecb7ade44a3df3d3dd13d979b6034e2c18f
+    - kind: breaking-change
+      summary: The Elasticsearch exporter in the EDOT Collector no longer accepts its deprecated settings
+      description: |
+        The OTel Collector Contrib Elasticsearch exporter removed the following deprecated settings in v0.165.0:
+        `mapping::mode`, `retry::max_requests`, `logs_dynamic_index`, `metrics_dynamic_index` and `traces_dynamic_index`.
+        These settings were already ignored or translated to their replacements.
+        See https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/52027
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: |
+        An EDOT Collector configuration that sets any of the removed settings on an `elasticsearch` exporter fails to load,
+        and the Collector does not start.
+      action: |
+        Remove the settings from your configuration. Use `retry::max_retries` instead of `retry::max_requests`
+        (`max_retries` is `max_requests - 1`). To select a mapping mode other than `otel`, use the `X-Elastic-Mapping-Mode`
+        client metadata key or the `elastic.mapping.mode` scope attribute, and `mapping::allowed_modes` to restrict the
+        modes that can be selected.
+      timestamp: 1794493711
+      file:
+        name: 1794493711-elasticsearch-exporter-removes-deprecated-settings.yaml
+        checksum: dfd7a3faf63fa1a4f8def1665d35a92809254202
+    - kind: breaking-change
+      summary: HTTP client and server settings in the EDOT Collector no longer accept the deprecated keep-alive settings
+      description: |
+        OTel Collector v0.165.0 removed the deprecated top-level keep-alive settings from the shared HTTP
+        configuration used by HTTP-based receivers, exporters and extensions:
+        `idle_conn_timeout`, `max_idle_conns`, `max_idle_conns_per_host` and `disable_keep_alives` for HTTP clients,
+        and `idle_timeout` and `keep_alives_enabled` for HTTP servers.
+        See https://github.com/open-telemetry/opentelemetry-collector/pull/15973
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17154
+        - https://github.com/elastic/elastic-agent/pull/18099
+      issue: []
+      impact: |
+        An EDOT Collector configuration that sets any of the removed settings fails to load, and the Collector does not start.
+      action: |
+        Move `idle_conn_timeout`, `max_idle_conns`, `max_idle_conns_per_host` and `idle_timeout` into the `keepalive` section
+        of the same HTTP settings, for example `keepalive::idle_conn_timeout`. Remove `disable_keep_alives` and `keep_alives_enabled`.
+      timestamp: 1794493712
+      file:
+        name: 1794493712-confighttp-removes-deprecated-keepalive-settings.yaml
+        checksum: b96003c49a1a19abb73c8bf32391634f2593b8cc
