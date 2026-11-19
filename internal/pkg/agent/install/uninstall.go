@@ -297,10 +297,22 @@ func checkForUnprivilegedVault(ctx context.Context, opts ...vault.OptionFunc) (b
 // the rename) is logged and the loop continues, since each retry of
 // os.RemoveAll re-enters removeBlockingExe with a fresh handle.
 func RemovePath(log *logger.Logger, path string) error {
+	return RemovePathContext(context.Background(), log, path)
+}
+
+// RemovePathContext is RemovePath that stops retrying when ctx is done, and returns the error of the context
+// together with the last error of the removal. A removal that is in progress is not interrupted, only the wait
+// before the next try is.
+func RemovePathContext(ctx context.Context, log *logger.Logger, path string) error {
 	const arbitraryTimeout = 60 * time.Second
+	const retryInterval = 500 * time.Millisecond
 	start := time.Now()
 	var lastErr error
 	for time.Since(start) <= arbitraryTimeout {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("stopped removing %q: %w", path, errors.Join(ctxErr, lastErr))
+		}
+
 		lastErr = os.RemoveAll(path)
 
 		if lastErr == nil || !isRetryableError(lastErr) {
@@ -313,7 +325,10 @@ func RemovePath(log *logger.Logger, path string) error {
 			}
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+		case <-time.After(retryInterval):
+		}
 	}
 
 	return fmt.Errorf("timed out while removing %q. Last error: %w", path, lastErr)

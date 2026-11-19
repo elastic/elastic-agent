@@ -134,6 +134,9 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				return waitForAgentAndFleetHealthy(ctx, t, fixture)
 			}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 		})
+		t.Run("fleet-server does not write logs to the installation", func(t *testing.T) {
+			assertNoLogsInInstallation(t, fixture.WorkDir())
+		})
 
 		// Make sure uninstall from within the topPath fails on Windows
 		if runtime.GOOS == "windows" {
@@ -185,6 +188,9 @@ func TestInstallFleetServerBootstrap(t *testing.T) {
 				return waitForAgentAndFleetHealthy(ctx, t, fixture)
 			}, time.Minute, time.Second, "agent never became healthy or connected to Fleet")
 		})
+		t.Run("fleet-server does not write logs to the installation", func(t *testing.T) {
+			assertNoLogsInInstallation(t, fixture.WorkDir())
+		})
 
 		// Make sure uninstall from within the topPath fails on Windows
 		if runtime.GOOS == "windows" {
@@ -224,12 +230,13 @@ func testFleetServerInternalAPI() func(t *testing.T) {
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			resp.Body.Close()
-			if resp.StatusCode == http.StatusOK {
+			statusCode := resp.StatusCode
+			_ = resp.Body.Close()
+			if statusCode == http.StatusOK {
 				fleetOK = true
 				break
 			}
-			t.Logf("fleet-server status check returned incorrect status: %d, retry in 10s", resp.StatusCode)
+			t.Logf("fleet-server status check returned incorrect status: %d, retry in 10s", statusCode)
 			time.Sleep(10 * time.Second)
 			continue
 		}

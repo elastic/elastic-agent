@@ -441,10 +441,8 @@ agent.monitoring.enabled: {{ .MonitoringEnabled }}
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
-	// httpjsonTracerConfigTemplate runs httpjson as a normal filebeat subprocess (process
-	// mode). In that mode filebeat sets the global paths.Paths.Logs, so the httpjson tracer
-	// path validation works and writes trace files to {versionedHome}/components/logs/httpjson/
-	// — the directory the diagnostic bundle fix now collects.
+	// httpjsonTracerConfigTemplate runs httpjson with the request tracer in the given runtime. Trace files
+	// are written to {buildLogs}/components/httpjson/, which the diagnostic bundle collects.
 	httpjsonTracerConfigTemplate := `
 inputs:
   - type: httpjson
@@ -463,13 +461,9 @@ outputs:
     type: elasticsearch
     hosts: [{{ .ESHost }}]
     api_key: placeholder
-agent.monitoring.enabled: false
-# Force process (subprocess) mode for httpjson. The default runtime for all filebeat inputs
-# is otel (see DefaultRuntimeConfig), but in otel mode the fbreceiver stores paths in
-# b.Info.Paths rather than the global paths.Paths, so the httpjson tracer path validation
-# reads an uninitialised paths.Paths.Logs and rejects the tracer filename. In process mode
-# filebeat runs as a subprocess and initialises the global paths normally.
-agent.internal.runtime.filebeat.httpjson: process
+agent.monitoring.enabled: {{ .MonitoringEnabled }}
+{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 2s{{ end }}
+agent.internal.runtime.filebeat.httpjson: {{ .Runtime }}
 `
 
 	fileStreamAgentCompState := map[string]integrationtest.ComponentState{
@@ -552,11 +546,8 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
-			// Verifies that beat receiver trace logs written to {versionedHome}/components/logs/
-			// are included in the diagnostic bundle under logs/<commit>/httpjson/.
-			// Uses httpjson in process mode: the filebeat subprocess sets the global
-			// paths.Paths.Logs so the tracer path validation succeeds, and trace files land in
-			// {versionedHome}/components/logs/httpjson/ — the path the fix now collects.
+			// Verifies that trace logs written by a filebeat subprocess to {buildLogs}/components/
+			// are included in the diagnostic bundle under logs/<group>/components/httpjson/.
 			name:    "httpjson trace logs in bundle",
 			runtime: "process",
 			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
@@ -566,6 +557,24 @@ agent.internal.runtime.filebeat.httpjson: process
 				"beat-rendered-config.yml",
 				"global_processors.txt",
 			),
+			agentCompState: httpjsonAgentCompState,
+			diagCompSetup: map[string]integrationtest.ComponentState{
+				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},
+			},
+			configTemplate:             httpjsonTracerConfigTemplate,
+			checkBeatReceiverTraceLogs: true,
+		},
+		{
+			// Same as above for httpjson running as a beat receiver in the collector: the receiver
+			// writes its trace files to {buildLogs}/components/ too.
+			name:              "httpjson trace logs in bundle, otel runtime",
+			runtime:           "otel",
+			monitoringEnabled: true,
+			expectedCompDiagnosticsFiles: []string{
+				"*/registry.tar.gz",
+				"*/beat_metrics.json",
+				"*/input_metrics.json",
+			},
 			agentCompState: httpjsonAgentCompState,
 			diagCompSetup: map[string]integrationtest.ComponentState{
 				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},

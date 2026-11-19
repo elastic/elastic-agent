@@ -137,6 +137,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		"path": map[string]any{
 			"home": paths.Components(),
 			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+			"logs": paths.BuildComponentsLogs(),
 		},
 		"queue": map[string]any{
 			"mem": map[string]any{
@@ -201,9 +202,10 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 							"sasl.mechanism":             "OAUTHBEARER",
 							"auth": map[string]any{
 								"oauth2client": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
-									"client_id":     "my-client",
-									"client_secret": "my-secret",
-									"token_url":     "https://example.com/oauth2/token",
+									"client_id":                   "my-client",
+									"client_secret":               "my-secret",
+									"__mark_redact_client_secret": true,
+									"token_url":                   "https://example.com/oauth2/token",
 								},
 							},
 						}),

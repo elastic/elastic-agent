@@ -48,9 +48,6 @@ exporters:
       Authorization: ApiKey {{.ESApiKey}}
     resource_to_telemetry_conversion:
       enabled: true
-    # Do not queue, so that failures show up right away in the logs.
-    sending_queue:
-      enabled: false
 
 service:
   pipelines:
