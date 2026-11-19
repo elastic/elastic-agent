@@ -66,6 +66,26 @@ func (l CPULimit) Percent() int {
 	return l.percent
 }
 
+// The floor keeps a low cap from leaving a small host with too little CPU.
+const (
+	// cpuFloorPercent is the floor as a percentage of at most cpuFloorMaxCPUs logical CPUs.
+	cpuFloorPercent = 5.0
+	// cpuFloorMaxCPUs is the largest number of logical CPUs the floor counts.
+	cpuFloorMaxCPUs = 32
+)
+
+// EffectiveCPUs returns the number of CPUs the cap allows, after the floor.
+// logicalCPUs is the number of online logical CPUs on the host and must be at least 1.
+// The result can be below 1, for example 0.2. It is 0 when the cap is off.
+func (l CPULimit) EffectiveCPUs(logicalCPUs int) float64 {
+	if !l.Enabled() {
+		return 0
+	}
+	requested := float64(l.percent) * float64(logicalCPUs) / 100
+	floor := cpuFloorPercent * float64(min(logicalCPUs, cpuFloorMaxCPUs)) / 100
+	return max(requested, floor)
+}
+
 type LimitsOnChangeCallback func(new, old LimitsConfig)
 
 // this struct exists only for grouping variables, it's a singleton

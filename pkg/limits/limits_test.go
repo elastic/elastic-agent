@@ -195,3 +195,29 @@ func TestParseCPU(t *testing.T) {
 		})
 	}
 }
+
+func TestEffectiveCPUs(t *testing.T) {
+	cases := []struct {
+		name        string
+		percent     int
+		logicalCPUs int
+		exp         float64
+	}{
+		{name: "the cap is off", percent: 0, logicalCPUs: 8, exp: 0},
+		{name: "50% of 8 CPUs", percent: 50, logicalCPUs: 8, exp: 4},
+		{name: "1% of 4 CPUs is raised to the floor", percent: 1, logicalCPUs: 4, exp: 0.2},
+		{name: "1% of 200 CPUs is above the floor", percent: 1, logicalCPUs: 200, exp: 2},
+		{name: "5% of 8 CPUs equals the floor", percent: 5, logicalCPUs: 8, exp: 0.4},
+		{name: "1% of 32 CPUs is raised to the floor", percent: 1, logicalCPUs: 32, exp: 1.6},
+		{name: "the floor does not grow above 32 CPUs", percent: 1, logicalCPUs: 33, exp: 1.6},
+		{name: "4% of 40 CPUs equals the floor", percent: 4, logicalCPUs: 40, exp: 1.6},
+		{name: "100% of 4096 CPUs", percent: 100, logicalCPUs: 4096, exp: 4096},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			l := CPULimit{percent: tc.percent}
+			require.Equal(t, tc.exp, l.EffectiveCPUs(tc.logicalCPUs))
+		})
+	}
+}
