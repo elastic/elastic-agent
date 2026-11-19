@@ -51,7 +51,7 @@ func TestInferLatestRelease(t *testing.T) {
 				t.Errorf("ParseReleaseVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			got := InferLatestRelease(parsed)
+			got := CoreVersionString(InferLatestRelease(parsed))
 			if got != tt.want {
 				t.Errorf("InferLatestRelease() = %s, want %s", got, tt.want)
 			}
@@ -93,6 +93,9 @@ func TestLoadReleaseSettingsFromEnv(t *testing.T) {
 
 	if s.Release.NextRelease != "9.5.0" {
 		t.Errorf("NextRelease = %s, want 9.5.0", s.Release.NextRelease)
+	}
+	if s.Release.NextReleaseVersion == nil || s.Release.NextReleaseVersion.CoreVersion() != "9.5.0" {
+		t.Errorf("NextReleaseVersion = %v, want 9.5.0", s.Release.NextReleaseVersion)
 	}
 	if s.Release.ReleaseBranch != "9.5" {
 		t.Errorf("ReleaseBranch = %s, want 9.5", s.Release.ReleaseBranch)

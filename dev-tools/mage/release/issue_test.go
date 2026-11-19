@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/go-github/v68/github"
 	"github.com/stretchr/testify/require"
+
+	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
 
 func TestReleaseIssueTitle(t *testing.T) {
@@ -18,8 +20,12 @@ func TestReleaseIssueTitle(t *testing.T) {
 }
 
 func TestIsMajorMinorRelease(t *testing.T) {
-	require.True(t, isMajorMinorRelease("9.5.0"), "expected 9.5.0 to be treated as major/minor")
-	require.False(t, isMajorMinorRelease("9.5.1"), "expected 9.5.1 not to be treated as major/minor")
+	minor, err := devtools.ParseReleaseVersion("9.5.0")
+	require.NoError(t, err)
+	require.True(t, isMajorMinorRelease(minor), "expected 9.5.0 to be treated as major/minor")
+	patch, err := devtools.ParseReleaseVersion("9.5.1")
+	require.NoError(t, err)
+	require.False(t, isMajorMinorRelease(patch), "expected 9.5.1 not to be treated as major/minor")
 }
 
 func TestVersionMentioned(t *testing.T) {
@@ -75,7 +81,7 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 - [x] https://github.com/elastic/elastic-agent/pull/10
 - [ ] https://github.com/elastic/elastic-agent/pull/11
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{
+	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", false, []string{
 		"https://github.com/elastic/elastic-agent/pull/11",
 		"https://github.com/elastic/elastic-agent/pull/12",
 	})
@@ -85,7 +91,7 @@ func TestMergeReleaseIssueBodyAddsMissingPRsAndPreservesChecks(t *testing.T) {
 	require.Contains(t, updated, "- [ ] https://github.com/elastic/elastic-agent/pull/12")
 	require.Contains(t, updated, "- [x] Find the Elastic Agent release PRs")
 
-	_, changedAgain := mergeReleaseIssueBody(updated, "9.4.1", []string{
+	_, changedAgain := mergeReleaseIssueBody(updated, "9.4.1", false, []string{
 		"https://github.com/elastic/elastic-agent/pull/10",
 		"https://github.com/elastic/elastic-agent/pull/11",
 		"https://github.com/elastic/elastic-agent/pull/12",
@@ -100,7 +106,7 @@ func TestMergeReleaseIssueBodyAddsTrackerWhenMissing(t *testing.T) {
 
 - [ ] https://github.com/elastic/elastic-agent/pull/10
 `
-	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", []string{"https://github.com/elastic/elastic-agent/pull/10"})
+	updated, changed := mergeReleaseIssueBody(existing, "9.4.1", false, []string{"https://github.com/elastic/elastic-agent/pull/10"})
 	require.True(t, changed, "missing global tracker should trigger an update")
 	require.True(t, strings.HasPrefix(strings.TrimSpace(updated), "Global tracker: "+globalReleaseTrackerURL))
 }
