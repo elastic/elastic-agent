@@ -33,6 +33,38 @@ type LimitsConfig struct {
 	// Translates into the GOMAXPROCS runtime parameter for each Go process started by the agent and the agent itself.
 	// By default is set to `0` which means using all available CPUs.
 	GoMaxProcs int `yaml:"go_max_procs" config:"go_max_procs" json:"go_max_procs"`
+
+	// CPU is the requested CPU limit for the agent and its components together, as a percentage of the host CPU capacity.
+	// It accepts a number from 1 to 100. go-ucfg converts numbers and numeric text the same way as for go_max_procs, so a
+	// fraction is cut to its whole part. 0 and any value outside 1 to 100 is rejected. No value means the cap is disabled.
+	// It is excluded from JSON because components must not receive it.
+	CPU CPULimit `config:"cpu" json:"-"`
+}
+
+// CPULimit is a cap on CPU use, as a percentage of the host CPU capacity.
+// The zero value means no value, so the cap is disabled. A config value of 0 is invalid, so that it is not mistaken for
+// "off" or "unlimited".
+type CPULimit struct {
+	percent int
+}
+
+// Unpack implements ucfg.IntUnpacker.
+func (l *CPULimit) Unpack(n int64) error {
+	if n < 1 || n > 100 {
+		return fmt.Errorf("invalid CPU limit %d: must be a whole number from 1 to 100", n)
+	}
+	l.percent = int(n)
+	return nil
+}
+
+// Enabled reports whether the cap has a value.
+func (l CPULimit) Enabled() bool {
+	return l.percent > 0
+}
+
+// Percent returns the cap as a percentage from 1 to 100, or 0 when there is no value.
+func (l CPULimit) Percent() int {
+	return l.percent
 }
 
 type LimitsOnChangeCallback func(new, old LimitsConfig)
@@ -72,11 +104,14 @@ func (f *limits) set(newLimits *LimitsConfig) {
 		for _, cb := range f.callbacks {
 			cb(f.cfg, oldLimits)
 		}
+	} else {
+		// The other fields did not change, so only the CPU value needs a write.
+		f.cfg.CPU = newLimits.CPU
 	}
 }
 
 // AddLimitsOnChangeCallback takes a callback function that will be called with the new and old values
-// of limits whenever they change.
+// of limits when the go_max_procs value changes.
 // It also takes a string ID which is used in `RemoveLimitsOnChangeCallback` to de-register the callback.
 func AddLimitsOnChangeCallback(cb LimitsOnChangeCallback, id string) {
 	current.mu.Lock()

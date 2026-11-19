@@ -15,7 +15,18 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/pkg/limits"
 )
+
+func TestComponentLimitsAsProtoExcludesCPU(t *testing.T) {
+	l, err := limits.Parse(map[string]any{"agent": map[string]any{"limits": map[string]any{"go_max_procs": 2, "cpu": 50}}})
+	require.NoError(t, err)
+	require.True(t, l.CPU.Enabled())
+
+	p := ComponentLimits(*l).AsProto()
+	assert.Equal(t, uint64(2), p.GoMaxProcs)
+	assert.Equal(t, map[string]any{"go_max_procs": float64(2)}, p.Source.AsMap())
+}
 
 func TestExpectedConfig(t *testing.T) {
 	scenarios := []struct {
