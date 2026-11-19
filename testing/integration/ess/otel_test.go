@@ -3027,6 +3027,24 @@ func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
 	// runs against the same stack do not observe each other's state.
 	inputID := "cel-esauth-" + strings.ReplaceAll(uuid.Must(uuid.NewV4()).String(), "-", "")
 	stateIndex := "agentless-state-" + inputID
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), 30*time.Second)
+		defer cancel()
+
+		res, err := info.ESClient.Indices.Delete(
+			[]string{stateIndex},
+			info.ESClient.Indices.Delete.WithContext(ctx),
+			info.ESClient.Indices.Delete.WithIgnoreUnavailable(true),
+		)
+		if err != nil {
+			t.Logf("failed to delete state index %s: %v", stateIndex, err)
+			return
+		}
+		defer res.Body.Close()
+		if res.IsError() {
+			t.Logf("failed to delete state index %s: %s", stateIndex, res.String())
+		}
+	})
 
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
