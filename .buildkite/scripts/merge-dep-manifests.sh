@@ -20,6 +20,9 @@ set -euo pipefail
 WORKFLOW="${1:?workflow argument required (snapshot|staging)}"
 BRANCH="${2:?branch argument required}"
 OUTPUT_FILE="${3:?output-file argument required}"
+# Dep teams publish latest pointers under "master.json" for their default branch.
+DEP_BRANCH="${BRANCH}"
+[[ "${BRANCH}" == "main" ]] && DEP_BRANCH="master"
 
 PACKAGES_YML="${PACKAGES_YML:-dev-tools/packaging/packages.yml}"
 
@@ -43,7 +46,7 @@ PROJECTS_JSON="{}"
 STACK_VERSION=""
 
 for dep in "${DEPS[@]}"; do
-  latest_url="${ARTIFACT_HOST}/${dep}/latest/${BRANCH}.json"
+  latest_url="${ARTIFACT_HOST}/${dep}/latest/${DEP_BRANCH}.json"
   echo "Fetching latest pointer for ${dep}: ${latest_url}"
 
   latest_json=$(curl -sf --retry 5 --retry-delay 5 --retry-all-errors "${latest_url}") || {

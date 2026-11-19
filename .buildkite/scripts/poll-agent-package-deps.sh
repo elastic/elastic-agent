@@ -16,6 +16,9 @@
 set -euo pipefail
 
 BRANCH="${BUILDKITE_BRANCH:?BUILDKITE_BRANCH is required}"
+# Dep teams publish latest pointers under "master.json" for their default branch.
+DEP_BRANCH="${BRANCH}"
+[[ "${BRANCH}" == "main" ]] && DEP_BRANCH="master"
 WORKFLOW="${DRA_WORKFLOW:?DRA_WORKFLOW is required}"
 GCS_BUCKET="${GCS_BUCKET:?GCS_BUCKET is required}"
 BK_ORG="elastic"
@@ -66,11 +69,11 @@ HAS_NEWER=false
 declare -A CURRENT_BUILD_IDS
 
 for dep in "${DEPS[@]}"; do
-  latest_url="${ARTIFACT_HOST}/${dep}/latest/${BRANCH}.json"
+  latest_url="${ARTIFACT_HOST}/${dep}/latest/${DEP_BRANCH}.json"
   latest_json=$(curl -sf --retry 3 --retry-delay 5 "${latest_url}" 2>/dev/null || true)
 
   if [[ -z "${latest_json}" ]]; then
-    echo "WARNING: no latest pointer for ${dep} on branch ${BRANCH}, skipping"
+    echo "WARNING: no latest pointer for ${dep} on branch ${DEP_BRANCH}, skipping"
     continue
   fi
 
