@@ -3164,7 +3164,7 @@ agent.grpc.port: 0
 			if !assert.NoError(ct, err, "searching %s", stateIndex) {
 				return
 			}
-			if !assert.GreaterOrEqual(ct, docs.Hits.Total.Value, 1, "expected state document in %s", stateIndex) {
+			if !assert.Equal(ct, 1, docs.Hits.Total.Value, "expected state document in %s", stateIndex) {
 				return
 			}
 			v, ok := docs.Hits.Hits[0].Source["v"].(map[string]any)
