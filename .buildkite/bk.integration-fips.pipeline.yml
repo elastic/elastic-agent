@@ -218,8 +218,11 @@ steps:
             groups:
               - fleet
 
+  # Only tears down: destroys the shared FRS stack and any cluster left by a start retry.
+  # It also depends on the start step so it runs when the start step fails and no test starts.
   - label: ESS FIPS stack cleanup
     depends_on:
+      - integration-fips-ess
       - integration-tests-ubuntu-fips
       - integration-tests-windows-fips
     env:
