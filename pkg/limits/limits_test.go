@@ -96,3 +96,102 @@ func TestAddLimitsOnChangeCallback(t *testing.T) {
 		require.False(t, called, "callback must not be called")
 	})
 }
+
+// restoreLimits restores the global limits and the runtime GOMAXPROCS value when the test ends.
+func restoreLimits(t *testing.T) {
+	current.mu.RLock()
+	prevCfg := current.cfg
+	current.mu.RUnlock()
+	prevGoMaxProcs := runtime.GOMAXPROCS(0)
+	t.Cleanup(func() {
+		current.mu.Lock()
+		current.cfg = prevCfg
+		current.mu.Unlock()
+		runtime.GOMAXPROCS(prevGoMaxProcs)
+	})
+}
+
+func TestApplyCPU(t *testing.T) {
+	t.Run("a change of only the CPU limit does not change GOMAXPROCS", func(t *testing.T) {
+		restoreLimits(t)
+		require.NoError(t, Apply(config.MustNewConfigFrom(`agent.limits.go_max_procs: 2`)))
+		// A different runtime value shows that Apply does not set it again.
+		runtime.GOMAXPROCS(3)
+
+		called := false
+		AddLimitsOnChangeCallback(func(new, old LimitsConfig) { called = true }, "cpu-test")
+		t.Cleanup(func() { RemoveLimitsOnChangeCallback("cpu-test") })
+
+		require.NoError(t, Apply(config.MustNewConfigFrom(`agent.limits: {go_max_procs: 2, cpu: 50}`)))
+		require.False(t, called, "callback must not be called")
+		require.Equal(t, 2, GoMaxProcs(), "stored value should be valid")
+		require.Equal(t, 3, runtime.GOMAXPROCS(0), "runtime value must not be set again")
+	})
+
+	t.Run("an invalid CPU limit rejects the whole config", func(t *testing.T) {
+		restoreLimits(t)
+		require.NoError(t, Apply(config.MustNewConfigFrom(`agent.limits.go_max_procs: 2`)))
+
+		require.Error(t, Apply(config.MustNewConfigFrom(`agent.limits: {go_max_procs: 3, cpu: 0}`)))
+		require.Equal(t, 2, GoMaxProcs(), "stored value should be valid")
+		require.Equal(t, 2, runtime.GOMAXPROCS(0), "actual runtime value should be valid")
+	})
+
+	t.Run("the stored CPU limit follows the config", func(t *testing.T) {
+		restoreLimits(t)
+		for _, tc := range []struct {
+			c          string
+			expPercent int
+		}{
+			{c: `agent.limits: {go_max_procs: 2, cpu: 50}`, expPercent: 50},
+			{c: `agent.limits: {go_max_procs: 2, cpu: 60}`, expPercent: 60},
+			{c: `agent.limits: {go_max_procs: 2}`, expPercent: 0},
+		} {
+			require.NoError(t, Apply(config.MustNewConfigFrom(tc.c)))
+			current.mu.RLock()
+			percent := current.cfg.CPU.Percent()
+			current.mu.RUnlock()
+			require.Equal(t, tc.expPercent, percent, tc.c)
+		}
+	})
+}
+
+func TestParseCPU(t *testing.T) {
+	cases := []struct {
+		name       string
+		policy     any
+		expErr     bool
+		expPercent int
+	}{
+		{name: "the limit is off if cpu is absent", policy: config.MustNewConfigFrom(`agent.limits.go_max_procs: 2`)},
+		{name: "the limit is off if cpu is empty", policy: config.MustNewConfigFrom(`agent.limits.cpu:`)},
+		{name: "accepts 1", policy: config.MustNewConfigFrom(`agent.limits.cpu: 1`), expPercent: 1},
+		{name: "accepts 100", policy: config.MustNewConfigFrom(`agent.limits.cpu: 100`), expPercent: 100},
+		{name: "accepts a quoted number", policy: config.MustNewConfigFrom(`agent.limits.cpu: "50"`), expPercent: 50},
+		{
+			name:       "accepts a map with a JSON number",
+			policy:     map[string]any{"agent": map[string]any{"limits": map[string]any{"cpu": float64(50)}}},
+			expPercent: 50,
+		},
+		{name: "rejects 0", policy: config.MustNewConfigFrom(`agent.limits.cpu: 0`), expErr: true},
+		{name: "rejects a negative number", policy: config.MustNewConfigFrom(`agent.limits.cpu: -1`), expErr: true},
+		{name: "rejects 101", policy: config.MustNewConfigFrom(`agent.limits.cpu: 101`), expErr: true},
+		{name: "rejects a fraction", policy: config.MustNewConfigFrom(`agent.limits.cpu: 50.5`), expErr: true},
+		{name: "rejects a string", policy: config.MustNewConfigFrom(`agent.limits.cpu: abc`), expErr: true},
+		{name: "rejects a boolean", policy: config.MustNewConfigFrom(`agent.limits.cpu: true`), expErr: true},
+		{name: "rejects a list", policy: config.MustNewConfigFrom(`agent.limits.cpu: [50]`), expErr: true},
+		{name: "rejects an object", policy: config.MustNewConfigFrom(`agent.limits.cpu.value: 50`), expErr: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			l, err := Parse(tc.policy)
+			if tc.expErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tc.expPercent, l.CPU.Percent())
+		})
+	}
+}
