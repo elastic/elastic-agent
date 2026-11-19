@@ -20,7 +20,7 @@ WORKFLOW="${DRA_WORKFLOW:?DRA_WORKFLOW is required}"
 GCS_BUCKET="${GCS_BUCKET:?GCS_BUCKET is required}"
 BK_ORG="elastic"
 BK_PIPELINE="elastic-agent-package"
-DEPS_CONFIG=".buildkite/elastic-agent-package-deps.yaml"
+PACKAGES_YML="dev-tools/packaging/packages.yml"
 
 case "${WORKFLOW}" in
   snapshot) ARTIFACT_HOST="https://artifacts-snapshot.elastic.co" ;;
@@ -28,8 +28,11 @@ case "${WORKFLOW}" in
   *) echo "ERROR: unknown workflow '${WORKFLOW}'" >&2; exit 1 ;;
 esac
 
-# Read dependency list
-mapfile -t DEPS < <(grep '^ *- ' "${DEPS_CONFIG}" | sed 's/^ *- //')
+# Derive dep list from packages.yml projectName fields (the authoritative source).
+# beats is a submodule dep not listed as a projectName, so it is added explicitly.
+mapfile -t DEPS < <(
+  { grep -E '^\s+projectName:' "${PACKAGES_YML}" | awk '{print $2}' | sort -u; echo "beats"; } | sort -u
+)
 
 echo "--- :mag: Checking dependency versions for elastic-agent-package (branch=${BRANCH}, workflow=${WORKFLOW})"
 
@@ -110,7 +113,7 @@ echo "--- :compression: Merging dependency manifests"
 MERGED_MANIFEST_FILE=$(mktemp --suffix=.json)
 trap 'rm -f "${MERGED_MANIFEST_FILE}"' EXIT
 
-DEPS_CONFIG="${DEPS_CONFIG}" \
+PACKAGES_YML="${PACKAGES_YML}" \
   .buildkite/scripts/merge-dep-manifests.sh "${WORKFLOW}" "${BRANCH}" "${MERGED_MANIFEST_FILE}"
 
 # --- Step 5: Upload merged manifest to GCS ----------------------------------
@@ -135,11 +138,13 @@ gcloud storage cp \
 # Translate main → main (no change needed; elastic-agent-package uses main directly)
 AGENT_PKG_BRANCH="${BRANCH}"
 
-# Determine DRA_VERSION from branch: strip -SNAPSHOT suffix if present, derive semver
-# The latest pointer's version field gives us the base version
+# Determine DRA_VERSION from the first dep's latest pointer.
+# For snapshot builds the version field includes -SNAPSHOT (e.g. 9.6.0-SNAPSHOT);
+# for staging it does not (e.g. 9.6.0-rc1). Pass it as-is so the pipeline does
+# not need to append or strip the qualifier.
 FIRST_DEP="${DEPS[0]}"
 FIRST_DEP_LATEST=$(curl -sf --retry 3 "${ARTIFACT_HOST}/${FIRST_DEP}/latest/${BRANCH}.json")
-STACK_VERSION=$(echo "${FIRST_DEP_LATEST}" | jq -r '.version' | sed 's/-SNAPSHOT//')
+STACK_VERSION=$(echo "${FIRST_DEP_LATEST}" | jq -r '.version')
 
 echo "--- :pipeline: Triggering elastic-agent-package build"
 echo "  Branch:       ${AGENT_PKG_BRANCH}"

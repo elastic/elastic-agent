@@ -21,7 +21,7 @@ WORKFLOW="${1:?workflow argument required (snapshot|staging)}"
 BRANCH="${2:?branch argument required}"
 OUTPUT_FILE="${3:?output-file argument required}"
 
-DEPS_CONFIG="${DEPS_CONFIG:-.buildkite/elastic-agent-package-deps.yaml}"
+PACKAGES_YML="${PACKAGES_YML:-dev-tools/packaging/packages.yml}"
 
 case "${WORKFLOW}" in
   snapshot) ARTIFACT_HOST="https://artifacts-snapshot.elastic.co" ;;
@@ -29,8 +29,12 @@ case "${WORKFLOW}" in
   *) echo "ERROR: unknown workflow '${WORKFLOW}', expected snapshot or staging" >&2; exit 1 ;;
 esac
 
-# Read dependency list from config file
-IFS=$'\n' read -r -d '' -a DEPS < <(grep '^ *- ' "${DEPS_CONFIG}" | sed 's/^ *- //' && printf '\0')
+# Derive dep list from packages.yml projectName fields (the authoritative source).
+# beats is a submodule dep not listed as a projectName, so it is added explicitly.
+IFS=$'\n' read -r -d '' -a DEPS < <(
+  { grep -E '^\s+projectName:' "${PACKAGES_YML}" | awk '{print $2}' | sort -u; echo "beats"; } | sort -u
+  printf '\0'
+)
 
 echo "--- :package: Merging DRA manifests for branch=${BRANCH} workflow=${WORKFLOW}"
 echo "Dependencies: ${DEPS[*]}"

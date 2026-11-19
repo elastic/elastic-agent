@@ -204,7 +204,7 @@ steps:
       - *google_oidc_plugin
       - elastic/dra-prep#v0.1.7:
           product_id: "elastic-agent-package"
-          stack_version: "${DRA_VERSION}-SNAPSHOT"
+          stack_version: "${DRA_VERSION}"
           workflow: "${DRA_WORKFLOW}"
 
   - label: ":pipeline: DRA processing for elastic-agent-package / ${DRA_VERSION} / ${DRA_WORKFLOW}"
@@ -214,7 +214,7 @@ steps:
     build:
       env:
         DRA_PRODUCT_ID: "elastic-agent-package"
-        DRA_STACK_VERSION: "${DRA_VERSION}-SNAPSHOT"
+        DRA_STACK_VERSION: "${DRA_VERSION}"
         DRA_WORKFLOW: "${DRA_WORKFLOW}"
 
   - label: "Publishing via BK API for Independent Agent Release"
