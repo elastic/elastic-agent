@@ -8,7 +8,7 @@ These settings were already ignored or translated to their replacements.
 See https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/52027
 
 
-For more information, check [#17154](https://github.com/elastic/elastic-agent/pull/17154) [#18099](https://github.com/elastic/elastic-agent/pull/18099).
+For more information, check [#17977](https://github.com/elastic/elastic-agent/pull/17977).
 
 **Impact**<br>An EDOT Collector configuration that sets any of the removed settings on an `elasticsearch` exporter fails to load,
 and the Collector does not start.
@@ -29,7 +29,7 @@ and `idle_timeout` and `keep_alives_enabled` for HTTP servers.
 See https://github.com/open-telemetry/opentelemetry-collector/pull/15973
 
 
-For more information, check [#17154](https://github.com/elastic/elastic-agent/pull/17154) [#18099](https://github.com/elastic/elastic-agent/pull/18099).
+For more information, check [#17977](https://github.com/elastic/elastic-agent/pull/17977).
 
 **Impact**<br>An EDOT Collector configuration that sets any of the removed settings fails to load, and the Collector does not start.
 

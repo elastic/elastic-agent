@@ -6,8 +6,7 @@ entries:
         Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17208
       issue: []
       impact: ""
       action: ""
@@ -20,8 +19,7 @@ entries:
       description: ""
       component: edot-collector
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17451
       issue: []
       impact: ""
       action: ""
@@ -48,8 +46,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17668
       issue: []
       impact: ""
       action: ""
@@ -62,8 +59,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17715
       issue:
         - https://github.com/elastic/elastic-agent/issues/17714
       impact: ""
@@ -77,8 +73,7 @@ entries:
       description: The internal logs of the Agent, which diagnostics collects, are now written to data/logs/<build> instead of the logs directory of the installation directory (data/elastic-agent-<build>/logs). Both are inside the installation directory of the Agent, but the new one is not removed with an old build. The logs of the running build and of the latest previous build are kept. Tools that read the logs from the versioned directory need the new path.
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17802
       issue:
         - https://github.com/elastic/elastic-agent/issues/17234
       impact: ""
@@ -92,8 +87,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17938
       issue: []
       impact: ""
       action: ""
@@ -106,8 +100,7 @@ entries:
       description: ""
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17977
       issue: []
       impact: ""
       action: ""
@@ -124,8 +117,7 @@ entries:
         See https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/52027
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17977
       issue: []
       impact: |
         An EDOT Collector configuration that sets any of the removed settings on an `elasticsearch` exporter fails to load,
@@ -149,8 +141,7 @@ entries:
         See https://github.com/open-telemetry/opentelemetry-collector/pull/15973
       component: elastic-agent
       pr:
-        - https://github.com/elastic/elastic-agent/pull/17154
-        - https://github.com/elastic/elastic-agent/pull/18099
+        - https://github.com/elastic/elastic-agent/pull/17977
       issue: []
       impact: |
         An EDOT Collector configuration that sets any of the removed settings fails to load, and the Collector does not start.
