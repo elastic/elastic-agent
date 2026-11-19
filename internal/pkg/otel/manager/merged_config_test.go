@@ -24,7 +24,6 @@ import (
 	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
-	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
@@ -253,18 +252,4 @@ func BenchmarkBuildMergedConfig(b *testing.B) {
 			}
 		}
 	})
-}
-
-// BenchmarkVerifyComponentIsOtelSupported measures the check that decides if a component can run in the otel runtime,
-// which the coordinator and the otel manager each do for every component on every policy change.
-func BenchmarkVerifyComponentIsOtelSupported(b *testing.B) {
-	setTestTopPath(b)
-	comp := testComponentWithInputs("bench", 10_000)
-
-	b.ReportAllocs()
-	for b.Loop() {
-		if err := translate.VerifyComponentIsOtelSupported(&comp); err != nil {
-			b.Fatal(err)
-		}
-	}
 }

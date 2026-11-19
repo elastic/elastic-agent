@@ -201,10 +201,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	// Check if the actual configuration is supported. We need to translate the config and look for the right kind of
-	// error. Only the output can be unsupported, so translate just that: generating the whole component config would
-	// also generate all of its receivers, which is expensive for a component with thousands of inputs. This is called
-	// on every policy change, and any other error is left for the code that generates the config to report.
+	// Only the output config can be unsupported; translating the inputs too is expensive for components with many inputs.
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
 	if err != nil {
 		return err
