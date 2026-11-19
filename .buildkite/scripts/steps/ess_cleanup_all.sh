@@ -15,6 +15,7 @@ fi
 export METADATA_PREFIX
 
 echo "~~~ Phase 1: Cleaning up shared cluster"
+shared_cluster="$(buildkite-agent meta-data get "${METADATA_PREFIX}cluster-name" 2>/dev/null || true)"
 ess_down
 
 echo ""
@@ -40,6 +41,12 @@ while IFS= read -r metadata_key; do
 
   if [ -z "$cluster_name" ]; then
     echo "Warning: Empty cluster name for metadata key '$metadata_key'"
+    continue
+  fi
+
+  # The last start attempt is both the shared cluster and a retry-cluster-* key.
+  if [ "$cluster_name" = "$shared_cluster" ]; then
+    echo "Skipping $cluster_name (from $metadata_key), already destroyed in phase 1"
     continue
   fi
 
