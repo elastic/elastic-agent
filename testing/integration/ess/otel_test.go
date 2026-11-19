@@ -3088,8 +3088,14 @@ service:
   telemetry:
     metrics:
       level: none
+agent.grpc.port: 0
 `
 	var otelConfigBuffer bytes.Buffer
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	require.NoError(t, fixture.Prepare(ctx))
+
 	require.NoError(t,
 		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
 			otelConfigOptions{
@@ -3099,9 +3105,6 @@ service:
 				PathHome:   fixture.WorkDir(),
 			}))
 
-	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
-	defer cancel()
-	require.NoError(t, fixture.Prepare(ctx))
 	require.NoError(t, fixture.Configure(ctx, otelConfigBuffer.Bytes()))
 
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
