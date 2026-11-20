@@ -682,6 +682,6 @@ instrumentation:
       - name: OTEL_DOTNET_AUTO_PLUGINS
         value: "Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation"
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.19.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.19.1
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.25.0
