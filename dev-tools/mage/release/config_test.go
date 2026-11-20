@@ -6,28 +6,24 @@ package release
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateReleaseConfig(t *testing.T) {
 	t.Run("requires current release", func(t *testing.T) {
 		err := ValidateReleaseConfig(&ReleaseConfig{DryRun: true})
-		if err == nil {
-			t.Fatal("expected error for empty CurrentRelease")
-		}
+		require.Error(t, err, "expected error for empty CurrentRelease")
 	})
 
 	t.Run("requires token when not dry-run", func(t *testing.T) {
 		err := ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: "9.5.0"})
-		if err == nil {
-			t.Fatal("expected error for missing GITHUB_TOKEN")
-		}
+		require.Error(t, err, "expected error for missing GITHUB_TOKEN")
 	})
 
 	t.Run("ok in dry-run without token", func(t *testing.T) {
 		err := ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: "9.5.0", DryRun: true})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
+		require.NoError(t, err)
 	})
 }
 
@@ -39,18 +35,10 @@ func TestEnsureLatestRelease(t *testing.T) {
 	t.Cleanup(func() { fetchLatestReleaseBefore = orig })
 
 	cfg := &ReleaseConfig{CurrentRelease: "9.5.0"}
-	if err := EnsureLatestRelease(cfg); err != nil {
-		t.Fatalf("EnsureLatestRelease() error = %v", err)
-	}
-	if cfg.LatestRelease != "9.4.2" {
-		t.Fatalf("LatestRelease = %s, want 9.4.2", cfg.LatestRelease)
-	}
+	require.NoError(t, EnsureLatestRelease(cfg))
+	require.Equal(t, "9.4.2", cfg.LatestRelease)
 
 	cfg.LatestRelease = "already-set"
-	if err := EnsureLatestRelease(cfg); err != nil {
-		t.Fatalf("EnsureLatestRelease() error = %v", err)
-	}
-	if cfg.LatestRelease != "already-set" {
-		t.Fatalf("LatestRelease = %s, want already-set", cfg.LatestRelease)
-	}
+	require.NoError(t, EnsureLatestRelease(cfg))
+	require.Equal(t, "already-set", cfg.LatestRelease)
 }
