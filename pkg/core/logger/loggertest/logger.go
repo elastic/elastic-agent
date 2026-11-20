@@ -17,14 +17,14 @@ import (
 
 // New creates a testing logger that buffers the logs in memory and
 // logs in debug level. Check observer.ObservedLogs for more details.
+//
+// The logger does not use the global logger, so tests that change the global
+// logger do not affect it.
 func New(name string) (*logger.Logger, *observer.ObservedLogs) {
 	core, obs := observer.New(zapcore.DebugLevel)
 
-	log := logp.NewLogger(
-		name,
-		zap.WrapCore(func(in zapcore.Core) zapcore.Core {
-			return zapcore.NewTee(in, core)
-		}))
+	// NewZapLogger never returns an error.
+	log, _ := logp.NewZapLogger(zap.New(core).Named(name))
 
 	return log, obs
 }
