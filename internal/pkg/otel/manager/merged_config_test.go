@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
@@ -60,9 +62,7 @@ func forEachMergeAppendGate(t *testing.T, f func(t *testing.T, gateEnabled bool)
 
 func setTestTopPath(t testing.TB) {
 	t.Helper()
-	topPath := paths.Top()
-	paths.SetTop(t.TempDir())
-	t.Cleanup(func() { paths.SetTop(topPath) })
+	pathstest.SetTop(t, t.TempDir())
 }
 
 // noHostInfoAgent is an info.Agent that does not look up host information, so the monitoring

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -19,7 +21,7 @@ import (
 func setupDir(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
-	paths.SetDownloads(dir)
+	pathstest.SetDownloads(t, dir)
 
 	err := os.WriteFile(filepath.Join(dir, "test-8.3.0-file"), []byte("hello, world!"), 0600)
 	require.NoError(t, err)

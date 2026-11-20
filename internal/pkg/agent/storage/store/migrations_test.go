@@ -11,10 +11,11 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
@@ -715,7 +716,7 @@ func TestStoreMigrations(t *testing.T) {
 			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
-			paths.SetConfig(tempDir)
+			pathstest.SetConfig(t, tempDir)
 			vaultPath := createAgentVaultAndSecret(t, ctx, tempDir)
 
 			stateStorePath := filepath.Join(tempDir, "store.enc")
@@ -758,7 +759,7 @@ func TestStoreMigrations(t *testing.T) {
 			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
-			paths.SetConfig(tempDir)
+			pathstest.SetConfig(t, tempDir)
 			createAgentVaultAndSecret(t, ctx, tempDir)
 			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
 			newStateStorePath := filepath.Join(tempDir, "state_store.enc")
@@ -781,7 +782,7 @@ func TestStoreMigrations(t *testing.T) {
 			log, _ := loggertest.New("")
 
 			tempDir := t.TempDir()
-			paths.SetConfig(tempDir)
+			pathstest.SetConfig(t, tempDir)
 			createAgentVaultAndSecret(t, ctx, tempDir)
 			oldActionStorePath := filepath.Join(tempDir, "action_store.yml")
 			newStateStorePath := filepath.Join(tempDir, "state_store.enc")

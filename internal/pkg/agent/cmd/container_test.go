@@ -22,6 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"gopkg.in/yaml.v3"
 
 	"github.com/stretchr/testify/mock"
@@ -1667,9 +1669,7 @@ func TestContainerEnvOverridesFleetTLSPaths(t *testing.T) {
 	t.Setenv("ELASTIC_AGENT_CERT", envCertPath)
 	t.Setenv("ELASTIC_AGENT_CERT_KEY", envKeyPath)
 
-	origCfg := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(origCfg) })
-	paths.SetConfig(t.TempDir())
+	pathstest.SetConfig(t, t.TempDir())
 
 	ctx := t.Context()
 	require.NoError(t, secret.CreateAgentSecret(ctx, vault.WithUnprivileged(true)))
@@ -1706,9 +1706,7 @@ func TestContainerEnvOverridesFleetCA(t *testing.T) {
 	esCAPath := filepath.Join(certDir, "es-ca.crt")
 	require.NoError(t, os.WriteFile(esCAPath, rootPair.Cert, 0o644))
 
-	origCfg := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(origCfg) })
-	paths.SetConfig(t.TempDir())
+	pathstest.SetConfig(t, t.TempDir())
 	for _, key := range []string{"FLEET_CA", "KIBANA_CA", "ELASTICSEARCH_CA"} {
 		if orig, ok := os.LookupEnv(key); ok {
 			t.Cleanup(func() { os.Setenv(key, orig) })

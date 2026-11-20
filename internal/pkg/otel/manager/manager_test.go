@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
@@ -934,13 +936,8 @@ func TestOTelManager_Logging(t *testing.T) {
 	const waitTimeForStop = 30 * time.Second
 
 	tmp := t.TempDir()
-	topPath, logsPath := paths.Top(), paths.Logs()
-	paths.SetTop(tmp)
-	paths.SetLogs(filepath.Join(tmp, "logs"))
-	t.Cleanup(func() {
-		paths.SetTop(topPath)
-		paths.SetLogs(logsPath)
-	})
+	pathstest.SetTop(t, tmp)
+	pathstest.SetLogs(t, filepath.Join(tmp, "logs"))
 
 	l, _ := loggertest.New("otel-manager")
 
@@ -1610,10 +1607,8 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	// Set a temp top path so injectDiagnosticsExtension can compute a valid
 	// socket path without side-effects on the real paths.
-	topPath := paths.Top()
 	tempTopPath := t.TempDir()
-	paths.SetTop(tempTopPath)
-	t.Cleanup(func() { paths.SetTop(topPath) })
+	pathstest.SetTop(t, tempTopPath)
 
 	m := &OTelManager{
 		healthCheckExtComponentID: "healthcheckv2/test",
@@ -1725,10 +1720,8 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 // components (and therefore no component-generated extensions), the collector
 // config extensions are still preserved in the merged output.
 func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
-	topPath := paths.Top()
 	tempTopPath := t.TempDir()
-	paths.SetTop(tempTopPath)
-	t.Cleanup(func() { paths.SetTop(topPath) })
+	pathstest.SetTop(t, tempTopPath)
 
 	m := &OTelManager{
 		healthCheckExtComponentID: "healthcheckv2/test",
