@@ -3161,25 +3161,24 @@ agent.grpc.port: 0
 			defer findCancel()
 
 			docs, err := estools.GetAllLogsForIndexWithContext(findCtx, info.ESClient, stateIndex)
-			if !assert.NoError(ct, err, "searching %s", stateIndex) {
-				return
-			}
-			if !assert.Equal(ct, 1, docs.Hits.Total.Value, "expected state document in %s", stateIndex) {
-				return
-			}
+			require.NoError(ct, err, "searching %s", stateIndex)
+			require.Equal(ct, 1, docs.Hits.Total.Value, "expected single state document in %s", stateIndex)
+
 			v, ok := docs.Hits.Hits[0].Source["v"].(map[string]any)
-			if !assert.True(ct, ok, "expected state document 'v' object in %s", stateIndex) {
-				return
-			}
+			require.True(ct, ok, "expected state document 'v' object in %s", stateIndex)
+
 			cursor, ok := v["cursor"].(map[string]any)
-			if !assert.True(ct, ok, "expected state document 'v.cursor' object in %s", stateIndex) {
-				return
-			}
+			require.True(ct, ok, "expected state document 'v.cursor' object in %s", stateIndex)
+
 			seq, ok := cursor["sequence"].(float64)
-			if !assert.True(ct, ok, "expected numeric 'v.cursor.sequence' in %s", stateIndex) {
-				return
-			}
-			assert.GreaterOrEqual(ct, seq, float64(1), "expected incremented cursor sequence in %s", stateIndex)
+			require.True(ct, ok, "expected numeric 'v.cursor.sequence' in %s", stateIndex)
+
+			require.GreaterOrEqual(
+				ct,
+				seq,
+				float64(1),
+				"expected incremented cursor sequence in %s", stateIndex,
+			)
 		},
 		1*time.Minute, 1*time.Second, "expected incremented cursor state in %s", stateIndex)
 
