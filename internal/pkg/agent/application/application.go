@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	stateStore "github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
+	"github.com/elastic/elastic-agent/internal/pkg/browserca"
 	"github.com/elastic/elastic-agent/internal/pkg/capabilities"
 	"github.com/elastic/elastic-agent/internal/pkg/composable"
 	"github.com/elastic/elastic-agent/internal/pkg/composable/include"
@@ -146,6 +147,14 @@ func New(
 	var configMgr coordinator.ConfigManager
 	var managed *managedConfigManager
 	var compModifiers = []component.ComponentsModifier{InjectAPMConfig}
+	// Resolve browser trust before components start, without changing Agent's HOME.
+	var browserCAs browserca.Config
+	if synthetics := cfg.Settings.Synthetics; synthetics != nil {
+		browserCAs = synthetics.Browser
+	}
+	if home := browserca.Start(ctx, log.Named("browserca"), browserCAs); home != "" {
+		compModifiers = append(compModifiers, browserHomeModifier(home))
+	}
 	var composableManaged bool
 	var isManaged bool
 	var actionAcker acker.Acker

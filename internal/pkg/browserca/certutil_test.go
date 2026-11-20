@@ -221,3 +221,77 @@ func TestSyncAsRootDoesNotFollowASymlinkedDatabase(t *testing.T) {
 	require.NoError(t, err, "stat the symlink target")
 	assert.Zero(t, info.Sys().(*syscall.Stat_t).Uid, "the symlink target must still belong to root")
 }
+
+func TestRootOwnershipRepairLeavesUnrelatedFilesAlone(t *testing.T) {
+	certutil, o := rootTestOwner(t)
+	home := rootTestHome(t, o)
+	m := &manager{home: home, certs: execRunner(certutil, nil), log: &testLog{}}
+	// Simulate a database created by root before ownership repair.
+	require.NoError(t, os.MkdirAll(m.dbDir(), 0o700))
+	_, err := m.certs(t.Context(), nil, "-N", "-d", "sql:"+m.dbDir(), "--empty-password")
+	require.NoError(t, err)
+	unrelated := []string{filepath.Join(home, ".pki", "other.pem"), filepath.Join(m.dbDir(), "other.db")}
+	for _, path := range unrelated {
+		require.NoError(t, os.WriteFile(path, []byte("untouched"), 0o600))
+	}
+	m.owner, m.certs = o, execRunner(certutil, o)
+	m.paths = []string{t.TempDir()}
+	write(t, m.paths[0], "ca.pem", newCA(t, "ca"))
+	require.NoError(t, m.reconcile(t.Context()))
+	for _, path := range unrelated {
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		assert.Zero(t, info.Sys().(*syscall.Stat_t).Uid)
+		content, err := os.ReadFile(path)
+		require.NoError(t, err)
+		assert.Equal(t, "untouched", string(content))
+	}
+	for _, name := range []string{"cert9.db", "key4.db", "pkcs11.txt"} {
+		info, err := os.Stat(filepath.Join(m.dbDir(), name))
+		require.NoError(t, err)
+		assert.Equal(t, o.uid, info.Sys().(*syscall.Stat_t).Uid)
+	}
+}
+
+func TestRootOwnershipRepairRejectsLinkedDatabaseFile(t *testing.T) {
+	_, o := rootTestOwner(t)
+	for _, link := range []string{"symlink", "hardlink"} {
+		t.Run(link, func(t *testing.T) {
+			m := &manager{home: rootTestHome(t, o), owner: o}
+			require.NoError(t, os.MkdirAll(m.dbDir(), 0o700))
+			target := filepath.Join(t.TempDir(), "target")
+			require.NoError(t, os.WriteFile(target, []byte("untouched"), 0o600))
+			path := filepath.Join(m.dbDir(), "cert9.db")
+			if link == "symlink" {
+				require.NoError(t, os.Symlink(target, path))
+			} else {
+				require.NoError(t, os.Link(target, path))
+			}
+			require.Error(t, m.prepareDBDir())
+			info, err := os.Stat(target)
+			require.NoError(t, err)
+			assert.Zero(t, info.Sys().(*syscall.Stat_t).Uid)
+		})
+	}
+}
+
+func TestRootCleanupLeavesUnmanagedStoreUntouched(t *testing.T) {
+	certutil, o := rootTestOwner(t)
+	home := rootTestHome(t, o)
+	m := &manager{home: home, certs: execRunner(certutil, o), owner: o, inspect: execRunner(certutil, nil), log: &testLog{}}
+	require.NoError(t, os.MkdirAll(m.dbDir(), 0o700))
+	_, err := m.inspect(t.Context(), nil, "-N", "-d", "sql:"+m.dbDir(), "--empty-password")
+	require.NoError(t, err)
+	_, err = m.inspect(t.Context(), []byte(newCA(t, "unmanaged")), "-A", "-d", "sql:"+m.dbDir(), "-n", "user-ca", "-t", "C,,", "-a")
+	require.NoError(t, err)
+	path := filepath.Join(m.dbDir(), "cert9.db")
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, m.reconcile(t.Context()))
+	info, err := os.Stat(path)
+	require.NoError(t, err)
+	assert.Zero(t, info.Sys().(*syscall.Stat_t).Uid)
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+}

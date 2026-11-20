@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Scope browser CA management and bound startup work
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/17931
