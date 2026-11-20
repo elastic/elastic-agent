@@ -213,8 +213,9 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
 	paths.SetTop(tempAgentRoot)
-	// we don't set a 'data' subdirectory in order to make the zip process return an error
-	// this is the only way/trick to do it with the current implementation, sadly :(
+	// 'data' is a file, not a directory, so the zip process always returns an error.
+	// A missing directory is not enough: paths.TempDir() creates it on its first call in the process.
+	require.NoError(t, os.WriteFile(path.Join(tempAgentRoot, "data"), nil, 0600))
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
