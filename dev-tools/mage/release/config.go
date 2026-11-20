@@ -21,26 +21,31 @@ var fetchLatestReleaseBefore = func(token, owner, repo, current string) (string,
 
 // EnsureLatestRelease sets LatestRelease when unset by querying elastic/elastic-agent releases.
 func EnsureLatestRelease(c *ReleaseConfig) error {
-	if c.LatestRelease != "" {
+	if err := c.EnsureParsedVersions(); err != nil {
+		return err
+	}
+	if c.LatestReleaseVersion != nil {
 		return nil
 	}
-	if c.CurrentRelease == "" {
-		return fmt.Errorf("CurrentRelease is required to resolve LatestRelease")
+	if c.LatestRelease != "" {
+		return c.SetLatestReleaseFromString(c.LatestRelease)
 	}
 
-	latest, err := fetchLatestReleaseBefore(c.GitHubToken, releasesLookupOwner, releasesLookupRepo, c.CurrentRelease)
+	latest, err := fetchLatestReleaseBefore(c.GitHubToken, releasesLookupOwner, releasesLookupRepo, c.NextRelease)
 	if err != nil {
 		return fmt.Errorf("failed to resolve LatestRelease from GitHub: %w", err)
 	}
-	c.LatestRelease = latest
-	fmt.Printf("Resolved LatestRelease from %s/%s: %s\n", releasesLookupOwner, releasesLookupRepo, latest)
+	if err := c.SetLatestReleaseFromString(latest); err != nil {
+		return fmt.Errorf("failed to parse LatestRelease from GitHub (%s): %w", latest, err)
+	}
+	fmt.Printf("Resolved LatestRelease from %s/%s: %s\n", releasesLookupOwner, releasesLookupRepo, c.LatestRelease)
 	return nil
 }
 
 // ValidateReleaseConfig checks if the configuration is valid for release workflows.
 func ValidateReleaseConfig(c *ReleaseConfig) error {
-	if c.CurrentRelease == "" {
-		return fmt.Errorf("CurrentRelease is required")
+	if err := c.EnsureParsedVersions(); err != nil {
+		return err
 	}
 
 	if !c.DryRun && c.GitHubToken == "" {
