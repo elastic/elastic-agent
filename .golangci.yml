@@ -47,6 +47,8 @@ linters:
         - pattern: fmt.Print.*
         - pattern: ^context\.Background$
           msg: "use t.Context() in tests so the context is cancelled when the test ends"
+        - pattern: ^paths\.(SetTop|SetConfig|SetLogs|SetDownloads|SetVersionHome)$
+          msg: "tests must restore the global paths, use the pathstest helpers"
       exclude-godoc-examples: true
     gomoddirectives:
       replace-allow-list:
@@ -108,6 +110,10 @@ linters:
           - forbidigo
         path-except: "testing/integration/.*_test\\.go$"
         text: "use t\\.Context\\(\\) in tests"
+      - linters:
+          - forbidigo
+        path-except: "_test\\.go$"
+        text: "tests must restore the global paths"
     paths:
       - third_party$
       - builtin$

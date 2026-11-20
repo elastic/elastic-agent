@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -247,9 +249,7 @@ fleet:
 
 func setupConfigReloaderTest(t *testing.T) {
 	t.Helper()
-	origConfig := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(origConfig) })
-	paths.SetConfig(t.TempDir())
+	pathstest.SetConfig(t, t.TempDir())
 	testutils.InitStorage(t)
 }
 

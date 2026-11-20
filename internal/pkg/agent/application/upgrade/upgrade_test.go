@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/gofrs/flock"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
@@ -1442,7 +1444,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 			require.NoError(t, os.MkdirAll(paths.Data(), 0755))
 
 			mockAgentInfo := info.NewMockAgent(t)
@@ -1504,9 +1506,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 
 	// Use the package-local helper so the live install lands at the exact path
 	// paths.VersionedHome() will resolve to inside Upgrader.Upgrade — passing
@@ -1585,9 +1585,7 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// Write initial active.commit pointing to the current binary.
@@ -1671,9 +1669,7 @@ func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// Write initial active.commit so the S3 disk-read path is exercised.
@@ -1731,9 +1727,7 @@ func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, agentCommitFile), []byte(release.Commit()), 0o600))
@@ -1850,7 +1844,7 @@ func TestCopyActionStore(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			newHome := filepath.Join(baseDir, "new_home")
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 
 			actionStorePath := paths.AgentActionStoreFile()
 			actionStateStoreYamlPath := paths.AgentStateStoreYmlFile()
@@ -1935,7 +1929,7 @@ func TestCopyRunDirectory(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 
 			oldRunPath := filepath.Join(baseDir, "old_dir", "run")
 			oldRunFile := filepath.Join(oldRunPath, "file.txt")
