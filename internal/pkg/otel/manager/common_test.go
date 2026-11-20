@@ -6,8 +6,10 @@ package manager
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 
@@ -44,6 +46,129 @@ func TestFindRandomPort(t *testing.T) {
 	}
 	_, err = findRandomTCPPorts(portCount)
 	assert.Error(t, err, "failed to find random port")
+}
+
+// TestFindRandomTCPPorts_AvoidsWildcardBoundPorts verifies that findRandomTCPPorts never returns
+// a port already bound on 0.0.0.0. Third-party services such as HP OpenView Agent bind on the
+// wildcard address; on some Linux kernels the ephemeral-port allocator can hand back a port number
+// that is already occupied on 0.0.0.0 when the availability probe is made only against 127.0.0.1.
+// If this test fails it means the supervised collector will receive a port that it cannot bind,
+// triggering the restart loop described in https://github.com/elastic/elastic-agent/issues/16142.
+func TestFindRandomTCPPorts_AvoidsWildcardBoundPorts(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("wildcard vs loopback port-allocation behaviour is Linux-specific")
+	}
+
+	// Simulate a third-party service holding a port on all interfaces.
+	// netListen is used (rather than net.Listen directly) to satisfy the noctx linter.
+	l, err := netListen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+	boundPort := l.Addr().(*net.TCPAddr).Port
+
+	const iterations = 100
+	for i := 0; i < iterations; i++ {
+		ports, err := findRandomTCPPorts(1)
+		require.NoError(t, err)
+		require.Len(t, ports, 1)
+		assert.NotEqualf(t, boundPort, ports[0],
+			"findRandomTCPPorts returned port %d which is already bound on 0.0.0.0; "+
+				"the loopback-only availability check does not exclude wildcard-bound ports",
+			boundPort)
+	}
+}
+
+// TestFindRandomTCPPorts_PortsVary verifies that findRandomTCPPorts returns different port numbers
+// across sequential calls. If the OS ephemeral-port allocator deterministically hands back the same
+// "first free" port every time, the function would always return the same port — making it
+// vulnerable to repeatedly colliding with a service that transiently occupies that specific port.
+// See https://github.com/elastic/sdh-beats/issues/7463#issuecomment-5541484862.
+func TestFindRandomTCPPorts_PortsVary(t *testing.T) {
+	const iterations = 50
+	seen := make(map[int]struct{}, iterations)
+	for i := 0; i < iterations; i++ {
+		ports, err := findRandomTCPPorts(1)
+		require.NoError(t, err)
+		require.Len(t, ports, 1)
+		seen[ports[0]] = struct{}{}
+	}
+	assert.Greater(t, len(seen), 1,
+		"findRandomTCPPorts returned the same port on all %d sequential calls; "+
+			"the OS ephemeral-port allocator appears deterministic rather than random",
+		iterations)
+}
+
+// findRandomTCPPortsOnAllInterfaces is a variant of findRandomTCPPorts that probes port
+// availability by binding on 0.0.0.0 instead of localhost. Binding on the wildcard address causes
+// the OS to exclude ports already occupied on 0.0.0.0, avoiding the loopback-vs-wildcard
+// allocation divergence that can cause findRandomTCPPorts to return a port already in use.
+func findRandomTCPPortsOnAllInterfaces(count int) (ports []int, err error) {
+	ports = make([]int, 0, count)
+	listeners := make([]net.Listener, 0, count)
+	defer func() {
+		for _, listener := range listeners {
+			if closeErr := listener.Close(); closeErr != nil {
+				err = errors.Join(err, fmt.Errorf("error closing listener: %w", closeErr))
+			}
+		}
+	}()
+	for range count {
+		l, err := netListen("tcp", "0.0.0.0:0")
+		if err != nil {
+			return nil, err
+		}
+		listeners = append(listeners, l)
+
+		port := l.Addr().(*net.TCPAddr).Port
+		if port == 0 {
+			return nil, fmt.Errorf("failed to find random port")
+		}
+		ports = append(ports, port)
+	}
+
+	return ports, err
+}
+
+// TestFindRandomTCPPortsOnAllInterfaces_AvoidsWildcardBoundPorts is the analogue of
+// TestFindRandomTCPPorts_AvoidsWildcardBoundPorts for the 0.0.0.0 probe variant.
+// It should pass where the localhost variant fails: the wildcard probe causes the OS to exclude
+// ports already bound on 0.0.0.0.
+func TestFindRandomTCPPortsOnAllInterfaces_AvoidsWildcardBoundPorts(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("wildcard vs loopback port-allocation behaviour is Linux-specific")
+	}
+
+	l, err := netListen("tcp", "0.0.0.0:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = l.Close() })
+	boundPort := l.Addr().(*net.TCPAddr).Port
+
+	const iterations = 100
+	for i := 0; i < iterations; i++ {
+		ports, err := findRandomTCPPortsOnAllInterfaces(1)
+		require.NoError(t, err)
+		require.Len(t, ports, 1)
+		assert.NotEqualf(t, boundPort, ports[0],
+			"findRandomTCPPortsOnAllInterfaces returned port %d which is already bound on 0.0.0.0",
+			boundPort)
+	}
+}
+
+// TestFindRandomTCPPortsOnAllInterfaces_PortsVary is the analogue of
+// TestFindRandomTCPPorts_PortsVary for the 0.0.0.0 probe variant.
+func TestFindRandomTCPPortsOnAllInterfaces_PortsVary(t *testing.T) {
+	const iterations = 50
+	seen := make(map[int]struct{}, iterations)
+	for i := 0; i < iterations; i++ {
+		ports, err := findRandomTCPPortsOnAllInterfaces(1)
+		require.NoError(t, err)
+		require.Len(t, ports, 1)
+		seen[ports[0]] = struct{}{}
+	}
+	assert.Greater(t, len(seen), 1,
+		"findRandomTCPPortsOnAllInterfaces returned the same port on all %d sequential calls; "+
+			"the OS ephemeral-port allocator appears deterministic rather than random",
+		iterations)
 }
 
 func testComponent(componentId string) agentcomponent.Component {
