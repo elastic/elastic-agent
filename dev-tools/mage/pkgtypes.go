@@ -49,7 +49,8 @@ const (
 	// defaultRootDir is the default name of the root directory contained inside of zip and
 	// tar.gz packages.
 	// NOTE: This uses .BeatName instead of .Name because we wanted the internal
-	// directory to not include "-oss".
+	// directory to not include "-oss". Specs that need the name in the root
+	// directory, like the EDR flavor, set root_dir_includes_name.
 	defaultRootDir = "{{.BeatName}}{{if .Qualifier}}-{{.Qualifier}}{{end}}-{{.Version}}{{if .Snapshot}}-SNAPSHOT{{end}}{{if .OS}}-{{.OS}}{{end}}{{if .Arch}}-{{.Arch}}{{end}}"
 
 	componentConfigMode os.FileMode = 0600
@@ -111,11 +112,12 @@ type PackageSpec struct {
 	PostInstallScript       string                 `yaml:"post_install_script,omitempty"`
 	PostRmScript            string                 `yaml:"post_rm_script,omitempty"`
 	Files                   map[string]PackageFile `yaml:"files"`
-	Qualifier               string                 `yaml:"qualifier,omitempty"`   // Optional
-	OutputFile              string                 `yaml:"output_file,omitempty"` // Optional
-	ExtraVars               map[string]string      `yaml:"extra_vars,omitempty"`  // Optional
-	ExtraTags               []string               `yaml:"extra_tags,omitempty"`  // Optional
-	Components              []packaging.BinarySpec `yaml:"components"`            // Optional: Components required for this package
+	Qualifier               string                 `yaml:"qualifier,omitempty"`              // Optional
+	OutputFile              string                 `yaml:"output_file,omitempty"`            // Optional
+	RootDirIncludesName     bool                   `yaml:"root_dir_includes_name,omitempty"` // Optional: name the root directory of zip and tar.gz packages after the spec name
+	ExtraVars               map[string]string      `yaml:"extra_vars,omitempty"`             // Optional
+	ExtraTags               []string               `yaml:"extra_tags,omitempty"`             // Optional
+	Components              []packaging.BinarySpec `yaml:"components"`                       // Optional: Components required for this package
 
 	cfg                    *Settings
 	evalContext            map[string]interface{}
@@ -595,6 +597,10 @@ func (s PackageSpec) toMap() map[string]interface{} {
 func (s PackageSpec) rootDir() string {
 	if s.OutputFile != "" {
 		return filepath.Base(s.OutputFile)
+	}
+
+	if s.RootDirIncludesName {
+		return s.MustExpand(defaultBinaryName)
 	}
 
 	return s.MustExpand(defaultRootDir)

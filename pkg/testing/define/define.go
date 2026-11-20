@@ -70,16 +70,22 @@ func Version() string {
 // NewFixtureFromLocalBuild returns a new Elastic Agent testing fixture with a LocalFetcher and
 // the agent logging to the test logger.
 func NewFixtureFromLocalBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	return newFixtureFromLocalBuild(t, version, false, opts...)
+	return newFixtureFromLocalBuild(t, version, false, "", opts...)
 }
 
 // NewFixtureFromLocalFIPSBuild returns a new FIPS-capable Elastic Agent testing fixture with a LocalFetcher
 // and the agent logging to the test logger.
 func NewFixtureFromLocalFIPSBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
-	return newFixtureFromLocalBuild(t, version, true, opts...)
+	return newFixtureFromLocalBuild(t, version, true, "", opts...)
 }
 
-func newFixtureFromLocalBuild(t *testing.T, version string, fips bool, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+// NewFixtureFromLocalEDRBuild returns a new Elastic Agent testing fixture for the EDR flavor, with a
+// LocalFetcher and the agent logging to the test logger.
+func NewFixtureFromLocalEDRBuild(t *testing.T, version string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
+	return newFixtureFromLocalBuild(t, version, false, "edr", opts...)
+}
+
+func newFixtureFromLocalBuild(t *testing.T, version string, fips bool, flavor string, opts ...atesting.FixtureOpt) (*atesting.Fixture, error) {
 	ver, err := semver.ParseVersion(version)
 	if err != nil {
 		return nil, fmt.Errorf("%q is an invalid agent version: %w", version, err)
@@ -91,6 +97,9 @@ func newFixtureFromLocalBuild(t *testing.T, version string, fips bool, opts ...a
 	}
 	if fips {
 		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalFIPSOnly())
+	}
+	if flavor != "" {
+		localFetcherOpts = append(localFetcherOpts, atesting.WithLocalFlavor(flavor))
 	}
 	binFetcher := atesting.LocalFetcher(buildsDir(t), localFetcherOpts...)
 

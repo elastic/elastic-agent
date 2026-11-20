@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	v1 "github.com/elastic/elastic-agent/pkg/api/v1"
 )
 
@@ -411,7 +412,7 @@ func TestFlavor(t *testing.T) {
 		{
 			name: "valid flavor file",
 			setupFn: func(dir string) error {
-				return os.WriteFile(filepath.Join(dir, flavorFileName),
+				return os.WriteFile(filepath.Join(dir, paths.FlavorFileName),
 					[]byte(FlavorServers), 0644)
 			},
 			wantFlavor: FlavorServers,
@@ -500,6 +501,32 @@ func TestSpecsForFlavor(t *testing.T) {
 
 			specs := SpecsForFlavor(flavor)
 			assert.ElementsMatch(t, tt.wantSpecs, specs)
+		})
+	}
+}
+
+func TestFlavorForInstall(t *testing.T) {
+	tests := []struct {
+		name           string
+		builtFlavor    string
+		installServers bool
+		want           string
+		wantErr        bool
+	}{
+		{name: "standard build defaults to basic", want: FlavorBasic},
+		{name: "standard build with servers", installServers: true, want: FlavorServers},
+		{name: "edr build installs edr", builtFlavor: FlavorEDR, want: FlavorEDR},
+		{name: "edr build cannot install servers", builtFlavor: FlavorEDR, installServers: true, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := flavorForInstall(tc.builtFlavor, tc.installServers)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

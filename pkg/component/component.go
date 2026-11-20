@@ -906,6 +906,15 @@ func (r *RuntimeSpecs) componentsForInputType(
 				if input.runtimeManager == "" {
 					input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
 				}
+				// In the EDR flavor, only beats compiled into the
+				// EDR elastic-otel-collector are supported.
+				if len(flavorAllowedInputTypes) > 0 && inputSpec.BeatName() != "" {
+					if _, ok := flavorAllowedInputTypes[inputType]; !ok {
+						componentErr = fmt.Errorf("input type %q is not supported in this flavor", inputType)
+					} else {
+						input.runtimeManager = OtelRuntimeManager
+					}
+				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
 					unitForInput(input, unitID, shared.cache),
@@ -965,6 +974,13 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 			if input.runtimeManager == "" {
 				input.runtimeManager = runtimeConfig.RuntimeManagerForInputType(input.inputType, inputSpec.BeatName(), output)
+			}
+			if len(flavorAllowedInputTypes) > 0 && inputSpec.BeatName() != "" {
+				if _, ok := flavorAllowedInputTypes[inputType]; !ok {
+					componentErr = fmt.Errorf("input type %q is not supported in this flavor", inputType)
+				} else {
+					input.runtimeManager = OtelRuntimeManager
+				}
 			}
 
 			var units []Unit
@@ -1258,6 +1274,11 @@ func toIntermediate(
 			case OtelRuntimeManager, ProcessRuntimeManager:
 			default:
 				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', valid values are: %s, %s", idx, OtelRuntimeManager, ProcessRuntimeManager)
+			}
+			// When a flavor restricts input types, it also cannot run beats in
+			// process mode — the beat subcommands are not compiled in.
+			if len(flavorAllowedInputTypes) > 0 && runtimeManagerVal == ProcessRuntimeManager {
+				return nil, fmt.Errorf("invalid 'inputs.%d.runtime', process runtime is not supported in this flavor", idx)
 			}
 			runtimeManager = runtimeManagerVal
 			delete(input, runtimeManagerKey)

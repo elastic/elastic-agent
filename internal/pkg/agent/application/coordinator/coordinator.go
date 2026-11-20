@@ -2370,6 +2370,15 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *compone
 		// check if the component is actually supported
 		err := translate.VerifyComponentIsOtelSupported(comp)
 		if err != nil {
+			if release.IsEDRFlavor() {
+				// In the EDR flavor, process mode is not available: the beat
+				// subcommands are not compiled in. Surface a clear error rather than
+				// silently downgrading, which would then fail trying to exec a
+				// non-existent subcommand.
+				logger.Errorf("otel runtime is not supported for component %s in the EDR flavor and cannot fall back to process runtime: %v", comp.ID, err)
+				comp.Err = fmt.Errorf("otel runtime not supported in the EDR flavor: %w", err)
+				return
+			}
 			logger.Infof("otel runtime is not supported for component %s, switching to process runtime, reason: %v", comp.ID, err)
 			comp.RuntimeManager = component.ProcessRuntimeManager
 		}

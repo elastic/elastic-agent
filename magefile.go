@@ -333,6 +333,7 @@ func GolangCrossBuild(ctx context.Context) error {
 	params := devtools.DefaultGolangCrossBuildArgs(cfg)
 	params.OutputDir = "build/golang-crossbuild"
 	params.Package = "github.com/elastic/elastic-agent"
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=grpcnotrace")
 	injectBuildVars(cfg, params.Vars)
 
 	// The elastic-agent binary only requires cgo on darwin (Keychain access
@@ -352,6 +353,31 @@ func GolangCrossBuild(ctx context.Context) error {
 	return nil
 }
 
+// GolangCrossBuildEDR builds the EDR flavor of the elastic-agent binary
+// inside the golang-builder. Do not use directly; use Build.CrossBuildEDR instead.
+// The binary is stamped with release.flavor=edr and written as elastic-agent-edr-<goos>-<arch>
+// so it can coexist with the standard elastic-agent-<goos>-<arch> in build/golang-crossbuild/.
+func GolangCrossBuildEDR(ctx context.Context) error {
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGolangCrossBuildArgs(cfg)
+	params.OutputDir = "build/golang-crossbuild"
+	params.Name = "elastic-agent-edr-" + cfg.Build.GOOS + "-" + cfg.Platform().Arch
+	params.Package = "github.com/elastic/elastic-agent"
+	injectBuildVars(cfg, params.Vars)
+	params.Vars["github.com/elastic/elastic-agent/internal/pkg/release.flavor"] = "edr"
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=edr,grpcnotrace")
+
+	if cfg.Platform().GOOS != "darwin" {
+		params.CGO = false
+	}
+
+	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Binary build the fleet artifact.
 func (Build) Binary(ctx context.Context) error {
 	mg.Deps(Prepare.Env)
@@ -359,6 +385,7 @@ func (Build) Binary(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
 	buildArgs := devtools.DefaultBuildArgs(cfg)
 	buildArgs.OutputDir = buildDir
+	buildArgs.ExtraFlags = append(buildArgs.ExtraFlags, "-tags=grpcnotrace")
 	injectBuildVars(cfg, buildArgs.Vars)
 
 	return devtools.Build(ctx, cfg, buildArgs)
@@ -651,7 +678,7 @@ func (Test) Coverage() error {
 // commit the downloaded binary was built at). Mixing the two produces
 // packages whose metadata disagrees with their binary contents.
 //
-// SNAPSHOT, FIPS, VERSION_QUALIFIER, DOCKER_VARIANTS, AGENT_DROP_PATH, and
+// SNAPSHOT, FIPS, VERSION_QUALIFIER, FLAVOR, DOCKER_VARIANTS, AGENT_DROP_PATH, and
 // KEEP_ARCHIVE apply as documented on their respective settings.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -710,7 +737,43 @@ func Package(ctx context.Context) error {
 		}
 	}
 
-	return packageAgent(ctx, cfg, pkgSpec)
+	selectedFlavors := cfg.GetFlavors()
+	for _, f := range selectedFlavors {
+		if f != devtools.FlavorBasic && f != devtools.FlavorEDR {
+			return fmt.Errorf("unsupported FLAVOR %q, accepted values are %q and %q", f, devtools.FlavorBasic, devtools.FlavorEDR)
+		}
+	}
+	buildBasic := slices.Contains(selectedFlavors, devtools.FlavorBasic)
+	buildEDR := slices.Contains(selectedFlavors, devtools.FlavorEDR)
+
+	// When both flavors are built, keep the drop path alive so that
+	// packageAgentEDR can reuse the already-downloaded component archives.
+	keepArchive := cfg.Packaging.KeepArchive
+	if buildBasic && buildEDR {
+		cfg.Packaging.KeepArchive = true
+	}
+
+	if buildBasic {
+		if err := packageAgent(ctx, cfg, pkgSpec); err != nil {
+			return err
+		}
+	}
+
+	// Build elastic-agent-edr-* artifacts.
+	if buildEDR {
+		edrSpec, err := devtools.LoadElasticAgentEDRPackageSpec(cfg.ElasticBeatsDir)
+		if err != nil {
+			return fmt.Errorf("error loading EDR package spec: %w", err)
+		}
+		if cfg.Packaging.CoreSource == devtools.CoreSourceLocal {
+			mg.CtxDeps(ctx, PackageAgentEDRCore)
+		}
+		if err := packageAgentEDR(ctx, cfg, edrSpec, buildBasic, keepArchive); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // DownloadManifest downloads the provided manifest file into the predefined folder and downloads all components in the manifest.
@@ -935,6 +998,16 @@ func CrossBuild(ctx context.Context) error {
 	return devtools.CrossBuild(ctx, cfg)
 }
 
+// CrossBuildEDR cross-builds the EDR flavor of the elastic-agent binary.
+// The resulting binary is named elastic-agent-edr-<goos>-<arch> and is stamped with
+// the EDR flavor ldflag so it can coexist with the standard build output.
+func (Build) CrossBuildEDR(ctx context.Context) error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+	cfg := devtools.SettingsFromContext(ctx)
+	opts := []devtools.CrossBuildOption{devtools.WithTarget("golangCrossBuildEDR")}
+	return devtools.CrossBuild(ctx, cfg, opts...)
+}
+
 // PackageAgentCore cross-builds and packages distribution artifacts containing
 // only elastic-agent binaries with no extra files or dependencies.
 //
@@ -963,6 +1036,28 @@ func PackageAgentCore(ctx context.Context) error {
 
 	fmt.Println("--- Package elastic-agent-core")
 	coreSpec, err := devtools.LoadElasticAgentCorePackageSpec(cfg.ElasticBeatsDir)
+	if err != nil {
+		return err
+	}
+	// ran directly as we don't want mage to cache that it already called devtools.Package
+	return devtools.Package(ctx, cfg, coreSpec)
+}
+
+// PackageAgentEDRCore cross-builds and packages the elastic-agent-edr-core intermediate
+// artifact. This is the EDR flavor's equivalent of PackageAgentCore: it
+// produces elastic-agent-edr-core-<version>-<platform>.tar.gz archives used as the
+// input for the final elastic-agent-edr packaging step.
+func PackageAgentEDRCore(ctx context.Context) error {
+	start := time.Now()
+	defer func() { fmt.Println("packageAgentEDRCore ran for", time.Since(start)) }()
+
+	cfg := devtools.SettingsFromContext(ctx)
+
+	fmt.Println("--- Build elastic-agent-edr-core")
+	mg.CtxDeps(ctx, Update, Otel.Prepare, Otel.CrossBuildEDR, Build.CrossBuildEDR, Build.WindowsArchiveRootBinary)
+
+	fmt.Println("--- Package elastic-agent-edr-core")
+	coreSpec, err := devtools.LoadElasticAgentEDRCorePackageSpec(cfg.ElasticBeatsDir)
 	if err != nil {
 		return err
 	}
@@ -1321,6 +1416,94 @@ func packageAgent(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtoo
 	}
 
 	// build package and test
+	if err := devtools.Package(ctx, cfg, pkgSpecs); err != nil {
+		return err
+	}
+	return nil
+}
+
+// packageAgentEDR packages the EDR flavor of the elastic-agent.
+// It mirrors packageAgent but extracts from elastic-agent-edr-core (build/core-edr/)
+// and uses the EDR packaging spec.
+//
+// When reuseArchives is true the standard packaging pass already downloaded the component
+// archives into the drop path, otherwise they are collected here. keepArchive keeps the
+// drop path after packaging.
+func packageAgentEDR(ctx context.Context, cfg *devtools.Settings, pkgSpecs []devtools.OSPackageArgs, reuseArchives, keepArchive bool) error {
+	fmt.Println("--- Package elastic-agent-edr")
+
+	dependenciesVersion := cfg.Build.DependenciesVersion
+	if dependenciesVersion == "" {
+		agentCoreVersion := cfg.AgentQualifiedCoreVersion()
+		if agentCoreVersion == "" {
+			dependenciesVersion = bversion.GetDefaultVersion()
+		} else {
+			dependenciesVersion = agentCoreVersion
+		}
+		dependenciesVersion += devtools.MaybeSnapshotSuffix(cfg)
+	}
+	log.Printf("EDR packaging with dependenciesVersion: %s", dependenciesVersion)
+
+	dependencies, err := extractComponentsFromSelectedPkgSpecs(cfg, pkgSpecs)
+	if err != nil {
+		return fmt.Errorf("failed extracting EDR dependencies: %w", err)
+	}
+
+	platforms := cfg.GetPlatforms().Names()
+
+	var archivePath, dropPath string
+	if reuseArchives {
+		// Reuse the drop path kept alive by Package (KeepArchive=true when both flavors are built).
+		// The standard packaging run already downloaded and moved component archives into
+		// dropPath/archives/; calling collectPackageDependencies again would call
+		// movePackagesToArchive which globs dropPath/*.tar.gz — but those files were
+		// already moved to the archives/ subdir in the first pass and are no longer at the
+		// root. So we locate the drop path directly and reuse archives/ as-is.
+		dropPath = cfg.Packaging.AgentDropPath
+		if dropPath == "" {
+			dropPath = filepath.Join("build", "distributions", "elastic-agent-drop")
+			var absErr error
+			dropPath, absErr = filepath.Abs(dropPath)
+			if absErr != nil {
+				return fmt.Errorf("obtaining absolute EDR drop path: %w", absErr)
+			}
+		}
+		archivePath = filepath.Join(dropPath, "archives")
+	} else {
+		// The standard packaging pass did not run, collect the component archives here.
+		archivePath, dropPath, dependencies = collectPackageDependencies(cfg, platforms, dependenciesVersion, dependencies)
+	}
+
+	cfg = cfg.WithAgentDropPath(dropPath)
+
+	if !keepArchive {
+		defer os.RemoveAll(dropPath)
+	}
+
+	flatPath := filepath.Join(dropPath, ".elastic-agent-edr_flat")
+	if err := os.MkdirAll(flatPath, 0o755); err != nil {
+		return fmt.Errorf("creating flat dir %q: %w", flatPath, err)
+	}
+	defer os.RemoveAll(flatPath)
+
+	// When the standard packaging pass ran it already copied its components into the
+	// per-platform drop directories. Remove them so the EDR flavor starts from a clean
+	// state and does not trip the component overwrite check. The component archives in
+	// archivePath are kept.
+	for _, pltf := range platforms {
+		versionedDropPath := filepath.Join(dropPath, manifest.PlatformPackages[pltf])
+		if err := os.RemoveAll(versionedDropPath); err != nil {
+			return fmt.Errorf("cleaning drop dir %q: %w", versionedDropPath, err)
+		}
+	}
+
+	flattenDependencies(cfg, platforms, dependenciesVersion, archivePath, dropPath, flatPath, dependencies)
+
+	err = extractAgentEDRCoreForPackage(ctx, cfg, dependenciesVersion)
+	if err != nil {
+		return err
+	}
+
 	if err := devtools.Package(ctx, cfg, pkgSpecs); err != nil {
 		return err
 	}
@@ -1732,15 +1915,27 @@ func downloadDRAArtifacts(ctx context.Context, build *manifest.Build, version st
 }
 
 func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
+	return extractAgentCoreForPackageWith(ctx, cfg, version, devtools.AgentCoreProjectName, "core")
+}
+
+func extractAgentEDRCoreForPackage(ctx context.Context, cfg *devtools.Settings, version string) error {
+	return extractAgentCoreForPackageWith(ctx, cfg, version, devtools.AgentEDRCoreProjectName, "core-edr")
+}
+
+// extractAgentCoreForPackageWith extracts a core archive identified by projectName into
+// build/<baseDirName>/extracted/<goos>-<arch>/ so that packages.yml file entries can source
+// from those paths.
+func extractAgentCoreForPackageWith(ctx context.Context, cfg *devtools.Settings, version string, projectName string, baseDirName string) error {
 	components, err := packaging.Components()
 	if err != nil {
 		return fmt.Errorf("retrieving defined components: %w", err)
 	}
-	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(devtools.AgentCoreProjectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
+	elasticAgentCoreComponents := packaging.FilterComponents(components, packaging.WithProjectName(projectName), packaging.WithFIPS(cfg.Build.FIPSBuild))
 	if len(elasticAgentCoreComponents) != 1 {
 		return fmt.Errorf(
-			"found an unexpected number of elastic-agent-core components (should be 1) [projectName: %q, fips: %v]: %v",
-			devtools.AgentCoreProjectName,
+			"found an unexpected number of %s components (should be 1) [projectName: %q, fips: %v]: %v",
+			projectName,
+			projectName,
 			cfg.Build.FIPSBuild,
 			elasticAgentCoreComponents,
 		)
@@ -1749,7 +1944,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 	platforms := cfg.GetPlatforms().Names()
 
 	repositoryRoot := cfg.ElasticBeatsDir
-	downloadDir := filepath.Join(repositoryRoot, "build", "core")
+	downloadDir := filepath.Join(repositoryRoot, "build", baseDirName)
 
 	var coreDownloadDir string
 	switch cfg.Packaging.CoreSource {
@@ -1758,12 +1953,12 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 		coreDownloadDir = filepath.Join(downloadDir, cfg.Packaging.Manifest.BuildID)
 		_, err = downloadDRAArtifacts(ctx, cfg.Packaging.Manifest, version, coreDownloadDir, platforms, elasticAgentCoreComponent)
 		if err != nil {
-			return fmt.Errorf("downloading elastic-agent-core artifacts: %w", err)
+			return fmt.Errorf("downloading %s artifacts: %w", projectName, err)
 		}
 	default:
 		// CoreSourceLocal (and the empty zero value, which callers outside
 		// Package may leave unset): use the packages written by
-		// PackageAgentCore into build/distributions.
+		// PackageAgentCore/PackageAgentEDRCore into build/distributions.
 		coreDownloadDir = filepath.Join(repositoryRoot, "build", "distributions")
 	}
 
@@ -1772,7 +1967,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 	extractDir := filepath.Join(downloadDir, extractionSubdir)
 	_ = os.RemoveAll(extractDir) // ignore error
 
-	// place the artifacts where the package.yml expects them (in 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}')
+	// place the artifacts where the package.yml expects them (in 'build/<baseDirName>/extracted/{{.GOOS}}-{{.Platform.Arch}}')
 	for _, platform := range platforms {
 		if !elasticAgentCoreComponent.SupportsPlatform(platform) {
 			continue
@@ -1788,7 +1983,7 @@ func extractAgentCoreForPackage(ctx context.Context, cfg *devtools.Settings, ver
 		}
 
 		// rename this directory to match the format expected by the core_source packaging target
-		// this is 'build/dra/extracted/{{.GOOS}}-{{.Platform.Arch}}' in the repository
+		// this is 'build/<baseDirName>/extracted/{{.GOOS}}-{{.Platform.Arch}}' in the repository
 		targetArtifactName := elasticAgentCoreComponent.GetRootDir(version, platform)
 		srcDir := filepath.Join(extractDir, targetArtifactName)
 		dstDir := filepath.Join(extractDir, strings.Replace(platform, "/", "-", 1))
@@ -2174,7 +2369,7 @@ func ironbankResourcesFromManifest(manifestPath string) (map[string]ironbankReso
 // Docker variant spec. Ironbank supplies these through the hardening manifest;
 // the public CI build has no such step, so they are downloaded and verified here
 // from the same manifest, which stays their only definition. The download runs
-// when the spec is evaluated, so only builds that include the variant fetch them.
+// when the spec is evaluated, so only builds that include the flavor fetch them.
 func addIronbankResources(specs []devtools.OSPackageArgs) error {
 	manifestPath := filepath.Join("dev-tools", "packaging", "templates", "ironbank", "hardening_manifest.yaml.tmpl")
 	resources, err := ironbankResourcesFromManifest(manifestPath)
@@ -3878,7 +4073,7 @@ func (Otel) GolangCrossBuild(ctx context.Context) error {
 	params.OutputDir = "build/golang-crossbuild"
 	params.WorkDir = "internal/edot"
 	params.Package = "."
-	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat")
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat,grpcnotrace")
 	injectBuildVars(cfg, params.Vars)
 
 	// Workaround for https://github.com/golang/go/issues/75077: the Go PE linker assigns
@@ -3972,6 +4167,50 @@ func (Otel) CrossBuild(ctx context.Context) error {
 		// use the npcap build image for windows
 		opts = append(opts, devtools.ImageSelector(npcapImageSelector(cfg.Docker.WindowsNpcap)))
 	}
+
+	return devtools.CrossBuild(ctx, cfg, opts...)
+}
+
+// GolangCrossBuildEDR builds the EDR flavor elastic-otel-collector binary inside the
+// golang-crossbuild container. Do not use directly; use Otel.CrossBuildEDR instead.
+// Built with the edr build tag, which removes beat subcommands and excludes
+// heartbeat and packetbeat receivers.
+func (Otel) GolangCrossBuildEDR(ctx context.Context) error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+
+	cfg := devtools.SettingsFromContext(ctx)
+	params := devtools.DefaultGolangCrossBuildArgs(cfg)
+	params.Name = "elastic-otel-collector-edr-" + cfg.Build.GOOS + "-" + cfg.Platform().Arch
+	params.OutputDir = "build/golang-crossbuild"
+	params.WorkDir = "internal/edot"
+	params.Package = "."
+	params.ExtraFlags = append(params.ExtraFlags, "-tags=agentbeat,edr,grpcnotrace")
+	injectBuildVars(cfg, params.Vars)
+
+	if cfg.Build.DevBuild && cfg.Build.GOOS == "windows" {
+		if params.Env == nil {
+			params.Env = map[string]string{}
+		}
+		params.Env["GOEXPERIMENT"] = "nodwarf5"
+	}
+
+	if err := devtools.GolangCrossBuild(ctx, cfg, params); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// CrossBuildEDR builds the EDR flavor elastic-otel-collector binary for all target platforms.
+// The resulting binary is named elastic-otel-collector-edr-<goos>-<arch> and compiled with the
+// edr build tag, which removes beat subcommands and excludes heartbeat
+// and packetbeat receivers.
+func (Otel) CrossBuildEDR(ctx context.Context) error {
+	mg.Deps(EnsureCrossBuildOutputDir)
+
+	cfg := devtools.SettingsFromContext(ctx)
+
+	opts := []devtools.CrossBuildOption{devtools.WithName("elastic-otel-collector-edr"), devtools.WithTarget("otel:golangCrossBuildEDR")}
 
 	return devtools.CrossBuild(ctx, cfg, opts...)
 }
