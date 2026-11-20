@@ -6,6 +6,7 @@ package limits
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"sync"
 
@@ -33,6 +34,36 @@ type LimitsConfig struct {
 	// Translates into the GOMAXPROCS runtime parameter for each Go process started by the agent and the agent itself.
 	// By default is set to `0` which means using all available CPUs.
 	GoMaxProcs int `yaml:"go_max_procs" config:"go_max_procs" json:"go_max_procs"`
+
+	// CPU is the requested CPU limit for the agent and its components together, as a percentage of the host CPU capacity.
+	// It is excluded from JSON because components must not receive it.
+	CPU CPULimit `config:"cpu" json:"-"`
+}
+
+// CPULimit is a cap on CPU use, as a percentage of the host CPU capacity.
+// The zero value means the cap is off.
+type CPULimit struct {
+	percent int
+}
+
+// Unpack implements ucfg.FloatUnpacker.
+// It takes a float64 because go-ucfg would silently cut 50.5 to 50 when it unpacks into an int.
+func (l *CPULimit) Unpack(v float64) error {
+	if v != math.Trunc(v) || v < 1 || v > 100 {
+		return fmt.Errorf("invalid CPU limit %v: must be an integer from 1 to 100", v)
+	}
+	l.percent = int(v)
+	return nil
+}
+
+// Enabled reports whether the cap is on.
+func (l CPULimit) Enabled() bool {
+	return l.percent > 0
+}
+
+// Percent returns the cap as a percentage from 1 to 100, or 0 when the cap is off.
+func (l CPULimit) Percent() int {
+	return l.percent
 }
 
 type LimitsOnChangeCallback func(new, old LimitsConfig)
@@ -72,11 +103,14 @@ func (f *limits) set(newLimits *LimitsConfig) {
 		for _, cb := range f.callbacks {
 			cb(f.cfg, oldLimits)
 		}
+	} else {
+		// The other fields did not change, so only the CPU value needs a write.
+		f.cfg.CPU = newLimits.CPU
 	}
 }
 
 // AddLimitsOnChangeCallback takes a callback function that will be called with the new and old values
-// of limits whenever they change.
+// of limits when the go_max_procs value changes.
 // It also takes a string ID which is used in `RemoveLimitsOnChangeCallback` to de-register the callback.
 func AddLimitsOnChangeCallback(cb LimitsOnChangeCallback, id string) {
 	current.mu.Lock()
