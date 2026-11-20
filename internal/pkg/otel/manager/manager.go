@@ -511,7 +511,12 @@ func (m *OTelManager) buildMergedConfig(
 	// the service::extensions lists so that component-generated extensions (e.g.
 	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		if err := mergeWithExtensions(overlay, cfgUpdate.collectorCfg); err != nil {
+		// Beat receivers set the agent metadata themselves, so only pipelines from the collector config need it.
+		collectorCfg, err := injectAgentMetadataProcessor(cfgUpdate.collectorCfg, agentInfo, m.agentHostname(ctx))
+		if err != nil {
+			return nil, fmt.Errorf("failed to inject agent metadata processor: %w", err)
+		}
+		if err := mergeWithExtensions(overlay, collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
@@ -657,6 +662,16 @@ func generateUserAgent(agentInfo info.Agent) string {
 	}
 
 	return useragent.UserAgentWithBeatTelemetry("Agent", agentInfo.Version(), mode, unprivileged, release.FIPSDistribution(), uaOpts...)
+}
+
+// agentHostname returns the agent's hostname from the host information, or an empty string if it isn't available.
+func (m *OTelManager) agentHostname(ctx context.Context) string {
+	host, err := m.hostInfo.Get(ctx)
+	if err != nil {
+		m.managerLogger.Warnf("Failed to get the host information, agent.name won't be set on bodymap logs: %v", err)
+		return ""
+	}
+	return host.Hostname
 }
 
 // monitoringHostname returns the hostname for the collector's monitoring events: the agent's hostname, or the OS

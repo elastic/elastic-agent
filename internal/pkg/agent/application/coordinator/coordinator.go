@@ -180,6 +180,9 @@ type HostInfoWatcher interface {
 
 	// Get returns the latest host information.
 	Get(ctx context.Context) (hostinfo.Info, error)
+
+	// Changed returns a channel that is closed when the host information changes.
+	Changed() <-chan struct{}
 }
 
 // OTelManager provides an interface to run components and plain otel configurations in an otel collector.
@@ -350,6 +353,11 @@ type Coordinator struct {
 
 	// hostInfo is the agent's shared host information. The Coordinator runs it.
 	hostInfo HostInfoWatcher
+	// hostInfoChanged is closed when the host information changes.
+	hostInfoChanged <-chan struct{}
+	// hostname is the last hostname from hostInfo. It's used in the OTel configuration, which is updated when it
+	// changes.
+	hostname string
 
 	initialCfg *configuration.Configuration
 	currentCfg *configuration.Configuration
@@ -1672,6 +1680,7 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	hostInfoDone := make(chan struct{})
 	if c.hostInfo != nil {
+		c.hostInfoChanged = c.hostInfo.Changed()
 		go func() {
 			defer close(hostInfoDone)
 			if err := c.hostInfo.Run(ctx); err != nil && ctx.Err() == nil {
@@ -1758,6 +1767,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		c.setUpgradeDetails(upgradeDetails)
 
 	case c.heartbeatChan <- struct{}{}:
+
+	case <-c.hostInfoChanged:
+		c.processHostInfoChange(ctx)
 
 	case <-c.componentPIDTicker.C:
 		// if we hit the ticker and we've got a new PID,
@@ -2302,6 +2314,24 @@ func componentIDs(components []component.Component) []string {
 		ids[i] = comp.ID
 	}
 	return ids
+}
+
+// processHostInfoChange refreshes the component model when the hostname changes, so the OTel collector
+// configuration uses the new hostname immediately.
+func (c *Coordinator) processHostInfoChange(ctx context.Context) {
+	c.hostInfoChanged = c.hostInfo.Changed()
+	host, err := c.hostInfo.Get(ctx)
+	if err != nil {
+		c.logger.Warnf("Failed to get the host information: %v", err)
+		return
+	}
+	if host.Hostname == c.hostname {
+		return
+	}
+	c.hostname = host.Hostname
+	if err := c.refreshComponentModel(ctx); err != nil {
+		c.logger.Errorf("Error refreshing component model for hostname change: %v", err)
+	}
 }
 
 // applyOTelUpdate sends an update to the OTel manager.
