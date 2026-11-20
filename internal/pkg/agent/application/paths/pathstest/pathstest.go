@@ -54,3 +54,11 @@ func SetVersionHome(t testing.TB, version bool) {
 	t.Cleanup(func() { paths.SetVersionHome(orig) })
 	paths.SetVersionHome(version)
 }
+
+// SetDiagnosticsExtensionSocket sets the diagnostics extension socket path until the end of the test.
+func SetDiagnosticsExtensionSocket(t testing.TB, path string) {
+	t.Helper()
+	orig := paths.DiagnosticsExtensionSocket()
+	t.Cleanup(func() { paths.SetDiagnosticsExtensionSocket(orig) })
+	paths.SetDiagnosticsExtensionSocket(path)
+}

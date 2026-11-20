@@ -47,8 +47,8 @@ linters:
         - pattern: fmt.Print.*
         - pattern: ^context\.Background$
           msg: "use t.Context() in tests so the context is cancelled when the test ends"
-        - pattern: ^paths\.(SetTop|SetConfig|SetLogs|SetDownloads|SetVersionHome)$
-          msg: "tests must restore the global paths, use the pathstest helpers"
+        - pattern: ^paths\.(SetTop|SetConfig|SetLogs|SetDownloads|SetInstall|SetInstallNamespace|SetControlSocket|SetDiagnosticsExtensionSocket|SetVersionHome)$
+          msg: "tests must restore the global paths, use the pathstest helpers (add one if the setter has none)"
       exclude-godoc-examples: true
     gomoddirectives:
       replace-allow-list:
