@@ -23,5 +23,5 @@ func TestInferNextProjectMinorVersion(t *testing.T) {
 	parsed, err := devtools.ParseReleaseVersion("9.5.0")
 	require.NoError(t, err)
 	got := devtools.InferNextProjectMinorVersion(parsed)
-	require.Equal(t, "9.6.0", got)
+	require.Equal(t, "9.6.0", got.CoreVersion())
 }
