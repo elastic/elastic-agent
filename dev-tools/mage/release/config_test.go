@@ -12,19 +12,19 @@ func TestValidateReleaseConfig(t *testing.T) {
 	t.Run("requires current release", func(t *testing.T) {
 		err := ValidateReleaseConfig(&ReleaseConfig{DryRun: true})
 		if err == nil {
-			t.Fatal("expected error for empty CurrentRelease")
+			t.Fatal("expected error for empty NextRelease")
 		}
 	})
 
 	t.Run("requires token when not dry-run", func(t *testing.T) {
-		err := ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: "9.5.0"})
+		err := ValidateReleaseConfig(&ReleaseConfig{NextRelease: "9.5.0"})
 		if err == nil {
 			t.Fatal("expected error for missing GITHUB_TOKEN")
 		}
 	})
 
 	t.Run("ok in dry-run without token", func(t *testing.T) {
-		err := ValidateReleaseConfig(&ReleaseConfig{CurrentRelease: "9.5.0", DryRun: true})
+		err := ValidateReleaseConfig(&ReleaseConfig{NextRelease: "9.5.0", DryRun: true})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -38,7 +38,7 @@ func TestEnsureLatestRelease(t *testing.T) {
 	}
 	t.Cleanup(func() { fetchLatestReleaseBefore = orig })
 
-	cfg := &ReleaseConfig{CurrentRelease: "9.5.0"}
+	cfg := &ReleaseConfig{NextRelease: "9.5.0"}
 	if err := EnsureLatestRelease(cfg); err != nil {
 		t.Fatalf("EnsureLatestRelease() error = %v", err)
 	}

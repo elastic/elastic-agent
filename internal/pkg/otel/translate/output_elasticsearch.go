@@ -17,7 +17,6 @@ import (
 	"github.com/go-viper/mapstructure/v2"
 	otelcomponent "go.opentelemetry.io/collector/component"
 
-	"github.com/elastic/beats/v7/libbeat/cloudid"
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
@@ -139,14 +138,6 @@ var defaultOptions = esToOTelOptions{
 func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (exporterCfg map[string]any, processorCfg map[string]any, extensionCfg map[string]any, err error) {
 	escfg := defaultOptions
 
-	// Cloud resolution returns a copy, but effective queue settings must be
-	// written back for unitToExporterConfig.
-	originalOutput := output
-	output, err = resolveElasticsearchOutputCloudConfig(output)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
 	// check for unsupported config
 	err = checkUnsupportedConfig(output)
 	if err != nil {
@@ -220,19 +211,6 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		queueSize = getQueueSize(logger, output)
 		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
 			logger.Infof("queue.mem.events (%d) is below the suggested minimum for %d connection(s); consider setting queue.mem.events: %d", queueSize, maxConns, suggested)
-		}
-	}
-
-	// unitToExporterConfig promotes the effective output queue into the receiver
-	// configuration after translation. Preserve that write-back while keeping
-	// Cloud ID resolution isolated from the policy-derived output config.
-	if output.HasField("queue") {
-		queueConfig, err := output.Child("queue", -1)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed reading effective output queue config: %w", err)
-		}
-		if err := originalOutput.SetChild("queue", -1, queueConfig); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed updating effective output queue config: %w", err)
 		}
 	}
 
@@ -474,67 +452,6 @@ func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string
 	return hosts, nil
 }
 
-// resolveElasticsearchOutputCloudConfig returns an independently owned,
-// environment-resolved output config and applies output-scoped Cloud ID fields
-// without changing the policy-derived source map.
-func resolveElasticsearchOutputCloudConfig(output *config.C) (*config.C, error) {
-	var resolvedMap map[string]any
-	if err := output.Unpack(&resolvedMap); err != nil {
-		return nil, fmt.Errorf("failed resolving Elasticsearch output config: %w", err)
-	}
-	resolvedOutput, err := config.NewConfigFrom(resolvedMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed copying Elasticsearch output config: %w", err)
-	}
-
-	cloudID, err := firstConfiguredString(resolvedOutput, "cloud_id", "cloud.id")
-	if err != nil {
-		return nil, err
-	}
-	cloudAuth, err := firstConfiguredString(resolvedOutput, "cloud_auth", "cloud.auth")
-	if err != nil {
-		return nil, err
-	}
-	if cloudID == "" {
-		if cloudAuth != "" {
-			return nil, errors.New("cloud_auth is configured but cloud_id is empty")
-		}
-		return resolvedOutput, nil
-	}
-
-	cloudConfig, err := cloudid.NewCloudID(cloudID, cloudAuth)
-	if err != nil {
-		return nil, fmt.Errorf("invalid cloud_id: %w", err)
-	}
-	resolvedMap["hosts"] = []string{cloudConfig.ElasticsearchURL()}
-	if cloudAuth != "" {
-		resolvedMap["username"] = cloudConfig.Username()
-		resolvedMap["password"] = cloudConfig.Password()
-	}
-
-	resolvedOutput, err = config.NewConfigFrom(resolvedMap)
-	if err != nil {
-		return nil, fmt.Errorf("failed applying cloud_id to Elasticsearch output config: %w", err)
-	}
-	return resolvedOutput, nil
-}
-
-func firstConfiguredString(cfg *config.C, fields ...string) (string, error) {
-	for _, field := range fields {
-		if !cfg.HasField(field) {
-			continue
-		}
-		value, err := cfg.String(field, -1)
-		if err != nil {
-			return "", fmt.Errorf("%s must be a string: %w", field, err)
-		}
-		if value != "" {
-			return value, nil
-		}
-	}
-	return "", nil
-}
-
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
@@ -591,7 +508,7 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
 	}
 
-	if outputCfg.HasField("hosts") || outputCfg.HasField("cloud_id") || outputCfg.HasField("cloud.id") {
+	if outputCfg.HasField("hosts") {
 		endpoints, err := getURL(esConfig, outputCfg)
 		if err != nil {
 			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)

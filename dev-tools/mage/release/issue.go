@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v93/github"
+
+	"github.com/elastic/elastic-agent/pkg/version"
 )
 
 // globalReleaseTrackerURL is the ingest-wide release tracker linked from every Elastic Agent release issue.
@@ -32,7 +34,7 @@ func warnEnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.Pul
 }
 
 // EnsureReleaseIssueTracker creates or updates the Elastic Agent release checklist issue for
-// cfg.CurrentRelease. It links related Elastic Agent PRs (workflow PRs plus open/merged PRs
+// cfg.NextRelease. It links related Elastic Agent PRs (workflow PRs plus open/merged PRs
 // with label "release" that mention the same version). Updates are idempotent: missing
 // PR links are appended; existing checklist and checkbox state are preserved.
 // Standalone mage release:ensureIssueTracker surfaces errors; runMajorMinor/runPatch
@@ -41,12 +43,13 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	if cfg == nil {
 		return fmt.Errorf("release config is required")
 	}
-	if cfg.CurrentRelease == "" {
-		return fmt.Errorf("CURRENT_RELEASE is required")
+	if err := cfg.EnsureParsedVersions(); err != nil {
+		return fmt.Errorf("NEXT_RELEASE is required: %w", err)
 	}
 
-	title := releaseIssueTitle(cfg.CurrentRelease)
+	title := releaseIssueTitle(cfg.NextRelease)
 	seedURLs := prURLsFromPullRequests(workflowPRs)
+	isMajorMinor := isMajorMinorRelease(cfg.NextReleaseVersion)
 
 	if cfg.DryRun {
 		fmt.Printf("\nDRY RUN: Would ensure issue tracker %q\n", title)
@@ -66,9 +69,9 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	owner := cfg.ProjectOwner
 	repo := cfg.ProjectRepo
 
-	discovered, err := gh.ListReleaseLabeledPRsForVersion(owner, repo, cfg.CurrentRelease)
+	discovered, err := gh.ListReleaseLabeledPRsForVersion(owner, repo, cfg.NextRelease)
 	if err != nil {
-		return fmt.Errorf("discover release-labeled PRs for %s: %w", cfg.CurrentRelease, err)
+		return fmt.Errorf("discover release-labeled PRs for %s: %w", cfg.NextRelease, err)
 	}
 	prURLs := mergePRURLs(seedURLs, prURLsFromPullRequests(discovered))
 
@@ -78,7 +81,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 	}
 
 	if !found {
-		body := buildReleaseIssueBody(cfg.CurrentRelease, isMajorMinorRelease(cfg.CurrentRelease), prURLs, nil)
+		body := buildReleaseIssueBody(cfg.NextRelease, isMajorMinor, prURLs, nil)
 		issue, err := gh.CreateIssue(owner, repo, title, body, []string{"release"})
 		if err != nil {
 			return err
@@ -87,7 +90,7 @@ func EnsureReleaseIssueTracker(cfg *ReleaseConfig, workflowPRs []*github.PullReq
 		return nil
 	}
 
-	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.CurrentRelease, prURLs)
+	updatedBody, changed := mergeReleaseIssueBody(existing.GetBody(), cfg.NextRelease, isMajorMinor, prURLs)
 	if !changed {
 		fmt.Printf("Release issue tracker already up to date: #%d %s\n", existing.GetNumber(), existing.GetHTMLURL())
 		return nil
@@ -107,9 +110,8 @@ func releaseIssueTitle(version string) string {
 	return fmt.Sprintf("[RELEASE %s] Instructions & Checklist", version)
 }
 
-func isMajorMinorRelease(version string) bool {
-	parts := strings.Split(version, ".")
-	return len(parts) >= 3 && parts[2] == "0"
+func isMajorMinorRelease(v *version.ParsedSemVer) bool {
+	return v != nil && v.Patch() == 0
 }
 
 func prURLsFromPullRequests(prs []*github.PullRequest) []string {
@@ -219,12 +221,12 @@ func formatPRChecklist(prURLs []string, checked map[string]bool) string {
 
 // mergeReleaseIssueBody updates an existing issue body with missing tracker link and PR URLs.
 // Checklist item checkboxes outside the PRs section are left untouched.
-func mergeReleaseIssueBody(existingBody, version string, prURLs []string) (string, bool) {
+func mergeReleaseIssueBody(existingBody, version string, isMajorMinor bool, prURLs []string) (string, bool) {
 	existingChecked := extractPRCheckboxes(existingBody)
 	allURLs := mergePRURLs(prURLs, keys(existingChecked))
 
 	if strings.TrimSpace(existingBody) == "" {
-		return buildReleaseIssueBody(version, isMajorMinorRelease(version), allURLs, existingChecked), true
+		return buildReleaseIssueBody(version, isMajorMinor, allURLs, existingChecked), true
 	}
 
 	body := existingBody

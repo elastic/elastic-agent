@@ -602,13 +602,20 @@ outputs:
 			output, err := fixture.Install(ctx, &atesting.InstallOpts{Privileged: true, Force: true})
 			require.NoError(t, err, "failed to install agent: %s", output)
 
-			require.Eventually(t, func() bool {
-				err = fixture.IsHealthy(ctx)
-				if err != nil {
-					t.Logf("waiting for agent healthy: %s", err.Error())
-					return false
+			// The agent reports HEALTHY before it has started any components, so wait for the
+			// system/metrics component itself to be healthy before looking for its documents.
+			require.EventuallyWithT(t, func(collect *assert.CollectT) {
+				status, statusErr := fixture.ExecStatus(ctx)
+				require.NoError(collect, statusErr)
+				assert.Equal(collect, int(cproto.State_HEALTHY), status.State, "agent state")
+				var found bool
+				for _, comp := range status.Components {
+					if comp.ID == "system/metrics-default" {
+						found = true
+						assert.Equal(collect, int(cproto.State_HEALTHY), comp.State, "component %s state", comp.ID)
+					}
 				}
-				return true
+				assert.True(collect, found, "system/metrics-default component not reported yet")
 			}, 1*time.Minute, 1*time.Second)
 
 			mustClauses := []map[string]any{
@@ -627,6 +634,9 @@ outputs:
 				},
 			}
 
+			// Metricbeat delays each metricset's first fetch by a random fraction of its period (10s),
+			// and on slow hosts the collector may take a while to start its receivers, so allow a
+			// generous window for the first document.
 			for _, mset := range metricsets {
 				index := fmt.Sprintf(".ds-metrics-system.%s-%s*", mset, info.Namespace)
 				require.EventuallyWithTf(t,
@@ -642,7 +652,7 @@ outputs:
 						}
 						require.Greater(ct, docs.Hits.Total.Value, 0, "docs count")
 					},
-					30*time.Second, 1*time.Second,
+					2*time.Minute, 1*time.Second,
 					"Expected to find at least one document for metricset %s in index %s and runtime %q, got 0", mset, index, tt.runtimeExperimental)
 			}
 		})
@@ -723,6 +733,17 @@ outputs:
 
 				StripNondeterminism(agentDoc, tt.metricset)
 				StripNondeterminism(otelDoc, tt.metricset)
+
+				// cloud.* is added by add_cloud_metadata, which queries the cloud metadata service once
+				// at startup with a 3s timeout and no retry. Whether these fields are present depends on
+				// that service answering during each of the two separate installs, not on the runtime.
+				for _, doc := range []mapstr.M{agentDoc, otelDoc} {
+					for k := range doc {
+						if strings.HasPrefix(k, "cloud.") {
+							delete(doc, k)
+						}
+					}
+				}
 
 				AssertMapstrKeysEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents keys to be equal for metricset "+tt.metricset)
 				AssertMapsEqual(t, agentDoc, otelDoc, ignoredFields, "expected documents to be equal for metricset "+tt.metricset)

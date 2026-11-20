@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"go.yaml.in/yaml/v4"
+	"go.yaml.in/yaml/v3"
 )
 
 // --- Packaging spec loading ---
