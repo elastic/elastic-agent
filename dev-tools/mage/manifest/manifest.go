@@ -6,6 +6,7 @@ package manifest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -96,8 +97,18 @@ var PlatformPackages = map[string]string{
 	"windows/arm64": "windows-arm64.zip",
 }
 
-// DownloadManifest is going to download the given manifest file and return the ManifestResponse
+// DownloadManifest downloads the given manifest file and returns the ManifestResponse.
+//
+// The location may also be a path to a local file, or a file:// URL. That is
+// how a merged manifest produced locally by `mage dra:mergeManifests` is fed
+// into a packaging run without publishing it anywhere first. It does not widen
+// what packaging will fetch: the package URLs the manifest names are still
+// checked against AllowedManifestHosts when they are downloaded.
 func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
+	if localPath, isLocal := localManifestPath(manifest); isLocal {
+		return readManifestFile(localPath)
+	}
+
 	manifestUrl, urlError := url.Parse(manifest)
 	if urlError != nil {
 		return Build{}, errorInvalidManifestURL
@@ -123,6 +134,38 @@ func DownloadManifest(ctx context.Context, manifest string) (Build, error) {
 		log.Printf(">>>> Packaging version: %s, build_id: %s, manifest_version:%s", manifestResponse.Version, manifestResponse.BuildID, manifestResponse.ManifestVersion)
 	}
 	return manifestResponse, nil
+}
+
+// localManifestPath reports whether location refers to a file on disk and, if
+// so, returns the path to read.
+func localManifestPath(location string) (string, bool) {
+	if after, found := strings.CutPrefix(location, "file://"); found {
+		return after, true
+	}
+	// Anything carrying a URL scheme is a remote location; everything else is
+	// treated as a filesystem path. A single-letter scheme is a Windows drive
+	// letter (`C:\build\merged.json` parses as scheme "c"), not a URL.
+	if parsed, err := url.Parse(location); err == nil && len(parsed.Scheme) > 1 {
+		return "", false
+	}
+	return location, true
+}
+
+func readManifestFile(path string) (Build, error) {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		return Build{}, fmt.Errorf("reading local manifest %q: %w", path, err)
+	}
+
+	var build Build
+	if err := json.Unmarshal(contents, &build); err != nil {
+		return Build{}, fmt.Errorf("decoding local manifest %q: %w", path, err)
+	}
+	if mg.Verbose() {
+		log.Printf(">>>> Read local manifest %s", path)
+		log.Printf(">>>> Packaging version: %s, build_id: %s, manifest_version:%s", build.Version, build.BuildID, build.ManifestVersion)
+	}
+	return build, nil
 }
 
 // DownloadComponents is going to download a set of components from the given manifest into the destination

@@ -1234,7 +1234,8 @@ type PackagingSettings struct {
 	// AgentPackageVersion overrides the package version (from AGENT_PACKAGE_VERSION env var)
 	AgentPackageVersion string
 
-	// ManifestURL is the location of manifest file for packaging (from MANIFEST_URL env var)
+	// ManifestURL is the location of the manifest file for packaging (from the
+	// MANIFEST_URL env var, or MANIFEST_PATH for a file on disk).
 	ManifestURL string
 
 	// Manifest is the downloaded manifest response. Populated by WithManifestInfo when ManifestURL is set.
@@ -1643,6 +1644,16 @@ func (s *Settings) loadPackagingSettingsFromEnv() error {
 	}
 	manifestURLSet := false
 	if v, ok := os.LookupEnv("MANIFEST_URL"); ok && v != "" {
+		s.Packaging.ManifestURL = v
+		manifestURLSet = true
+	}
+	// MANIFEST_PATH is the same setting pointed at a file on disk, which is how
+	// a merged manifest produced locally by `mage dra:mergeManifests` is fed
+	// into a packaging run.
+	if v, ok := os.LookupEnv("MANIFEST_PATH"); ok && v != "" {
+		if manifestURLSet {
+			return errors.New("MANIFEST_URL and MANIFEST_PATH are mutually exclusive: both name the manifest to package from")
+		}
 		s.Packaging.ManifestURL = v
 		manifestURLSet = true
 	}
