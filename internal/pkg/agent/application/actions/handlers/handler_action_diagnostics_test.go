@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -29,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -96,7 +96,7 @@ func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
@@ -177,7 +177,7 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -213,12 +213,13 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
 	paths.SetTop(tempAgentRoot)
-	// we don't set a 'data' subdirectory in order to make the zip process return an error
-	// this is the only way/trick to do it with the current implementation, sadly :(
+	// 'data' is a file, not a directory, so the zip process always returns an error.
+	// A missing directory is not enough: paths.TempDir() creates it on its first call in the process.
+	require.NoError(t, os.WriteFile(path.Join(tempAgentRoot, "data"), nil, 0600))
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -254,7 +255,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -293,7 +294,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -333,7 +334,7 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, observedLogs := loggertest.New("diagnostic-handler-test")
+	testLogger, observedLogs := logptest.NewTestingLoggerWithObserver(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{})
@@ -377,7 +378,7 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, _ := loggertest.New("diagnostic-handler-test")
+	testLogger := logptest.NewTestingLogger(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
@@ -447,7 +448,7 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 		return "upload-id", nil
 	})
 
-	testLogger, _ := loggertest.New("diagnostic-handler-test")
+	testLogger := logptest.NewTestingLogger(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 	handler.collectDiag(t.Context(), &fleetapi.ActionDiagnostics{}, mockAcker)
 	require.True(t, called, "expected the mock diagnostics server to be called")
