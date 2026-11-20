@@ -24,6 +24,5 @@ These pages describe the Buildkite definitions and supporting configuration chec
 
 ## Source gaps
 
-- `catalog-info.yaml` references `.buildkite/macos.integration.pipeline.yml` and `.buildkite/macos.integration.scheduler.yml`, but neither file exists in this checkout. Their runtime definitions could not be checked, so they are not documented as repository pipeline pages.
 - The downstream `serverless-quality-gates`, `unified-release-*`, and agentless GitOps pipeline definitions are outside this repository. Pages describe only the local trigger contracts.
 - Buildkite's live schedules, provider settings, and runtime-generated steps are not independently verified against the Buildkite service; this index describes checked-in YAML and repository metadata only.
