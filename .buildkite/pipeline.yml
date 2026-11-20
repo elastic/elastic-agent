@@ -564,27 +564,6 @@ steps:
     plugins:
     - *sparse_checkout_plugin
 
-  # Metrics gathering for the macOS (Orka) integration tests: only a sample of the commits (default 5%) runs them,
-  # asynchronously, so the PR never waits for the small Orka pool. Label a PR "macos-it" to always run them.
-  - label: "Trigger macOS integration tests (sampled)"
-    if: |
-      build.pull_request.id != null && build.pull_request.repository.fork != true &&
-      !(build.env("GITHUB_PR_LABELS") =~ /skip-it/)
-    command: ".buildkite/scripts/steps/trigger-macos-integration-sampled.sh"
-    plugins:
-    - *sparse_checkout_plugin
-    env:
-      GITHUB_PR_LABELS: ${GITHUB_PR_LABELS}
-      MACOS_ORKA_SAMPLE_PERCENT: "5"
-    if_changed:
-      include:
-        - internal/**
-        - dev-tools/**
-        - pkg/**
-        - testing/**
-        - specs/**
-        - .buildkite/**
-
   # NOTE: This should help detecting issues earlier in the development cycle
   # See https://github.com/elastic/elastic-agent/issues/11604
   - label: "Trigger Elastic Agent Package"
