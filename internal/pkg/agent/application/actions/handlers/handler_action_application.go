@@ -6,6 +6,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -72,6 +73,7 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		action.StartedAt = time.Now().UTC().Format(time.RFC3339Nano)
 		action.CompletedAt = action.StartedAt
 		action.Error = fmt.Sprintf("matching app is not found for action input: %s", action.InputType)
+		h.restrictAckData(action)
 		return acker.Ack(ctx, action)
 	}
 
@@ -114,7 +116,38 @@ func (h *AppAction) Handle(ctx context.Context, a fleetapi.Action, acker acker.A
 		appendActionResponse(action, action.InputType, res)
 	}
 
+	h.restrictAckData(action)
 	return acker.Ack(ctx, action)
+}
+
+// restrictAckData drops action data fields the input's spec does not allow in
+// acks, so credentials sent to a component are not stored in Fleet action results.
+func (h *AppAction) restrictAckData(action *fleetapi.ActionApp) {
+	spec, _ := h.coord.InputSpec(action.InputType)
+	if spec.Spec.AckActionData == nil {
+		return
+	}
+	action.Data = filterActionData(action.Data, spec.Spec.AckActionData.Fields)
+}
+
+// filterActionData keeps only the listed top-level fields of data. Data that is
+// not a JSON object is replaced entirely, since its contents can't be vetted.
+func filterActionData(data json.RawMessage, fields []string) json.RawMessage {
+	var all map[string]json.RawMessage
+	if err := json.Unmarshal(data, &all); err != nil {
+		return json.RawMessage("{}")
+	}
+	kept := make(map[string]json.RawMessage, len(fields))
+	for _, f := range fields {
+		if v, ok := all[f]; ok {
+			kept[f] = v
+		}
+	}
+	out, err := json.Marshal(kept)
+	if err != nil {
+		return json.RawMessage("{}")
+	}
+	return out
 }
 
 var (
