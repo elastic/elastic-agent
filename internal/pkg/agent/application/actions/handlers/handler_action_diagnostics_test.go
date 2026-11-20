@@ -30,7 +30,6 @@ import (
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
-	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -378,7 +377,7 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 
 	mockDiagProvider := newMockDiagnosticsProvider(t)
 	mockUploader := NewMockUploader(t)
-	testLogger, _ := loggertest.New("diagnostic-handler-test")
+	testLogger := logptest.NewTestingLogger(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 
 	mockDiagProvider.EXPECT().DiagnosticHooks().Return([]diagnostics.Hook{hook1})
@@ -449,7 +448,7 @@ func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 		return "upload-id", nil
 	})
 
-	testLogger, _ := loggertest.New("diagnostic-handler-test")
+	testLogger := logptest.NewTestingLogger(t, "diagnostic-handler-test")
 	handler := NewDiagnostics(testLogger, tempAgentRoot, mockDiagProvider, defaultRateLimit, mockUploader)
 	handler.collectDiag(t.Context(), &fleetapi.ActionDiagnostics{}, mockAcker)
 	require.True(t, called, "expected the mock diagnostics server to be called")
