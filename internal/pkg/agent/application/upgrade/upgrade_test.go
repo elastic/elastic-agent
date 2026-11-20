@@ -1442,6 +1442,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
+			origTop := paths.Top()
+			t.Cleanup(func() { paths.SetTop(origTop) })
 			paths.SetTop(baseDir)
 			require.NoError(t, os.MkdirAll(paths.Data(), 0755))
 
@@ -1850,6 +1852,8 @@ func TestCopyActionStore(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			newHome := filepath.Join(baseDir, "new_home")
+			origTop := paths.Top()
+			t.Cleanup(func() { paths.SetTop(origTop) })
 			paths.SetTop(baseDir)
 
 			actionStorePath := paths.AgentActionStoreFile()
@@ -1935,6 +1939,8 @@ func TestCopyRunDirectory(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
+			origTop := paths.Top()
+			t.Cleanup(func() { paths.SetTop(origTop) })
 			paths.SetTop(baseDir)
 
 			oldRunPath := filepath.Join(baseDir, "old_dir", "run")
