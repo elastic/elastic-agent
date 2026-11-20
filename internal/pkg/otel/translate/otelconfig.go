@@ -30,7 +30,12 @@ import (
 	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+<<<<<<< HEAD
 	"github.com/elastic/elastic-agent/internal/pkg/util"
+=======
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
+>>>>>>> 9e87946 (Share one host info source across the whole application (#17853))
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
@@ -534,8 +539,8 @@ func getReceiversConfigForComponent(
 
 	// OTel Beat receivers never see CLI flags, so pass ELASTIC_AGENT_HOSTNAME via the
 	// native Beat hostname config key for the receiver's own identity initialisation.
-	if hostname := util.HostnameOverride(); hostname != "" {
-		sharedConfig["hostname"] = hostname
+	if override := hostinfo.Override(); override != "" {
+		sharedConfig["hostname"] = override
 	}
 
 	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
