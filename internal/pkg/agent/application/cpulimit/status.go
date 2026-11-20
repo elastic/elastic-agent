@@ -2,7 +2,7 @@
 // or more contributor license agreements. Licensed under the Elastic License 2.0;
 // you may not use this file except in compliance with the Elastic License 2.0.
 
-// Package cpulimit models the state of the CPU cap shared by the agent and its components.
+// Package cpulimit enforces one CPU cap for the agent and its components. It also reports the cap state.
 package cpulimit
 
 import (
