@@ -2,7 +2,7 @@
 navigation_title: Prometheus remote write v1 receiver
 description: The Prometheus remote write v1 receiver is an OpenTelemetry Collector component that receives metrics from Prometheus using the remote write 1.0 protocol.
 applies_to:
-  stack: ga 9.5
+  stack: ga 9.7
   serverless:
     observability: ga
 products:
@@ -13,9 +13,9 @@ products:
 
 # Prometheus remote write v1 receiver
 
-The Prometheus remote write v1 receiver gets metrics from Prometheus and compatible agents using the [Prometheus remote write 1.0 protocol](https://prometheus.io/docs/specs/prw/remote_write_spec/). It accepts writes on an HTTP endpoint and translates them into OpenTelemetry metrics.
+The Prometheus remote write v1 receiver receives metrics from Prometheus and compatible agents using the [Prometheus remote write 1.0 protocol](https://prometheus.io/docs/specs/prw/remote_write_spec/). It accepts writes on an HTTP endpoint and translates them into OpenTelemetry metrics.
 
-Use this receiver when the sender speaks remote write 1.0. For remote write 2.0, use the [Prometheus remote write receiver](/reference/edot-collector/components/prometheusremotewritereceiver.md).
+Use this receiver when the sender uses remote write 1.0. For remote write 2.0, use the [Prometheus remote write receiver](/reference/edot-collector/components/prometheusremotewritereceiver.md).
 
 ## Get started
 
@@ -26,6 +26,8 @@ receivers:
   prometheusremotewritev1:
     endpoint: 0.0.0.0:9090
 ```
+
+The default endpoint is `localhost:9090`, which only accepts local connections. The example binds to `0.0.0.0:9090` so that Prometheus instances on other hosts can reach the receiver.
 
 Point Prometheus `remote_write` at the receiver:
 
@@ -48,7 +50,7 @@ The receiver serves `POST /api/v1/write` and expects `Content-Type: application/
 
 ## Limitations
 
-Each time series becomes one gauge metric. Labels other than `__name__` are stored as data point attributes. The receiver does not set resource attributes and does not preserve Prometheus metric type, unit, or help text from remote write 1.0 metadata.
+Each time series becomes one gauge metric. The receiver stores labels other than `__name__` as data point attributes. It does not set resource attributes and does not preserve Prometheus metric type, unit, or help text from remote write 1.0 metadata.
 
 ## Resources
 
