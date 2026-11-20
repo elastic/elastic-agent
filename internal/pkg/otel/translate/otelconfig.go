@@ -202,9 +202,12 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	// check if the actual configuration is supported. We need to actually generate the config and look for
-	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, logp.NewNopLogger())
+	// Only the output config can be unsupported; translating the inputs too is expensive for components with many inputs.
+	exporterType, err := OutputTypeToExporterType(comp.OutputType)
+	if err != nil {
+		return err
+	}
+	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
