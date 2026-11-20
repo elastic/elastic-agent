@@ -293,7 +293,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		},
 	})
 
-	actualConf, err := GetOtelConfig(model, logp.NewNopLogger())
+	actualConf, err := GetOtelConfig(model, "", logp.NewNopLogger())
 	require.NoError(t, err)
 	assert.Equal(t, expectedConfig.ToStringMap(), actualConf.ToStringMap())
 }

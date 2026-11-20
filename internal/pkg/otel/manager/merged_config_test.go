@@ -18,6 +18,7 @@ import (
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/featuregate"
 
+	fbfeatures "github.com/elastic/beats/v7/libbeat/features"
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
@@ -197,6 +198,70 @@ func TestBuildMergedConfigMonitoringReceiver(t *testing.T) {
 
 		assert.ElementsMatch(t, []string{fileExporter, connector}, got.Get(metricsPipeline+"::exporters"))
 		assert.ElementsMatch(t, []string{"elasticsearch/_agent-component/monitoring"}, got.Get(logsPipeline+"::exporters"))
+	})
+}
+
+func TestBuildMergedConfigElasticsearchStorageAuthenticator(t *testing.T) {
+	setTestTopPath(t)
+	t.Cleanup(fbfeatures.ReinitForTest)
+	t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "filestream")
+	fbfeatures.ReinitForTest()
+
+	const (
+		authenticatorKey = "extensions::elasticsearch_storage::auth::authenticator"
+		beatsAuth        = "beatsauth/_agent-component/"
+		esAuth           = "elasticsearchauth/fleet"
+	)
+	components := []component.Component{testComponent("default-output")}
+	esAuthCfg := map[string]any{"endpoints": []any{"https://es.example:9200"}}
+	collectorCfg := func(extensions map[string]any) *confmap.Conf {
+		return confmap.NewFromStringMap(map[string]any{"extensions": extensions})
+	}
+
+	forEachMergeAppendGate(t, func(t *testing.T, _ bool) {
+		t.Run("the storage uses the elasticsearchauth extension of the collector config", func(t *testing.T) {
+			got := buildTestMergedConfig(t, configUpdate{
+				components:   components,
+				collectorCfg: collectorCfg(map[string]any{esAuth: esAuthCfg}),
+			})
+
+			assert.Equal(t, esAuth, got.Get(authenticatorKey))
+			assert.Equal(t, esAuthCfg, got.Get("extensions::"+esAuth))
+			assert.Contains(t, got.Get("service::extensions"), esAuth, "the collector must start the authenticator")
+			assert.Contains(t, got.Get("service::extensions"), beatsAuth, "the exporter still needs beatsauth")
+		})
+
+		t.Run("without an elasticsearchauth extension the storage uses beatsauth", func(t *testing.T) {
+			got := buildTestMergedConfig(t, configUpdate{
+				components:   components,
+				collectorCfg: collectorCfg(map[string]any{"zpages": map[string]any{}}),
+			})
+
+			assert.Equal(t, beatsAuth, got.Get(authenticatorKey))
+		})
+
+		t.Run("with more than one elasticsearchauth extension the storage uses beatsauth", func(t *testing.T) {
+			got := buildTestMergedConfig(t, configUpdate{
+				components:   components,
+				collectorCfg: collectorCfg(map[string]any{esAuth: esAuthCfg, "elasticsearchauth/other": esAuthCfg}),
+			})
+
+			assert.Equal(t, beatsAuth, got.Get(authenticatorKey))
+			assert.NotContains(t, got.Get("service::extensions"), esAuth)
+		})
+	})
+
+	t.Run("an elasticsearchauth extension is not started when the state store is disabled", func(t *testing.T) {
+		t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "")
+		fbfeatures.ReinitForTest()
+
+		got := buildTestMergedConfig(t, configUpdate{
+			components:   components,
+			collectorCfg: collectorCfg(map[string]any{esAuth: esAuthCfg}),
+		})
+
+		assert.False(t, got.IsSet("extensions::elasticsearch_storage"))
+		assert.NotContains(t, got.Get("service::extensions"), esAuth)
 	})
 }
 
