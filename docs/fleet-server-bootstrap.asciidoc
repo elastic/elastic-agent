@@ -49,7 +49,7 @@ with `--fleet-server-cert`, `--fleet-server-cert-ca`, and `--certificate-authori
 [[fleet-server-bootstrap-process]]
 === How Does It Bootstrap
 
-Bootstrapping is ran during the `enroll` command. The `install` command
+Bootstrapping is run during the `enroll` command. The `install` command
 or the `container` command (used by Docker container) will call the `enroll`
 command to perform the bootstrapping process.
 

@@ -20,6 +20,17 @@ If you think you found a bug, it probably is a bug. Fill it in [GitHub](https://
 If you've found a security issue, before submitting anything via a PR, please
 get in touch with our security team [here](https://github.com/elastic/.github/blob/main/SECURITY.md).
 
+# Setting Up Your Development Environment
+
+A fresh clone needs the `beats` git submodule initialized before Go commands work:
+
+```sh
+git submodule update --init
+```
+
+See [Repository prerequisites](README.md#repository-prerequisites) for why, and the rest of
+the README's `Developing` section for build, test and packaging instructions.
+
 # Pull Request Guidelines
 
 The following exists as a way to set expectations for yourself and for the review process. We *want* to merge fixes and features, so let's describe how we can achieve this:

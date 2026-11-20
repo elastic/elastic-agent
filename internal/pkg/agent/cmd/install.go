@@ -139,7 +139,7 @@ func installCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 
 	runUninstallBinary, _ := cmd.Flags().GetBool(flagInstallRunUninstallFromBinary)
 	if status == install.Installed && force && runUninstallBinary {
-		fmt.Fprintln(streams.Out, "Uninstall will not be ran from the agent installed in system path, components may persist.")
+		fmt.Fprintln(streams.Out, "Uninstall will not be run from the agent installed in system path; components may persist.")
 	}
 
 	nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
