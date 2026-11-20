@@ -140,6 +140,73 @@ service:
       exporters: [debug, elasticsearch/otel]
 ```
 
+### Send edge-aggregated data to Managed OTLP
+
+Use this configuration when tail-based sampling and {{product.apm}} metric aggregation run in the edge Collector and the resulting telemetry is sent to the {{motlp}}.
+
+A dedicated OTLP exporter adds the `x-elastic-apm-aggregation-processed: "true"` header. The {{motlp}} uses this header to avoid aggregating the telemetry again. Use this exporter only for post-sampling traces, logs and metrics processed by the edge `elasticapm` connector, and metrics produced by the connector. Send unrelated host metrics, platform logs, and other telemetry through an exporter without the header.
+
+The following configuration is a full working example:
+
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+connectors:
+  elasticapm: {}
+  forward:
+
+processors:
+  elasticapm: {}
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 100
+    expected_new_traces_per_sec: 10
+    policies:
+      [
+        {
+          name: latency-5000ms-10000ms,
+          type: latency,
+          latency: {threshold_ms: 5000, upper_threshold_ms: 10000}
+        }
+      ]
+
+exporters:
+  otlp_grpc/motlp-aggregated:
+    endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
+    headers:
+      Authorization: ApiKey ${env:ELASTIC_API_KEY}
+      x-elastic-apm-aggregation-processed: "true"
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [elasticapm]
+      exporters: [elasticapm, otlp_grpc/motlp-aggregated]
+    logs:
+      receivers: [otlp]
+      processors: [elasticapm]
+      exporters: [elasticapm, otlp_grpc/motlp-aggregated]
+    traces/1-process-elastic:
+      receivers: [otlp]
+      processors: [elasticapm]
+      exporters: [elasticapm, forward]
+    traces/2-process-tbs:
+      receivers: [forward]
+      processors: [tail_sampling]
+      exporters: [otlp_grpc/motlp-aggregated]
+    metrics/aggregated-otel-metrics:
+      receivers: [elasticapm]
+      processors: []
+      exporters: [otlp_grpc/motlp-aggregated]
+```
+
 ### Scale with a load-balancing Collector
 
 To horizontally scale collectors with tail-based sampling turned on, all traces should go through a load-balancing Collector in front of the downstream tail-sampling collectors. Set the `traceID` as the routing key in the load-balancing Collector so that all traces belonging to the same trace ID go to the same downstream tail-sampling Collector.
