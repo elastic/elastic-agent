@@ -63,6 +63,11 @@ receivers:
       logs: Undefined
       metrics: Development
       traces: Undefined
+  - name: prometheusremotewritev1
+    stability:
+      logs: Undefined
+      metrics: Development
+      traces: Undefined
   - name: zipkin
     stability:
       logs: Undefined

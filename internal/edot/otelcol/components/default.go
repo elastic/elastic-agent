@@ -65,6 +65,7 @@ import (
 
 	akamaisiemreceiver "github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver"
 	elasticapmintakereceiver "github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver" // for collecting APM data from Elastic APM agents
+	prometheusremotewritev1receiver "github.com/elastic/opentelemetry-collector-components/receiver/prometheusremotewritev1receiver"
 
 	abreceiver "github.com/elastic/beats/v7/x-pack/auditbeat/abreceiver"
 	fbreceiver "github.com/elastic/beats/v7/x-pack/filebeat/fbreceiver"
@@ -214,6 +215,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			googlecloudmonitoringreceiver.NewFactory(),
 			windowsperfcountersreceiver.NewFactory(),
 			prometheusremotewritereceiver.NewFactory(),
+			prometheusremotewritev1receiver.NewFactory(),
 			akamaisiemreceiver.NewFactory(),
 		}
 
