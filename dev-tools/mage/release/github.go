@@ -82,11 +82,11 @@ func (gh *GitHubClient) CreatePR(opts PROptions) (*github.PullRequest, error) {
 	}
 
 	newPR := github.CreatePullRequest{
-		Title: github.Ptr(opts.Title),
+		Title: new(opts.Title),
 		Head:  opts.Head,
 		Base:  opts.Base,
-		Body:  github.Ptr(opts.Body),
-		Draft: github.Ptr(opts.Draft),
+		Body:  new(opts.Body),
+		Draft: new(opts.Draft),
 	}
 
 	pr, _, err := gh.client.PullRequests.Create(gh.ctx, opts.Owner, opts.Repo, newPR)
@@ -288,8 +288,8 @@ func (gh *GitHubClient) EnsureLabel(owner, repo, name, color, description string
 
 	_, _, err = gh.client.Issues.CreateLabel(gh.ctx, owner, repo, github.CreateIssueLabelRequest{
 		Name:        name,
-		Color:       github.Ptr(color),
-		Description: github.Ptr(description),
+		Color:       new(color),
+		Description: new(description),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create label %q: %w", name, err)
@@ -348,7 +348,7 @@ func (gh *GitHubClient) FindIssueByTitle(owner, repo, title string) (*github.Iss
 func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []string) (*github.Issue, error) {
 	req := github.CreateIssueRequest{
 		Title: title,
-		Body:  github.Ptr(body),
+		Body:  new(body),
 	}
 	if len(labels) > 0 {
 		req.Labels = labels
@@ -363,7 +363,7 @@ func (gh *GitHubClient) CreateIssue(owner, repo, title, body string, labels []st
 // UpdateIssueBody replaces the body of an existing issue.
 func (gh *GitHubClient) UpdateIssueBody(owner, repo string, number int, body string) error {
 	_, _, err := gh.client.Issues.Update(gh.ctx, owner, repo, number, github.UpdateIssueRequest{
-		Body: github.Ptr(body),
+		Body: new(body),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to update issue #%d body: %w", number, err)
@@ -403,10 +403,10 @@ func (gh *GitHubClient) ListReleaseLabeledPRsForVersion(owner, repo, version str
 			}
 			seen[num] = struct{}{}
 			prs = append(prs, &github.PullRequest{
-				Number:  github.Ptr(num),
-				HTMLURL: github.Ptr(issue.GetHTMLURL()),
-				Title:   github.Ptr(issue.GetTitle()),
-				State:   github.Ptr(issue.GetState()),
+				Number:  new(num),
+				HTMLURL: new(issue.GetHTMLURL()),
+				Title:   new(issue.GetTitle()),
+				State:   new(issue.GetState()),
 			})
 		}
 		if resp == nil || resp.NextPage == 0 {

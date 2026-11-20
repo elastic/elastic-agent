@@ -116,7 +116,7 @@ func TestEnsureReleaseIssueTrackerDryRun(t *testing.T) {
 		NextRelease: "9.4.1",
 		DryRun:      true,
 	}
-	pr := &github.PullRequest{HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/99")}
+	pr := &github.PullRequest{HTMLURL: new("https://github.com/elastic/elastic-agent/pull/99")}
 	require.NoError(t, EnsureReleaseIssueTracker(cfg, []*github.PullRequest{pr}))
 }
 
@@ -127,7 +127,7 @@ func TestWarnEnsureReleaseIssueTrackerDoesNotPanicOnError(t *testing.T) {
 func TestPrURLsFromPullRequestsSkipsNil(t *testing.T) {
 	got := prURLsFromPullRequests([]*github.PullRequest{
 		nil,
-		{HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/1")},
+		{HTMLURL: new("https://github.com/elastic/elastic-agent/pull/1")},
 	})
 	require.Equal(t, []string{"https://github.com/elastic/elastic-agent/pull/1"}, got)
 }
