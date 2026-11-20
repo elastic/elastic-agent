@@ -574,6 +574,8 @@ github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceive
 github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0/go.mod h1:wxuk1s8hoiG0apiFowbT0d5tru+2oTwP6tDyA4STjfw=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.81.0 h1:pbT4W1RWs5+ieZTTIjxNp3wSMtlE8YFt85pDUo0V87Q=
 github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.81.0/go.mod h1:Iv4LO9KA+EMCEuYEBJ6bp6pbUzWbYduF2SWuLPqUQSs=
+github.com/elastic/opentelemetry-collector-components/receiver/prometheusremotewritev1receiver v0.81.0 h1:Ui2MXAmm7Tql1HH3AhjTCjnu+fu3a4F2saVgpjK9Uwc=
+github.com/elastic/opentelemetry-collector-components/receiver/prometheusremotewritev1receiver v0.81.0/go.mod h1:qvwJh6sWJ2oylZeSjxZQSKkOzcpOkvL9uaHNxlx7X0I=
 github.com/elastic/opentelemetry-collector-components/receiver/prometheusscrapereceiver v0.78.0 h1:Yf+Bndi58MlUitw+ZN0XdNN3ywZZ29j2TfZ4sV3iuDE=
 github.com/elastic/opentelemetry-collector-components/receiver/prometheusscrapereceiver v0.78.0/go.mod h1:86s01O9fjFlfe0LUwqcrq47ER868kS1oqncAdXIrORU=
 github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b h1:e2vBkk6UyTNNP+2pR84VZC/LlBqnv4doLYsgjQNQ5pg=

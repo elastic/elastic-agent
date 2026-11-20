@@ -84,7 +84,7 @@ The Prometheus remote write receiver has some behaviors to be aware of:
 
 * **Resource metrics cache.** The receiver uses an internal LRU cache to store `target_info` metrics across requests. The cache has a hardcoded limit of 1,000 resource metrics. If the process restarts, the cache is lost, which might cause some inconsistencies.
 
-* **Remote write v1 is not supported.** The receiver only supports the remote write 2.0 protocol. Remote write v1 lacks support for metadata, created timestamps, and atomic histogram ingestion.
+* **Remote write v1 is not supported.** The receiver only supports the remote write 2.0 protocol. Remote write v1 lacks support for metadata, created timestamps, and atomic histogram ingestion. To ingest remote write 1.0, use the [Prometheus remote write v1 receiver](/reference/edot-collector/components/prometheusremotewritev1receiver.md).
 
 
 ## Resources

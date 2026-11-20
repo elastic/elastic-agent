@@ -37,6 +37,10 @@ components:
     doc_path: "/reference/edot-collector/components/prometheusremotewritereceiver.md"
     title: "Prometheus remote write receiver"
 
+  prometheusremotewritev1receiver:
+    doc_path: "/reference/edot-collector/components/prometheusremotewritev1receiver.md"
+    title: "Prometheus remote write v1 receiver"
+
   # Processors
   elasticapmprocessor:
     doc_path: "/reference/edot-collector/components/elasticapmprocessor.md"

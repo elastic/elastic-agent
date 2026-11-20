@@ -154,6 +154,8 @@ receivers:
           metric_name: Invocations
   prometheus_remote_write:
     endpoint: 0.0.0.0:9090
+  prometheusremotewritev1:
+    endpoint: 0.0.0.0:9091
   statsd:
     endpoint: localhost:8125
   syslog:
@@ -331,6 +333,7 @@ service:
         - mysql
         - postgresql
         - prometheus_remote_write
+        - prometheusremotewritev1
         - snmp
         - azure_monitor
         - kafka_metrics
