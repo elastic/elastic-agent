@@ -29,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
@@ -1150,6 +1151,94 @@ inputs:
 		agentInfo, err := applyPolicy(policy)
 		require.NoError(t, err)
 		assert.Empty(t, agentInfo.GetTags(), "the tags are not sent when include_tags_in_events is off")
+	})
+}
+
+// TestCoordinatorHostnameChangeUpdatesOTelManager verifies that the Coordinator updates the OTel manager when the
+// hostname in the host information changes, so the collector configuration uses the new hostname immediately.
+func TestCoordinatorHostnameChangeUpdatesOTelManager(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+
+	var mx sync.Mutex
+	host := hostinfo.Info{Hostname: "host"}
+	setHost := func(h hostinfo.Info) {
+		mx.Lock()
+		defer mx.Unlock()
+		host = h
+	}
+	watcher := hostinfo.NewWatcherWithFetcher(logp.NewLogger("testing"), time.Hour, func(context.Context) (hostinfo.Info, error) {
+		mx.Lock()
+		defer mx.Unlock()
+		return host, nil
+	})
+	// The watcher fetches the host information again whenever the feature flags are applied.
+	refetch := func() {
+		require.NoError(t, features.Apply(config.MustNewConfigFrom(map[string]any{})))
+	}
+
+	updates := 0
+	configChan := make(chan ConfigChange, 1)
+	coord := &Coordinator{
+		logger:           logp.NewLogger("testing"),
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr: &fakeRuntimeManager{},
+		otelMgr: &fakeOTelManager{
+			updateCollectorCallback: func(*confmap.Conf) error {
+				updates++
+				return nil
+			},
+		},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		hostInfo:           watcher,
+	}
+	// Like Coordinator.runner, which also runs the watcher.
+	coord.hostInfoChanged = watcher.Changed()
+	watchCtx, stopWatching := context.WithCancel(ctx)
+	defer stopWatching()
+	go func() { _ = watcher.Run(watchCtx) }()
+
+	// The first fetch is a change.
+	coord.runLoopIteration(ctx)
+	require.Equal(t, "host", coord.hostname)
+
+	cfgChange := &configChange{cfg: config.MustNewConfigFrom(`
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`)}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+	require.True(t, cfgChange.acked, "policy change was not acked")
+	require.NoError(t, cfgChange.err)
+	require.Equal(t, 1, updates)
+
+	// The steps run in sequence on one coordinator. Each step depends on the previous one.
+	t.Run("hostname change updates the OTel manager", func(t *testing.T) {
+		updates = 0
+		setHost(hostinfo.Info{Hostname: "host.example.com"})
+		refetch()
+		coord.runLoopIteration(ctx)
+		assert.Equal(t, "host.example.com", coord.hostname)
+		assert.Equal(t, 1, updates)
+	})
+
+	t.Run("other host information changes don't update the OTel manager", func(t *testing.T) {
+		updates = 0
+		setHost(hostinfo.Info{Hostname: "host.example.com", IPs: []string{"10.0.0.1"}})
+		refetch()
+		coord.runLoopIteration(ctx)
+		assert.Equal(t, 0, updates)
 	})
 }
 
