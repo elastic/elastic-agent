@@ -1,178 +1,165 @@
 #!/usr/bin/env bash
-# Poller for elastic-agent-package DRA dependency changes.
+# Scheduled poller for elastic-agent-package DRA dependency changes.
 #
-# Runs on a schedule. Checks whether any dependent product (beats, apm-server,
-# fleet-server, cloud-defend, cloudbeat, elastic-agent-core) has a newer DRA
-# build than what elastic-agent-package last built with. If so, merges the
-# dependency manifests, uploads the merged manifest, and triggers a new
-# elastic-agent-package build.
+# The decisions this script does NOT make live in Go, in `mage
+# dra:mergeManifests` (see dev-tools/mage/dra): which products
+# elastic-agent-package depends on, which DRA build of each is current, and what
+# the merged manifest handed to packaging looks like. That is packaging logic
+# and has to be runnable locally. What is left here is the CI plumbing — GCS and
+# the Buildkite API — which cannot be run locally anyway.
+#
+# The contract between the two halves is the merged manifest's `build_id`: a
+# content hash of the dependency build IDs. This script publishes the manifest
+# under that id and records next to it that a build was triggered, so an input
+# set that was already built is recognised on the next tick.
 #
 # Required env vars:
-#   BUILDKITE_BRANCH      - release branch (e.g. "main", "9.6")
-#   BUILDKITE_API_TOKEN   - Buildkite API token (read from Vault in the pipeline)
-#   GCS_BUCKET            - GCS bucket for merged manifest upload
-#                           (elastic-artifacts-snapshot or elastic-artifacts-staging)
-#   DRA_WORKFLOW          - "snapshot" or "staging"
+#   BUILDKITE_BRANCH     - release branch (e.g. "main", "9.6")
+#   BUILDKITE_API_TOKEN  - Buildkite API token (read_builds, write_builds)
+#   DRA_WORKFLOW         - "snapshot" or "staging"
+#   GCS_BUCKET           - elastic-artifacts-snapshot or elastic-artifacts-staging
+#
+# Optional:
+#   DRA_POLL_FORCE=true  - trigger even if this input set was already built
+#   DRA_POLL_DRY_RUN=true - resolve and merge, but publish and trigger nothing
 set -euo pipefail
 
+_SELF=$(dirname "$0")
+source "${_SELF}/common.sh"
+
 BRANCH="${BUILDKITE_BRANCH:?BUILDKITE_BRANCH is required}"
-# Dep teams publish latest pointers under "master.json" for their default branch.
-DEP_BRANCH="${BRANCH}"
-[[ "${BRANCH}" == "main" ]] && DEP_BRANCH="master"
 WORKFLOW="${DRA_WORKFLOW:?DRA_WORKFLOW is required}"
 GCS_BUCKET="${GCS_BUCKET:?GCS_BUCKET is required}"
+DRY_RUN="${DRA_POLL_DRY_RUN:-false}"
+FORCE="${DRA_POLL_FORCE:-false}"
+
 BK_ORG="elastic"
 BK_PIPELINE="elastic-agent-package"
-PACKAGES_YML="dev-tools/packaging/packages.yml"
+MERGED_MANIFEST_FILE="${WORKSPACE}/build/dra/agent-artifacts-merged.json"
+GCS_PREFIX="elastic-agent-package/poller-merged"
 
-case "${WORKFLOW}" in
-  snapshot) ARTIFACT_HOST="https://artifacts-snapshot.elastic.co" ;;
-  staging)  ARTIFACT_HOST="https://artifacts-staging.elastic.co" ;;
-  *) echo "ERROR: unknown workflow '${WORKFLOW}'" >&2; exit 1 ;;
+# The merged manifest has to be served from a host the packaging code is allowed
+# to download manifests from; see AllowedManifestHosts in
+# dev-tools/mage/manifest/manifest.go.
+case "${GCS_BUCKET}" in
+  elastic-artifacts-snapshot) ARTIFACT_HOST="artifacts-snapshot.elastic.co" ;;
+  elastic-artifacts-staging)  ARTIFACT_HOST="artifacts-staging.elastic.co" ;;
+  *) echo "ERROR: no public host known for bucket '${GCS_BUCKET}'" >&2; exit 1 ;;
 esac
 
-# Derive dep list from packages.yml projectName fields (the authoritative source).
-# beats is a submodule dep not listed as a projectName, so it is added explicitly.
-mapfile -t DEPS < <(
-  { grep -E '^\s+projectName:' "${PACKAGES_YML}" | awk '{print $2}' | sort -u; echo "beats"; } | sort -u
-)
+# --- Step 1: resolve dependencies and build the merged manifest --------------
 
-echo "--- :mag: Checking dependency versions for elastic-agent-package (branch=${BRANCH}, workflow=${WORKFLOW})"
+echo "--- :mag: Resolving elastic-agent-package dependencies (branch=${BRANCH}, workflow=${WORKFLOW})"
+mage dra:mergeManifests
 
-# --- Step 1: Get the version elastic-agent-package last built with -----------
-
-AGENT_PKG_LATEST_URL="${ARTIFACT_HOST}/elastic-agent-package/latest/${BRANCH}.json"
-AGENT_PKG_LATEST=$(curl -sf --retry 3 --retry-delay 5 "${AGENT_PKG_LATEST_URL}" 2>/dev/null || true)
-
-declare -A LAST_DEP_BUILD_IDS
-
-if [[ -n "${AGENT_PKG_LATEST}" ]]; then
-  AGENT_PKG_MANIFEST_URL=$(echo "${AGENT_PKG_LATEST}" | jq -r '.manifest_url')
-  echo "Last elastic-agent-package manifest: ${AGENT_PKG_MANIFEST_URL}"
-
-  # Read dependency build IDs embedded in the last agent-package manifest
-  AGENT_PKG_MANIFEST=$(curl -sf --retry 3 --retry-delay 5 "${AGENT_PKG_MANIFEST_URL}" 2>/dev/null || true)
-  if [[ -n "${AGENT_PKG_MANIFEST}" ]]; then
-    for dep in "${DEPS[@]}"; do
-      build_id=$(echo "${AGENT_PKG_MANIFEST}" | jq -r --arg dep "${dep}" \
-        '.projects[$dep].build_id // empty' 2>/dev/null || true)
-      LAST_DEP_BUILD_IDS["${dep}"]="${build_id:-}"
-    done
-  fi
-else
-  echo "No existing elastic-agent-package latest pointer found on branch ${BRANCH} — cold start, will trigger unconditionally."
+DEPENDENCY_SET_ID=$(jq -r '.build_id' "${MERGED_MANIFEST_FILE}")
+if [[ -z "${DEPENDENCY_SET_ID}" || "${DEPENDENCY_SET_ID}" == "null" ]]; then
+  echo "ERROR: merged manifest ${MERGED_MANIFEST_FILE} has no build_id" >&2
+  exit 1
+fi
+# The merged manifest's version is what the dependencies themselves report:
+# "9.7.0-SNAPSHOT" for snapshots, "9.6.0-rc1" for staging. The pipeline passes
+# it to dra-prep as stack_version verbatim, so pass it on unmodified.
+STACK_VERSION=$(jq -r '.version' "${MERGED_MANIFEST_FILE}")
+if [[ -z "${STACK_VERSION}" || "${STACK_VERSION}" == "null" ]]; then
+  echo "ERROR: merged manifest ${MERGED_MANIFEST_FILE} has no version" >&2
+  exit 1
 fi
 
-# --- Step 2: Check each dependency for newer versions -----------------------
+GCS_DIR="gs://${GCS_BUCKET}/${GCS_PREFIX}/${BRANCH}/${DEPENDENCY_SET_ID}"
+MERGED_MANIFEST_URL="https://${ARTIFACT_HOST}/${GCS_PREFIX}/${BRANCH}/${DEPENDENCY_SET_ID}/agent-artifacts-merged.json"
 
-HAS_NEWER=false
-declare -A CURRENT_BUILD_IDS
+# --- Step 2: has this exact set of dependency builds already been built? -----
 
-for dep in "${DEPS[@]}"; do
-  latest_url="${ARTIFACT_HOST}/${dep}/latest/${DEP_BRANCH}.json"
-  latest_json=$(curl -sf --retry 3 --retry-delay 5 "${latest_url}" 2>/dev/null || true)
-
-  if [[ -z "${latest_json}" ]]; then
-    echo "WARNING: no latest pointer for ${dep} on branch ${DEP_BRANCH}, skipping"
-    continue
+if [[ "${FORCE}" != "true" ]]; then
+  if gcloud storage ls "${GCS_DIR}/triggered.json" >/dev/null 2>&1; then
+    echo "Dependency set ${DEPENDENCY_SET_ID} was already built — nothing to do."
+    exit 0
   fi
+fi
 
-  current_build_id=$(echo "${latest_json}" | jq -r '.build_id')
-  CURRENT_BUILD_IDS["${dep}"]="${current_build_id}"
-  last_build_id="${LAST_DEP_BUILD_IDS[${dep}]:-}"
-
-  if [[ "${current_build_id}" != "${last_build_id}" ]]; then
-    echo "  ${dep}: NEWER (was '${last_build_id}', now '${current_build_id}')"
-    HAS_NEWER=true
-  else
-    echo "  ${dep}: up to date (${current_build_id})"
-  fi
-done
-
-if [[ "${HAS_NEWER}" == "false" && -n "${AGENT_PKG_LATEST}" ]]; then
-  echo "All dependencies are up to date — nothing to do."
+# A dry run stops here: everything below needs a Buildkite token.
+if [[ "${DRY_RUN}" == "true" ]]; then
+  echo "--- :no_entry: Dry run: would publish ${MERGED_MANIFEST_URL} and trigger ${BK_PIPELINE} on ${BRANCH}"
   exit 0
 fi
 
-# --- Step 3: Check if a build is already running ----------------------------
+# --- Step 3: stand down while a build is in flight ---------------------------
 
-echo "--- :buildkite: Checking for in-flight elastic-agent-package builds on branch ${BRANCH}"
+: "${BUILDKITE_API_TOKEN:?BUILDKITE_API_TOKEN is required unless DRA_POLL_DRY_RUN=true}"
 
-RUNNING=$(curl -sf --retry 3 \
+echo "--- :buildkite: Checking for in-flight ${BK_PIPELINE} builds on ${BRANCH}"
+RUNNING=$(curl -sf --retry 3 --retry-delay 5 \
   -H "Authorization: Bearer ${BUILDKITE_API_TOKEN}" \
-  "https://api.buildkite.com/v2/organizations/${BK_ORG}/pipelines/${BK_PIPELINE}/builds?branch=${BRANCH}&state[]=running&state[]=scheduled&per_page=1" \
+  "https://api.buildkite.com/v2/organizations/${BK_ORG}/pipelines/${BK_PIPELINE}/builds?branch=${BRANCH}&state[]=creating&state[]=scheduled&state[]=running&per_page=1" \
   | jq 'length')
 
 if [[ "${RUNNING}" -gt 0 ]]; then
-  echo "An elastic-agent-package build is already running on branch ${BRANCH} — skipping trigger."
-  echo "The in-flight build will pick up the latest dependency versions."
+  echo "A ${BK_PIPELINE} build is already running on ${BRANCH} — standing down."
+  echo "The next poll picks up whatever is current then."
   exit 0
 fi
 
-# --- Step 4: Merge dependency manifests -------------------------------------
+# --- Step 4: publish the merged manifest -------------------------------------
 
-echo "--- :compression: Merging dependency manifests"
-
-MERGED_MANIFEST_FILE=$(mktemp --suffix=.json)
-trap 'rm -f "${MERGED_MANIFEST_FILE}"' EXIT
-
-PACKAGES_YML="${PACKAGES_YML}" \
-  .buildkite/scripts/merge-dep-manifests.sh "${WORKFLOW}" "${BRANCH}" "${MERGED_MANIFEST_FILE}"
-
-# --- Step 5: Upload merged manifest to GCS ----------------------------------
-
-TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-MERGED_MANIFEST_GCS_PATH="${GCS_BUCKET}/elastic-agent-package/poller-merged/${BRANCH}/${TIMESTAMP}/agent-artifacts-merged.json"
-# GCS buckets are fronted by elastic.co CDN domains that are in the packaging allowlist.
-# elastic-artifacts-snapshot → artifacts-snapshot.elastic.co
-# elastic-artifacts-staging  → artifacts-staging.elastic.co
-ARTIFACT_HOST_DOMAIN="${GCS_BUCKET/elastic-artifacts-/artifacts-}.elastic.co"
-MERGED_MANIFEST_URL="https://${ARTIFACT_HOST_DOMAIN}/elastic-agent-package/poller-merged/${BRANCH}/${TIMESTAMP}/agent-artifacts-merged.json"
-
-echo "--- :gcloud: Uploading merged manifest to gs://${MERGED_MANIFEST_GCS_PATH}"
+echo "--- :gcloud: Publishing merged manifest to ${GCS_DIR}/agent-artifacts-merged.json"
 gcloud storage cp \
   --content-type=application/json \
   --cache-control="no-store, no-cache, max-age=0" \
   "${MERGED_MANIFEST_FILE}" \
-  "gs://${MERGED_MANIFEST_GCS_PATH}"
+  "${GCS_DIR}/agent-artifacts-merged.json"
 
-# --- Step 6: Trigger elastic-agent-package build ----------------------------
+# --- Step 5: trigger the build -----------------------------------------------
 
-# Translate main → main (no change needed; elastic-agent-package uses main directly)
-AGENT_PKG_BRANCH="${BRANCH}"
-
-# Determine DRA_VERSION from the first dep's latest pointer.
-# For snapshot builds the version field includes -SNAPSHOT (e.g. 9.6.0-SNAPSHOT);
-# for staging it does not (e.g. 9.6.0-rc1). Pass it as-is so the pipeline does
-# not need to append or strip the qualifier.
-FIRST_DEP="${DEPS[0]}"
-FIRST_DEP_LATEST=$(curl -sf --retry 3 "${ARTIFACT_HOST}/${FIRST_DEP}/latest/${BRANCH}.json")
-STACK_VERSION=$(echo "${FIRST_DEP_LATEST}" | jq -r '.version')
-
-echo "--- :pipeline: Triggering elastic-agent-package build"
-echo "  Branch:       ${AGENT_PKG_BRANCH}"
+echo "--- :pipeline: Triggering ${BK_PIPELINE}"
+echo "  Branch:       ${BRANCH}"
 echo "  DRA_VERSION:  ${STACK_VERSION}"
 echo "  DRA_WORKFLOW: ${WORKFLOW}"
 echo "  MANIFEST_URL: ${MERGED_MANIFEST_URL}"
 
-curl -sf \
+BUILD_RESPONSE=$(curl -sf \
   -H "Authorization: Bearer ${BUILDKITE_API_TOKEN}" \
   -H "Content-Type: application/json" \
   "https://api.buildkite.com/v2/organizations/${BK_ORG}/pipelines/${BK_PIPELINE}/builds" \
   -d "$(jq -n \
-    --arg branch "${AGENT_PKG_BRANCH}" \
+    --arg branch "${BRANCH}" \
     --arg version "${STACK_VERSION}" \
     --arg workflow "${WORKFLOW}" \
     --arg manifest_url "${MERGED_MANIFEST_URL}" \
+    --arg set_id "${DEPENDENCY_SET_ID}" \
     '{
+      commit: "HEAD",
       branch: $branch,
-      message: ("Poller-triggered build: " + $workflow + " / " + $version),
+      message: ("DRA dependency poller: " + $workflow + " / " + $set_id),
       env: {
         DRA_WORKFLOW: $workflow,
         DRA_VERSION: $version,
         MANIFEST_URL: $manifest_url
       },
       ignore_pipeline_branch_filters: true
-    }')"
+    }')")
 
-echo "Triggered elastic-agent-package build on branch ${AGENT_PKG_BRANCH}."
+BUILD_URL=$(echo "${BUILD_RESPONSE}" | jq -r '.web_url')
+echo "Triggered ${BUILD_URL}"
+
+# --- Step 6: record that this input set was built ----------------------------
+#
+# Written last, and only after the trigger succeeded: until it exists the
+# dependency set counts as un-built, so a failed trigger is retried next tick.
+
+echo "${BUILD_RESPONSE}" | jq \
+  --arg set_id "${DEPENDENCY_SET_ID}" \
+  --arg manifest_url "${MERGED_MANIFEST_URL}" \
+  '{
+    dependency_set_id: $set_id,
+    merged_manifest_url: $manifest_url,
+    build_number: .number,
+    build_url: .web_url,
+    triggered_at: (now | todate)
+  }' > build/dra/triggered.json
+
+gcloud storage cp \
+  --content-type=application/json \
+  --cache-control="no-store, no-cache, max-age=0" \
+  "${WORKSPACE}/build/dra/triggered.json" \
+  "${GCS_DIR}/triggered.json"

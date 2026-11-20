@@ -848,6 +848,32 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "https://manifest.url", settings.Packaging.ManifestURL)
 	})
 
+	t.Run("loads MANIFEST_PATH as the manifest to package from", func(t *testing.T) {
+		// This is how a merged manifest produced locally by
+		// `mage dra:mergeManifests` is fed into a packaging run.
+		t.Setenv("MANIFEST_PATH", "build/dra/agent-artifacts-merged.json")
+
+		settings, err := LoadSettings()
+		require.NoError(t, err)
+		assert.Equal(t, "build/dra/agent-artifacts-merged.json", settings.Packaging.ManifestURL)
+	})
+
+	t.Run("rejects MANIFEST_PATH combined with MANIFEST_URL", func(t *testing.T) {
+		t.Setenv("MANIFEST_URL", "https://manifest.url")
+		t.Setenv("MANIFEST_PATH", "build/dra/agent-artifacts-merged.json")
+
+		_, err := LoadSettings()
+		assert.ErrorContains(t, err, "mutually exclusive")
+	})
+
+	t.Run("rejects MANIFEST_PATH combined with explicit USE_PACKAGE_VERSION=true", func(t *testing.T) {
+		t.Setenv("MANIFEST_PATH", "build/dra/agent-artifacts-merged.json")
+		t.Setenv("USE_PACKAGE_VERSION", "true")
+
+		_, err := LoadSettings()
+		assert.ErrorContains(t, err, "mutually exclusive")
+	})
+
 	t.Run("rejects MANIFEST_URL combined with explicit USE_PACKAGE_VERSION=true", func(t *testing.T) {
 		t.Setenv("MANIFEST_URL", "https://manifest.url")
 		t.Setenv("USE_PACKAGE_VERSION", "true")
