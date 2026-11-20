@@ -19,7 +19,6 @@ import (
 	ctesting "github.com/elastic/elastic-agent/internal/pkg/composable/testing"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
 	testlogger "github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/go-sysinfo/types"
@@ -150,9 +149,9 @@ func TestHostMapping(t *testing.T) {
 func TestHostMappingLowercasesHostnameOverride(t *testing.T) {
 	// Unlike add_host_metadata in Beats, the provider lowercases ELASTIC_AGENT_HOSTNAME, see the hostinfo package
 	// documentation.
-	t.Setenv(util.EnvHostName, "My-Node")
+	t.Setenv(hostinfo.EnvOverride, "My-Node")
 	l, _ := testlogger.New(t.Name())
-	info, err := hostinfo.Fetch(l)
+	info, err := hostinfo.Fetch(t.Context(), l)
 	require.NoError(t, err)
 	assert.Equal(t, "my-node", hostMapping(info)["name"])
 }

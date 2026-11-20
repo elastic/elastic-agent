@@ -23,10 +23,10 @@ import (
 
 	edotOtelCol "github.com/elastic/elastic-agent/internal/edot/otelcol"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
 
@@ -37,7 +37,7 @@ const (
 
 // initBeatHostnameFromEnv sets the process-wide Beat hostname override from ELASTIC_AGENT_HOSTNAME.
 func initBeatHostnameFromEnv() {
-	beat.SetHostnameOverride(util.HostnameOverride())
+	beat.SetHostnameOverride(hostinfo.Override())
 }
 
 func NewOtelCommandWithArgs(args []string, streams *cli.IOStreams, componentsFn func() (otelcol.Factories, error)) *cobra.Command {
