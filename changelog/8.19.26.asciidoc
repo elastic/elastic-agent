@@ -28,10 +28,8 @@ Review important information about the  8.19.26 release.
 
 
 * Load the EDOT .NET plugin in kube-stack auto-instrumentation. https://github.com/elastic/elastic-agent/pull/17451[#17451] 
-
-
 * Fix components and units that are removed and quickly re-added by a policy change staying stopped until the agent restarts. https://github.com/elastic/elastic-agent/pull/17715[#17715] https://github.com/elastic/elastic-agent/issues/17714[#17714]
-* Fix elastic-agent logs failing on Windows before the event logs directory exists. https://github.com/elastic/elastic-agent/pull/17897[#17897] 
-* Fix upgrade watcher double counting restarts. https://github.com/elastic/elastic-agent/pull/17938[#17938] 
+* Fix the `elastic-agent logs` command failing on Windows before the event logs directory exists. https://github.com/elastic/elastic-agent/pull/17897[#17897]
+* Fix the upgrade watcher double-counting Elastic Agent restarts after an upgrade. https://github.com/elastic/elastic-agent/pull/17938[#17938]
 
 // end 8.19.26 relnotes
