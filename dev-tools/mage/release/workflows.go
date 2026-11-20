@@ -7,7 +7,7 @@ package release
 import (
 	"fmt"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v93/github"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
 )
@@ -147,7 +147,10 @@ func RunMajorMinorRelease(cfg *ReleaseConfig) error {
 		return err
 	}
 
-	gh := NewGitHubClient(cfg.GitHubToken)
+	gh, err := NewGitHubClient(cfg.GitHubToken)
+	if err != nil {
+		return fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
@@ -388,7 +391,10 @@ func RunPatchRelease(cfg *ReleaseConfig) error {
 		return nil
 	}
 
-	gh := NewGitHubClient(cfg.GitHubToken)
+	gh, err := NewGitHubClient(cfg.GitHubToken)
+	if err != nil {
+		return fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 	results, err := finalizeWorkflowPRs(repo, gh, cfg.GitHubToken, branchesToFinalize)
 	if err != nil {
 		return err
