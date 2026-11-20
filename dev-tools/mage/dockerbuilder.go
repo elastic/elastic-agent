@@ -6,7 +6,6 @@ package mage
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
@@ -21,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/klauspost/pgzip"
 	"github.com/magefile/mage/mg"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -331,14 +331,7 @@ func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtr
 		}
 		defer f.Close()
 
-		w := gzip.NewWriter(f)
-		defer w.Close()
-
-		_, err = io.Copy(w, stdout)
-		if err != nil {
-			return err
-		}
-		return nil
+		return gzipCopy(f, stdout)
 	}()
 	if err != nil {
 		return err
@@ -360,4 +353,25 @@ func (b *dockerBuilder) dockerSave(ctx context.Context, tag string, templateExtr
 
 func isBuildxEnabled() bool {
 	return sh.Run("docker", "buildx", "version") == nil
+}
+
+// gzipCopy compresses src into dst as a gzip stream.
+//
+// The image tarballs are hundreds of MB to over a GB each and the standard
+// library gzip compresses on a single core, so compressing them is a large
+// share of the packaging time. pgzip compresses independent blocks in parallel
+// on all CPUs and writes a regular gzip stream that any gzip reader accepts.
+func gzipCopy(dst io.Writer, src io.Reader) error {
+	w, err := pgzip.NewWriterLevel(dst, pgzip.DefaultCompression)
+	if err != nil {
+		return err
+	}
+	if err := w.SetConcurrency(1<<20, runtime.GOMAXPROCS(0)); err != nil {
+		return err
+	}
+	if _, err := io.Copy(w, src); err != nil {
+		_ = w.Close()
+		return err
+	}
+	return w.Close()
 }
