@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions/v2 v2.0.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261112051337-65bae9ee687e
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261120115257-86ddcb77513d
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.81.0
@@ -112,7 +112,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.63.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.13.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
-	github.com/bluekeyes/go-gitdiff v0.7.1 // indirect
 	github.com/brunoscheufler/aws-ecs-metadata-go v0.0.0-20221221133751-67e37ae746cd // indirect
 	github.com/buger/jsonparser v1.1.2 // indirect
 	github.com/cenkalti/backoff/v7 v7.0.3 // indirect
@@ -129,7 +128,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/internal/sharedcomponent v0.0.0-20250220025958-386ba0c4bced // indirect
 	github.com/elastic/proxy-connect-dialer-go v0.1.1 // indirect
 	github.com/elastic/tk-btf v0.3.0 // indirect
-	github.com/elastic/toutoumomoma v0.0.0-20240626215117-76e39db18dfb // indirect
+	github.com/elastic/toutoumomoma v0.0.0-20261115195231-8e972b20fa5e // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
 	github.com/go-openapi/swag/cmdutils v0.29.2 // indirect
@@ -229,7 +228,6 @@ require (
 	go.opentelemetry.io/proto/otlp/processcontext/v1development v0.4.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.6 // indirect
-	mvdan.cc/garble v0.12.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.2 // indirect
 )
@@ -433,7 +431,7 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.23.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.19.0 // indirect
+	github.com/elastic/elastic-agent-client/v7 v7.20.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/go-concert v0.3.1 // indirect
 	github.com/elastic/go-docappender/v2 v2.15.0 // indirect
@@ -849,4 +847,4 @@ replace (
 	github.com/open-telemetry/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver => github.com/elastic/opentelemetry-collector-contrib/receiver/awscloudwatchreceiver v0.0.0-20260915073819-8c118d44408b
 )
 
-replace go.opentelemetry.io/contrib/otelconf => github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261107222439-e13e23510317
+replace go.opentelemetry.io/contrib/otelconf => github.com/swiatekm/opentelemetry-go-contrib/otelconf v0.0.0-20261117140130-d3e15f1c55d4
