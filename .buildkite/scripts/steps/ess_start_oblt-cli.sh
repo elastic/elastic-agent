@@ -14,10 +14,24 @@ if [[ "${FIPS:-false}" == "true" ]]; then
 fi
 export METADATA_PREFIX
 
+# Record every cluster this attempt creates, even when the attempt fails afterwards
+# (secrets, Fleet preinstall, oblt-cli wait timeout). A step retry creates a new
+# cluster and overwrites the shared `cluster-name` key, so without this the first
+# cluster would never be destroyed. The cleanup step destroys every
+# `retry-cluster-*` key, one per attempt.
+function record_created_cluster() {
+  local name
+  name="$(jq -r '.ClusterName // empty' "${PWD}/cluster-info.json" 2>/dev/null || true)"
+  if [ -n "${name}" ]; then
+    buildkite-agent meta-data set "${METADATA_PREFIX}retry-cluster-${BUILDKITE_STEP_ID}-${BUILDKITE_RETRY_COUNT:-0}" "${name}" || true
+  fi
+}
+trap record_created_cluster EXIT
+
 ess_up "$STACK_VERSION" "$STACK_BUILD_ID"
 
 # Publish the shared cluster name via meta-data so the global cleanup step
-# (ess_down_oblt-cli.sh) can find and destroy it. Per-step retries intentionally
+# (ess_cleanup_all.sh) can find and destroy it. Per-step retries intentionally
 # don't touch this key - they rely on their own local cluster-info.json for
 # teardown - so this always points at the shared cluster created above.
 CLUSTER_NAME="$(jq -r '.ClusterName' "${PWD}/cluster-info.json")"

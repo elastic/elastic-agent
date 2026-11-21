@@ -3,6 +3,12 @@
 # integration test jobs share one stack. Keep in sync with ess_oblt-cli.sh.
 $script:EssMaxShardsPerNode = if ($Env:ESS_MAX_SHARDS_PER_NODE) { [int]$Env:ESS_MAX_SHARDS_PER_NODE } else { 2000 }
 
+# FIPS runs publish their shared cluster metadata under the "fips." prefix.
+function Get-Ess-Metadata-Prefix {
+  if ($Env:FIPS -eq "true") { return "fips." }
+  return ""
+}
+
 function ess_up {
   param (
       [string]$StackVersion,
@@ -31,10 +37,26 @@ function ess_up {
       $params.ElasticAgentDockerImage = $Env:INTEGRATION_SERVER_DOCKER_IMAGE
   }
 
-  # Snapshot stacks need explicit image tags. Released stacks can be created
-  # from StackVersion alone until the next snapshot build is available.
-  if ($StackBuildId) {
-      $params.StackBuildId = "$StackBuildId"
+  # FIPS runs on FedRAMP Staging (frs). Only the generic `ess` template is
+  # supported there, and FRS only offers plain stack versions, so the
+  # StackBuildId pinning of ess-ea-it-build-id isn't available.
+  # See https://github.com/elastic/observability-test-environments/blob/main/docs/kb/create-ech-cluster-on-frs.md
+  $isFips = $Env:FIPS -eq "true"
+  if ($isFips) {
+      $template = "ess"
+      $clusterPrefix = "frs"
+      # Creating a cluster on FRS takes about 20 minutes.
+      $waitMinutes = 40
+      $params.Target = "frs"
+  } else {
+      $template = "ess-ea-it-build-id"
+      $clusterPrefix = "hosted"
+      $waitMinutes = 20
+      # Snapshot stacks need explicit image tags. Released stacks can be created
+      # from StackVersion alone until the next snapshot build is available.
+      if ($StackBuildId) {
+          $params.StackBuildId = "$StackBuildId"
+      }
   }
 
   $params | ConvertTo-Json -Compress | Set-Content -Path $paramsPath -Encoding ASCII
@@ -43,12 +65,12 @@ function ess_up {
     # --output-file must be an absolute path; oblt-cli resolves relative
     # paths against its own config dir (~/.oblt-cli), not CWD.
     & oblt-cli cluster create custom `
-        --template ess-ea-it-build-id `
-        --cluster-name-prefix hosted `
+        --template $template `
+        --cluster-name-prefix $clusterPrefix `
         --parameters-file $paramsPath `
         --parameter "ExpireInHours=4" `
         --output-file $clusterInfoPath `
-        --wait 20
+        --wait $waitMinutes
   } finally {
     Remove-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
   }
@@ -77,7 +99,7 @@ function ess_up {
   # However, store retry cluster names in a separate metadata key so they can
   # be cleaned up by a dedicated cleanup step if the finally block fails (e.g., timeout)
   if ($Env:BUILDKITE_RETRY_COUNT -and $Env:BUILDKITE_RETRY_COUNT -gt 0) {
-      $MetadataPrefix = if ($Env:FIPS -eq "true") { "fips." } else { "" }
+      $MetadataPrefix = Get-Ess-Metadata-Prefix
       $retryKey = "${MetadataPrefix}retry-cluster-$($Env:BUILDKITE_STEP_ID)-$($Env:BUILDKITE_RETRY_COUNT)"
       Write-Output "Storing retry cluster name in metadata: $retryKey = $ClusterName"
       & buildkite-agent meta-data set $retryKey $ClusterName
@@ -133,7 +155,7 @@ function ess_down {
       $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
     }
     if (-not $ClusterName) {
-      $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+      $ClusterName = & buildkite-agent meta-data get "$(Get-Ess-Metadata-Prefix)cluster-name" 2>$null
     }
     if (-not $ClusterName) {
       Write-Output "No cluster-name found; nothing to destroy."
@@ -162,7 +184,7 @@ function ess_load_secrets {
     $ClusterName = (Get-Content -Path $clusterInfoPath | ConvertFrom-Json).ClusterName
   }
   if (-not $ClusterName) {
-    $ClusterName = & buildkite-agent meta-data get cluster-name 2>$null
+    $ClusterName = & buildkite-agent meta-data get "$(Get-Ess-Metadata-Prefix)cluster-name" 2>$null
   }
   if (-not $ClusterName) {
     Write-Error "Error: no cluster-name available (neither cluster-info.json nor meta-data); cannot load secrets."
