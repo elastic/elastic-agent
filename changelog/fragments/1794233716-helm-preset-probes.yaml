@@ -1,0 +1,3 @@
+kind: enhancement
+summary: Allow liveness, readiness and startup probes on Helm chart agent presets
+component: elastic-agent
