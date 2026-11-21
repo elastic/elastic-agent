@@ -21,7 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -455,7 +455,7 @@ func (c *commandRuntime) start(comm Communicator) error {
 
 	args = append(args, pathArgs(workDir, c.current.BeatName())...)
 
-	args = append(args, hostnameOverrideArgs(c.current.BeatName(), util.HostnameOverride())...)
+	args = append(args, hostnameOverrideArgs(c.current.BeatName(), hostinfo.Override())...)
 
 	// reset checkin state before starting the process.
 	c.lastCheckin = time.Time{}
