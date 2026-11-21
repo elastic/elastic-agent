@@ -361,6 +361,14 @@ func TestUpgradeHandlerNewVersion(t *testing.T) {
 	require.NoError(t, err1)
 	checkMsg(upgradeCalledChan, "8.2.0", "first call must be with version 8.2.0")
 
+	// The handler clears its queue only after the failed upgrade is fully
+	// handled. Wait for that so no work is left running after the test ends.
+	require.Eventually(t, func() bool {
+		u.bkgMutex.Lock()
+		defer u.bkgMutex.Unlock()
+		return len(u.bkgActions) == 0
+	}, 5*time.Second, 10*time.Millisecond)
+
 	err2 := u.Handle(ctx, &a2, ack)
 	require.NoError(t, err2)
 	checkMsg(upgradeCalledChan, "8.5.0", "second call to Upgrade must be with version 8.5.0")
