@@ -1,0 +1,6 @@
+kind: bug-fix
+summary: Collect the logs that newer versions keep in data/logs/<build> in the diagnostics bundle
+description: "Newer versions of the Agent write their logs to data/logs/<build> instead of the installation directory, so that they are retained when an upgrade fails. The diagnostics bundle now also collects the logs of the builds in data/logs, so that the logs of a failed upgrade are included after the Agent rolled back to this version."
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/17234
+pr: https://github.com/elastic/elastic-agent/pull/17802
