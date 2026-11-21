@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/buildkite/pipeline-schema/main/schema.json
+# Scheduled poller pipeline for elastic-agent-package DRA builds.
+#
+# Runs on a schedule (e.g. every 30 minutes). Checks whether any dependent
+# product (beats, apm-server, fleet-server, cloud-defend, cloudbeat,
+# elastic-agent-core) has published a newer DRA build since the last
+# elastic-agent-package build. If so, merges their manifests and triggers
+# a new elastic-agent-package build.
+#
+# This pipeline must be configured in the Buildkite UI with a schedule
+# on each active release branch (main, 9.6, etc.).
+
+env:
+  DRA_WORKFLOW: "${DRA_WORKFLOW:-snapshot}"
+
+steps:
+  - label: ":mag: Poll elastic-agent-package dependencies"
+    key: poll-deps
+    command: ".buildkite/scripts/poll-agent-package-deps.sh"
+    agents:
+      image: "docker.elastic.co/release-eng/wolfi-build-essential-release-eng:latest"
+      cpu: "1"
+      memory: "1Gi"
+    env:
+      GCS_BUCKET: "${GCS_BUCKET:-elastic-artifacts-snapshot}"
+    plugins:
+      - elastic/oblt-google-auth#v1.3.5:
+          lifetime: 3600
+          project-id: "elastic-observability-ci"
+          project-number: "911195782929"
+      - elastic/vault-secrets#v0.1.0:
+          path: "kv/ci-shared/platform-ingest/buildkite_token"
+          field: "value"
+          env_var: "BUILDKITE_API_TOKEN"
