@@ -7,7 +7,7 @@ package k8s
 import "path/filepath"
 
 const (
-	KubeStackChartVersion         = "0.16.0"
+	KubeStackChartVersion         = "0.18.0"
 	KubeStackChartName            = "opentelemetry-kube-stack"
 	KubeStackChartNameWithVersion = KubeStackChartName + "-" + KubeStackChartVersion
 	KubeStackChartArchiveName     = KubeStackChartNameWithVersion + ".tgz"
