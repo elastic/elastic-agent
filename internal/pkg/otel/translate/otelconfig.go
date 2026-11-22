@@ -210,7 +210,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 	if err != nil {
 		return err
 	}
-	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, logp.NewNopLogger())
+	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, "", logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
