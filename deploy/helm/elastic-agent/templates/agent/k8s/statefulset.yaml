@@ -25,6 +25,9 @@ spec:
     metadata:
       labels:
         name: {{ $agentName }}
+        {{- with ($presetVal).podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         checksum/config: {{ print (include "elasticagent.engine.k8s.secretData" (list $ $presetVal $agentName)) | sha256sum }}
         {{- with ($presetVal).annotations }}
