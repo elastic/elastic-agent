@@ -1,0 +1,4 @@
+kind: enhancement
+summary: Reduce the CPU and memory used to check whether the OTel runtime supports a component
+component: elastic-agent
+pr: https://github.com/elastic/elastic-agent/pull/18061

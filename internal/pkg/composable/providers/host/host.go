@@ -88,8 +88,8 @@ func (c *contextProvider) Close() error {
 func ContextProviderBuilder(log *logger.Logger, c *config.Config, _ bool) (corecomp.ContextProvider, error) {
 	p := &contextProvider{
 		logger: log,
-		fetcher: func(context.Context) (hostinfo.Info, error) {
-			return hostinfo.Fetch(log)
+		fetcher: func(ctx context.Context) (hostinfo.Info, error) {
+			return hostinfo.Fetch(ctx, log)
 		},
 	}
 	if c != nil {

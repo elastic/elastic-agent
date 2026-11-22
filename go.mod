@@ -16,7 +16,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261118210701-59a62be9feb5
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261120115257-86ddcb77513d
 	github.com/elastic/cloud-on-k8s/v3 v3.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.20.0
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
@@ -35,7 +35,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-containerregistry v0.22.1
-	github.com/google/go-github/v68 v68.0.0
+	github.com/google/go-github/v93 v93.0.0
 	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26
 	github.com/gorilla/mux v1.8.1
 	github.com/jedib0t/go-pretty/v6 v6.8.3

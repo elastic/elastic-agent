@@ -31,7 +31,7 @@ import (
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
@@ -205,9 +205,12 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	// check if the actual configuration is supported. We need to actually generate the config and look for
-	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, "", logp.NewNopLogger())
+	// Only the output config can be unsupported; translating the inputs too is expensive for components with many inputs.
+	exporterType, err := OutputTypeToExporterType(comp.OutputType)
+	if err != nil {
+		return err
+	}
+	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -553,8 +556,8 @@ func getReceiversConfigForComponent(
 
 	// OTel Beat receivers never see CLI flags, so pass ELASTIC_AGENT_HOSTNAME via the
 	// native Beat hostname config key for the receiver's own identity initialisation.
-	if hostname := util.HostnameOverride(); hostname != "" {
-		sharedConfig["hostname"] = hostname
+	if override := hostinfo.Override(); override != "" {
+		sharedConfig["hostname"] = override
 	}
 
 	// When SingleReceiver is set, merge all stream inputs into one receiver instead of

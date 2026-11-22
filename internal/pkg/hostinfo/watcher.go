@@ -17,8 +17,26 @@ import (
 	"github.com/elastic/elastic-agent/pkg/features"
 )
 
+// Source provides the host information. A Watcher is a Source that caches it, a FetchFunc is one that gathers it for
+// every call.
+type Source interface {
+	Get(ctx context.Context) (Info, error)
+}
+
 // FetchFunc gathers the host information.
 type FetchFunc func(context.Context) (Info, error)
+
+// NewFetcher returns a FetchFunc that gathers the host information with Fetch.
+func NewFetcher(log *logger.Logger) FetchFunc {
+	return func(ctx context.Context) (Info, error) {
+		return Fetch(ctx, log)
+	}
+}
+
+// Get calls f, so a FetchFunc is a Source.
+func (f FetchFunc) Get(ctx context.Context) (Info, error) {
+	return f(ctx)
+}
 
 // Watcher keeps the latest host information, so it can be shared without doing the I/O for every use. While it runs,
 // it fetches the host information every check interval, and whenever the feature flags, which include the FQDN
@@ -41,9 +59,7 @@ type Watcher struct {
 // NewWatcher returns a Watcher that fetches the host information every interval, or every DefaultCheckInterval if
 // interval isn't positive.
 func NewWatcher(log *logger.Logger, interval time.Duration) *Watcher {
-	return NewWatcherWithFetcher(log, interval, func(context.Context) (Info, error) {
-		return Fetch(log)
-	})
+	return NewWatcherWithFetcher(log, interval, NewFetcher(log))
 }
 
 // NewWatcherWithFetcher returns a Watcher like NewWatcher, which gets the host information from fetch instead of

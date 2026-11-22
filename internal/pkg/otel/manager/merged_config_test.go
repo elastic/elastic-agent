@@ -7,7 +7,6 @@
 package manager
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -26,8 +25,6 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // mergeAppendGate is the confmap feature gate the agent turns on at startup. It changes how
@@ -66,24 +63,12 @@ func setTestTopPath(t testing.TB) {
 	t.Cleanup(func() { paths.SetTop(topPath) })
 }
 
-// noHostInfoAgent is an info.Agent that does not look up host information, so the monitoring
-// templates fall back to os.Hostname. This keeps the tests reliable on macOS, where go-sysinfo's
-// memory lookup, which ECSMetadata calls, can overwrite unrelated memory on the Go heap:
-// https://github.com/elastic/go-sysinfo/issues/298
-type noHostInfoAgent struct {
-	info.Agent
-}
-
-func (noHostInfoAgent) ECSMetadata(*logger.Logger) (*ecsmeta.ECSMeta, error) {
-	return nil, errors.New("host information is not looked up in tests")
-}
-
 // buildTestMergedConfig builds the merged config for update, with the agent log level at warn.
 func buildTestMergedConfig(t *testing.T, update configUpdate) *confmap.Conf {
 	t.Helper()
 	update.agentLogLevel = logp.WarnLevel
-	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888}
-	got, err := m.buildMergedConfig(update, noHostInfoAgent{&info.AgentInfo{}}, logp.NewNopLogger())
+	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888, hostInfo: testHostInfo}
+	got, err := m.buildMergedConfig(t.Context(), update, &info.AgentInfo{}, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	return got
@@ -300,7 +285,7 @@ func BenchmarkBuildMergedConfig(b *testing.B) {
 
 	const inputs = 10_000
 	comp := testComponentWithInputs("bench", inputs)
-	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888}
+	m := &OTelManager{healthCheckExtComponentID: "healthcheckv2/test", collectorMetricsPort: 8888, hostInfo: testHostInfo}
 	agentInfo := &info.AgentInfo{}
 	logger := logp.NewNopLogger()
 
@@ -312,7 +297,7 @@ func BenchmarkBuildMergedConfig(b *testing.B) {
 				components:    []component.Component{comp},
 				agentLogLevel: logp.InfoLevel,
 			}
-			if _, err := m.buildMergedConfig(update, agentInfo, logger); err != nil {
+			if _, err := m.buildMergedConfig(b.Context(), update, agentInfo, logger); err != nil {
 				b.Fatal(err)
 			}
 		}
