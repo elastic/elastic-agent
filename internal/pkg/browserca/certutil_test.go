@@ -278,19 +278,21 @@ func TestRootOwnershipRepairRejectsLinkedDatabaseFile(t *testing.T) {
 func TestRootCleanupLeavesUnmanagedStoreUntouched(t *testing.T) {
 	certutil, o := rootTestOwner(t)
 	home := rootTestHome(t, o)
-	m := &manager{home: home, certs: execRunner(certutil, o), owner: o, inspect: execRunner(certutil, nil), log: &testLog{}}
+	m := &manager{home: home, certs: execRunner(certutil, o), owner: o, log: &testLog{}}
 	require.NoError(t, os.MkdirAll(m.dbDir(), 0o700))
-	_, err := m.inspect(t.Context(), nil, "-N", "-d", "sql:"+m.dbDir(), "--empty-password")
+	// Set the store up as the browser user's own tools would, here as root.
+	setup := execRunner(certutil, nil)
+	_, err := setup(t.Context(), nil, "-N", "-d", "sql:"+m.dbDir(), "--empty-password")
 	require.NoError(t, err)
-	_, err = m.inspect(t.Context(), []byte(newCA(t, "unmanaged")), "-A", "-d", "sql:"+m.dbDir(), "-n", "user-ca", "-t", "C,,", "-a")
+	_, err = setup(t.Context(), []byte(newCA(t, "unmanaged")), "-A", "-d", "sql:"+m.dbDir(), "-n", "user-ca", "-t", "C,,", "-a")
 	require.NoError(t, err)
 	path := filepath.Join(m.dbDir(), "cert9.db")
 	before, err := os.ReadFile(path)
 	require.NoError(t, err)
-	require.NoError(t, m.reconcile(t.Context()))
-	info, err := os.Stat(path)
-	require.NoError(t, err)
-	assert.Zero(t, info.Sys().(*syscall.Stat_t).Uid)
+
+	// Without the marker, no CA configured means no certutil, as root or otherwise.
+	assert.False(t, managedStore(home), "an unrelated store must not be treated as managed")
+
 	after, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, before, after)

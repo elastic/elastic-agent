@@ -89,11 +89,10 @@ type manager struct {
 	// paths are PEM files, or directories whose *.crt and *.pem files are read.
 	paths []string
 	// home is the browser's home directory; the database is <home>/.pki/nssdb.
-	home    string
-	certs   runner
-	inspect runner // read-only listing for unconfigured cleanup, before ownership repair
-	owner   *owner // if set, owns the database; certs runs as it too
-	log     logs
+	home  string
+	certs runner
+	owner *owner // if set, owns the database; certs runs as it too
+	log   logs
 
 	// applied holds the certificates of the last successful sync, nil until one
 	// succeeds and after one fails, so that the next check reconciles again.
@@ -257,15 +256,6 @@ func (m *manager) reconcile(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if m.inspect != nil {
-		out, err := m.inspect(ctx, nil, "-L", "-d", "sql:"+m.dbDir())
-		if err != nil {
-			return fmt.Errorf("inspecting previous browser CAs: %w", err)
-		}
-		if len(managedCertificates(out)) == 0 {
-			return nil
-		}
-	}
 	want, err := m.certificates(ctx)
 	if err != nil {
 		// Leave the database alone until every CA file can be listed and read: syncing a
@@ -276,6 +266,9 @@ func (m *manager) reconcile(ctx context.Context) error {
 		return nil
 	}
 	if len(want) == 0 && !m.hasDB() {
+		if err := m.unmarkManaged(); err != nil {
+			return err
+		}
 		m.applied = want
 		return nil
 	}
@@ -302,6 +295,13 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 	}
 	if err := m.prepareDBDir(); err != nil {
 		return err
+	}
+	if len(want) > 0 {
+		// Record the store before changing it, so a failed or interrupted import is
+		// still cleaned up once the configuration is removed.
+		if err := m.markManaged(); err != nil {
+			return err
+		}
 	}
 	db := m.dbDir()
 	dbArg := "sql:" + db
@@ -359,6 +359,10 @@ func (m *manager) sync(ctx context.Context, want map[string][]byte) error {
 	if added > 0 || removed > 0 {
 		m.log.Infof("Custom CA certificates in the browser trust store: %d (added %d, removed %d)", len(want), added, removed)
 	}
+	if len(want) == 0 {
+		// Nothing of ours is left: later starts have nothing to clean up.
+		return m.unmarkManaged()
+	}
 	return nil
 }
 
@@ -373,6 +377,62 @@ func managedCertificates(out []byte) map[string]bool {
 	return existing
 }
 
+// managedMarker is left in a database directory while Agent manages certificates in
+// it. Startup without configured CAs only touches a store that has it, so unrelated
+// stores are never inspected, and the store is found again after the CAs are removed.
+const managedMarker = ".elastic-agent-managed"
+
+// managedStore reports whether Agent manages the store of the browser home.
+func managedStore(home string) bool {
+	return (&manager{home: home}).managed()
+}
+
+// managed only looks at the marker: it never follows a link or runs anything.
+func (m *manager) managed() bool {
+	info, err := os.Lstat(filepath.Join(m.dbDir(), managedMarker)) //nolint:gosec // Browser homes are intentional; this only checks the marker without following links.
+	return err == nil && info.Mode().IsRegular()
+}
+
+func (m *manager) markManaged() error {
+	root, err := os.OpenRoot(m.home)
+	if err != nil {
+		return fmt.Errorf("opening the browser home: %w", err)
+	}
+	defer root.Close()
+	path := filepath.Join(".pki", "nssdb", managedMarker)
+	info, err := root.Lstat(path)
+	switch {
+	case err == nil:
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("database path %s is not a regular file", path)
+		}
+		return nil
+	case !errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("checking the managed marker: %w", err)
+	}
+	// O_EXCL never opens through a link planted since the check.
+	f, err := root.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("creating the managed marker: %w", err)
+	}
+	return f.Close()
+}
+
+func (m *manager) unmarkManaged() error {
+	if !m.managed() {
+		return nil
+	}
+	root, err := os.OpenRoot(m.home)
+	if err != nil {
+		return fmt.Errorf("opening the browser home: %w", err)
+	}
+	defer root.Close()
+	if err := root.Remove(filepath.Join(".pki", "nssdb", managedMarker)); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("removing the managed marker: %w", err)
+	}
+	return nil
+}
+
 // prepareDBDir repairs only NSS's directories and known database files. It never
 // walks .pki: unrelated files keep their owners. All operations remain anchored
 // at the browser home; final-component symlinks are rejected before repair.
@@ -385,6 +445,13 @@ func (m *manager) prepareDBDir() error {
 	for _, dir := range []string{".pki", filepath.Join(".pki", "nssdb")} {
 		if err := root.Mkdir(dir, 0o700); err != nil && !errors.Is(err, fs.ErrExist) {
 			return fmt.Errorf("creating database directory: %w", err)
+		}
+		// Mkdir accepts what exists, and certutil would follow a symlink out of the
+		// browser home, so check the directory whether or not ownership is repaired.
+		if info, err := root.Lstat(dir); err != nil {
+			return fmt.Errorf("checking database directory: %w", err)
+		} else if !info.IsDir() {
+			return fmt.Errorf("database path %s is not a directory", dir)
 		}
 		if m.owner != nil {
 			if err := chownDatabasePath(root, dir, m.owner, true); err != nil {

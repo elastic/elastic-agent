@@ -553,7 +553,8 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", home)
 		t.Setenv(browserUserEnv, cur.Username)
 
-		got, o, setHome := browserHome(&testLog{}, true)
+		got, o, setHome, ok := browserHome(&testLog{}, true)
+		assert.True(t, ok)
 
 		assert.Equal(t, home, got, "browser home")
 		assert.Nil(t, o, "only root changes the owner")
@@ -564,7 +565,8 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", "/proc")
 		t.Setenv(browserUserEnv, cur.Username)
 
-		got, o, setHome := browserHome(&testLog{}, true)
+		got, o, setHome, ok := browserHome(&testLog{}, true)
+		assert.True(t, ok)
 
 		assert.Equal(t, cur.HomeDir, got, "browser home")
 		assert.Nil(t, o, "only root changes the owner")
@@ -576,11 +578,120 @@ func TestBrowserHome(t *testing.T) {
 		t.Setenv("HOME", "/proc")
 		t.Setenv(browserUserEnv, "")
 
-		got, _, setHome := browserHome(&testLog{}, true)
+		got, _, setHome, ok := browserHome(&testLog{}, true)
+		assert.True(t, ok)
 
 		assert.Equal(t, "/proc", got, "browser home")
 		assert.False(t, setHome, "HOME must not change")
 	})
+}
+
+// browserHomeFor selects the home without configured CAs, with the browser user's
+// home replaced by a temporary one so that no real home is touched.
+func browserHomeFor(t *testing.T, home, userHome string) (string, bool, bool) {
+	t.Helper()
+	cur, err := user.Current()
+	require.NoError(t, err, "current user")
+	t.Setenv("HOME", home)
+	t.Setenv(browserUserEnv, cur.Username)
+	orig := lookupUser
+	t.Cleanup(func() { lookupUser = orig })
+	lookupUser = func(string) (*user.User, error) {
+		u := *cur
+		u.HomeDir = userHome
+		return &u, nil
+	}
+	got, _, setHome, ok := browserHome(&testLog{}, false)
+	return got, setHome, ok
+}
+
+func markStore(t *testing.T, home string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".pki", "nssdb"), 0o700))
+	require.NoError(t, (&manager{home: home}).markManaged())
+}
+
+func TestBrowserHomeWithoutConfiguredCAs(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("covers a browser that runs as the agent's own, non-root user")
+	}
+	t.Run("an unrelated store is left alone", func(t *testing.T) {
+		home, userHome := t.TempDir(), t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(home, ".pki", "nssdb"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(home, ".pki", "nssdb", "cert9.db"), nil, 0o600))
+		_, _, ok := browserHomeFor(t, home, userHome)
+		assert.False(t, ok, "a store Agent never managed must not be inspected")
+	})
+
+	t.Run("a managed store in HOME is cleaned up", func(t *testing.T) {
+		home, userHome := t.TempDir(), t.TempDir()
+		markStore(t, home)
+		got, setHome, ok := browserHomeFor(t, home, userHome)
+		assert.True(t, ok)
+		assert.Equal(t, home, got)
+		assert.False(t, setHome)
+	})
+
+	t.Run("a managed store in the fallback home is cleaned up", func(t *testing.T) {
+		// HOME has a store of its own, as when it is read-only, and the CAs went to the
+		// browser user's home.
+		home, userHome := t.TempDir(), t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(home, ".pki", "nssdb"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(home, ".pki", "nssdb", "cert9.db"), nil, 0o600))
+		markStore(t, userHome)
+		got, setHome, ok := browserHomeFor(t, home, userHome)
+		assert.True(t, ok)
+		assert.Equal(t, userHome, got)
+		assert.False(t, setHome, "cleanup does not need to redirect the browser")
+		assert.NoFileExists(t, filepath.Join(home, ".browserca-probe"))
+	})
+}
+
+func TestManagedMarkerFollowsTheConfiguration(t *testing.T) {
+	m, _, dir, _ := setup(t)
+	write(t, dir, "ca.pem", newCA(t, "ca"))
+	require.NoError(t, m.reconcile(t.Context()))
+	assert.True(t, m.managed(), "importing must mark the store as managed")
+
+	require.NoError(t, os.Remove(filepath.Join(dir, "ca.pem")))
+	require.NoError(t, m.reconcile(t.Context()))
+	assert.False(t, m.managed(), "a store without managed CAs must not be visited again")
+}
+
+func TestMarkerIsKeptWhileAnImportFails(t *testing.T) {
+	m, fake, dir, _ := setup(t)
+	fake.fail = func(op string, _ []string) error {
+		if op == "-A" {
+			return errors.New("database is locked")
+		}
+		return nil
+	}
+	write(t, dir, "ca.pem", newCA(t, "ca"))
+	require.Error(t, m.reconcile(t.Context()))
+	assert.True(t, m.managed(), "a partly imported store must be cleaned up once the configuration is removed")
+}
+
+func TestPrepareDBDirRejectsSymlinkedDirectories(t *testing.T) {
+	for _, link := range []string{".pki", "nssdb"} {
+		t.Run(link, func(t *testing.T) {
+			m, fake, dir, _ := setup(t) // no owner: nothing repairs or validates ownership
+			write(t, dir, "ca.pem", newCA(t, "ca"))
+			target := t.TempDir()
+			if link == ".pki" {
+				require.NoError(t, os.Symlink(target, filepath.Join(m.home, ".pki")))
+			} else {
+				require.NoError(t, os.Mkdir(filepath.Join(m.home, ".pki"), 0o700))
+				require.NoError(t, os.Symlink(target, filepath.Join(m.home, ".pki", "nssdb")))
+			}
+
+			require.Error(t, m.reconcile(t.Context()), "a symlinked database directory must fail the sync")
+
+			assert.Empty(t, fake.calls, "certutil must not run on a symlinked database path")
+			entries, err := os.ReadDir(target)
+			require.NoError(t, err)
+			assert.Empty(t, entries, "nothing may be written where the symlink points")
+		})
+	}
 }
 
 func TestStartDoesNothingWithoutConfiguredPathsOrAStore(t *testing.T) {

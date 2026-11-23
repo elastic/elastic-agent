@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"time"
@@ -49,9 +48,10 @@ func start(ctx context.Context, log logs, cfg Config, timeout time.Duration) str
 	ready := make(chan string)
 	go func() {
 		m := &manager{paths: cfg.CertificateAuthorities, log: log}
-		var setHome bool
-		m.home, m.owner, setHome = browserHome(log, len(m.paths) > 0)
-		if len(m.paths) == 0 && !m.hasDB() {
+		var setHome, ok bool
+		m.home, m.owner, setHome, ok = browserHome(log, len(m.paths) > 0)
+		if !ok {
+			// Nothing configured and no store of ours to clean up: never run certutil.
 			close(ready)
 			return
 		}
@@ -72,11 +72,6 @@ func start(ctx context.Context, log logs, cfg Config, timeout time.Duration) str
 				close(ready)
 				return
 			}
-		}
-		if len(m.paths) == 0 {
-			// Listing does not need ownership changes. As root, it must also work
-			// for a database left root-owned by a previous Agent run.
-			m.inspect = execRunner(certutil, nil)
 		}
 		err = m.reconcile(initialCtx)
 		if err != nil {
@@ -127,29 +122,37 @@ func exists(path string) bool {
 
 // browserHome returns the home directory whose .pki/nssdb the browser reads, the
 // owner the database needs, and whether HOME must be changed to that directory.
+// ok is false when no CA is configured and no home holds a store Agent manages, so
+// there is nothing to do and no unrelated store is ever touched.
 //
 // As root, Heartbeat runs the browser as BEAT_SETUID_AS with that user's home, so
 // the database goes there and is given to that user. Otherwise the browser uses
 // HOME, unless HOME isn't writable (arbitrary UIDs on OpenShift get "/"): then HOME
 // must be changed to that user's home, which the browser inherits when it starts.
-func browserHome(log logs, configured bool) (string, *owner, bool) {
+//
+// Without configured CAs the same homes are tried in the same order, but each is
+// matched by the marker Agent leaves in a store it manages, not by a write probe, so
+// cleanup finds the store that an earlier configured run used, fallback or not.
+func browserHome(log logs, configured bool) (string, *owner, bool, bool) {
 	home := os.Getenv("HOME")
 	isRoot := os.Geteuid() == 0
-	// Without configured CAs, locate an existing store without a write probe.
-	if !isRoot && ((configured && writable(home)) || (!configured && exists(filepath.Join(home, ".pki", "nssdb", "cert9.db")))) {
-		return home, nil, false
+	if !isRoot && ((configured && writable(home)) || (!configured && managedStore(home))) {
+		return home, nil, false, true
 	}
 	userHome, o, err := lookupBrowserUser(os.Getenv(browserUserEnv))
 	if err != nil && configured {
 		log.Warnf("the browser may not read the custom CAs: %v", err)
 	}
 	if userHome == "" {
-		return home, nil, false
+		return home, nil, false, configured || managedStore(home)
+	}
+	if !configured && !managedStore(userHome) {
+		return "", nil, false, false
 	}
 	if isRoot {
-		return userHome, o, false
+		return userHome, o, false, true
 	}
-	return userHome, nil, configured
+	return userHome, nil, configured, true
 }
 
 func writable(dir string) bool {
@@ -172,13 +175,16 @@ func writable(dir string) bool {
 	return true
 }
 
+// lookupUser is replaceable so tests can give the browser user a temporary home.
+var lookupUser = user.Lookup
+
 // lookupBrowserUser returns the home and the owner of the user the browser runs as,
 // or nothing when none is configured.
 func lookupBrowserUser(name string) (string, *owner, error) {
 	if name == "" {
 		return "", nil, nil
 	}
-	u, err := user.Lookup(name)
+	u, err := lookupUser(name)
 	if err != nil {
 		return "", nil, fmt.Errorf("looking up %s: %w", browserUserEnv, err)
 	}
