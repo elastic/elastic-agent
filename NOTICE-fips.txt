@@ -85002,11 +85002,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/google/pprof
-Version: v0.0.0-20261111200114-fac431ef4d26
+Version: v0.0.0-20261118010117-084b33a85f63
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20261111200114-fac431ef4d26/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/google/pprof@v0.0.0-20261118010117-084b33a85f63/LICENSE:
 
 
                                  Apache License

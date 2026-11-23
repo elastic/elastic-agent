@@ -142,6 +142,7 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchauth"
 	elasticmonitoringconnector "github.com/elastic/elastic-agent/internal/edot/connectors/elasticmonitoring"
 	elasticmonitoringprocessor "github.com/elastic/elastic-agent/internal/edot/processors/elasticmonitoring"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
@@ -305,6 +306,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			apmconfigextension.NewFactory(),
 			headersetterextension.NewFactory(),
 			beatsauthextension.NewFactory(),
+			elasticsearchauth.NewFactory(),
 			elasticdiagnostics.NewFactory(),
 			meterlifecycle.NewFactory(),
 			elasticsearchstorage.NewFactory(),
