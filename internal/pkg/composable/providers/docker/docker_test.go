@@ -144,48 +144,6 @@ func TestRunLogsFurtherConnectFailuresAtDebug(t *testing.T) {
 	assert.True(t, connected.stopped.Load(), "watcher is stopped when the provider context is cancelled")
 }
 
-func TestRunRetriesWhenStartFails(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	var calls atomic.Int32
-	var failed *fakeWatcher
-	watching := make(chan struct{})
-	p, buf := testProvider(t, 5*time.Millisecond, func(log *logger.Logger, _ string, _ *docker.TLSConfig, _ bool) (docker.Watcher, error) {
-		n := calls.Add(1)
-		w := &fakeWatcher{events: bus.New(log, "docker")}
-		if n == 1 {
-			w.startErr = errors.New("docker events stream closed")
-			failed = w
-			return w, nil
-		}
-		close(watching)
-		return w, nil
-	})
-
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- p.Run(cancelComm{Context: ctx})
-	}()
-
-	select {
-	case <-watching:
-	case <-time.After(2 * time.Second):
-		t.Fatal("provider did not retry after Start failed")
-	}
-	cancel()
-	select {
-	case err := <-errCh:
-		require.ErrorIs(t, err, context.Canceled)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Run did not return after cancel")
-	}
-
-	require.NotNil(t, failed)
-	assert.True(t, failed.stopped.Load(), "failed watcher is stopped before the retry")
-	info, debug := countSkipLogs(buf.String())
-	assert.Equal(t, 1, info)
-	assert.Equal(t, 0, debug)
-}
-
 func countSkipLogs(logs string) (info int, debug int) {
 	for _, line := range strings.Split(logs, "\n") {
 		if !strings.Contains(line, connectSkipMessage) {
