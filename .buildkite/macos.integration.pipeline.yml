@@ -4,7 +4,7 @@
 #   bk build create --pipeline elastic/elastic-agent-macos-integration --branch <branch> --commit HEAD
 env:
   # Same value as pipeline.yml
-  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1791307568"
+  IMAGE_UBUNTU_2204_ARM_64: "platform-ingest-elastic-agent-ubuntu-2204-aarch64-1793494863"
 
 common:
   - google_oidc_plugin: &google_oidc_plugin
