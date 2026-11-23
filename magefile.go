@@ -4417,7 +4417,7 @@ func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	return buildTargets
 }
 
-// loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
+// loadReleaseConfig loads mage Settings and requires NEXT_RELEASE for workflows.
 func loadReleaseConfig() (*release.ReleaseConfig, error) {
 	settings, err := devtools.LoadSettings()
 	if err != nil {
