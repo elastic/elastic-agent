@@ -10,6 +10,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -53,11 +55,17 @@ func TestServer(t *testing.T) {
 	defer cancel()
 
 	log, _ := loggertest.New("unitserver")
-	address := "unix://" + filepath.Join(t.TempDir(), "units.sock")
+	socket := filepath.Join(t.TempDir(), "units.sock")
+	address := "unix://" + socket
 	s, err := New(log, address, &info.AgentInfo{}, 100*1024*1024)
 	require.NoError(t, err)
-	runErr := make(chan error, 1)
-	go func() { runErr <- s.Run(ctx) }()
+	require.NoError(t, s.Start(ctx))
+
+	// The server listens as soon as Start returns, so a receiver started after
+	// it never finds the socket missing.
+	conn, err := (&net.Dialer{}).DialContext(t.Context(), "unix", socket)
+	require.NoError(t, err, "the server should be listening when Start returns")
+	require.NoError(t, conn.Close())
 
 	// Units of other components are never sent.
 	otherComp := component.Component{ID: "filestream-default", RuntimeManager: component.OtelRuntimeManager}
@@ -106,8 +114,22 @@ func TestServer(t *testing.T) {
 	}
 
 	cancel()
-	err = <-runErr
-	assert.True(t, err == nil || errors.Is(err, context.Canceled), "unexpected error: %v", err)
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(socket)
+		return errors.Is(err, os.ErrNotExist)
+	}, 10*time.Second, 10*time.Millisecond, "the socket should be removed once the server stops")
+}
+
+// Start returns errors in setting the server up, rather than reporting them
+// later, so the caller knows the server isn't running.
+func TestServerStartError(t *testing.T) {
+	log, _ := loggertest.New("unitserver")
+	// A socket under a regular file can't be created.
+	file := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
+	s, err := New(log, "unix://"+filepath.Join(file, "units.sock"), &info.AgentInfo{}, 1024)
+	require.NoError(t, err)
+	assert.Error(t, s.Start(t.Context()))
 }
 
 // assertRejected checks that a client connecting without TLS, using the

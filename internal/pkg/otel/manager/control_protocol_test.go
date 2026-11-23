@@ -6,6 +6,7 @@ package manager
 
 import (
 	"encoding/base64"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -135,4 +136,28 @@ func TestBuildMergedConfigInjectsControlProtocolConnections(t *testing.T) {
 	require.True(t, ok, "no connection secret for %s in %v", receiverID, result.ToStringMap()["receivers"])
 	assert.NotEmpty(t, secret)
 	assert.True(t, result.IsSet(receiverKey+"::heartbeat"), "the receiver should keep its own config")
+}
+
+// If the unit server can't start, the next update must try again, and the
+// receiver config must still get its connection info.
+func TestUpdateUnitServerRetriesStart(t *testing.T) {
+	log, _ := loggertest.New("test")
+	// A socket under a regular file can't be created.
+	file := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
+	unitServer, err := unitserver.New(log, "unix://"+filepath.Join(file, "units.sock"), &info.AgentInfo{}, 1024)
+	require.NoError(t, err)
+	m := &OTelManager{unitServer: unitServer, managerLogger: log}
+
+	comp := component.Component{
+		ID:             "synthetics/tcp-default",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			Spec: component.InputSpec{SingleReceiver: true, ControlProtocolUnits: true},
+		},
+	}
+	m.updateUnitServer(t.Context(), []component.Component{comp})
+	assert.False(t, m.unitServerStarted, "a server that failed to start should be started again on the next update")
+	_, err = unitServer.ConnectionInfo(comp.ID)
+	assert.NoError(t, err, "the units should be kept even if the server isn't running")
 }

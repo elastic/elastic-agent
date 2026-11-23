@@ -106,14 +106,11 @@ func New(logger *logger.Logger, address string, agentInfo info.Agent, maxMessage
 	}, nil
 }
 
-// Run serves the control protocol until ctx is done.
-func (s *Server) Run(ctx context.Context) error {
-	listener, err := ipc.CreateListener(s.logger, s.address)
-	if err != nil {
-		return fmt.Errorf("failed to create listener for %s: %w", s.address, err)
-	}
-	defer ipc.CleanupListener(s.logger, s.address)
-
+// Start listens on the server's address and serves the control protocol in the
+// background until ctx is done. It returns once the server is listening, so
+// receivers started after it can connect right away, and it returns any error
+// in setting the server up.
+func (s *Server) Start(ctx context.Context) error {
 	certPool := x509.NewCertPool()
 	if !certPool.AppendCertsFromPEM(s.ca.Crt()) {
 		return errors.New("failed to add the certificate authority to the pool")
@@ -127,15 +124,23 @@ func (s *Server) Run(ctx context.Context) error {
 	server := grpc.NewServer(grpc.Creds(creds), grpc.MaxRecvMsgSize(s.maxMessageSize))
 	proto.RegisterElasticAgentServer(server, s)
 
+	listener, err := ipc.CreateListener(s.logger, s.address)
+	if err != nil {
+		return fmt.Errorf("failed to create listener for %s: %w", s.address, err)
+	}
+
 	go func() {
 		<-ctx.Done()
 		server.Stop()
 	}()
+	go func() {
+		defer ipc.CleanupListener(s.logger, s.address)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) && ctx.Err() == nil {
+			s.logger.Errorf("Unit server stopped serving at %s: %v", s.address, err)
+		}
+	}()
 	s.logger.Infof("Serving units to OTel receivers at %s", s.address)
-	if err := server.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) && ctx.Err() == nil {
-		return err
-	}
-	return ctx.Err()
+	return nil
 }
 
 // Update sets the expected units for the components whose units are delivered

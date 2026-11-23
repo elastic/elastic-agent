@@ -401,22 +401,22 @@ func (m *OTelManager) Run(ctx context.Context) error {
 }
 
 // updateUnitServer sends the units of components with control protocol units to the
-// unit server, starting it for the first such component.
+// unit server, starting it for the first such component. The server is listening
+// once this returns, so the receivers started by the following collector config
+// can connect right away. If it fails to start, the next update tries again.
 func (m *OTelManager) updateUnitServer(ctx context.Context, components []component.Component) {
 	if m.unitServer == nil {
 		return
 	}
-	if !m.unitServerStarted {
-		if !slices.ContainsFunc(components, func(c component.Component) bool { return c.UsesControlProtocolUnits() }) {
-			return
+	if !m.unitServerStarted && slices.ContainsFunc(components, func(c component.Component) bool { return c.UsesControlProtocolUnits() }) {
+		if err := m.unitServer.Start(ctx); err != nil {
+			m.managerLogger.Errorf("failed to start the unit server, will retry on the next update: %v", err)
+		} else {
+			m.unitServerStarted = true
 		}
-		m.unitServerStarted = true
-		go func() {
-			if err := m.unitServer.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-				m.managerLogger.Errorf("unit server stopped: %v", err)
-			}
-		}()
 	}
+	// The units are kept even if the server isn't running, as the receiver
+	// config needs the connection info for them.
 	m.unitServer.Update(components)
 }
 
