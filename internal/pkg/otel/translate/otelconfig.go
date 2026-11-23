@@ -101,11 +101,8 @@ var (
 // GetOtelConfig returns the Otel collector configuration for the given component model.
 // All added component and pipelines names are prefixed with OtelNamePrefix.
 // Unsupported components are quietly ignored.
-// storageAuthenticator is the ID of the authenticator extension, defined outside the components, that the
-// Elasticsearch storage extension uses. If it is empty, the storage extension uses the output's beatsauth extension.
 func GetOtelConfig(
 	model *component.Model,
-	storageAuthenticator string,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	components := getSupportedComponents(logger, model)
@@ -120,7 +117,7 @@ func GetOtelConfig(
 	extensions := map[string]bool{} // we have to manually handle extensions because otel does not merge lists, it overrides them. This is a known issue: see https://github.com/open-telemetry/opentelemetry-collector/issues/8754
 
 	for _, comp := range components {
-		componentConfig, compErr := getCollectorConfigForComponent(comp, storageAuthenticator, logger)
+		componentConfig, compErr := getCollectorConfigForComponent(comp, logger)
 		if compErr != nil {
 			return nil, compErr
 		}
@@ -210,7 +207,7 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 	if err != nil {
 		return err
 	}
-	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, "", logp.NewNopLogger())
+	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -332,7 +329,6 @@ func GetProcessorID(name string) otelcomponent.ID {
 // Note: Lists are not merged and should be handled by the caller of the method
 func getCollectorConfigForComponent(
 	comp *component.Component,
-	storageAuthenticator string,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
 	exporterType, err := OutputTypeToExporterType(comp.OutputType)
@@ -340,7 +336,7 @@ func getCollectorConfigForComponent(
 		return nil, err
 	}
 	exporterID := GetExporterID(exporterType, comp.OutputName)
-	exporterConfig, outputQueueConfig, extensionConfig, processorConfig, err := getExporterConfigForComponent(comp, exporterType, storageAuthenticator, logger)
+	exporterConfig, outputQueueConfig, extensionConfig, processorConfig, err := getExporterConfigForComponent(comp, exporterType, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -702,7 +698,7 @@ func GetDefaultProcessors(beatName string) []map[string]any {
 // getExporterConfigForComponent returns the exporter configuration and queue settings for a component. Note that a
 // valid component is always created from a single output config, so there should only be one output unit per
 // component; if there is more than one, this function returns the first.
-func getExporterConfigForComponent(comp *component.Component, exporterType otelcomponent.Type, storageAuthenticator string, logger *logp.Logger) (
+func getExporterConfigForComponent(comp *component.Component, exporterType otelcomponent.Type, logger *logp.Logger) (
 	exporterCfg map[string]any,
 	queueCfg map[string]any,
 	extensionCfg map[string]any,
@@ -717,7 +713,6 @@ func getExporterConfigForComponent(comp *component.Component, exporterType otelc
 		outputUnit,
 		comp.OutputName,
 		exporterType,
-		storageAuthenticator,
 		logger,
 	)
 	if err != nil {
@@ -771,10 +766,7 @@ func OutputTypeToExporterType(outputType string) (otelcomponent.Type, error) {
 // - extensionCfg: OTel extension configuration, or nil if not needed for the exporter
 // - processorCfg: OTel processor configuration or nil if not needed for the exporter
 // - err: the error, if any
-//
-// storageAuthenticator is the ID of the authenticator extension the Elasticsearch storage extension uses.
-// If it is empty, the storage extension uses the output's beatsauth extension.
-func unitToExporterConfig(unit component.Unit, outputName string, exporterType otelcomponent.Type, storageAuthenticator string, logger *logp.Logger) (
+func unitToExporterConfig(unit component.Unit, outputName string, exporterType otelcomponent.Type, logger *logp.Logger) (
 	exportersCfg map[string]any,
 	queueSettings map[string]any,
 	extensionCfg map[string]any,
@@ -843,17 +835,11 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 		}
 
 		if fbfeatures.IsElasticsearchStateStoreEnabled() {
-			// Add the Elasticsearch state store extension for agentless mode. It uses the
-			// authenticator from the policy when there is one, because the output credentials
-			// can't read or update state when the output uses the managed _bulk endpoint.
-			// Otherwise it reuses the output's Beats authenticator for endpoints and transport.
-			authenticator := storageAuthenticator
-			if authenticator == "" {
-				authenticator = getBeatsAuthExtensionID(outputName).String()
-			}
+			// Add the Elasticsearch state store extension for agentless mode and
+			// reuse the output's Beats authenticator for endpoints and transport.
 			extensionConfig[elasticsearchStateStoreExtensionName] = map[string]any{
 				"auth": map[string]any{
-					"authenticator": authenticator,
+					"authenticator": getBeatsAuthExtensionID(outputName).String(),
 				},
 			}
 		}

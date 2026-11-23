@@ -56,6 +56,9 @@ const (
 	// elasticsearchAuthExtensionType is the type of the extension Fleet adds to agentless policies to
 	// authenticate the Elasticsearch storage extension.
 	elasticsearchAuthExtensionType = "elasticsearchauth"
+	// elasticsearchStorageExtensionID is the ID of the storage extension the translator generates for the
+	// Elasticsearch state store.
+	elasticsearchStorageExtensionID = "elasticsearch_storage"
 
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
@@ -469,11 +472,10 @@ func (m *OTelManager) buildMergedConfig(
 ) (*confmap.Conf, error) {
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
-	storageAuthenticator := elasticsearchStorageAuthenticator(cfgUpdate.collectorCfg, logger)
 	if len(cfgUpdate.components) > 0 {
 		model := &component.Model{Components: cfgUpdate.components}
 		var err error
-		componentOtelCfg, err = translate.GetOtelConfig(model, storageAuthenticator, logger)
+		componentOtelCfg, err = translate.GetOtelConfig(model, logger)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate otel config: %w", err)
 		}
@@ -520,15 +522,11 @@ func (m *OTelManager) buildMergedConfig(
 		if err := mergeWithExtensions(overlay, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
-	}
 
-	// The storage extension of the components references the authenticator, so the collector has to start it
-	// even if the collector config only defines it.
-	if componentOtelCfg != nil && storageAuthenticator != "" {
-		if err := mergeWithExtensions(overlay, confmap.NewFromStringMap(map[string]any{
-			"service::extensions": []any{storageAuthenticator},
-		})); err != nil {
-			return nil, fmt.Errorf("failed to enable the Elasticsearch storage authenticator: %w", err)
+		if componentOtelCfg != nil {
+			if err := useElasticsearchAuthForStorage(overlay, componentOtelCfg, cfgUpdate.collectorCfg, logger); err != nil {
+				return nil, fmt.Errorf("failed to configure the Elasticsearch storage authenticator: %w", err)
+			}
 		}
 	}
 
@@ -569,16 +567,28 @@ func (m *OTelManager) buildMergedConfig(
 	return componentOtelCfg, nil
 }
 
-// elasticsearchStorageAuthenticator returns the ID of the elasticsearchauth extension in the collector config,
-// which the Elasticsearch storage extension of the components uses instead of the output's beatsauth extension.
-// Fleet adds it to agentless policies with credentials that can read and update the state, which the output
-// credentials can't do when the output uses the managed _bulk endpoint. It returns an empty ID, so that the
-// storage keeps using beatsauth, when the state store is disabled or there isn't exactly one such extension.
-func elasticsearchStorageAuthenticator(collectorCfg *confmap.Conf, logger *logp.Logger) string {
-	if collectorCfg == nil || !fbfeatures.IsElasticsearchStateStoreEnabled() {
-		return ""
+func useElasticsearchAuthForStorage(overlay, componentCfg, collectorCfg *confmap.Conf, logger *logp.Logger) error {
+	storageKey := "extensions::" + elasticsearchStorageExtensionID
+	if !componentCfg.IsSet(storageKey) {
+		return nil
 	}
-	extensions, _ := collectorCfg.Get("extensions").(map[string]any)
+	authID := elasticsearchAuthExtensionID(collectorCfg, logger)
+	if authID == "" {
+		return nil
+	}
+	// The overlay is merged into the component config last, so this authenticator replaces beatsauth. The
+	// position in service::extensions doesn't matter: the collector starts the storage after the extension it
+	// declares as its authenticator.
+	return mergeWithExtensions(overlay, confmap.NewFromStringMap(map[string]any{
+		storageKey + "::auth::authenticator": authID,
+		"service::extensions":                []any{authID},
+	}))
+}
+
+// elasticsearchAuthExtensionID returns the ID of the only elasticsearchauth extension in config, or an empty ID
+// if there is none or more than one.
+func elasticsearchAuthExtensionID(config *confmap.Conf, logger *logp.Logger) string {
+	extensions, _ := config.Get("extensions").(map[string]any)
 	var ids []string
 	for key := range extensions {
 		var id otelcomponent.ID
