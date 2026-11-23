@@ -1,0 +1,55 @@
+version: 8.19.26
+entries:
+    - kind: bug-fix
+      summary: Load the EDOT .NET plugin in kube-stack auto-instrumentation
+      description: ""
+      component: edot-collector
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17451
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1792652202
+      file:
+        name: 1792652202-Load-the-EDOT-.NET-plugin-in-kube-stack-auto-instrumentation.yaml
+        checksum: 5ed8c8efe7a5036b801f9222d8b3e3644d5015b2
+    - kind: bug-fix
+      summary: Fix components and units that are removed and quickly re-added by a policy change staying stopped until the agent restarts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17715
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/17714
+      impact: ""
+      action: ""
+      timestamp: 1793388219
+      file:
+        name: 1793388219-fix-components-readded-by-next-policy-change.yaml
+        checksum: 15db661ed949484a2c1db203f59a53b058a64dce
+    - kind: bug-fix
+      summary: Fix elastic-agent logs failing on Windows before the event logs directory exists
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17897
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1794233182
+      file:
+        name: 1794233182-fix-elastic-agent-logs-failing-when-the-event-logs-directory-does-not-exist-yet.yaml
+        checksum: 998d4a67703d2089335b01f131cedcfc42178aaf
+    - kind: bug-fix
+      summary: Fix upgrade watcher double counting restarts
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/17938
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1794381974
+      file:
+        name: 1794381974-fix-upgrade-watcher-double-count.yaml
+        checksum: daad4f78951d2920fd2d4f3cf25cf75020c4c9ff
