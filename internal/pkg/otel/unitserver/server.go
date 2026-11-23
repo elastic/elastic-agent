@@ -11,8 +11,8 @@
 // the connection info in its config.
 //
 // The server only delivers configuration. Receivers report their status through
-// the collector like any other receiver, so the server only tracks when they
-// check in, which tells whether a receiver gets its units.
+// the collector like any other receiver, so the server only uses their check-ins
+// to tell whether a receiver gets its units, and which configs it already has.
 package unitserver
 
 import (
@@ -335,10 +335,50 @@ func (s *Server) expected(componentID string) (*proto.CheckinExpected, <-chan st
 	}
 	msg.Units = make([]*proto.UnitExpected, 0, len(cu.units))
 	for _, unit := range cu.units {
-		// copy, as Update modifies the units in place
-		msg.Units = append(msg.Units, gproto.Clone(unit).(*proto.UnitExpected))
+		// copy, as Update modifies the units in place; it replaces configs
+		// rather than modifying them, so they can be shared
+		msg.Units = append(msg.Units, copyUnit(unit))
 	}
 	return msg, cu.changed
+}
+
+func copyUnit(unit *proto.UnitExpected) *proto.UnitExpected {
+	return &proto.UnitExpected{
+		Id:             unit.Id,
+		Type:           unit.Type,
+		State:          unit.State,
+		ConfigStateIdx: unit.ConfigStateIdx,
+		Config:         unit.Config,
+		LogLevel:       unit.LogLevel,
+	}
+}
+
+// appliedConfigs returns the config state index of each unit the receiver
+// reports having.
+func appliedConfigs(observed *proto.CheckinObserved) map[unitKey]uint64 {
+	applied := make(map[unitKey]uint64, len(observed.Units))
+	for _, unit := range observed.Units {
+		applied[unitKey{unitType: client.UnitType(unit.Type), id: unit.Id}] = unit.ConfigStateIdx
+	}
+	return applied
+}
+
+// withoutAppliedConfigs returns the expected state without the configs the
+// receiver already has, as the runtime manager sends it to beat processes. The
+// receiver keeps a unit's config while its config state index is the same.
+func withoutAppliedConfigs(expected *proto.CheckinExpected, applied map[unitKey]uint64) *proto.CheckinExpected {
+	msg := &proto.CheckinExpected{
+		AgentInfo: expected.AgentInfo,
+		Units:     make([]*proto.UnitExpected, 0, len(expected.Units)),
+	}
+	for _, unit := range expected.Units {
+		unit = copyUnit(unit)
+		if idx, ok := applied[unitKey{unitType: client.UnitType(unit.Type), id: unit.Id}]; ok && idx == unit.ConfigStateIdx {
+			unit.Config = nil
+		}
+		msg.Units = append(msg.Units, unit)
+	}
+	return msg
 }
 
 // CheckinV2 sends the receiver its expected units whenever they change.
@@ -358,29 +398,42 @@ func (s *Server) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	s.checkedIn(componentID)
 
 	// The receiver reports its status through the collector, so observed
-	// check-ins only tell that the receiver is still connected.
+	// check-ins only tell that the receiver is still connected, and which
+	// configs it has.
+	applied := appliedConfigs(first)
 	recvDone := make(chan error, 1)
+	observedCh := make(chan *proto.CheckinObserved, 1)
 	go func() {
 		for {
-			if _, err := chunk.RecvObserved(server); err != nil {
+			observed, err := chunk.RecvObserved(server)
+			if err != nil {
 				recvDone <- err
 				return
 			}
 			s.checkedIn(componentID)
+			// only the latest check-in matters
+			select {
+			case <-observedCh:
+			default:
+			}
+			observedCh <- observed
 		}
 	}()
 
 	var lastSent *proto.CheckinExpected
+	expected, changed := s.expected(componentID)
 	for {
-		expected, changed := s.expected(componentID)
 		if lastSent == nil || !gproto.Equal(lastSent, expected) {
-			if err := s.send(server, expected, chunking); err != nil {
+			if err := s.send(server, withoutAppliedConfigs(expected, applied), chunking); err != nil {
 				return err
 			}
 			lastSent = expected
 		}
 		select {
 		case <-changed:
+			expected, changed = s.expected(componentID)
+		case observed := <-observedCh:
+			applied = appliedConfigs(observed)
 		case err := <-recvDone:
 			if errors.Is(err, context.Canceled) {
 				return nil

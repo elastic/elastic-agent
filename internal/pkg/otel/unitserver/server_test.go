@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
@@ -162,6 +163,86 @@ func TestMissedCheckins(t *testing.T) {
 	s.checkedIn("synthetics-default")
 	missed, _ = s.MissedCheckins("synthetics-default", period)
 	assert.Zero(t, missed, "a check-in should reset the missed check-ins")
+}
+
+// As for beat processes, a unit's config is only sent if the receiver doesn't
+// have it yet, for example when it reconnects.
+func TestCheckinV2OmitsAppliedConfigs(t *testing.T) {
+	log, _ := loggertest.New("unitserver")
+	s, err := New(log, "unix://"+filepath.Join(t.TempDir(), "units.sock"), &info.AgentInfo{}, 100*1024*1024)
+	require.NoError(t, err)
+	comp := controlProtocolComponent("synthetics-default", "@every 1m")
+	s.Update([]component.Component{comp})
+
+	// The receiver reconnects with all the configs it was sent before.
+	s.mx.Lock()
+	cu := s.components[comp.ID]
+	reconnect := &proto.CheckinObserved{Token: cu.token}
+	for _, unit := range cu.units {
+		reconnect.Units = append(reconnect.Units, &proto.UnitObserved{Id: unit.Id, Type: unit.Type, ConfigStateIdx: unit.ConfigStateIdx})
+	}
+	s.mx.Unlock()
+
+	stream := &fakeCheckinStream{
+		ctx:      t.Context(),
+		observed: make(chan *proto.CheckinObserved, 1),
+		expected: make(chan *proto.CheckinExpected, 10),
+	}
+	stream.observed <- reconnect
+	done := make(chan error, 1)
+	go func() { done <- s.CheckinV2(stream) }()
+
+	// configs returns the config of each unit in the next message, nil if omitted.
+	configs := func() map[string]*proto.UnitExpectedConfig {
+		select {
+		case msg := <-stream.expected:
+			configs := make(map[string]*proto.UnitExpectedConfig)
+			for _, unit := range msg.Units {
+				configs[unit.Id] = unit.Config
+			}
+			return configs
+		case <-time.After(10 * time.Second):
+			require.FailNow(t, "timed out waiting for expected units")
+			return nil
+		}
+	}
+
+	assert.Equal(t, map[string]*proto.UnitExpectedConfig{"monitor-a": nil, "output": nil}, configs(),
+		"the receiver should be sent its units without the configs it has")
+
+	s.Update([]component.Component{controlProtocolComponent("synthetics-default", "@every 5m")})
+	changed := configs()
+	require.Len(t, changed, 2, "every expected unit should still be sent")
+	assert.Nil(t, changed["output"], "the receiver already has the output config")
+	require.NotNil(t, changed["monitor-a"], "the changed config should be sent")
+	assert.Equal(t, "@every 5m", changed["monitor-a"].Source.AsMap()["schedule"])
+
+	close(stream.observed)
+	require.Error(t, <-done)
+}
+
+// fakeCheckinStream is a check-in stream that records the expected state sent to
+// the receiver.
+type fakeCheckinStream struct {
+	grpc.ServerStream
+	ctx      context.Context
+	observed chan *proto.CheckinObserved
+	expected chan *proto.CheckinExpected
+}
+
+func (f *fakeCheckinStream) Context() context.Context { return f.ctx }
+
+func (f *fakeCheckinStream) Send(msg *proto.CheckinExpected) error {
+	f.expected <- msg
+	return nil
+}
+
+func (f *fakeCheckinStream) Recv() (*proto.CheckinObserved, error) {
+	msg, ok := <-f.observed
+	if !ok {
+		return nil, io.EOF
+	}
+	return msg, nil
 }
 
 // A unit that is removed and added again gets a new config state index, so a
