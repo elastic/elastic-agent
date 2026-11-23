@@ -278,7 +278,7 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}
-	cpuLimit := cpulimit.NewController(log.Named("cpu_limit"), cpulimit.NewUnsupportedBackend())
+	cpuLimit := cpulimit.NewController(log.Named("cpu_limit"), cpulimit.NewBackend(paths.ServiceName()))
 	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, hostInfo, cpuLimit, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the

@@ -14,6 +14,7 @@ require (
 	github.com/cenkalti/backoff/v7 v7.0.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/containerd/errdefs v1.0.0
+	github.com/coreos/go-systemd/v22 v22.7.0
 	github.com/docker/go-units v0.5.0
 	github.com/dolmen-go/contextio v1.0.0
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123204423-67f7497b6db0
@@ -31,6 +32,7 @@ require (
 	github.com/go-git/go-billy/v5 v5.9.2
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/go-viper/mapstructure/v2 v2.5.0
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/gofrs/flock v0.13.2
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/go-cmp v0.7.0
