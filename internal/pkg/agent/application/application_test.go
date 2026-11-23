@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -489,10 +491,7 @@ func createLink(t *testing.T, topDir string, relVersionedHomePath string) {
 func TestApplicationStandaloneEncrypted(t *testing.T) {
 	log, _ := loggertest.New("TestApplicationStandaloneEncrypted")
 
-	cfgPath := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(cfgPath) })
-
-	paths.SetConfig(t.TempDir())
+	pathstest.SetConfig(t, t.TempDir())
 	err := os.WriteFile(paths.ConfigFile(), []byte(`agent:
   features:
     encrypted_config:
@@ -661,9 +660,7 @@ func TestHasEncryptedStandaloneConfigChanged(t *testing.T) {
 func TestApplicationStandaloneEncryptedWithFleetEnabled(t *testing.T) {
 	log, _ := loggertest.New("TestApplicationStandaloneEncryptedWithFleetEnabled")
 
-	cfgPath := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(cfgPath) })
-	paths.SetConfig(t.TempDir())
+	pathstest.SetConfig(t, t.TempDir())
 
 	err := os.WriteFile(paths.ConfigFile(), DefaultAgentFleetConfig, 0640)
 	require.NoError(t, err)
@@ -742,8 +739,7 @@ func TestCleanupOldBuildLogs(t *testing.T) {
 	})
 
 	t.Run("unversioned home keeps all logs", func(t *testing.T) {
-		paths.SetVersionHome(false)
-		t.Cleanup(func() { paths.SetVersionHome(true) })
+		pathstest.SetVersionHome(t, false)
 		topDir := t.TempDir()
 		seedBuildLogs(t, topDir, "9.0.0-aaaaaa", 2*time.Hour)
 		seedBuildLogs(t, topDir, "9.0.1-bbbbbb", time.Hour)

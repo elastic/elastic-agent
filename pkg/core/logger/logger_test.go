@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -94,13 +96,8 @@ func TestNewNamedLogger(t *testing.T) {
 	const name = "test-component"
 
 	tmp := t.TempDir()
-	topPath, logsPath := paths.Top(), paths.Logs()
-	paths.SetTop(tmp)
-	paths.SetLogs(filepath.Join(tmp, "logs"))
-	t.Cleanup(func() {
-		paths.SetTop(topPath)
-		paths.SetLogs(logsPath)
-	})
+	pathstest.SetTop(t, tmp)
+	pathstest.SetLogs(t, filepath.Join(tmp, "logs"))
 
 	log, err := NewNamedLogger(name, DefaultLoggingConfig(), DefaultEventLoggingConfig())
 	require.NoError(t, err)

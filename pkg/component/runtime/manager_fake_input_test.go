@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"google.golang.org/protobuf/encoding/protojson"
 	gproto "google.golang.org/protobuf/proto"
 
@@ -79,8 +81,8 @@ func (suite *FakeInputSuite) setupTestPaths() {
 	t.Helper()
 
 	tmpDir := t.TempDir()
-	paths.SetTop(tmpDir)
-	paths.SetVersionHome(false)
+	pathstest.SetTop(t, tmpDir)
+	pathstest.SetVersionHome(t, false)
 }
 
 func (suite *FakeInputSuite) TestManager_Features() {

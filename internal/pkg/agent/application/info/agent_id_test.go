@@ -12,10 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
@@ -31,7 +32,7 @@ func TestAgentIDStandaloneWorks(t *testing.T) {
 	defer cancel()
 
 	tmpPath := t.TempDir()
-	paths.SetConfig(tmpPath)
+	pathstest.SetConfig(t, tmpPath)
 
 	vaultPath := filepath.Join(tmpPath, "vault")
 	err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath))
