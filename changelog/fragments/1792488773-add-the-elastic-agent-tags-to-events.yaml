@@ -1,0 +1,7 @@
+kind: feature
+summary: Add the Elastic Agent tags to the tags field of events
+description: >-
+  Elastic Agent adds its tags from Fleet or from the standalone configuration to the tags field of
+  the events that it collects. The tags that an integration sets stay and the agent tags come after
+  them. To use this feature, enable the agent.features.include_tags_in_events.enabled flag.
+component: elastic-agent

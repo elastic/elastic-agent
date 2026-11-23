@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
 
 func TestKafkaTranslationLogic(t *testing.T) {
@@ -67,9 +67,13 @@ headers:
 					"min_size":      1600,
 					"sizer":         "items",
 				},
-				"queue_size": 3200,
+				"enabled":           true,
+				"queue_size":        3200,
+				"block_on_overflow": true,
+				"wait_for_result":   true,
 			},
-			"timeout": 10 * time.Second,
+			"timeout":      10 * time.Second,
+			"dial_timeout": 30 * time.Second,
 			"record_headers": []map[string]any{
 				{
 					"name":  "some-key",
@@ -125,9 +129,13 @@ max_message_bytes: 1000000`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
-				"timeout": 10 * time.Second,
+				"timeout":      10 * time.Second,
+				"dial_timeout": 30 * time.Second,
 				"auth": map[string]any{
 					"sasl": map[string]any{
 						"username":  "elastic",
@@ -175,12 +183,65 @@ max_message_bytes: 1000000`,
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"logs": map[string]any{
 					"encoding": "raw",
 				},
-				"timeout": 10 * time.Second,
+				"timeout":      10 * time.Second,
+				"dial_timeout": 30 * time.Second,
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
+			},
+		},
+		{
+			name: "when timeout is provided",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+timeout: 5s
+broker_timeout: 20s`,
+			expectedMap: map[string]any{
+				"brokers": []string{"kafka1:9092"},
+				"logs": map[string]any{
+					"topic":    "static-topic",
+					"encoding": "raw",
+				},
+				"client_id": "beats",
+				"metadata": map[string]any{
+					"refresh_interval": 10 * time.Minute,
+				},
+				"producer": map[string]any{
+					"compression": "gzip",
+					"compression_params": map[string]any{
+						"level": 4,
+					},
+					"max_message_bytes": 1000000,
+					"required_acks":     1,
+				},
+				"protocol_version": "2.1.0",
+				"retry_on_failure": map[string]any{
+					"initial_interval": 1 * time.Second,
+					"max_interval":     60 * time.Second,
+				},
+				"sending_queue": map[string]any{
+					"batch": map[string]any{
+						"flush_timeout": "10s",
+						"max_size":      2048,
+						"sizer":         "items",
+						"min_size":      1600,
+					},
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
+				},
+				"timeout":      20 * time.Second,
+				"dial_timeout": 5 * time.Second,
 				"record_partitioner": map[string]any{
 					"extension": "kafkapartitioner/_agent-component/default",
 				},
@@ -371,12 +432,12 @@ ssl:
 `,
 		},
 		{
-			"ca_sha_256 is set",
+			"ca_sha256 is set",
 			`
 hosts: ["kafka1:9092", "kafka2:9092", "kafka3:9092"]
 topic: static-topic
 ssl:
-  ca_sha_256:  sha256
+  ca_sha256:  sha256
 `,
 		},
 	}

@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -45,7 +45,7 @@ func newInstallCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.Comman
 		Short: "Install Elastic Agent permanently on this system",
 		Long: `This command installs Elastic Agent permanently on this system. The system's service manager then manages the installed Elastic agent.
 
-Unless all the require command-line parameters are provided or -f is used this command will ask questions on how you
+Unless all the required command-line parameters are provided or -f is used this command will ask questions on how you
 would like the Agent to operate.
 `,
 		Run: func(c *cobra.Command, _ []string) {

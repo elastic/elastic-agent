@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.uber.org/zap/zapcore"
 
@@ -530,6 +532,13 @@ func TestStreamIDForComponent(t *testing.T) {
 	assert.Equal(t, "", streamIDForComponent("not-a-receiver", "system/metrics-default"))
 }
 
+func TestDiagnosticsMatchEncodedComponentID(t *testing.T) {
+	comp := testComponent("filestream-my output")
+	name := "filebeatreceiver/_agent-component/filestream-my%20output/input-test-1"
+	assert.Equal(t, []string{comp.ID}, diagnosticComponentIDsFromName(name, []component.Component{comp}))
+	assert.Equal(t, "input-test-1", streamIDForComponent(name, comp.ID))
+}
+
 // TestPerformComponentDiagnosticsUnexpectedError verifies that when EDOT returns an error other than
 // "not running" (ENOENT/ECONNREFUSED), the error is recorded on each component and the call itself
 // still returns nil so the rest of the diagnostics archive is produced.
@@ -581,10 +590,6 @@ func TestPerformComponentDiagnosticsUnexpectedError(t *testing.T) {
 }
 
 func setTemporaryAgentPath(t *testing.T) {
-	topPath := paths.Top()
 	tempTopPath := t.TempDir()
-	paths.SetTop(tempTopPath)
-	t.Cleanup(func() {
-		paths.SetTop(topPath)
-	})
+	pathstest.SetTop(t, tempTopPath)
 }

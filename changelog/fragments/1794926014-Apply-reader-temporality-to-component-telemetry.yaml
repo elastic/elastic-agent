@@ -1,0 +1,4 @@
+kind: bug-fix
+summary: Apply reader temporality and aggregation configuration to component-scoped internal telemetry metrics
+component: elastic-agent
+issue: https://github.com/elastic/elastic-agent/issues/18047

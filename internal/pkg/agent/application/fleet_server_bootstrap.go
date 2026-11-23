@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
@@ -31,22 +31,25 @@ const (
 // bootstrapped with the required command-line arguments for the Elastic Agent to be able to run the Fleet Server.
 var ErrFleetServerNotBootstrapped = errors.New("elastic-agent must be bootstrapped with a fleet-server; re-install or re-enroll with --fleet-server-* options")
 
-// injectFleetServerInput is the base configuration that is used plus the FleetServerComponentModifier that adjusts
-// the components before sending them to the runtime manager.
-var injectFleetServerInput = config.MustNewConfigFrom(map[string]interface{}{
-	"outputs": map[string]interface{}{
-		"default": map[string]interface{}{
-			"type":  elasticsearch,
-			"hosts": []string{"localhost:9200"},
+// newFleetServerInputConfig returns the base configuration that is used plus the FleetServerComponentModifier that
+// adjusts the components before sending them to the runtime manager. A new config is built for every config change
+// as the coordinator consumes the inputs of the configs it processes.
+func newFleetServerInputConfig() *config.Config {
+	return config.MustNewConfigFrom(map[string]interface{}{
+		"outputs": map[string]interface{}{
+			"default": map[string]interface{}{
+				"type":  elasticsearch,
+				"hosts": []string{"localhost:9200"},
+			},
 		},
-	},
-	"inputs": []interface{}{
-		map[string]interface{}{
-			"id":   fleetServer,
-			"type": fleetServer,
+		"inputs": []interface{}{
+			map[string]interface{}{
+				"id":   fleetServer,
+				"type": fleetServer,
+			},
 		},
-	},
-})
+	})
+}
 
 // FleetServerComponentModifier modifies the comps to inject extra information from the policy into
 // the Fleet Server component and units needed to run Fleet Server correctly.
@@ -222,7 +225,7 @@ func (m *fleetServerBootstrapManager) Run(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case m.ch <- &localConfigChange{injectFleetServerInput}:
+	case m.ch <- &localConfigChange{newFleetServerInputConfig()}:
 	}
 
 	<-ctx.Done()
@@ -270,7 +273,7 @@ func fixInputMap(m map[string]interface{}) {
 // match the loading and unloading of the configuration so this ensures that it will match what Fleet Server is
 // expecting.
 func toMapStr(input ...interface{}) (map[string]interface{}, error) {
-	m := map[interface{}]interface{}{}
+	m := map[string]interface{}{}
 	for _, i := range input {
 		im, err := toMapInterface(i)
 		if err != nil {
@@ -278,19 +281,12 @@ func toMapStr(input ...interface{}) (map[string]interface{}, error) {
 		}
 		m = mergeNestedMaps(m, im)
 	}
-	// toMapInterface will set nested maps to a map[interface{}]interface{} which `component.ExpectedConfig` cannot
-	// handle they must be a map[string]interface{}.
-	fm := fixYamlMap(m)
-	r, ok := fm.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("expected map[string]interface{}, got %T", fm)
-	}
-	return r, nil
+	return m, nil
 }
 
-// toMapInterface converts the input into a map[interface{}]interface{} using YAML marshall and unmarshall.
-func toMapInterface(input interface{}) (map[interface{}]interface{}, error) {
-	var res map[interface{}]interface{}
+// toMapInterface converts the input into a map[string]interface{} using YAML marshall and unmarshall.
+func toMapInterface(input interface{}) (map[string]interface{}, error) {
+	var res map[string]interface{}
 	raw, err := yaml.Marshal(input)
 	if err != nil {
 		return nil, err
@@ -302,16 +298,16 @@ func toMapInterface(input interface{}) (map[interface{}]interface{}, error) {
 	return res, nil
 }
 
-// mergeNestedMaps merges two map[interface{}]interface{} together deeply.
-func mergeNestedMaps(a, b map[interface{}]interface{}) map[interface{}]interface{} {
-	res := make(map[interface{}]interface{}, len(a))
+// mergeNestedMaps merges two map[string]interface{} together deeply.
+func mergeNestedMaps(a, b map[string]interface{}) map[string]interface{} {
+	res := make(map[string]interface{}, len(a))
 	for k, v := range a {
 		res[k] = v
 	}
 	for k, v := range b {
-		if v, ok := v.(map[interface{}]interface{}); ok {
+		if v, ok := v.(map[string]interface{}); ok {
 			if bv, ok := res[k]; ok {
-				if bv, ok := bv.(map[interface{}]interface{}); ok {
+				if bv, ok := bv.(map[string]interface{}); ok {
 					res[k] = mergeNestedMaps(bv, v)
 					continue
 				}
@@ -320,27 +316,4 @@ func mergeNestedMaps(a, b map[interface{}]interface{}) map[interface{}]interface
 		res[k] = v
 	}
 	return res
-}
-
-// fixYamlMap converts map[interface{}]interface{} into map[string]interface{} through out the entire map.
-func fixYamlMap(input interface{}) interface{} {
-	switch i := input.(type) {
-	case map[string]interface{}:
-		for k, v := range i {
-			i[k] = fixYamlMap(v)
-		}
-	case map[interface{}]interface{}:
-		m := map[string]interface{}{}
-		for k, v := range i {
-			if ks, ok := k.(string); ok {
-				m[ks] = fixYamlMap(v)
-			}
-		}
-		return m
-	case []interface{}:
-		for j, v := range i {
-			i[j] = fixYamlMap(v)
-		}
-	}
-	return input
 }

@@ -17,11 +17,13 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +34,7 @@ import (
 	"go.opentelemetry.io/collector/featuregate"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
@@ -1466,9 +1468,7 @@ exporters:
 			tempDir := t.TempDir()
 
 			// Override the config path to point to our temp directory
-			oldConfigPath := paths.Config()
-			paths.SetConfig(tempDir)
-			t.Cleanup(func() { paths.SetConfig(oldConfigPath) })
+			pathstest.SetConfig(t, tempDir)
 
 			// Write persisted config file where paths.ConfigFile() expects it
 			persistedConfigPath := paths.ConfigFile()
@@ -1736,7 +1736,7 @@ func createCoordinator(t testing.TB, ctx context.Context, opts ...CoordinatorOpt
 	if acker == nil {
 		acker = &fakeActionAcker{}
 	}
-	coord := New(l, cfg, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil)
+	coord := New(l, cfg, logp.DebugLevel, ai, specs, &fakeReExecManager{}, upgradeManager, rm, cfgMgr, varsMgr, caps, monitoringMgr, o.managed, otelMgr, acker, nil, nil)
 	return coord, cfgMgr, varsMgr
 }
 

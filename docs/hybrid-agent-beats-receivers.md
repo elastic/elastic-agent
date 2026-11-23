@@ -11,10 +11,10 @@ testing instructions.
 **Beat Receivers** are beat inputs and processors executing as a receiver in an OpenTelemetry collector pipeline.
 Beat receivers are designed to output the exact same data they do today, and do not output data in the OTLP schema.
 
-Beat receivers will eventually be the default execution mode for Beat inputs in an elastic-agent.yml file (whether
-written by hand or generated via Fleet). Elastic Agent will automatically translate the relevant parts of it's
-elastic-agent.yml file into OpenTelemetry collector configurations and execute them in the collector. This capability
-is currently gated by a feature flag.
+Beat receivers are the default execution mode for most Beat inputs in an elastic-agent.yml file (whether
+written by hand or generated via Fleet). Elastic Agent automatically translates the relevant parts of its
+elastic-agent.yml file into OpenTelemetry collector configurations and executes them in the collector. The runtime
+can be selected per Beat and per input type, see [Beat Receivers for Data Collection](#beat-receivers-for-data-collection).
 
 ### Beat Receivers for Agent Monitoring
 
@@ -35,8 +35,10 @@ agent.monitoring:
 
 ### Beat Receivers for Data Collection
 
-The capability to use Beat receivers is being enabled on per Beat and per input type basis. As of 9.4.0 all Metricbeat inputs run as
-beats receivers by default, and all other beat inputs are capable of being run as beats receivers.
+The runtime is selected on a per Beat and per input type basis. By default, the Filebeat, Metricbeat, Auditbeat,
+Osquerybeat and Packetbeat inputs run as beats receivers (`otel`). Heartbeat has no Beat-level default, so its inputs
+use the global default, which is `process`. See `DefaultRuntimeConfig` in `pkg/component/component.go`. Inputs that
+the `otel` runtime cannot handle (for example because of unsupported output options) fall back to the `process` runtime.
 
 With the changes in https://github.com/elastic/elastic-agent/pull/11186 a new `agent.internal.runtime` section allows controlling
 the default runtime where `otel` indicates the input should run as a receiver. The default can be controlled on a per Beat and per
@@ -96,6 +98,27 @@ agent:
         kafka: process # Force all inputs using the kafka output to use the process runtime
 ```
 
+### Runtime precedence and automatic fallback
+
+For each input the runtime is the first one set in this list (highest precedence first):
+
+1. the input's own `_runtime_experimental: otel|process`
+2. `agent.internal.runtime.output.<output type>`, when that output is enabled
+3. `agent.internal.runtime.<beat>.<input type>`
+4. `agent.internal.runtime.<beat>.default`
+5. `agent.internal.runtime.default`
+
+Because most Beats have a Beat-level default of `otel`, setting only the global `default: process` does not move them
+back to the process runtime. See `RuntimeManagerForInputType` in `pkg/component/component.go`.
+
+Even when `otel` is selected, the Elastic Agent falls back to the `process` runtime for components that cannot run in
+the collector, and logs why (`maybeOverrideRuntimeForComponent` in
+`internal/pkg/agent/application/coordinator/coordinator.go`):
+
+- `otel runtime is not supported for component <id>, switching to process runtime, reason: ...`: for example an output
+  type other than `elasticsearch`, `logstash` or `kafka`, or unsupported output options.
+- `Component <id> uses dynamic variable providers, switching to <runtime> runtime`: see [Dynamic Inputs](#dynamic-inputs).
+
 ### Dynamic Inputs
 
 Inputs rendered from a [dynamic variable provider](https://www.elastic.co/docs/reference/fleet/dynamic-input-configuration)
@@ -148,6 +171,22 @@ input's dynamic provider are taken into account; variables of context providers 
 Running the Elastic Agent with `agent.logging.level: debug` logs the dynamic provider and the resolved provider
 variables for every rendered input, along with the inputs that were excluded by `static_variables`.
 
+### Runtime switches
+
+Changing the runtime of a running component, for example by changing `agent.internal.runtime` in the policy, moves it
+between the collector and a Beat process. The old instance has to stop before the new one starts, otherwise both would
+collect the same data. The coordinator therefore defers the update of the new runtime until the old instances are
+stopped, and queues newer component models while a transition is in progress. It logs:
+
+- `Deferring OTel components until process instances stop` (or `Deferring runtime components until OTel instances stop`
+  for the opposite direction)
+- `Component "<id>" stopped, N remaining before deferred update`
+- `Runtime transition timeout exceeded, force-applying deferred manager updates`: the old instance did not stop within
+  `transitionTimeout` (the process stop timeout plus 3 seconds), so the update is applied anyway.
+
+Duplicated or missing data around a switch is often the transition itself, with both instances or neither briefly
+collecting.
+
 ### Configuration Translation Overrides
 
 When an input is executed as a Beat receiver, it is injected into an OpenTelemetry collector pipeline that was
@@ -197,7 +236,7 @@ outputs:
 ## Hybrid Agent
 
 **Hybrid Agent** refers the capability of Elastic Agent to run OpenTelemetry collector pipelines specified directly in
-it's elastic-agent.yml file. This allows running Beat based ECS data collection alongside OTLP native data collection in
+its elastic-agent.yml file. This allows running Beat based ECS data collection alongside OTLP native data collection in
 the same agent. The diagram below shows the end state of the Elastic Agent where both Beats (via Beat receivers) and OpenTelemetry
 collector receivers run in the same collector process.
 
@@ -221,7 +260,7 @@ outputs:
 inputs:
   - id: filestream-system-66cab0a6-6fa3-46b1-9af1-2ea171fbd887
     type: filestream
-    # _runtime_experimental: otel # Optional - also run the filestream input as a collector receiver.
+    # _runtime_experimental: otel # Optional - explicitly run the filestream input as a collector receiver.
     data_stream:
       namespace: default
     streams:

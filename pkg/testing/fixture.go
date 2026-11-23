@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -244,6 +244,12 @@ func (f *Fixture) Version() string {
 // Hash returns the Elastic Agent build commit hash (populated only after the fixture has been prepared/extracted)
 func (f *Fixture) Hash() string {
 	return f.hash
+}
+
+// FetchedFromLocalBuild reports whether the fixture's Elastic Agent comes from a build of the code under test,
+// as opposed to a released or snapshot build from the artifacts repository.
+func (f *Fixture) FetchedFromLocalBuild() bool {
+	return f.fetcher.Name() == localFetcherName
 }
 
 // ShortHash returns the Elastic Agent build commit hash in short form (populated only after the fixture has been prepared/extracted)
@@ -1428,9 +1434,9 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
-		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+		if strings.HasPrefix(filename, paths.VersionedHomePrefix) && fi.IsDir() {
 			// Below we exclude the hash suffix (7 characters) of the directory to check the version
-			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
+			if version != "" && filename[:len(filename)-7] != paths.VersionedHomePrefix+version {
 				// version specified but version mismatch. in case of upgrade we have multiple
 				// directories, we don't want first found
 				continue
@@ -1550,20 +1556,23 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 		var sub client.ClientStateWatch
 		expBackoff := backoff.NewExponentialBackOff()
 		expBackoff.InitialInterval = 100 * time.Millisecond
-		expBackoff.MaxElapsedTime = timeout
 		expBackoff.MaxInterval = 2 * time.Second
-		err = backoff.RetryNotify(
-			func() error {
-				var err error
-				sub, err = c.StateWatch(ctx)
-				return err
+		_, err = backoff.Retry(ctx,
+			func() (struct{}, error) {
+				var watchErr error
+				sub, watchErr = c.StateWatch(ctx)
+				return struct{}{}, watchErr
 			},
-			backoff.WithContext(expBackoff, ctx),
-			func(err error, retryAfter time.Duration) {
+			backoff.WithBackOff(expBackoff),
+			backoff.WithMaxElapsedTime(timeout),
+			backoff.WithNotify(func(err error, retryAfter time.Duration) {
 				t.Logf("%s: StateWatch failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
-			},
+			}),
 		)
 		if err != nil {
+			if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+				err = re.LastErr
+			}
 			errCh <- fmt.Errorf("StateWatch() failed: %w", err)
 			return
 		}

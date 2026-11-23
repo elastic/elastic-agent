@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 )
 
 // TODO: is there an upper limit for this timeout?
@@ -66,31 +66,23 @@ func accessMarkerFileWithRetries(accessFn func() error) error {
 	expBackoff := backoff.NewExponentialBackOff()
 	expBackoff.InitialInterval = markerAccessBackoffInitialInterval
 	expBackoff.MaxInterval = markerAccessTimeout / minMarkerAccessRetries
-	expBackoff.MaxElapsedTime = markerAccessTimeout
 
 	ctx, cancel := context.WithTimeout(context.Background(), markerAccessTimeout)
 	defer cancel()
 
-	expBackoffWithTimeout := backoff.WithContext(expBackoff, ctx)
 	start := time.Now()
-
-	var duration time.Duration
 	var count int
-	var err error
-	if err = accessFn(); err == nil {
-		return nil
-	}
-
-	for duration = expBackoffWithTimeout.NextBackOff(); duration != backoff.Stop; duration = expBackoffWithTimeout.NextBackOff() {
-		time.Sleep(duration)
-
-		if err = accessFn(); err == nil {
-			return nil
+	var lastErr error
+	_, retryErr := backoff.Retry(ctx, func() (struct{}, error) {
+		lastErr = accessFn()
+		if lastErr != nil {
+			count++
 		}
-
-		count++
+		return struct{}{}, lastErr
+	}, backoff.WithBackOff(expBackoff), backoff.WithMaxElapsedTime(markerAccessTimeout))
+	if retryErr != nil {
+		return fmt.Errorf("could not write narker after %s and %d retries. Last error: %w",
+			time.Since(start), count, lastErr)
 	}
-
-	return fmt.Errorf("could not write narker after %s and %d retries. Last error: %w",
-		time.Since(start), count, err)
+	return nil
 }

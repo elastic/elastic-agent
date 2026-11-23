@@ -33,7 +33,7 @@ import (
 	"time"
 	"unicode"
 
-	backoff "github.com/cenkalti/backoff/v4"
+	backoff "github.com/cenkalti/backoff/v7"
 	"github.com/magefile/mage/sh"
 )
 
@@ -227,10 +227,18 @@ func Retry(f func() error) error {
 	exp.InitialInterval = 1 * time.Second
 	exp.Multiplier = 3
 	exp.MaxInterval = 10 * time.Second
-	return backoff.RetryNotify(f, backoff.WithMaxRetries(exp, retryMaxRetries),
-		func(err error, wait time.Duration) {
-			log.Printf("Attempt failed: %v, retrying in %v", err, wait)
-		})
+	_, err := backoff.Retry(context.Background(), func() (struct{}, error) {
+		return struct{}{}, f()
+	}, backoff.WithBackOff(exp), backoff.WithMaxTries(retryMaxRetries+1), backoff.WithNotify(func(err error, wait time.Duration) {
+		log.Printf("Attempt failed: %v, retrying in %v", err, wait)
+	}))
+	if err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return re.LastErr
+		}
+		return err
+	}
+	return nil
 }
 
 // DownloadFile downloads the given URL and writes the file to destinationDir,

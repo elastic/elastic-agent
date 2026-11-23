@@ -133,6 +133,10 @@ inputs:
 #   # retry_sleep_init_duration is the duration to sleep for before the first retry attempt. This
 #   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
 #   retry_sleep_init_duration: 30s
+#   # if reserve_diskspace is enabled, upgrade will check for available diskspace and attempt to
+#   # reserve the required amount upfront, failing the upgrade if there is insufficient diskspace.
+#   reserve_diskspace:
+#     enabled: true
 
 # agent.upgrade
 #   # rollback settings
@@ -147,6 +151,19 @@ inputs:
 #   # timeout for stopping processes. when process is not stopped by this timeout then the process.
 #   # is force killed
 #   stop_timeout: 30s
+
+# agent.synthetics.browser:
+#   # CAs that browser monitors trust: PEM files, or directories of *.crt and *.pem files.
+#   # In containers, ELASTIC_AGENT_BROWSER_CA replaces this list when it is set.
+#   # Requires certutil (in the complete images), Linux only.
+#   certificate_authorities: []
+#   certificate_reload:
+#     # check the CAs for changes while running, so none needs a restart
+#     enabled: true
+#     # Positive intervals below 1s use 1s and log a warning.
+#     # In containers, ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL overrides this interval;
+#     # setting the environment variable to 0 disables reloading.
+#     reload_interval: 30s
 
 # agent.grpc:
 #   # listen address for the GRPC server that spawned processes connect back to.

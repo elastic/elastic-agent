@@ -43,14 +43,20 @@ jobs:
             allowed="main|${previous_major_last//./\\.}"
           fi
 
-          jq --argjson branches "$branches" --arg allowed "$allowed" '
+          # Rules to rewrite are identified by a marker entry in their
+          # "description" array rather than by the human-readable text.
+          marker="managed-by: update-renovate-branches"
+
+          jq --argjson branches "$branches" --arg allowed "$allowed" --arg marker "$marker" '
             .baseBranchPatterns = $branches
-            | (.packageRules[] | select(.description | startswith("Major updates:")) | .matchBaseBranches)
+            | (.packageRules[]
+                | select([.description] | flatten | index($marker))
+                | .matchBaseBranches)
               = ["!/^(" + $allowed + ")$/"]
           ' renovate.json > renovate.json.new
           mv renovate.json.new renovate.json
 
-      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+      - uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "[Automation] Update Renovate baseBranches to current active branches"

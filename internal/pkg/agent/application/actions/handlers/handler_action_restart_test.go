@@ -111,7 +111,7 @@ func TestActionRestartHandler(t *testing.T) {
 
 	t.Run("restart error clears persisted action and acks failure", func(t *testing.T) {
 		action := &fleetapi.ActionRestart{ActionID: "r-fail", ActionType: fleetapi.ActionTypeRestart}
-		restartErr := errors.New("not upgradeable")
+		restartErr := errors.New("not restartable")
 
 		coord := &fakeRestartCoordinator{}
 		coord.On("Restart", mock.Anything, action).Return(restartErr)

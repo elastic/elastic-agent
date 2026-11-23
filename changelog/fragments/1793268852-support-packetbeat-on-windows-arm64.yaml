@@ -1,0 +1,6 @@
+kind: feature
+summary: Support Packetbeat on Windows ARM64
+description: >-
+  The Elastic Agent package for Windows ARM64 includes the Npcap installer and can capture network
+  traffic on Windows ARM64 hosts.
+component: elastic-agent
