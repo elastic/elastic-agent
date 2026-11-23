@@ -743,8 +743,10 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 			require.NoError(t, err)
 
 			foundTags := false
-			// foundFIPS is set by either the old signal (GOEXPERIMENT=systemcrypto) or the
-			// new signal (GOFIPS140). On 8.19 the two toolchains coexist across components.
+			// foundFIPS is set by any of the accepted signals: the microsoft/go toolchain
+			// (microsoft_systemcrypto, or GOEXPERIMENT=systemcrypto on toolchains older than
+			// go1.27) or the Go FIPS 140 module (GOFIPS140). On 8.19 both toolchains coexist
+			// across components.
 			foundFIPS := false
 			foundGOFIPS140 := false
 			foundFIPSDefault := false
@@ -754,8 +756,17 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 					foundTags = true
 					require.Contains(t, setting.Value, "requirefips")
 					continue
+				case "microsoft_systemcrypto":
+					// microsoft/go toolchain: the system crypto backend is recorded in its own
+					// build setting. This is the signal that survives the go1.27 bump, where the
+					// toolchain stopped recording GOEXPERIMENT=systemcrypto.
+					if setting.Value == "1" {
+						foundFIPS = true
+					}
+					continue
 				case "GOEXPERIMENT":
-					// Old microsoft/go toolchain: FIPS is signalled via GOEXPERIMENT=systemcrypto.
+					// microsoft/go toolchains older than go1.27 additionally signal FIPS via
+					// GOEXPERIMENT=systemcrypto.
 					if strings.Contains(setting.Value, "systemcrypto") {
 						foundFIPS = true
 					}
@@ -786,7 +797,7 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 			}
 
 			require.True(t, foundTags, "Did not find -tags within binary version information")
-			require.True(t, foundFIPS, "Did not find FIPS build signals (GOEXPERIMENT=systemcrypto or GOFIPS140) within binary version information")
+			require.True(t, foundFIPS, "Did not find FIPS build signals (microsoft_systemcrypto, GOEXPERIMENT=systemcrypto or GOFIPS140) within binary version information")
 		})
 	}
 }
