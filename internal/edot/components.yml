@@ -229,6 +229,7 @@ since:
   resourcedetectionprocessor: v9.0.0
   resourceprocessor: v9.0.0
   routingconnector: v9.0.0
+  sigv4authextension: v9.5.7
   snmpreceiver: v9.3.0
   spanmetricsconnector: v9.0.0
   sqlserverreceiver: v9.2.0
