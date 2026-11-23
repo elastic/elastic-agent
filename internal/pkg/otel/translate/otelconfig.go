@@ -30,7 +30,8 @@ import (
 	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
@@ -201,9 +202,12 @@ func VerifyComponentIsOtelSupported(comp *component.Component) error {
 		return fmt.Errorf("unsupported output type: %s", comp.OutputType)
 	}
 
-	// check if the actual configuration is supported. We need to actually generate the config and look for
-	// the right kind of error
-	_, compErr := getCollectorConfigForComponent(comp, logp.NewNopLogger())
+	// Only the output config can be unsupported; translating the inputs too is expensive for components with many inputs.
+	exporterType, err := OutputTypeToExporterType(comp.OutputType)
+	if err != nil {
+		return err
+	}
+	_, _, _, _, compErr := getExporterConfigForComponent(comp, exporterType, logp.NewNopLogger())
 	if errors.Is(compErr, errors.ErrUnsupported) {
 		return fmt.Errorf("unsupported configuration for %s: %w", comp.ID, compErr)
 	}
@@ -548,8 +552,8 @@ func getReceiversConfigForComponent(
 
 	// OTel Beat receivers never see CLI flags, so pass ELASTIC_AGENT_HOSTNAME via the
 	// native Beat hostname config key for the receiver's own identity initialisation.
-	if hostname := util.HostnameOverride(); hostname != "" {
-		sharedConfig["hostname"] = hostname
+	if override := hostinfo.Override(); override != "" {
+		sharedConfig["hostname"] = override
 	}
 
 	// When SingleReceiver is set, merge all stream inputs into one receiver instead of
@@ -774,6 +778,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 
 	// translate the configuration
 	unitConfigMap := unit.Config.GetSource().AsMap() // this is what beats do in libbeat/management/generate.go
+	removeRedactionMarkers(unitConfigMap)
 	outputCfgC, err := config.NewConfigFrom(unitConfigMap)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("error translating config for output: %s, unit: %s, error: %w", outputName, unit.ID, err)
@@ -843,6 +848,25 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 	return exporterConfig, queueSettings, extensionConfig, processorConfig, nil
 }
 
+// removeRedactionMarkers deletes the keys the coordinator adds next to secrets for diagnostics
+// redaction. Collector components reject unknown keys, so these must not reach their configs.
+func removeRedactionMarkers(v any) {
+	switch t := v.(type) {
+	case map[string]any:
+		for k, child := range t {
+			if strings.HasPrefix(k, diagnostics.RedactionMarkerPrefix) {
+				delete(t, k)
+				continue
+			}
+			removeRedactionMarkers(child)
+		}
+	case []any:
+		for _, child := range t {
+			removeRedactionMarkers(child)
+		}
+	}
+}
+
 // getInputsForUnit returns the beat inputs for a unit. These can directly be plugged into a beats receiver config.
 // It mainly calls a conversion function from the control protocol client.
 // receiverInput pairs a beat input config with its authoritative stream ID.
@@ -887,6 +911,7 @@ func getInputsForUnit(unit component.Unit, defaultDataStreamType string, comp *c
 	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(comp.InputType, "/")
 	result := make([]receiverInput, len(inputs))
 	for i, input := range inputs {
+		removeRedactionMarkers(input)
 		switch {
 		case inputTypeHasSlash && inputTypeSuffix == "metrics":
 			// metricbeat: "system/metrics" → "module: system" per https://www.elastic.co/docs/reference/beats/metricbeat/configuration-metricbeat
@@ -1091,6 +1116,7 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 	// inputs[0] — osquerybeat wires its client to inputs[0] and live-query result rows must
 	// land in the result stream, not action.responses.
 	osqMap, _ := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
+	removeRedactionMarkers(osqMap)
 	for i, ri := range result {
 		// "osquery_manager.result" is the dataset of the stream that carries osquery
 		// scheduled query results and must receive the input-level osquery configuration.

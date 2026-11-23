@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
@@ -265,9 +267,7 @@ func TestGetUpgradeSize(t *testing.T) {
 }
 
 func TestReserveDiskSpace(t *testing.T) {
-	originalTop := paths.Top()
-	paths.SetTop(t.TempDir())
-	t.Cleanup(func() { paths.SetTop(originalTop) })
+	pathstest.SetTop(t, t.TempDir())
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	t.Run("reserves disk space", func(t *testing.T) {

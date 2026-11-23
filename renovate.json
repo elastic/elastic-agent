@@ -166,6 +166,19 @@
       "enabled": false
     },
     {
+      "description": "go.yaml.in/yaml: block the v3 -> v4 major. The internal/edot module reaches github.com/pb33f/libopenapi (via prometheus, pinned by the Prometheus receiver) which is built against go.yaml.in/yaml/v4 v4.0.0-rc.6 and does not compile against v4.0.0. Because internal/edot replaces github.com/elastic/elastic-agent with the root module, a root-module requirement on v4.0.0 is pulled into internal/edot by MVS and breaks its build. Re-enable once libopenapi (or the pinned Prometheus) builds against go.yaml.in/yaml/v4 v4.0.0.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^go\\.yaml\\.in/yaml/"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
       "description": "fleet-server: block every non-digest update type. The nested github.com/elastic/fleet-server/pkg/api module declares no major suffix and publishes no tagged versions, so Renovate misreads the fleet-server repository tags (v9.x) and proposes a nonexistent /v9 module path. Pseudo-versions (digest) are the only valid updates.",
       "matchManagers": [
         "gomod"

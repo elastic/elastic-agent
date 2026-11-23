@@ -306,7 +306,7 @@ type goroutinesMonitor struct {
 
 func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *atesting.Fixture) {
 	oldTop := paths.Top()
-	paths.SetTop("/opt/Elastic/Agent")
+	paths.SetTop("/opt/Elastic/Agent") //nolint:forbidigo // the top path is restored at the end of this function, not at the end of the test
 	// fetch the unit ID of the component, use that to generate the path to the unix socket
 	status, err := fixture.ExecStatus(ctx)
 	if err != nil {
@@ -351,7 +351,7 @@ func (gm *goroutinesMonitor) Init(ctx context.Context, t *testing.T, fixture *at
 
 	}
 	gm.startTime = time.Now()
-	paths.SetTop(oldTop)
+	paths.SetTop(oldTop) //nolint:forbidigo // restores the top path set at the start of this function
 }
 
 func (gm *goroutinesMonitor) Update(t *testing.T, fixture *atesting.Fixture) {

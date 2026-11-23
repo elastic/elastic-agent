@@ -757,7 +757,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261117200636-a20ce3392341
+Version: v7.0.0-alpha2.0.20261120163632-b4b0aa4e506a
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -81393,11 +81393,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/tk-btf@v0.3.0/L
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/toutoumomoma
-Version: v0.0.0-20240626215117-76e39db18dfb
+Version: v0.0.0-20261115195231-8e972b20fa5e
 Licence type (autodetected): BSD-3-Clause
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/toutoumomoma@v0.0.0-20240626215117-76e39db18dfb/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/toutoumomoma@v0.0.0-20261115195231-8e972b20fa5e/LICENSE:
 
 Copyright ©2022 Elastic N.V. All rights reserved.
 Copyright ©2021 Dan Kortschak. All rights reserved.
