@@ -22,34 +22,94 @@ import (
 // ContainerPriority is the priority that container mappings are added to the provider.
 const ContainerPriority = 0
 
+// connectRetryInterval is how long Run waits before dialing Docker again after a
+// connect failure. It matches composable.defaultRetryInterval. The retry stays
+// inside Run so the controller does not log a provider crash every interval.
+const connectRetryInterval = 30 * time.Second
+
+// watcherFactory opens a Docker watcher. Tests replace it to simulate a missing daemon.
+type watcherFactory func(log *logger.Logger, host string, tls *docker.TLSConfig, storeShortID bool) (docker.Watcher, error)
+
 type dockerContainerData struct {
 	container  *docker.Container
 	mapping    map[string]interface{}
 	processors []map[string]interface{}
 }
 type dynamicProvider struct {
-	logger *logger.Logger
-	config *Config
+	logger       *logger.Logger
+	config       *Config
+	connectRetry time.Duration
+	newWatcher   watcherFactory
 }
 
 // Run runs the environment context provider.
 func (c *dynamicProvider) Run(comm composable.DynamicProviderComm) error {
-	watcher, err := docker.NewWatcher(c.logger, c.config.Host, c.config.TLS, false)
-	if err != nil {
-		// info only; return nil (do nothing)
-		c.logger.Infof("Docker provider skipped, unable to connect: %s", err)
-		return nil
+	logged := false
+	for {
+		watcher, err := c.openWatcher()
+		if err != nil {
+			if c.waitConnectRetry(comm, err, &logged) {
+				return comm.Err()
+			}
+			continue
+		}
+
+		// Subscribe before Start. Start publishes the containers that already exist,
+		// and those events are dropped if nobody is listening yet.
+		startListener := watcher.ListenStart()
+		stopListener := watcher.ListenStop()
+		if err := watcher.Start(); err != nil {
+			startListener.Stop()
+			stopListener.Stop()
+			watcher.Stop()
+			if c.waitConnectRetry(comm, err, &logged) {
+				return comm.Err()
+			}
+			continue
+		}
+
+		return c.watch(comm, watcher, startListener, stopListener)
 	}
-	startListener := watcher.ListenStart()
-	stopListener := watcher.ListenStop()
+}
+
+func (c *dynamicProvider) openWatcher() (docker.Watcher, error) {
+	factory := c.newWatcher
+	if factory == nil {
+		factory = docker.NewWatcher
+	}
+	return factory(c.logger, c.config.Host, c.config.TLS, false)
+}
+
+// waitConnectRetry logs a connect failure and waits for the next attempt.
+// It returns true when the provider context is done and Run must return.
+func (c *dynamicProvider) waitConnectRetry(comm composable.DynamicProviderComm, err error, logged *bool) bool {
+	if !*logged {
+		c.logger.Infof("Docker provider skipped, unable to connect: %s", err)
+		*logged = true
+	} else {
+		c.logger.Debugf("Docker provider skipped, unable to connect: %s", err)
+	}
+
+	timer := time.NewTimer(c.retryInterval())
+	defer timer.Stop()
+	select {
+	case <-comm.Done():
+		return true
+	case <-timer.C:
+		return false
+	}
+}
+
+func (c *dynamicProvider) retryInterval() time.Duration {
+	if c.connectRetry > 0 {
+		return c.connectRetry
+	}
+	return connectRetryInterval
+}
+
+func (c *dynamicProvider) watch(comm composable.DynamicProviderComm, watcher docker.Watcher, startListener bus.Listener, stopListener bus.Listener) error {
 	stoppers := map[string]*time.Timer{}
 	stopTrigger := make(chan *dockerContainerData)
-
-	if err := watcher.Start(); err != nil {
-		// info only; return nil (do nothing)
-		c.logger.Infof("Docker provider skipped, unable to connect: %s", err)
-		return nil
-	}
 	defer watcher.Stop()
 
 	for {
@@ -107,7 +167,12 @@ func DynamicProviderBuilder(logger *logger.Logger, c *config.Config, managed boo
 	if err != nil {
 		return nil, errors.New(err, "failed to unpack configuration")
 	}
-	return &dynamicProvider{logger, &cfg}, nil
+	return &dynamicProvider{
+		logger:       logger,
+		config:       &cfg,
+		connectRetry: connectRetryInterval,
+		newWatcher:   docker.NewWatcher,
+	}, nil
 }
 
 func generateData(event bus.Event) (*dockerContainerData, error) {
