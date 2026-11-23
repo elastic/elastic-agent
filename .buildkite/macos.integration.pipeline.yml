@@ -75,11 +75,12 @@ steps:
         concurrency_group: "elastic-agent-macos-integration/orka-macos"
         command: .buildkite/scripts/macos_tests.sh {{matrix}}
         artifact_paths:
-          - build/**
+          - build/*
+          - build/diagnostics/**
         agents:
           provider: orka
           imagePrefix: endpoint-macos-27-arm
-        timeout_in_minutes: 120
+        timeout_in_minutes: 125
         env:
           TEST_PACKAGE: "github.com/elastic/elastic-agent/testing/integration/ess"
           # Known darwin failures (diagnostics socket missing after install/switch, keychain cleanup), see
