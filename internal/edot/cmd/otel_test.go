@@ -12,7 +12,7 @@ import (
 
 	"github.com/elastic/beats/v7/libbeat/beat"
 
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 )
 
 func TestPrepareCollectorSettings(t *testing.T) {
@@ -39,14 +39,14 @@ func TestInitBeatHostnameFromEnv(t *testing.T) {
 
 	t.Run("plain_value", func(t *testing.T) {
 		t.Cleanup(reset)
-		t.Setenv(util.EnvHostName, "custom-node")
+		t.Setenv(hostinfo.EnvOverride, "custom-node")
 		initBeatHostnameFromEnv()
 		assert.Equal(t, "custom-node", beat.GetHostnameOverride())
 	})
 
 	t.Run("whitespace_trimmed", func(t *testing.T) {
 		t.Cleanup(reset)
-		t.Setenv(util.EnvHostName, "  custom-node  ")
+		t.Setenv(hostinfo.EnvOverride, "  custom-node  ")
 		initBeatHostnameFromEnv()
 		assert.Equal(t, "custom-node", beat.GetHostnameOverride())
 	})
@@ -54,14 +54,14 @@ func TestInitBeatHostnameFromEnv(t *testing.T) {
 	t.Run("whitespace_only_clears_stale_override", func(t *testing.T) {
 		t.Cleanup(reset)
 		beat.SetHostnameOverride("stale-node")
-		t.Setenv(util.EnvHostName, "   ")
+		t.Setenv(hostinfo.EnvOverride, "   ")
 		initBeatHostnameFromEnv()
 		assert.Equal(t, "", beat.GetHostnameOverride())
 	})
 
 	t.Run("unset_env_clears_stale_override", func(t *testing.T) {
 		t.Cleanup(reset)
-		t.Setenv(util.EnvHostName, "")
+		t.Setenv(hostinfo.EnvOverride, "")
 		beat.SetHostnameOverride("stale-node")
 		initBeatHostnameFromEnv()
 		assert.Equal(t, "", beat.GetHostnameOverride())

@@ -35,6 +35,7 @@ core_components:
   - kafkareceiver
   - kubeletstatsreceiver
   - otlpreceiver
+  - prometheusscrapereceiver
 
 # Exporters
   - elasticsearchexporter
@@ -222,6 +223,7 @@ since:
   prometheusreceiver: v9.0.0
   prometheusremotewritereceiver: v9.3.0
   prometheusremotewritev1receiver: v9.7.0
+  prometheusscrapereceiver: v9.7.0
   rabbitmqreceiver: v9.4.0
   ratelimitprocessor: v9.4.0
   receivercreator: v9.0.0

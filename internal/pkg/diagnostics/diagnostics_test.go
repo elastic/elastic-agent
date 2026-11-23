@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -717,10 +719,8 @@ func TestZipLogsConflictingNames(t *testing.T) {
 }
 
 func TestZipLogsUnversionedHome(t *testing.T) {
-	originalVersionHome := paths.IsVersionHome()
-	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
 	// Container layout: the home path is unversioned and logs live directly under the top path.
-	paths.SetVersionHome(false)
+	pathstest.SetVersionHome(t, false)
 
 	topPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "logs"), 0o700))
@@ -753,9 +753,7 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 // the configured data/state path (topPath) differs from the install home where
 // components run — both trees must appear in the bundle (see https://github.com/elastic/elastic-agent/issues/15771).
 func TestZipLogsUnversionedHomeDivergentComponents(t *testing.T) {
-	originalVersionHome := paths.IsVersionHome()
-	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
-	paths.SetVersionHome(false)
+	pathstest.SetVersionHome(t, false)
 
 	root := t.TempDir()
 

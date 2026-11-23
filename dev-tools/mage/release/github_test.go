@@ -10,10 +10,9 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"testing"
 
-	"github.com/google/go-github/v68/github"
+	"github.com/google/go-github/v93/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,11 +23,12 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 	server := httptest.NewServer(handler)
 	t.Cleanup(server.Close)
 
-	client := github.NewClient(server.Client())
-	baseURL, err := url.Parse(server.URL + "/")
+	baseURL := server.URL + "/"
+	client, err := github.NewClient(
+		github.WithHTTPClient(server.Client()),
+		github.WithURLs(&baseURL, &baseURL),
+	)
 	require.NoError(t, err)
-	client.BaseURL = baseURL
-	client.UploadURL = baseURL
 
 	return &GitHubClient{
 		client: client,
@@ -39,15 +39,15 @@ func newTestGitHubClient(t *testing.T, handler http.Handler) *GitHubClient {
 func TestCreatePRIdempotent(t *testing.T) {
 	createCalls := 0
 	existingPR := &github.PullRequest{
-		Number:  github.Ptr(42),
-		HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/42"),
+		Number:  new(42),
+		HTMLURL: new("https://github.com/elastic/elastic-agent/pull/42"),
 		Head: &github.PullRequestBranch{
-			Ref: github.Ptr("9.5"),
+			Ref: new("9.5"),
 		},
 		Base: &github.PullRequestBranch{
-			Ref: github.Ptr("main"),
+			Ref: new("main"),
 		},
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -89,8 +89,8 @@ func TestCreatePRIdempotent(t *testing.T) {
 func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 	createCalls := 0
 	newPR := &github.PullRequest{
-		Number:  github.Ptr(99),
-		HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/99"),
+		Number:  new(99),
+		HTMLURL: new("https://github.com/elastic/elastic-agent/pull/99"),
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -124,15 +124,15 @@ func TestCreatePRCreatesWhenNoneExists(t *testing.T) {
 
 func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
 	existingPR := &github.PullRequest{
-		Number:  github.Ptr(42),
-		HTMLURL: github.Ptr("https://github.com/elastic/elastic-agent/pull/42"),
+		Number:  new(42),
+		HTMLURL: new("https://github.com/elastic/elastic-agent/pull/42"),
 		Head: &github.PullRequestBranch{
-			Ref: github.Ptr("ff-prep-main-9.5.0"),
+			Ref: new("ff-prep-main-9.5.0"),
 		},
 		Base: &github.PullRequestBranch{
-			Ref: github.Ptr("main"),
+			Ref: new("main"),
 		},
-		State: github.Ptr("open"),
+		State: new("open"),
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +142,7 @@ func TestCreatePRFailsWhenLabelsCannotBeAdded(t *testing.T) {
 			require.NoError(t, json.NewEncoder(w).Encode([]*github.PullRequest{existingPR}))
 		case r.Method == http.MethodGet && r.URL.Path == "/repos/elastic/elastic-agent/labels/"+mergeLabelFFDay:
 			w.Header().Set("Content-Type", "application/json")
-			require.NoError(t, json.NewEncoder(w).Encode(&github.Label{Name: github.Ptr(mergeLabelFFDay)}))
+			require.NoError(t, json.NewEncoder(w).Encode(&github.Label{Name: mergeLabelFFDay}))
 		case r.Method == http.MethodPost && r.URL.Path == "/repos/elastic/elastic-agent/issues/42/labels":
 			w.WriteHeader(http.StatusForbidden)
 			_, _ = fmt.Fprint(w, `{"message":"Resource not accessible by integration"}`)

@@ -11,7 +11,7 @@
 kind: feature
 
 # Change summary; a 80ish characters long description of the change.
-summary: Add the sigv4auth extension to the EDOT Collector
+summary: Mark the prometheusscrapereceiver as a core EDOT component
 
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
