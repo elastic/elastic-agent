@@ -576,9 +576,7 @@ func useElasticsearchAuthForStorage(overlay, componentCfg, collectorCfg *confmap
 	if authID == "" {
 		return nil
 	}
-	// The overlay is merged into the component config last, so this authenticator replaces beatsauth. The
-	// position in service::extensions doesn't matter: the collector starts the storage after the extension it
-	// declares as its authenticator.
+	// The overlay is merged into the component config last, so this authenticator replaces beatsauth.
 	return mergeWithExtensions(overlay, confmap.NewFromStringMap(map[string]any{
 		storageKey + "::auth::authenticator": authID,
 		"service::extensions":                []any{authID},
