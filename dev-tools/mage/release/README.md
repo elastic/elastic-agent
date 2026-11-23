@@ -16,7 +16,7 @@ mage env settings. Root mage targets call package functions directly.
 
 **Workflows supported:**
 1. **Major/Minor Release (feature-freeze)** — Creates release branch + 2 grouped PRs (next-patch bumps belong to the patch workflow)
-2. **Patch Release** — Creates 2 grouped PRs on the release branch (docs before build; next-patch version + Helm/K8s manifests after release)
+2. **Patch Release** — Opens one post-release version bump PR to `NEXT_RELEASE` (`NEW_VERSION`), including Helm/K8s manifests. Docs stay off this path
 
 Release notes are handled separately via `.github/workflows/release-notes.yml`.
 
@@ -32,17 +32,18 @@ Release notes are handled separately via `.github/workflows/release-notes.yml`.
 ### Feature freeze (`runMajorMinor`) — 2 PRs
 
 ```bash
-export CURRENT_RELEASE="9.5.0"
+export NEXT_RELEASE="9.5.0"
 export GITHUB_TOKEN="ghp_your_token_here"
 export DRY_RUN=true
 
 mage release:runMajorMinor
 ```
 
-### Patch (`runPatch`) — 2 PRs
+### Patch (`runPatch`) — 1 PR (bump to NEXT_RELEASE)
 
 ```bash
-export CURRENT_RELEASE="9.4.3"
+# NEXT_RELEASE is the version to land; release branch must be at previous patch
+export NEXT_RELEASE="9.4.3"
 export DRY_RUN=true
 
 git fetch origin 9.4:9.4
@@ -65,12 +66,12 @@ mage -l | grep release
 ## Configuration
 
 Release env vars are loaded in `LoadSettings()` into `Settings.Release`
-(`ReleaseSettings` in `dev-tools/mage/release_settings.go`). `CURRENT_RELEASE`
+(`ReleaseSettings` in `dev-tools/mage/release_settings.go`). `NEXT_RELEASE`
 is optional for general mage targets; release workflows call `RequireRelease()`.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `CURRENT_RELEASE` | Version to release | `9.5.0` |
+| `NEXT_RELEASE` | FF: version on base; patch: version to land | `9.5.0` |
 | `GITHUB_TOKEN` | GitHub personal access token | `ghp_...` |
 | `DRY_RUN` | Preview mode (no push/PR) | `true` |
 | `BASE_BRANCH` | Base branch for mainline PRs | `main` |
@@ -78,15 +79,15 @@ is optional for general mage targets; release workflows call `RequireRelease()`.
 | `PROJECT_REPO` | GitHub repository name | `elastic-agent` |
 | `PROJECT_REVIEWERS` | Comma-separated reviewers | `elastic/elastic-agent-release` |
 
-`LatestRelease`, `NextRelease`, and `ReleaseBranch` are always inferred from
-`CURRENT_RELEASE` (and GitHub releases for minor versions). They are not
-configurable via environment variables.
+`LatestRelease` and `ReleaseBranch` are always inferred from `NEXT_RELEASE`
+(and GitHub releases for minor versions). They are not configurable via
+environment variables.
 
 ### Version file
 
 Workflows read and update `version/version.go` (`const defaultBeatVersion = "…"`).
-Feature freeze requires `CURRENT_RELEASE` to match that file on `BASE_BRANCH`.
-Patch releases require it to match on the release branch.
+Feature freeze requires `NEXT_RELEASE` to match that file on `BASE_BRANCH`.
+Patch releases require the release branch to be at the previous patch; `NEXT_RELEASE` is the version to land.
 
 ### EnsureIssueTracker
 
@@ -95,7 +96,7 @@ global tracker (https://github.com/elastic/ingest-dev/issues/8866) and Elastic
 Agent PRs labeled `release` that mention the version.
 
 ```bash
-export CURRENT_RELEASE="9.4.1"
+export NEXT_RELEASE="9.4.1"
 export GITHUB_TOKEN="ghp_your_token"
 mage release:ensureIssueTracker
 ```
