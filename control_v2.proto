@@ -219,8 +219,31 @@ message CollectorComponent {
   map<string, CollectorComponent> ComponentStatusMap = 4;
 }
 
+// CPULimit is the state of the CPU cap shared by Elastic Agent and its components.
+message CPULimit {
+  // State of the cap: disabled, pending, applied, unsupported or degraded.
+  string state = 1;
+  // Configured cap as a percentage of the host CPU capacity, from 1 to 100. 0 when the cap is off.
+  uint32 configured_percent = 2;
+  // Number of CPUs the cap asks for after the floor. 0 when no cap is requested or when the CPU count was never read.
+  double target_cpus = 3;
+  // What is known about the active quota: unknown, none or set.
+  string active_quota = 4;
+  // Active quota as a number of CPUs. Set only when active_quota is "set".
+  double active_quota_cpus = 5;
+  // Unresolved unexpected failure, if any.
+  string error = 6;
+  // Why enforcement is unavailable on this host. Set only when state is unsupported.
+  string reason = 7;
+  // Lowest limit that the system enforces on the Agent across its service and its parents: unknown, none or set.
+  // A lower value than active_quota means a quota above the Agent limits it. unknown when it was not read.
+  string effective_quota = 8;
+  // Effective quota as a number of CPUs. Set only when effective_quota is "set".
+  double effective_quota_cpus = 9;
+}
+
 // StateResponse is the current state of Elastic Agent.
-// Next unused id: 8
+// Next unused id: 10
 message StateResponse {
   // Overall information of Elastic Agent.
   StateAgentInfo info = 1;
@@ -243,6 +266,10 @@ message StateResponse {
 
   // OTel collector component status information.
   CollectorComponent collector = 8;
+
+  // CPU limit state, also sent when the cap is off. Not set when Elastic Agent does not run the CPU limit
+  // controller, or by older Elastic Agents.
+  CPULimit cpu_limit = 9;
 }
 
 // UpgradeDetails captures the details of an ongoing Agent upgrade.

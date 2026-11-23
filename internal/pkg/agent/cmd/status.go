@@ -24,6 +24,7 @@ import (
 
 	"github.com/jedib0t/go-pretty/v6/list"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
 )
@@ -192,8 +193,72 @@ func listAgentState(l list.Writer, state *client.AgentState, all bool) {
 		l.UnIndent()
 	}
 
+	listCPULimit(l, state.CPULimit, all)
+
 	// Upgrade details
 	listUpgradeDetails(l, state.UpgradeDetails)
+}
+
+func listCPULimit(l list.Writer, s *client.CPULimitState, all bool) {
+	if s == nil {
+		return
+	}
+	// A state this client does not know may come from a newer Elastic Agent, so only the known good states are hidden.
+	state := cpulimit.State(s.State)
+	hidden := state == "" || state == cpulimit.StateDisabled || state == cpulimit.StateApplied
+	if !all && hidden {
+		return
+	}
+
+	l.AppendItem("cpu_limit")
+	l.Indent()
+	l.AppendItem("state: " + s.State)
+	if state == cpulimit.StateDisabled {
+		l.UnIndent()
+		return
+	}
+	if s.ConfiguredPercent == 0 {
+		l.AppendItem("configured: off")
+	} else {
+		l.AppendItem(fmt.Sprintf("configured: %d%%", s.ConfiguredPercent))
+	}
+	if s.TargetCPUs > 0 {
+		l.AppendItem(fmt.Sprintf("target_cpus: %.2f", s.TargetCPUs))
+	}
+	if s.ActiveQuota == string(cpulimit.QuotaSet) {
+		l.AppendItem(fmt.Sprintf("active_quota: %.2f CPUs", s.ActiveQuotaCPUs))
+	} else {
+		l.AppendItem("active_quota: " + cpulimit.QuotaKind(s.ActiveQuota).Name())
+	}
+	if all {
+		if s.EffectiveQuota == string(cpulimit.QuotaSet) {
+			l.AppendItem(fmt.Sprintf("effective_quota: %.2f CPUs", s.EffectiveQuotaCPUs))
+		} else {
+			l.AppendItem("effective_quota: " + cpulimit.QuotaKind(s.EffectiveQuota).Name())
+		}
+		if limitedByParentQuota(s) {
+			l.AppendItem("limited_by: a quota above the Agent")
+		}
+	}
+	if s.Error != "" {
+		l.AppendItem("error: " + s.Error)
+	}
+	if s.Reason != "" {
+		l.AppendItem("reason: " + s.Reason)
+	}
+	l.UnIndent()
+}
+
+// limitedByParentQuota reports whether a quota above the Agent's own service limits the Agent more than its own quota.
+// It needs a set active quota: the effective quota also includes the Agent's own service, so without a set active quota
+// a set effective quota can be a quota on the Agent's own service that was not confirmed yet.
+// Differences up to 0.01 CPUs are ignored, so rounding does not show a false hint.
+func limitedByParentQuota(s *client.CPULimitState) bool {
+	if s.ActiveQuota != string(cpulimit.QuotaSet) || s.EffectiveQuota != string(cpulimit.QuotaSet) {
+		return false
+	}
+	// The small extra margin keeps a difference of exactly 0.01 below the limit despite float rounding.
+	return s.ActiveQuotaCPUs-s.EffectiveQuotaCPUs > 0.01+1e-9
 }
 
 func listUpgradeDetails(l list.Writer, upgradeDetails *cproto.UpgradeDetails) {

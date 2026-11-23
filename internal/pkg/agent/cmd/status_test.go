@@ -6,6 +6,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/list"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -279,4 +281,445 @@ func TestHumanDurationUntil(t *testing.T) {
 			require.Regexp(t, regexp.MustCompile(test.expectedDurationRegexp), actualTimeStr)
 		})
 	}
+}
+
+func TestListCPULimit(t *testing.T) {
+	cases := map[string]struct {
+		cpuLimit       *client.CPULimitState
+		all            bool
+		expectedOutput string
+	}{
+		"not_reported": {
+			cpuLimit:       nil,
+			all:            true,
+			expectedOutput: "",
+		},
+		"human_unknown_state": {
+			cpuLimit: &client.CPULimitState{State: "throttled", ConfiguredPercent: 50, TargetCPUs: 2, ActiveQuota: "none"},
+			expectedOutput: `── cpu_limit
+   ├─ state: throttled
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   └─ active_quota: none`,
+		},
+		"human_unknown_quota": {
+			cpuLimit: &client.CPULimitState{State: "pending", ConfiguredPercent: 50, ActiveQuota: "partial"},
+			expectedOutput: `── cpu_limit
+   ├─ state: pending
+   ├─ configured: 50%
+   └─ active_quota: partial`,
+		},
+		"full_cap_100": {
+			cpuLimit: &client.CPULimitState{
+				State:              "applied",
+				ConfiguredPercent:  100,
+				TargetCPUs:         4,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    4,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 4,
+			},
+			all: true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 100%
+   ├─ target_cpus: 4.00
+   ├─ active_quota: 4.00 CPUs
+   └─ effective_quota: 4.00 CPUs`,
+		},
+		"full_effective_lower": {
+			cpuLimit: &client.CPULimitState{
+				State:              "applied",
+				ConfiguredPercent:  50,
+				TargetCPUs:         2,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    2,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 1.5,
+			},
+			all: true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   ├─ effective_quota: 1.50 CPUs
+   └─ limited_by: a quota above the Agent`,
+		},
+		"full_effective_lower_within_rounding": {
+			cpuLimit: &client.CPULimitState{
+				State:              "applied",
+				ConfiguredPercent:  50,
+				TargetCPUs:         2,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    2,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 1.999,
+			},
+			all: true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   └─ effective_quota: 2.00 CPUs`,
+		},
+		"full_effective_lower_by_tolerance": {
+			cpuLimit: &client.CPULimitState{
+				State:              "applied",
+				ConfiguredPercent:  50,
+				TargetCPUs:         2,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    2,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 1.99,
+			},
+			all: true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   └─ effective_quota: 1.99 CPUs`,
+		},
+		"full_effective_lower_above_tolerance": {
+			cpuLimit: &client.CPULimitState{
+				State:              "applied",
+				ConfiguredPercent:  50,
+				TargetCPUs:         2,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    2,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 1.98,
+			},
+			all: true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   ├─ effective_quota: 1.98 CPUs
+   └─ limited_by: a quota above the Agent`,
+		},
+		"full_effective_higher": {
+			cpuLimit: &client.CPULimitState{
+				State:              "applied",
+				ConfiguredPercent:  50,
+				TargetCPUs:         2,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    2,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 3,
+			},
+			all: true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   └─ effective_quota: 3.00 CPUs`,
+		},
+		"full_effective_set_active_none": {
+			cpuLimit: &client.CPULimitState{State: "pending", ConfiguredPercent: 50, TargetCPUs: 2, ActiveQuota: "none", EffectiveQuota: "set", EffectiveQuotaCPUs: 1.5},
+			all:      true,
+			expectedOutput: `── cpu_limit
+   ├─ state: pending
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: none
+   └─ effective_quota: 1.50 CPUs`,
+		},
+		"full_effective_none": {
+			cpuLimit: &client.CPULimitState{State: "pending", ConfiguredPercent: 50, TargetCPUs: 2, ActiveQuota: "none", EffectiveQuota: "none"},
+			all:      true,
+			expectedOutput: `── cpu_limit
+   ├─ state: pending
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: none
+   └─ effective_quota: none`,
+		},
+		"full_effective_unknown": {
+			cpuLimit: &client.CPULimitState{State: "applied", ConfiguredPercent: 50, TargetCPUs: 2, ActiveQuota: "set", ActiveQuotaCPUs: 2, EffectiveQuota: "unknown"},
+			all:      true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   └─ effective_quota: unknown`,
+		},
+		"full_effective_not_reported": {
+			cpuLimit: &client.CPULimitState{State: "applied", ConfiguredPercent: 50, TargetCPUs: 2, ActiveQuota: "set", ActiveQuotaCPUs: 2},
+			all:      true,
+			expectedOutput: `── cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   └─ effective_quota: unknown`,
+		},
+		"full_effective_unknown_kind": {
+			cpuLimit: &client.CPULimitState{State: "pending", ConfiguredPercent: 50, ActiveQuota: "none", EffectiveQuota: "partial"},
+			all:      true,
+			expectedOutput: `── cpu_limit
+   ├─ state: pending
+   ├─ configured: 50%
+   ├─ active_quota: none
+   └─ effective_quota: partial`,
+		},
+		"human_disabled": {
+			cpuLimit:       &client.CPULimitState{State: "disabled", ActiveQuota: "unknown"},
+			expectedOutput: "",
+		},
+		"full_disabled": {
+			cpuLimit: &client.CPULimitState{State: "disabled", ActiveQuota: "unknown"},
+			all:      true,
+			expectedOutput: `── cpu_limit
+   └─ state: disabled`,
+		},
+		"human_pending_cap_off": {
+			cpuLimit: &client.CPULimitState{State: "pending", ActiveQuota: "set", ActiveQuotaCPUs: 2},
+			expectedOutput: `── cpu_limit
+   ├─ state: pending
+   ├─ configured: off
+   └─ active_quota: 2.00 CPUs`,
+		},
+		"human_applied": {
+			cpuLimit:       &client.CPULimitState{State: "applied", ConfiguredPercent: 50, TargetCPUs: 2, ActiveQuota: "set", ActiveQuotaCPUs: 2},
+			expectedOutput: "",
+		},
+		"human_pending": {
+			cpuLimit: &client.CPULimitState{State: "pending", ConfiguredPercent: 50},
+			expectedOutput: `── cpu_limit
+   ├─ state: pending
+   ├─ configured: 50%
+   └─ active_quota: unknown`,
+		},
+		"human_unsupported": {
+			cpuLimit: &client.CPULimitState{State: "unsupported", ConfiguredPercent: 25, ActiveQuota: "unknown", Reason: "not supported here"},
+			expectedOutput: `── cpu_limit
+   ├─ state: unsupported
+   ├─ configured: 25%
+   ├─ active_quota: unknown
+   └─ reason: not supported here`,
+		},
+		"human_degraded": {
+			cpuLimit: &client.CPULimitState{
+				State:              "degraded",
+				ConfiguredPercent:  50,
+				TargetCPUs:         2,
+				ActiveQuota:        "set",
+				ActiveQuotaCPUs:    3.25,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCPUs: 1,
+				Error:              "set failed",
+			},
+			expectedOutput: `── cpu_limit
+   ├─ state: degraded
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 3.25 CPUs
+   └─ error: set failed`,
+		},
+	}
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			l := list.NewWriter()
+			l.SetStyle(list.StyleConnectedLight)
+
+			listCPULimit(l, test.cpuLimit, test.all)
+			require.Equal(t, test.expectedOutput, l.Render())
+		})
+	}
+}
+
+func TestStatusOutputCPULimit(t *testing.T) {
+	state := &client.AgentState{
+		Info:         client.AgentStateInfo{ID: "agent-id", Version: "9.7.0", Commit: "abc"},
+		State:        client.Healthy,
+		Message:      "Running",
+		FleetState:   client.Healthy,
+		FleetMessage: "Connected",
+		CPULimit: &client.CPULimitState{
+			State:              "applied",
+			ConfiguredPercent:  50,
+			TargetCPUs:         2,
+			ActiveQuota:        "set",
+			ActiveQuotaCPUs:    2,
+			EffectiveQuota:     "set",
+			EffectiveQuotaCPUs: 1.5,
+		},
+	}
+
+	t.Run("human", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, humanOutput(&b, state))
+		require.Equal(t, `┌─ fleet
+│  └─ status: (HEALTHY) Connected
+└─ elastic-agent
+   └─ status: (HEALTHY) Running
+`, b.String())
+	})
+
+	t.Run("full", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, humanFullOutput(&b, state))
+		require.Equal(t, `┌─ fleet
+│  └─ status: (HEALTHY) Connected
+├─ elastic-agent
+│  ├─ status: (HEALTHY) Running
+│  └─ info
+│     ├─ id: agent-id
+│     ├─ version: 9.7.0
+│     └─ commit: abc
+└─ cpu_limit
+   ├─ state: applied
+   ├─ configured: 50%
+   ├─ target_cpus: 2.00
+   ├─ active_quota: 2.00 CPUs
+   ├─ effective_quota: 1.50 CPUs
+   └─ limited_by: a quota above the Agent
+`, b.String())
+	})
+
+	t.Run("json", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, jsonOutput(&b, state))
+		var out struct {
+			CPULimit map[string]any `json:"cpu_limit"`
+		}
+		require.NoError(t, json.Unmarshal(b.Bytes(), &out))
+		require.Equal(t, map[string]any{
+			"state":                "applied",
+			"configured_percent":   float64(50),
+			"target_cpus":          float64(2),
+			"active_quota":         "set",
+			"active_quota_cpus":    float64(2),
+			"effective_quota":      "set",
+			"effective_quota_cpus": 1.5,
+		}, out.CPULimit)
+	})
+
+	t.Run("yaml", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, yamlOutput(&b, state))
+		// Typed fields, because YAML may write the same number as 2 or 2.0.
+		type cpuLimitYAML struct {
+			State              string  `yaml:"state"`
+			ConfiguredPercent  uint32  `yaml:"configured_percent"`
+			TargetCPUs         float64 `yaml:"target_cpus"`
+			ActiveQuota        string  `yaml:"active_quota"`
+			ActiveQuotaCPUs    float64 `yaml:"active_quota_cpus"`
+			EffectiveQuota     string  `yaml:"effective_quota"`
+			EffectiveQuotaCPUs float64 `yaml:"effective_quota_cpus"`
+		}
+		var out struct {
+			CPULimit cpuLimitYAML `yaml:"cpu_limit"`
+		}
+		require.NoError(t, yaml.Unmarshal(b.Bytes(), &out))
+		require.Equal(t, cpuLimitYAML{
+			State:              "applied",
+			ConfiguredPercent:  50,
+			TargetCPUs:         2,
+			ActiveQuota:        "set",
+			ActiveQuotaCPUs:    2,
+			EffectiveQuota:     "set",
+			EffectiveQuotaCPUs: 1.5,
+		}, out.CPULimit)
+	})
+}
+
+func TestStatusOutputCPULimitDisabled(t *testing.T) {
+	state := &client.AgentState{
+		Info:         client.AgentStateInfo{ID: "agent-id", Version: "9.7.0", Commit: "abc"},
+		State:        client.Healthy,
+		Message:      "Running",
+		FleetState:   client.Healthy,
+		FleetMessage: "Connected",
+		CPULimit:     &client.CPULimitState{State: "disabled", ActiveQuota: "unknown", EffectiveQuota: "unknown"},
+	}
+
+	t.Run("human", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, humanOutput(&b, state))
+		require.Equal(t, `┌─ fleet
+│  └─ status: (HEALTHY) Connected
+└─ elastic-agent
+   └─ status: (HEALTHY) Running
+`, b.String())
+	})
+
+	t.Run("full", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, humanFullOutput(&b, state))
+		require.Equal(t, `┌─ fleet
+│  └─ status: (HEALTHY) Connected
+├─ elastic-agent
+│  ├─ status: (HEALTHY) Running
+│  └─ info
+│     ├─ id: agent-id
+│     ├─ version: 9.7.0
+│     └─ commit: abc
+└─ cpu_limit
+   └─ state: disabled
+`, b.String())
+	})
+
+	t.Run("json", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, jsonOutput(&b, state))
+		var out struct {
+			CPULimit map[string]any `json:"cpu_limit"`
+		}
+		require.NoError(t, json.Unmarshal(b.Bytes(), &out))
+		require.Equal(t, map[string]any{
+			"state":              "disabled",
+			"configured_percent": float64(0),
+			"target_cpus":        float64(0),
+			"active_quota":       "unknown",
+			"effective_quota":    "unknown",
+		}, out.CPULimit)
+	})
+
+	t.Run("yaml", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, yamlOutput(&b, state))
+		// Typed fields, because YAML may write the same number as 0 or 0.0.
+		type cpuLimitYAML struct {
+			State             string  `yaml:"state"`
+			ConfiguredPercent uint32  `yaml:"configured_percent"`
+			TargetCPUs        float64 `yaml:"target_cpus"`
+			ActiveQuota       string  `yaml:"active_quota"`
+			EffectiveQuota    string  `yaml:"effective_quota"`
+		}
+		var out struct {
+			CPULimit *cpuLimitYAML `yaml:"cpu_limit"`
+		}
+		require.NoError(t, yaml.Unmarshal(b.Bytes(), &out))
+		require.Equal(t, &cpuLimitYAML{State: "disabled", ActiveQuota: "unknown", EffectiveQuota: "unknown"}, out.CPULimit)
+	})
+}
+
+func TestStatusOutputCPULimitNotReported(t *testing.T) {
+	state := &client.AgentState{State: client.Healthy, Message: "Running", FleetState: client.Healthy, FleetMessage: "Connected"}
+
+	t.Run("json", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, jsonOutput(&b, state))
+		var out map[string]any
+		require.NoError(t, json.Unmarshal(b.Bytes(), &out))
+		require.Contains(t, out, "state")
+		require.NotContains(t, out, "cpu_limit")
+	})
+
+	t.Run("yaml", func(t *testing.T) {
+		var b bytes.Buffer
+		require.NoError(t, yamlOutput(&b, state))
+		var out map[string]any
+		require.NoError(t, yaml.Unmarshal(b.Bytes(), &out))
+		require.Contains(t, out, "state")
+		require.NotContains(t, out, "cpu_limit")
+	})
 }

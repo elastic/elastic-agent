@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -150,6 +151,34 @@ type AgentState struct {
 	FleetMessage   string                 `yaml:"fleet_message"`
 	UpgradeDetails *cproto.UpgradeDetails `json:"upgrade_details,omitempty" yaml:"upgrade_details,omitempty"`
 	Collector      *CollectorComponent    `json:"collector,omitempty" yaml:"collector,omitempty"`
+	// CPULimit is set also when the cap is off. It is nil when the Elastic Agent does not run the CPU limit controller,
+	// or when the Elastic Agent is too old to report it.
+	CPULimit *CPULimitState `json:"cpu_limit,omitempty" yaml:"cpu_limit,omitempty"`
+}
+
+// CPULimitState is the state of the CPU cap shared by the Elastic Agent and its components.
+type CPULimitState struct {
+	// State is disabled, pending, applied, unsupported or degraded.
+	State string `json:"state" yaml:"state"`
+	// ConfiguredPercent is the configured cap as a percentage of the host CPU capacity, from 1 to 100. It is 0 when the
+	// cap is off.
+	ConfiguredPercent uint32 `json:"configured_percent" yaml:"configured_percent"`
+	// TargetCPUs is the number of CPUs the cap asks for after the floor. It is 0 when no cap is requested or when the CPU
+	// count was never read.
+	TargetCPUs float64 `json:"target_cpus" yaml:"target_cpus"`
+	// ActiveQuota is unknown, none or set.
+	ActiveQuota string `json:"active_quota" yaml:"active_quota"`
+	// ActiveQuotaCPUs is the active quota as a number of CPUs. It has a meaning only when ActiveQuota is set.
+	ActiveQuotaCPUs float64 `json:"active_quota_cpus,omitempty" yaml:"active_quota_cpus,omitempty"`
+	// EffectiveQuota is the lowest limit that the system enforces on the Elastic Agent across its service and its
+	// parents: unknown, none or set. A lower value than ActiveQuota means a quota above the Elastic Agent limits it.
+	EffectiveQuota string `json:"effective_quota" yaml:"effective_quota"`
+	// EffectiveQuotaCPUs is the effective quota as a number of CPUs. It has a meaning only when EffectiveQuota is set.
+	EffectiveQuotaCPUs float64 `json:"effective_quota_cpus,omitempty" yaml:"effective_quota_cpus,omitempty"`
+	// Error is the unresolved unexpected failure, if any.
+	Error string `json:"error,omitempty" yaml:"error,omitempty"`
+	// Reason tells why enforcement is unavailable on this host.
+	Reason string `json:"reason,omitempty" yaml:"reason,omitempty"`
 }
 
 // DiagnosticFileResult is a diagnostic file result.
@@ -629,6 +658,19 @@ func toState(res *cproto.StateResponse) (*AgentState, error) {
 			return nil, err
 		}
 		s.Collector = cs
+	}
+	if res.CpuLimit != nil {
+		s.CPULimit = &CPULimitState{
+			State:              res.CpuLimit.State,
+			ConfiguredPercent:  res.CpuLimit.ConfiguredPercent,
+			TargetCPUs:         res.CpuLimit.TargetCpus,
+			ActiveQuota:        cpulimit.QuotaKind(res.CpuLimit.ActiveQuota).Name(),
+			ActiveQuotaCPUs:    res.CpuLimit.ActiveQuotaCpus,
+			EffectiveQuota:     cpulimit.QuotaKind(res.CpuLimit.EffectiveQuota).Name(),
+			EffectiveQuotaCPUs: res.CpuLimit.EffectiveQuotaCpus,
+			Error:              res.CpuLimit.Error,
+			Reason:             res.CpuLimit.Reason,
+		}
 	}
 	return s, nil
 }
