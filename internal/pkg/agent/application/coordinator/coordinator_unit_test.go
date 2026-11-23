@@ -3226,9 +3226,7 @@ func TestCoordinator_Uninstall(t *testing.T) {
 	})
 
 	t.Run("not installed returns ErrNotUninstallable and does not spawn", func(t *testing.T) {
-		top := paths.Top()
-		paths.SetTop(t.TempDir()) // empty dir, no install marker
-		t.Cleanup(func() { paths.SetTop(top) })
+		pathstest.SetTop(t, t.TempDir()) // empty dir, no install marker
 
 		spawned := false
 		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
@@ -3249,10 +3247,8 @@ func TestCoordinator_Uninstall(t *testing.T) {
 	})
 
 	t.Run("installed but not root returns ErrUninstallRequiresRoot and does not spawn", func(t *testing.T) {
-		top := paths.Top()
 		tmpTop := t.TempDir()
-		paths.SetTop(tmpTop)
-		t.Cleanup(func() { paths.SetTop(top) })
+		pathstest.SetTop(t, tmpTop)
 		require.NoError(t, os.WriteFile(
 			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
 
@@ -3277,10 +3273,8 @@ func TestCoordinator_Uninstall(t *testing.T) {
 	})
 
 	t.Run("installed but not supervised (interactive) returns ErrNotUninstallable and does not spawn", func(t *testing.T) {
-		top := paths.Top()
 		tmpTop := t.TempDir()
-		paths.SetTop(tmpTop)
-		t.Cleanup(func() { paths.SetTop(top) })
+		pathstest.SetTop(t, tmpTop)
 		require.NoError(t, os.WriteFile(
 			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
 
@@ -3308,10 +3302,8 @@ func TestCoordinator_Uninstall(t *testing.T) {
 	})
 
 	t.Run("installed spawns uninstaller and sets stopping override state", func(t *testing.T) {
-		top := paths.Top()
 		tmpTop := t.TempDir()
-		paths.SetTop(tmpTop)
-		t.Cleanup(func() { paths.SetTop(top) })
+		pathstest.SetTop(t, tmpTop)
 		// Create the install marker so RunningInstalled() reports installed.
 		require.NoError(t, os.WriteFile(
 			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
@@ -3365,8 +3357,9 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		// Uninstall spawns a reaping goroutine that, once the (noop) process exits
 		// while the agent is still installed, reads paths.RunningInstalled() and
 		// clears the in-flight flag. Wait for the flag to clear so that goroutine's
-		// read of the global paths finishes before this subtest returns and cleanup
-		// (and the next subtest) calls paths.SetTop — avoiding a data race.
+		// read of the global paths finishes before this subtest returns and the
+		// pathstest cleanup (and the next subtest) restores the global paths —
+		// avoiding a data race.
 		require.Eventuallyf(t, func() bool {
 			coord.uninstallMu.Lock()
 			defer coord.uninstallMu.Unlock()
@@ -3376,10 +3369,8 @@ func TestCoordinator_Uninstall(t *testing.T) {
 	})
 
 	t.Run("duplicate action already in-flight does not spawn a second uninstaller", func(t *testing.T) {
-		top := paths.Top()
 		tmpTop := t.TempDir()
-		paths.SetTop(tmpTop)
-		t.Cleanup(func() { paths.SetTop(top) })
+		pathstest.SetTop(t, tmpTop)
 		require.NoError(t, os.WriteFile(
 			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
 
@@ -3414,10 +3405,8 @@ func TestCoordinator_Uninstall(t *testing.T) {
 	})
 
 	t.Run("different action while one is in-flight is rejected so its failure is acked", func(t *testing.T) {
-		top := paths.Top()
 		tmpTop := t.TempDir()
-		paths.SetTop(tmpTop)
-		t.Cleanup(func() { paths.SetTop(top) })
+		pathstest.SetTop(t, tmpTop)
 		require.NoError(t, os.WriteFile(
 			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
 
