@@ -113,7 +113,7 @@ Follow these recommendations when using the Elastic APM processor:
 
 * **Place after batching in the pipeline**: Configure the Elastic APM processor after the batch processor to ensure optimal throughput. Batching first reduces the number of processing operations.
 
-* **Use only for direct {{es}} ingestion**: If you're using the {{motlp}}, you don't need the Elastic APM processor, because the endpoint handles enrichment automatically. Using both can cause conflicts or duplicate processing.
+* **Use only for direct {{es}} ingestion by default**: If you're using the {{motlp}}, you don't normally need the Elastic APM processor, because the endpoint handles enrichment automatically. The exception is a self-managed Gateway that performs [tail-based sampling and APM aggregation before sending the processed telemetry to Managed OTLP](../config/configure-tracing-collection.md#send-edge-aggregated-data-to-managed-otlp).
 
 * **Keep the processor updated**: The Elastic APM processor evolves with new Elastic {{product.apm}} features. Keep your {{agent}} version current to benefit from the latest enhancements and compatibility improvements.
 

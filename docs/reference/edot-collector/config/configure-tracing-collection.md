@@ -97,23 +97,24 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 connectors:
-  elasticapm: {}
+  elasticapm: {} # Generates APM metrics from spans enriched by the processor
   forward:
 
 processors:
-  elasticapm: {}
+  elasticapm: {} # Enriches spans before the connector generates APM metrics
   tail_sampling:
     decision_wait: 10s
     num_traces: 100
     expected_new_traces_per_sec: 10
     policies:
-      [
-        {
-          name: latency-5000ms-10000ms,
-          type: latency,
-          latency: {threshold_ms: 5000, upper_threshold_ms: 10000}
-        }
-      ]
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: probabilistic-10-percent
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
 
 exporters:
   debug: {}
@@ -142,9 +143,11 @@ service:
 
 ### Send edge-aggregated data to Managed OTLP
 
-Use this configuration when tail-based sampling and {{product.apm}} metric aggregation run in the edge Collector and the resulting telemetry is sent to the {{motlp}}.
+Run this configuration on a self-managed {{agent}} in [Gateway mode](../modes.md#edot-collector-as-gateway). OpenTelemetry SDKs and upstream Collectors send telemetry to this gateway, which performs tail-based sampling and {{product.apm}} metric aggregation before exporting to an Elastic Cloud {{motlp}}. The gateway requires a Managed OTLP endpoint and API key. If you send telemetry directly to a self-managed {{es}} deployment instead, use the [two-step direct-to-Elasticsearch configuration](#create-a-two-step-trace-pipeline).
 
 A dedicated OTLP exporter adds the `x-elastic-apm-aggregation-processed: "true"` header. The {{motlp}} uses this header to avoid aggregating the telemetry again. Use this exporter only for post-sampling traces, logs and metrics processed by the edge `elasticapm` connector, and metrics produced by the connector. Send unrelated host metrics, platform logs, and other telemetry through an exporter without the header.
+
+Before deploying this configuration in production, review [Scaling tail-based sampling](#scaling-tail-based-sampling).
 
 The following configuration is a full working example:
 
@@ -158,26 +161,27 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 connectors:
-  elasticapm: {}
+  elasticapm: {} # Generates APM metrics from spans enriched by the processor
   forward:
 
 processors:
-  elasticapm: {}
+  elasticapm: {} # Enriches spans before the connector generates APM metrics
   tail_sampling:
     decision_wait: 10s
     num_traces: 100
     expected_new_traces_per_sec: 10
     policies:
-      [
-        {
-          name: latency-5000ms-10000ms,
-          type: latency,
-          latency: {threshold_ms: 5000, upper_threshold_ms: 10000}
-        }
-      ]
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: probabilistic-10-percent
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
 
 exporters:
-  otlp_grpc/motlp-aggregated:
+  otlp_grpc/managed_otlp_aggregated:
     endpoint: ${env:ELASTIC_OTLP_ENDPOINT}
     headers:
       Authorization: ApiKey ${env:ELASTIC_API_KEY}
@@ -188,11 +192,11 @@ service:
     metrics:
       receivers: [otlp]
       processors: [elasticapm]
-      exporters: [elasticapm, otlp_grpc/motlp-aggregated]
+      exporters: [elasticapm, otlp_grpc/managed_otlp_aggregated]
     logs:
       receivers: [otlp]
       processors: [elasticapm]
-      exporters: [elasticapm, otlp_grpc/motlp-aggregated]
+      exporters: [elasticapm, otlp_grpc/managed_otlp_aggregated]
     traces/1-process-elastic:
       receivers: [otlp]
       processors: [elasticapm]
@@ -200,14 +204,22 @@ service:
     traces/2-process-tbs:
       receivers: [forward]
       processors: [tail_sampling]
-      exporters: [otlp_grpc/motlp-aggregated]
+      exporters: [otlp_grpc/managed_otlp_aggregated]
     metrics/aggregated-otel-metrics:
       receivers: [elasticapm]
       processors: []
-      exporters: [otlp_grpc/motlp-aggregated]
+      exporters: [otlp_grpc/managed_otlp_aggregated]
 ```
 
-### Scale with a load-balancing Collector
+### Scaling tail-based sampling [scaling-tail-based-sampling]
+
+The [tail-sampling processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/tailsamplingprocessor) holds pending traces in memory until it makes a sampling decision. `decision_wait` controls how long the processor waits after receiving the first span of a trace. Longer waits accommodate late spans but retain traces for longer. `num_traces` limits how many traces can be held in memory; when that capacity is exhausted, traces can be evicted before a decision is made.
+
+Size `num_traces` above the peak number of new traces received during `decision_wait`, with headroom for traffic bursts and late spans. Validate memory usage and early evictions under representative load before production.
+
+The {{agent}} does not currently include the upstream experimental [Pebble tail-storage extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/tailstorage/pebbletailstorageextension), so pending traces are buffered in memory. The `elasticapm` connector maintains separate metric aggregation state. For production workloads, configure its [`aggregation.directory`](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector#configuration) to store that state on disk.
+
+#### Distribute traces with a load-balancing Collector
 
 To horizontally scale collectors with tail-based sampling turned on, all traces should go through a load-balancing Collector in front of the downstream tail-sampling collectors. Set the `traceID` as the routing key in the load-balancing Collector so that all traces belonging to the same trace ID go to the same downstream tail-sampling Collector.
 
@@ -252,23 +264,24 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 connectors:
-  elasticapm: {}
+  elasticapm: {} # Generates APM metrics from spans enriched by the processor
   forward:
 
 processors:
-  elasticapm: {}
+  elasticapm: {} # Enriches spans before the connector generates APM metrics
   tail_sampling:
     decision_wait: 10s
     num_traces: 100
     expected_new_traces_per_sec: 10
     policies:
-      [
-        {
-          name: latency-5000ms-10000ms,
-          type: latency,
-          latency: {threshold_ms: 5000, upper_threshold_ms: 10000}
-        }
-      ]
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: probabilistic-10-percent
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10
 
 exporters:
   debug: {}
