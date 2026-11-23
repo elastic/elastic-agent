@@ -7,9 +7,9 @@ package release
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -17,7 +17,10 @@ func TestUpdateVersion(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir := t.TempDir()
 	versionDir := filepath.Join(tmpDir, "version")
-	require.NoError(t, os.Mkdir(versionDir, 0755), "failed to create version dir")
+	err := os.Mkdir(versionDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
 
 	versionFile := filepath.Join(versionDir, "version.go")
 	initialContent := `// Copyright notice
@@ -27,7 +30,10 @@ package version
 const defaultBeatVersion = "9.4.0"
 const Agent = defaultBeatVersion
 `
-	require.NoError(t, os.WriteFile(versionFile, []byte(initialContent), 0644), "failed to write test file")
+	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
@@ -36,7 +42,9 @@ const Agent = defaultBeatVersion
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -67,15 +75,21 @@ const Agent = defaultBeatVersion
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := UpdateVersion(tt.newVersion)
-			if tt.wantError {
-				require.Error(t, err)
+			if (err != nil) != tt.wantError {
+				t.Errorf("UpdateVersion() error = %v, wantError %v", err, tt.wantError)
 				return
 			}
-			require.NoError(t, err)
 
-			content, err := os.ReadFile(versionFile)
-			require.NoError(t, err, "failed to read version file")
-			require.Contains(t, string(content), tt.wantVersion)
+			if !tt.wantError {
+				content, err := os.ReadFile(versionFile)
+				if err != nil {
+					t.Fatalf("failed to read version file: %v", err)
+				}
+
+				if !strings.Contains(string(content), tt.wantVersion) {
+					t.Errorf("UpdateVersion() content = %v, want to contain %v", string(content), tt.wantVersion)
+				}
+			}
 		})
 	}
 }
@@ -86,7 +100,10 @@ func TestUpdateDocs(t *testing.T) {
 
 	// Create deploy/kubernetes directory
 	k8sDir := filepath.Join(tmpDir, "deploy", "kubernetes")
-	require.NoError(t, os.MkdirAll(k8sDir, 0755), "failed to create k8s dir")
+	err := os.MkdirAll(k8sDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create k8s dir: %v", err)
+	}
 
 	// Create test K8s manifests
 	managedManifest := filepath.Join(k8sDir, "elastic-agent-managed-kubernetes.yaml")
@@ -102,8 +119,15 @@ spec:
           image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0
 `
 
-	require.NoError(t, os.WriteFile(managedManifest, []byte(manifestContent), 0644), "failed to write managed manifest")
-	require.NoError(t, os.WriteFile(standaloneManifest, []byte(manifestContent), 0644), "failed to write standalone manifest")
+	err = os.WriteFile(managedManifest, []byte(manifestContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write managed manifest: %v", err)
+	}
+
+	err = os.WriteFile(standaloneManifest, []byte(manifestContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write standalone manifest: %v", err)
+	}
 
 	// Change to temp directory
 	originalWd, _ := os.Getwd()
@@ -112,47 +136,78 @@ spec:
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Test UpdateDocs
 	newVersion := "9.5.0"
-	require.NoError(t, UpdateDocs(newVersion))
+	err = UpdateDocs(newVersion)
+	if err != nil {
+		t.Errorf("UpdateDocs() error = %v", err)
+		return
+	}
 
 	// Verify both manifests were updated
 	for _, manifest := range []string{managedManifest, standaloneManifest} {
 		content, err := os.ReadFile(manifest)
-		require.NoError(t, err, "failed to read manifest")
+		if err != nil {
+			t.Fatalf("failed to read manifest: %v", err)
+		}
 
 		expectedImage := "docker.elastic.co/elastic-agent/elastic-agent:" + newVersion
-		require.Contains(t, string(content), expectedImage, "UpdateDocs() manifest %s", manifest)
+		if !strings.Contains(string(content), expectedImage) {
+			t.Errorf("UpdateDocs() manifest %s does not contain %s", manifest, expectedImage)
+		}
 	}
 }
 
 func TestUpdateDeploymentManifests(t *testing.T) {
 	tmpDir := t.TempDir()
 	origDir, err := os.Getwd()
-	require.NoError(t, err, "getwd")
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
 	t.Cleanup(func() {
 		_ = os.Chdir(origDir)
 	})
-	require.NoError(t, os.Chdir(tmpDir), "chdir")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
 
 	manifest := "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml"
-	require.NoError(t, os.MkdirAll(filepath.Dir(manifest), 0755), "mkdir")
-	require.NoError(t, os.WriteFile(manifest, []byte("image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0\n"), 0644), "write")
+	if err := os.MkdirAll(filepath.Dir(manifest), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(manifest, []byte("image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0\n"), 0644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
 	asciidoc := "version/docs/version.asciidoc"
-	require.NoError(t, os.MkdirAll(filepath.Dir(asciidoc), 0755), "mkdir")
-	require.NoError(t, os.WriteFile(asciidoc, []byte(":stack-version: 9.6.0\n:doc-branch: main\n"), 0644), "write asciidoc")
+	if err := os.MkdirAll(filepath.Dir(asciidoc), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(asciidoc, []byte(":stack-version: 9.6.0\n:doc-branch: main\n"), 0644); err != nil {
+		t.Fatalf("write asciidoc: %v", err)
+	}
 
-	require.NoError(t, UpdateDeploymentManifests("9.6.1"), "UpdateDeploymentManifests")
+	if err := UpdateDeploymentManifests("9.6.1"); err != nil {
+		t.Fatalf("UpdateDeploymentManifests: %v", err)
+	}
 
 	got, err := os.ReadFile(manifest)
-	require.NoError(t, err, "read")
-	require.Contains(t, string(got), "elastic-agent:9.6.1", "manifest = %q, want 9.6.1 image", got)
-
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(got), "elastic-agent:9.6.1") {
+		t.Fatalf("manifest = %q, want 9.6.1 image", got)
+	}
 	adoc, err := os.ReadFile(asciidoc)
-	require.NoError(t, err, "read asciidoc")
-	require.Contains(t, string(adoc), ":stack-version: 9.6.0", "asciidoc should be unchanged, got %q", adoc)
+	if err != nil {
+		t.Fatalf("read asciidoc: %v", err)
+	}
+	if !strings.Contains(string(adoc), ":stack-version: 9.6.0") {
+		t.Fatalf("asciidoc should be unchanged, got %q", adoc)
+	}
 }
 
 func TestUpdateVersionInFile(t *testing.T) {
@@ -165,7 +220,9 @@ func TestUpdateVersionInFile(t *testing.T) {
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	tests := []struct {
 		name        string
@@ -197,13 +254,30 @@ spec:
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, os.MkdirAll(filepath.Dir(manifestPath), 0755), "failed to create manifest dir")
-			require.NoError(t, os.WriteFile(manifestPath, []byte(tt.content), 0644), "failed to write test file")
-			require.NoError(t, updateVersionInFile(manifestPath, tt.newVersion))
+			err := os.MkdirAll(filepath.Dir(manifestPath), 0755)
+			if err != nil {
+				t.Fatalf("failed to create manifest dir: %v", err)
+			}
+
+			err = os.WriteFile(manifestPath, []byte(tt.content), 0644)
+			if err != nil {
+				t.Fatalf("failed to write test file: %v", err)
+			}
+
+			err = updateVersionInFile(manifestPath, tt.newVersion)
+			if err != nil {
+				t.Errorf("updateVersionInFile() error = %v", err)
+				return
+			}
 
 			content, err := os.ReadFile(manifestPath)
-			require.NoError(t, err, "failed to read test file")
-			require.Contains(t, string(content), tt.wantContent)
+			if err != nil {
+				t.Fatalf("failed to read test file: %v", err)
+			}
+
+			if !strings.Contains(string(content), tt.wantContent) {
+				t.Errorf("updateVersionInFile() content = %v, want to contain %v", string(content), tt.wantContent)
+			}
 		})
 	}
 }
@@ -218,7 +292,9 @@ func TestUpdateMergify(t *testing.T) {
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Create a basic .mergify.yml file
 	mergifyContent := `pull_request_rules:
@@ -231,7 +307,10 @@ func TestUpdateMergify(t *testing.T) {
         branches:
           - "9.3"
 `
-	require.NoError(t, os.WriteFile(".mergify.yml", []byte(mergifyContent), 0644), "failed to write test file")
+	err := os.WriteFile(".mergify.yml", []byte(mergifyContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	tests := []struct {
 		name       string
@@ -255,17 +334,28 @@ func TestUpdateMergify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.NoError(t, UpdateMergify(tt.version))
+			err := UpdateMergify(tt.version)
+			if err != nil {
+				t.Errorf("UpdateMergify() error = %v", err)
+				return
+			}
 
 			// Read and parse the updated file
 			content, err := os.ReadFile(".mergify.yml")
-			require.NoError(t, err, "failed to read .mergify.yml")
+			if err != nil {
+				t.Fatalf("failed to read .mergify.yml: %v", err)
+			}
 
 			var config map[string]interface{}
-			require.NoError(t, yaml.Unmarshal(content, &config), "failed to parse .mergify.yml")
+			err = yaml.Unmarshal(content, &config)
+			if err != nil {
+				t.Fatalf("failed to parse .mergify.yml: %v", err)
+			}
 
 			rules, ok := config["pull_request_rules"].([]interface{})
-			require.True(t, ok, "pull_request_rules not found")
+			if !ok {
+				t.Fatal("pull_request_rules not found")
+			}
 
 			// Check if the new rule was added
 			found := false
@@ -288,7 +378,9 @@ func TestUpdateMergify(t *testing.T) {
 				}
 			}
 
-			require.True(t, found, "UpdateMergify() did not add label %s", tt.wantLabel)
+			if !found {
+				t.Errorf("UpdateMergify() did not add label %s", tt.wantLabel)
+			}
 		})
 	}
 }
@@ -296,7 +388,10 @@ func TestUpdateMergify(t *testing.T) {
 func TestUpdateVersionIdempotent(t *testing.T) {
 	tmpDir := t.TempDir()
 	versionDir := filepath.Join(tmpDir, "version")
-	require.NoError(t, os.Mkdir(versionDir, 0755), "failed to create version dir")
+	err := os.Mkdir(versionDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
 
 	versionFile := filepath.Join(versionDir, "version.go")
 	initialContent := `package version
@@ -304,7 +399,10 @@ func TestUpdateVersionIdempotent(t *testing.T) {
 const defaultBeatVersion = "9.5.0"
 const Agent = defaultBeatVersion
 `
-	require.NoError(t, os.WriteFile(versionFile, []byte(initialContent), 0644), "failed to write test file")
+	err = os.WriteFile(versionFile, []byte(initialContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	originalWd, _ := os.Getwd()
 	defer func() {
@@ -312,18 +410,33 @@ const Agent = defaultBeatVersion
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
-	require.NoError(t, UpdateVersion("9.5.0"), "UpdateVersion() first call")
+	err = UpdateVersion("9.5.0")
+	if err != nil {
+		t.Errorf("UpdateVersion() first call error = %v", err)
+	}
 
 	content1, err := os.ReadFile(versionFile)
-	require.NoError(t, err, "failed to read version file")
+	if err != nil {
+		t.Fatalf("failed to read version file: %v", err)
+	}
 
-	require.NoError(t, UpdateVersion("9.5.0"), "UpdateVersion() second call")
+	err = UpdateVersion("9.5.0")
+	if err != nil {
+		t.Errorf("UpdateVersion() second call error = %v", err)
+	}
 
 	content2, err := os.ReadFile(versionFile)
-	require.NoError(t, err, "failed to read version file")
-	require.Equal(t, string(content1), string(content2), "UpdateVersion() is not idempotent - file changed on second call")
+	if err != nil {
+		t.Fatalf("failed to read version file: %v", err)
+	}
+
+	if string(content1) != string(content2) {
+		t.Error("UpdateVersion() is not idempotent - file changed on second call")
+	}
 }
 
 func TestUpdateMergifyIdempotent(t *testing.T) {
@@ -336,7 +449,9 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Create a basic .mergify.yml file
 	mergifyContent := `pull_request_rules:
@@ -349,48 +464,77 @@ func TestUpdateMergifyIdempotent(t *testing.T) {
         branches:
           - "9.4"
 `
-	require.NoError(t, os.WriteFile(".mergify.yml", []byte(mergifyContent), 0644), "failed to write test file")
+	err := os.WriteFile(".mergify.yml", []byte(mergifyContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
 
 	// First update
-	require.NoError(t, UpdateMergify("9.4.0"), "UpdateMergify() first call")
+	err = UpdateMergify("9.4.0")
+	if err != nil {
+		t.Errorf("UpdateMergify() first call error = %v", err)
+	}
 
 	// Read the file after first update
 	content1, err := os.ReadFile(".mergify.yml")
-	require.NoError(t, err, "failed to read .mergify.yml")
+	if err != nil {
+		t.Fatalf("failed to read .mergify.yml: %v", err)
+	}
 
 	// Second update with same version
-	require.NoError(t, UpdateMergify("9.4.0"), "UpdateMergify() second call")
+	err = UpdateMergify("9.4.0")
+	if err != nil {
+		t.Errorf("UpdateMergify() second call error = %v", err)
+	}
 
 	// Read the file after second update
 	content2, err := os.ReadFile(".mergify.yml")
-	require.NoError(t, err, "failed to read .mergify.yml")
+	if err != nil {
+		t.Fatalf("failed to read .mergify.yml: %v", err)
+	}
 
 	// The content should be the same (idempotent)
-	require.Equal(t, string(content1), string(content2), "UpdateMergify() is not idempotent - file changed on second call")
+	if string(content1) != string(content2) {
+		t.Error("UpdateMergify() is not idempotent - file changed on second call")
+	}
 }
 
 func TestUpdatePatchDocs(t *testing.T) {
 	tmpDir := t.TempDir()
 	docsDir := filepath.Join(tmpDir, "version", "docs")
-	require.NoError(t, os.MkdirAll(docsDir, 0755), "failed to create docs dir")
+	if err := os.MkdirAll(docsDir, 0755); err != nil {
+		t.Fatalf("failed to create docs dir: %v", err)
+	}
 
 	asciidocPath := filepath.Join(docsDir, "version.asciidoc")
-	require.NoError(t, os.WriteFile(asciidocPath, []byte(`:stack-version: 9.4.2
+	if err := os.WriteFile(asciidocPath, []byte(`:stack-version: 9.4.2
 :doc-branch: 9.4
-`), 0644), "failed to write asciidoc")
+`), 0644); err != nil {
+		t.Fatalf("failed to write asciidoc: %v", err)
+	}
 
 	originalWd, _ := os.Getwd()
 	defer func() {
 		_ = os.Chdir(originalWd)
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
-	require.NoError(t, UpdatePatchDocs("9.4.3"), "UpdatePatchDocs() error")
+	if err := UpdatePatchDocs("9.4.3"); err != nil {
+		t.Fatalf("UpdatePatchDocs() error = %v", err)
+	}
 
 	content, err := os.ReadFile(asciidocPath)
-	require.NoError(t, err, "failed to read asciidoc")
-	require.Contains(t, string(content), ":stack-version: 9.4.3", "UpdatePatchDocs() content = %q, want stack-version 9.4.3", string(content))
-	require.NotContains(t, string(content), ":stack-version: 9.4.2", "UpdatePatchDocs() still contains old stack version")
+	if err != nil {
+		t.Fatalf("failed to read asciidoc: %v", err)
+	}
+	if !strings.Contains(string(content), ":stack-version: 9.4.3") {
+		t.Errorf("UpdatePatchDocs() content = %q, want stack-version 9.4.3", string(content))
+	}
+	if strings.Contains(string(content), ":stack-version: 9.4.2") {
+		t.Errorf("UpdatePatchDocs() still contains old stack version")
+	}
 }
 
 func TestPrepareMajorMinorRelease(t *testing.T) {
@@ -403,36 +547,56 @@ func TestPrepareMajorMinorRelease(t *testing.T) {
 			t.Logf("failed to restore working directory: %v", err)
 		}
 	}()
-	require.NoError(t, os.Chdir(tmpDir), "failed to change to temp directory")
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("failed to change to temp directory: %v", err)
+	}
 
 	// Create required directory structure
 	versionDir := filepath.Join(tmpDir, "version")
 	k8sDir := filepath.Join(tmpDir, "deploy", "kubernetes")
-	require.NoError(t, os.MkdirAll(versionDir, 0755), "failed to create version dir")
-	require.NoError(t, os.MkdirAll(k8sDir, 0755), "failed to create k8s dir")
+	err := os.MkdirAll(versionDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create version dir: %v", err)
+	}
+	err = os.MkdirAll(k8sDir, 0755)
+	if err != nil {
+		t.Fatalf("failed to create k8s dir: %v", err)
+	}
 
 	// Create test files
 	versionFile := filepath.Join(versionDir, "version.go")
-	require.NoError(t, os.WriteFile(versionFile, []byte(`package version
+	err = os.WriteFile(versionFile, []byte(`package version
 
 const defaultBeatVersion = "9.4.0"
 const Agent = defaultBeatVersion
-`), 0644), "failed to write version file")
+`), 0644)
+	if err != nil {
+		t.Fatalf("failed to write version file: %v", err)
+	}
 
 	managedManifest := filepath.Join(k8sDir, "elastic-agent-managed-kubernetes.yaml")
 	standaloneManifest := filepath.Join(k8sDir, "elastic-agent-standalone-kubernetes.yaml")
 	manifestContent := `image: docker.elastic.co/elastic-agent/elastic-agent:9.4.0`
 
-	require.NoError(t, os.WriteFile(managedManifest, []byte(manifestContent), 0644), "failed to write managed manifest")
-	require.NoError(t, os.WriteFile(standaloneManifest, []byte(manifestContent), 0644), "failed to write standalone manifest")
+	err = os.WriteFile(managedManifest, []byte(manifestContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write managed manifest: %v", err)
+	}
+	err = os.WriteFile(standaloneManifest, []byte(manifestContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write standalone manifest: %v", err)
+	}
 
 	// Create .mergify.yml
 	mergifyContent := `pull_request_rules: []`
-	require.NoError(t, os.WriteFile(".mergify.yml", []byte(mergifyContent), 0644), "failed to write mergify file")
+	err = os.WriteFile(".mergify.yml", []byte(mergifyContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write mergify file: %v", err)
+	}
 
 	// Test PrepareMajorMinorRelease
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.0",
+		NextRelease:    "9.5.0",
 		BaseBranch:     "main",
 		ReleaseBranch:  "9.5",
 		ProjectOwner:   "elastic",
@@ -441,22 +605,45 @@ const Agent = defaultBeatVersion
 		GitAuthorEmail: "test@example.com",
 	}
 
-	require.NoError(t, PrepareMajorMinorRelease(cfg))
+	err = PrepareMajorMinorRelease(cfg)
+	if err != nil {
+		t.Errorf("PrepareMajorMinorRelease() error = %v", err)
+		return
+	}
 
 	// Verify version was updated
 	versionContent, err := os.ReadFile(versionFile)
-	require.NoError(t, err, "failed to read version file")
-	require.Contains(t, string(versionContent), "9.5.0", "Version file was not updated")
+	if err != nil {
+		t.Fatalf("failed to read version file: %v", err)
+	}
+	if !strings.Contains(string(versionContent), "9.5.0") {
+		t.Error("Version file was not updated")
+	}
 
 	// Verify manifests were updated
 	managedContent, err := os.ReadFile(managedManifest)
-	require.NoError(t, err, "failed to read managed manifest")
-	require.Contains(t, string(managedContent), "9.5.0", "Managed manifest was not updated")
+	if err != nil {
+		t.Fatalf("failed to read managed manifest: %v", err)
+	}
+	if !strings.Contains(string(managedContent), "9.5.0") {
+		t.Error("Managed manifest was not updated")
+	}
 }
 
 func TestPatchPRBodies(t *testing.T) {
-	body := patchBeforeBuildPRBody("9.7.1")
-	require.Contains(t, body, "9.7.1", "patchBeforeBuildPRBody() = %q, want version", body)
-	require.Contains(t, body, "before the final Release build", "patchBeforeBuildPRBody() = %q, want merge guidance", body)
-	require.Contains(t, body, "Does **not** bump version/version.go", "patchBeforeBuildPRBody() = %q, want version.go not bumped note", body)
+	cfg := &ReleaseConfig{
+		NextRelease:   "9.7.1",
+		LatestRelease: "9.7.0",
+		ReleaseBranch: "9.7",
+	}
+	body := patchVersionBumpBody(cfg)
+	if !strings.Contains(body, "to 9.7.1") {
+		t.Errorf("patchVersionBumpBody() = %q, want landing version", body)
+	}
+	if !strings.Contains(body, "merge promptly") {
+		t.Errorf("patchVersionBumpBody() = %q, want merge guidance", body)
+	}
+	if strings.Contains(body, "Merge after the release of") {
+		t.Errorf("patchVersionBumpBody() = %q, must not park with Merge-after-release wording", body)
+	}
 }
