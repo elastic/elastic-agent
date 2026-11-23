@@ -21,9 +21,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
@@ -44,6 +47,7 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -68,6 +72,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
 )
@@ -3188,5 +3193,891 @@ func TestCoordinator_Restart(t *testing.T) {
 		err := coord.Restart(ctx, action)
 		require.ErrorIs(t, err, ErrContainerNotSupported)
 		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
+	})
+}
+
+type fakeCPULimitController struct {
+	set     []limits.CPULimit
+	updates chan cpulimit.Snapshot
+	// run, when set, is called by Run.
+	run func(ctx context.Context) error
+	// ready is returned by Ready. Like the real controller, Set closes it when the cap is off.
+	ready       chan struct{}
+	readyClosed bool
+}
+
+func (f *fakeCPULimitController) Ready() <-chan struct{} {
+	return f.ready
+}
+
+func (f *fakeCPULimitController) closeReady() {
+	if f.ready != nil && !f.readyClosed {
+		f.readyClosed = true
+		close(f.ready)
+	}
+}
+
+func (f *fakeCPULimitController) Run(ctx context.Context) error {
+	if f.run != nil {
+		return f.run(ctx)
+	}
+	<-ctx.Done()
+	return nil
+}
+
+func (f *fakeCPULimitController) Set(l limits.CPULimit) {
+	f.set = append(f.set, l)
+	if !l.Enabled() {
+		f.closeReady()
+	}
+}
+
+// Snapshot follows the last Set like the real controller: disabled without a cap, and pending with a cap.
+func (f *fakeCPULimitController) Snapshot() cpulimit.Snapshot {
+	if len(f.set) == 0 || !f.set[len(f.set)-1].Enabled() {
+		return cpulimit.Snapshot{State: cpulimit.StateDisabled}
+	}
+	return cpulimit.Snapshot{State: cpulimit.StatePending, Configured: f.set[len(f.set)-1]}
+}
+
+func (f *fakeCPULimitController) Updates() <-chan cpulimit.Snapshot {
+	return f.updates
+}
+
+func cpuLimitPercent(t *testing.T, percent int) limits.CPULimit {
+	var l limits.CPULimit
+	require.NoError(t, l.Unpack(int64(percent)))
+	return l
+}
+
+type failingReloader struct{}
+
+func (failingReloader) Reload(*config.Config) error {
+	return errors.New("reload failed")
+}
+
+func newCPULimitTestCoordinator(t *testing.T, cpuLimit CPULimitController) *Coordinator {
+	log, _ := loggertest.New("")
+	ticker := time.NewTicker(time.Second * 30)
+	t.Cleanup(ticker.Stop)
+	return &Coordinator{
+		logger:                     log,
+		agentInfo:                  &info.AgentInfo{},
+		stateBroadcaster:           broadcaster.New(State{}, 0, 0),
+		runtimeMgr:                 &fakeRuntimeManager{},
+		otelMgr:                    &fakeOTelManager{},
+		cpuLimit:                   cpuLimit,
+		currentCfg:                 configuration.DefaultConfiguration(),
+		vars:                       emptyVars(t),
+		componentPIDTicker:         ticker,
+		componentPidRequiresUpdate: &atomic.Bool{},
+		secretMarkerFunc:           testSecretMarkerFunc,
+	}
+}
+
+// newCoordinatorWithCPULimit returns a Coordinator from New with no managers other than cpuLimit.
+func newCoordinatorWithCPULimit(t *testing.T, cpuLimit CPULimitController) *Coordinator {
+	log, _ := loggertest.New("")
+	coord := New(log, configuration.DefaultConfiguration(), logp.InfoLevel, &info.AgentInfo{}, pkgcomponent.RuntimeSpecs{},
+		nil, nil, nil, nil, nil, nil, nil, false, nil, nil, nil, nil, cpuLimit)
+	t.Cleanup(coord.componentPIDTicker.Stop)
+	return coord
+}
+
+func TestCoordinatorSetsCPULimitForAcceptedConfig(t *testing.T) {
+	ctx := t.Context()
+	cpuLimit := &fakeCPULimitController{}
+	coord := newCPULimitTestCoordinator(t, cpuLimit)
+
+	require.NoError(t, coord.processConfig(ctx, config.MustNewConfigFrom("agent.limits.cpu: 50")))
+	assert.Equal(t, []limits.CPULimit{cpuLimitPercent(t, 50)}, cpuLimit.set)
+
+	// An unchanged value is set again, so the controller checks the quota again.
+	require.NoError(t, coord.processConfig(ctx, config.MustNewConfigFrom("agent.limits.cpu: 50")))
+	assert.Len(t, cpuLimit.set, 2)
+
+	coord.processVars(ctx, emptyVars(t))
+	assert.Len(t, cpuLimit.set, 2, "a vars update must not set the CPU limit")
+
+	require.NoError(t, coord.processConfig(ctx, config.MustNewConfigFrom("")))
+	assert.Equal(t, []limits.CPULimit{cpuLimitPercent(t, 50), cpuLimitPercent(t, 50), {}}, cpuLimit.set)
+
+	coord.cpuLimit = nil
+	require.NoError(t, coord.processConfig(ctx, config.MustNewConfigFrom("agent.limits.cpu: 50")))
+}
+
+func TestCoordinatorDoesNotSetCPULimitForRejectedConfig(t *testing.T) {
+	tt := []struct {
+		name string
+		cfg  string
+		// inGenerateAST is true when the config is rejected while the AST is generated.
+		inGenerateAST bool
+		reloader      configReloader
+	}{
+		{name: "invalid CPU limit", cfg: "agent.limits.cpu: 101", inGenerateAST: true},
+		{name: "CPU limit 0", cfg: "agent.limits.cpu: 0", inGenerateAST: true},
+		{name: "failed reload after the limits are parsed", cfg: "agent.limits.cpu: 50", inGenerateAST: true, reloader: failingReloader{}},
+		{name: "invalid agent settings after the AST is generated", cfg: "agent.limits.cpu: 50\nagent.logging.level: invalid"},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			cpuLimit := &fakeCPULimitController{}
+			coord := newCPULimitTestCoordinator(t, cpuLimit)
+			coord.monitoringServerReloader = tc.reloader
+
+			err := coord.processConfig(t.Context(), config.MustNewConfigFrom(tc.cfg))
+			require.Error(t, err)
+			assert.Equal(t, tc.inGenerateAST, coord.configErr != nil)
+			assert.Empty(t, cpuLimit.set)
+		})
+	}
+}
+
+func TestCoordinatorKeepsCPULimitWhenComponentModelFails(t *testing.T) {
+	cpuLimit := &fakeCPULimitController{}
+	coord := newCPULimitTestCoordinator(t, cpuLimit)
+	initialCfg := coord.currentCfg
+
+	// The invalid condition fails the component model after the configuration is accepted.
+	err := coord.processConfig(t.Context(), config.MustNewConfigFrom(`
+agent.limits.cpu: 50
+inputs:
+  - type: filestream
+    condition: invalidExpression
+`))
+	require.Error(t, err)
+	require.Error(t, coord.componentModelErr)
+	assert.NoError(t, coord.configErr)
+	assert.NotSame(t, initialCfg, coord.currentCfg, "the configuration must stay accepted")
+	assert.Equal(t, []limits.CPULimit{cpuLimitPercent(t, 50)}, cpuLimit.set)
+}
+
+// cpuQuotaBackend is a cpulimit.Backend that keeps the quota in memory. Only Remove can fail, with removeErr.
+type cpuQuotaBackend struct {
+	mu    sync.Mutex
+	quota cpulimit.Quota
+	// parentCPUs is a quota set on a parent of the Agent's service. 0 means none.
+	parentCPUs float64
+	removeErr  error
+}
+
+func (b *cpuQuotaBackend) setRemoveErr(err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.removeErr = err
+}
+
+func (b *cpuQuotaBackend) LogicalCPUs(context.Context) (int, error) {
+	return 4, nil
+}
+
+func (b *cpuQuotaBackend) Inspect(context.Context) (cpulimit.Inspection, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	effective := b.quota
+	if b.parentCPUs > 0 && (b.quota.Kind != cpulimit.QuotaSet || b.parentCPUs < b.quota.CPUs) {
+		effective = cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: b.parentCPUs}
+	}
+	return cpulimit.Inspection{Service: b.quota, Effective: effective}, nil
+}
+
+func (b *cpuQuotaBackend) Apply(_ context.Context, cpus float64) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.quota = cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: cpus}
+	return nil
+}
+
+func (b *cpuQuotaBackend) Remove(context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.removeErr != nil {
+		return b.removeErr
+	}
+	b.quota = cpulimit.Quota{Kind: cpulimit.QuotaNone}
+	return nil
+}
+
+func TestCoordinatorReportsStateOfCPULimitController(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log, _ := loggertest.New("")
+		controller := cpulimit.NewController(log, &cpuQuotaBackend{quota: cpulimit.Quota{Kind: cpulimit.QuotaNone}})
+		coord := newCPULimitTestCoordinator(t, controller)
+		coord.managerChans.cpuLimitUpdate = controller.Updates()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		runDone := make(chan struct{})
+		go func() {
+			defer close(runDone)
+			_ = controller.Run(ctx)
+		}()
+		defer func() {
+			cancel()
+			<-runDone
+			close(coord.stateBroadcaster.InputChan)
+		}()
+
+		require.NoError(t, coord.processConfig(ctx, config.MustNewConfigFrom("agent.limits.cpu: 50")))
+		// The controller finishes its check, so the update channel holds the final state.
+		synctest.Wait()
+		coord.runLoopIteration(ctx)
+		synctest.Wait()
+
+		state := coord.State().CPULimit
+		require.NotNil(t, state)
+		assert.Equal(t, cpulimit.StateApplied, state.State)
+		assert.Equal(t, cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2}, state.ActiveQuota)
+		assert.Equal(t, controller.Snapshot(), *state)
+
+		// The controller removes its quota and reports the cap as disabled.
+		require.NoError(t, coord.processConfig(ctx, config.MustNewConfigFrom("")))
+		synctest.Wait()
+		coord.runLoopIteration(ctx)
+		synctest.Wait()
+		state = coord.State().CPULimit
+		require.NotNil(t, state)
+		assert.Equal(t, cpulimit.Snapshot{State: cpulimit.StateDisabled}, *state)
+	})
+}
+
+func TestCoordinatorReportsCPULimitState(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		coord := newCoordinatorWithCPULimit(t, nil)
+		assert.Nil(t, coord.State().CPULimit, "nothing about the CPU cap is reported without a controller")
+		close(coord.stateBroadcaster.InputChan)
+
+		cpuLimit := &fakeCPULimitController{updates: make(chan cpulimit.Snapshot, 1)}
+		coord = newCoordinatorWithCPULimit(t, cpuLimit)
+		defer close(coord.stateBroadcaster.InputChan)
+		require.NotNil(t, coord.State().CPULimit, "a disabled cap is reported")
+		assert.Equal(t, cpulimit.Snapshot{State: cpulimit.StateDisabled}, *coord.State().CPULimit)
+
+		unsupported := cpulimit.Snapshot{State: cpulimit.StateUnsupported, Configured: cpuLimitPercent(t, 50), Reason: "not supported"}
+		cpuLimit.updates <- unsupported
+		coord.runLoopIteration(t.Context())
+		synctest.Wait()
+		require.NotNil(t, coord.State().CPULimit)
+		assert.Equal(t, unsupported, *coord.State().CPULimit)
+
+		cpuLimit.updates <- cpulimit.Snapshot{State: cpulimit.StateDisabled}
+		coord.runLoopIteration(t.Context())
+		synctest.Wait()
+		require.NotNil(t, coord.State().CPULimit)
+		assert.Equal(t, cpulimit.Snapshot{State: cpulimit.StateDisabled}, *coord.State().CPULimit)
+	})
+}
+
+func TestCoordinatorRunsCPULimitController(t *testing.T) {
+	tt := []struct {
+		name string
+		// early is true when the controller's Run returns before the coordinator stops.
+		early  bool
+		runErr error
+	}{
+		{name: "runs until the coordinator stops"},
+		{name: "returns early with an error", early: true, runErr: errors.New("run failed")},
+		{name: "returns early without an error", early: true},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				started := make(chan context.Context, 1)
+				release := make(chan struct{})
+				cpuLimit := &fakeCPULimitController{run: func(ctx context.Context) error {
+					started <- ctx
+					if !tc.early {
+						<-ctx.Done()
+						<-release
+					}
+					return tc.runErr
+				}}
+				coord := newCoordinatorWithCPULimit(t, cpuLimit)
+
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				done := make(chan error, 1)
+				go func() { done <- coord.Run(ctx) }()
+
+				// The time is fake inside the bubble, so the timeouts below do not slow down the test.
+				var runCtx context.Context
+				select {
+				case runCtx = <-started:
+				case <-time.After(time.Minute):
+					t.Fatal("the controller was not started")
+				}
+				require.NoError(t, runCtx.Err(), "the controller must run with a live context")
+				synctest.Wait()
+				require.True(t, coord.IsActive(time.Second), "the coordinator must keep running")
+
+				cancel()
+				synctest.Wait()
+				if !tc.early {
+					select {
+					case err := <-done:
+						t.Fatalf("the coordinator stopped before the controller: %v", err)
+					default:
+					}
+					close(release)
+				}
+				select {
+				case err := <-done:
+					require.ErrorIs(t, err, context.Canceled)
+				case <-time.After(time.Minute):
+					t.Fatal("the coordinator did not stop")
+				}
+			})
+		})
+	}
+}
+
+func TestCoordinatorStopsWhenCPULimitControllerHangs(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		started := make(chan struct{})
+		release := make(chan struct{})
+		defer close(release)
+		cpuLimit := &fakeCPULimitController{run: func(context.Context) error {
+			close(started)
+			// Run ignores its context, like a stuck operating system call.
+			<-release
+			return nil
+		}}
+		coord := newCoordinatorWithCPULimit(t, cpuLimit)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- coord.Run(ctx) }()
+		<-started
+		synctest.Wait()
+
+		cancel()
+		stoppedAt := time.Now()
+		// The time is fake inside the bubble, so the timeout below does not slow down the test.
+		select {
+		case err := <-done:
+			require.ErrorIs(t, err, context.Canceled)
+			assert.Equal(t, cpuLimitShutdownTimeout, time.Since(stoppedAt), "the coordinator waits for the controller up to the timeout")
+		case <-time.After(time.Hour):
+			t.Fatal("the coordinator waited for the controller without a limit")
+		}
+	})
+}
+
+// cpuLimitGate is a Coordinator with a CPU limit controller and specs for a command input (filestream),
+// Fleet Server and a service input (endpoint).
+type cpuLimitGate struct {
+	coord *Coordinator
+	// cpuLimit is the controller when it is a fake, and nil otherwise.
+	cpuLimit *fakeCPULimitController
+	// models holds the sorted component IDs of each model the runtime manager received.
+	models [][]string
+	// otelUpdates holds each update the OTel manager received.
+	otelUpdates []gateOTelUpdate
+}
+
+type gateOTelUpdate struct {
+	cfg *confmap.Conf
+	// componentIDs are the sorted IDs of the components in the update.
+	componentIDs []string
+}
+
+const (
+	gateLogsID     = "filestream-default"
+	gateLogsOther  = "filestream-other"
+	gateFleetID    = "fleet-server-default"
+	gateEndpointID = "endpoint"
+)
+
+// newCPULimitGate must be called inside a synctest bubble. cpuLimit may be nil.
+func newCPULimitGate(t *testing.T, cpuLimit CPULimitController) *cpuLimitGate {
+	pathstest.SetTop(t, t.TempDir())
+	platforms := []string{"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64", "windows/amd64", "windows/arm64",
+		"container/amd64", "container/arm64"}
+	command := func(name string) pkgcomponent.InputRuntimeSpec {
+		return pkgcomponent.InputRuntimeSpec{InputType: name, BinaryName: name, Spec: pkgcomponent.InputSpec{
+			Name: name, Platforms: platforms, Command: &pkgcomponent.CommandSpec{},
+		}}
+	}
+	endpoint := pkgcomponent.InputRuntimeSpec{InputType: "endpoint", BinaryName: "endpoint-security", Spec: pkgcomponent.InputSpec{
+		Name: "endpoint", Platforms: platforms, Service: &pkgcomponent.ServiceSpec{},
+	}}
+	platform, err := pkgcomponent.LoadPlatformDetail()
+	require.NoError(t, err)
+	specs, err := pkgcomponent.NewRuntimeSpecs(platform, []pkgcomponent.InputRuntimeSpec{command("filestream"), command("fleet-server"), endpoint})
+	require.NoError(t, err)
+
+	g := &cpuLimitGate{}
+	g.cpuLimit, _ = cpuLimit.(*fakeCPULimitController)
+	log, _ := loggertest.New("")
+	ticker := time.NewTicker(24 * time.Hour)
+	g.coord = &Coordinator{
+		logger:           log,
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		state:            State{CoordinatorState: agentclient.Healthy, CoordinatorMessage: "Running"},
+		runtimeMgr: &fakeRuntimeManager{updateCallback: func(comps []pkgcomponent.Component) error {
+			ids := []string{}
+			for _, comp := range comps {
+				ids = append(ids, comp.ID)
+			}
+			slices.Sort(ids)
+			g.models = append(g.models, ids)
+			return nil
+		}},
+		otelMgr: &fakeOTelManager{
+			updateCollectorCallback: func(cfg *confmap.Conf) error {
+				g.otelUpdates = append(g.otelUpdates, gateOTelUpdate{cfg: cfg, componentIDs: []string{}})
+				return nil
+			},
+			// Update calls this right after updateCollectorCallback, so it fills in the update recorded there.
+			updateComponentCallback: func(comps []pkgcomponent.Component) error {
+				last := &g.otelUpdates[len(g.otelUpdates)-1]
+				for _, comp := range comps {
+					last.componentIDs = append(last.componentIDs, comp.ID)
+				}
+				slices.Sort(last.componentIDs)
+				return nil
+			},
+		},
+		cpuLimit:                   cpuLimit,
+		currentCfg:                 configuration.DefaultConfiguration(),
+		specs:                      specs,
+		vars:                       emptyVars(t),
+		componentPIDTicker:         ticker,
+		componentPidRequiresUpdate: &atomic.Bool{},
+		secretMarkerFunc:           testSecretMarkerFunc,
+	}
+	if cpuLimit != nil {
+		g.coord.managerChans.cpuLimitUpdate = cpuLimit.Updates()
+		g.coord.managerChans.cpuLimitReady = cpuLimit.Ready()
+	}
+	t.Cleanup(func() {
+		ticker.Stop()
+		g.coord.stopCPULimitStartTimer()
+		close(g.coord.stateBroadcaster.InputChan)
+	})
+	return g
+}
+
+// gatePolicy returns a policy with the given CPU limit and the given output for the filestream input.
+// An empty cpu leaves out the agent.limits section.
+func gatePolicy(cpu string, logsOutput string) string {
+	cpuLine := ""
+	if cpu != "" {
+		cpuLine = "agent.limits.cpu: " + cpu
+	}
+	return fmt.Sprintf(`
+%s
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [localhost:9200]
+  other:
+    type: elasticsearch
+    hosts: [localhost:9200]
+inputs:
+  - id: logs
+    type: filestream
+    use_output: %s
+  - id: fleet
+    type: fleet-server
+    use_output: default
+  - id: defend
+    type: endpoint
+    use_output: default
+`, cpuLine, logsOutput)
+}
+
+// apply processes gatePolicy(cpu, logsOutput).
+func (g *cpuLimitGate) apply(t *testing.T, cpu string, logsOutput string) {
+	require.NoError(t, g.coord.processConfig(t.Context(), config.MustNewConfigFrom(gatePolicy(cpu, logsOutput))))
+}
+
+func (g *cpuLimitGate) lastModel(t *testing.T) []string {
+	require.NotEmpty(t, g.models, "the runtime manager received no model")
+	return g.models[len(g.models)-1]
+}
+
+func (g *cpuLimitGate) health() (agentclient.State, string) {
+	s := g.coord.generateReportableState()
+	return s.State, s.Message
+}
+
+var (
+	gateExempt = []string{gateEndpointID, gateFleetID}
+	gateFull   = []string{gateEndpointID, gateLogsID, gateFleetID}
+)
+
+const gateWaitingMessage = "Waiting for the CPU limit before starting components"
+
+func TestCPULimitGateHoldsComponentsUntilReady(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+
+		g.apply(t, "50", "default")
+		assert.Equal(t, [][]string{gateExempt}, g.models, "only exempt components start while the cap is not ready")
+		state, msg := g.health()
+		assert.Equal(t, agentclient.Starting, state)
+		assert.Equal(t, gateWaitingMessage, msg)
+
+		g.cpuLimit.closeReady()
+		g.coord.runLoopIteration(t.Context())
+		assert.Equal(t, [][]string{gateExempt, gateFull}, g.models, "the full model is sent once on release")
+		state, msg = g.health()
+		assert.Equal(t, agentclient.Healthy, state)
+		assert.Equal(t, "Running", msg)
+
+		g.apply(t, "50", "other")
+		assert.Equal(t, []string{gateEndpointID, gateLogsOther, gateFleetID}, g.lastModel(t),
+			"a policy change after the release is not held")
+		assert.Len(t, g.models, 3)
+	})
+}
+
+func TestCPULimitGateSendsLatestModelOnRelease(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+
+		g.apply(t, "50", "default")
+		g.apply(t, "50", "other")
+		assert.Equal(t, [][]string{gateExempt, gateExempt}, g.models)
+
+		g.cpuLimit.closeReady()
+		g.coord.runLoopIteration(t.Context())
+		assert.Equal(t, []string{gateEndpointID, gateLogsOther, gateFleetID}, g.lastModel(t))
+	})
+}
+
+func TestCPULimitGateReleasesWhenCapTurnedOff(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+
+		g.apply(t, "50", "default")
+		require.Equal(t, gateExempt, g.lastModel(t))
+
+		// The fake controller closes Ready in Set, like the real one does when the cap is off.
+		g.apply(t, "", "default")
+		assert.Equal(t, gateFull, g.lastModel(t))
+		state, msg := g.health()
+		assert.Equal(t, agentclient.Healthy, state)
+		assert.Equal(t, "Running", msg)
+	})
+}
+
+func TestCPULimitGateDoesNotHold(t *testing.T) {
+	tt := []struct {
+		name     string
+		cpuLimit func() CPULimitController
+		cpu      string
+	}{
+		{name: "no cap in the policy", cpu: "", cpuLimit: func() CPULimitController {
+			return &fakeCPULimitController{ready: make(chan struct{})}
+		}},
+		{name: "cap without a value", cpu: "null", cpuLimit: func() CPULimitController {
+			return &fakeCPULimitController{ready: make(chan struct{})}
+		}},
+		{name: "no controller", cpu: "50", cpuLimit: func() CPULimitController { return nil }},
+		{name: "ready before the first policy", cpu: "50", cpuLimit: func() CPULimitController {
+			// For example the cap is unsupported on this host, or it was turned off before.
+			f := &fakeCPULimitController{ready: make(chan struct{})}
+			f.closeReady()
+			return f
+		}},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				g := newCPULimitGate(t, tc.cpuLimit())
+
+				g.apply(t, tc.cpu, "default")
+				assert.Equal(t, [][]string{gateFull}, g.models)
+				assert.Nil(t, g.coord.cpuLimitStartTimer)
+				state, msg := g.health()
+				assert.Equal(t, agentclient.Healthy, state)
+				assert.Equal(t, "Running", msg)
+			})
+		})
+	}
+}
+
+func TestCPULimitGateDoesNotHoldBeforeFirstSet(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+
+		// The invalid log level fails the policy after the AST is set and before the CPU limit is set.
+		rejected := config.MustNewConfigFrom(gatePolicy("", "default") + "agent.logging.level: invalid\n")
+		require.Error(t, g.coord.processConfig(t.Context(), rejected))
+		require.Empty(t, g.cpuLimit.set)
+
+		g.coord.processVars(t.Context(), emptyVars(t))
+		assert.Equal(t, [][]string{gateFull}, g.models)
+
+		g.apply(t, "50", "default")
+		assert.Equal(t, gateFull, g.lastModel(t), "a cap requested after the components started does not hold them")
+		state, msg := g.health()
+		assert.Equal(t, agentclient.Healthy, state)
+		assert.Equal(t, "Running", msg)
+	})
+}
+
+func TestCPULimitGateRejectedZeroDoesNotHold(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+
+		g.apply(t, "", "default")
+		require.Equal(t, [][]string{gateFull}, g.models)
+
+		require.Error(t, g.coord.processConfig(t.Context(), config.MustNewConfigFrom(gatePolicy("0", "default"))))
+		assert.Equal(t, [][]string{gateFull}, g.models)
+		assert.Nil(t, g.coord.cpuLimitStartTimer)
+		assert.Equal(t, []limits.CPULimit{{}}, g.cpuLimit.set, "the rejected policy does not set the CPU limit")
+	})
+}
+
+func TestCPULimitGateUnsupportedHost(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log, _ := loggertest.New("")
+		controller := cpulimit.NewController(log, cpulimit.NewUnsupportedBackend())
+		g := newCPULimitGate(t, controller)
+
+		g.apply(t, "50", "default")
+		assert.Equal(t, [][]string{gateExempt}, g.models)
+
+		// The controller starts after the policy, so the first model is always held.
+		ctx, cancel := context.WithCancel(t.Context())
+		runDone := make(chan struct{})
+		go func() {
+			defer close(runDone)
+			_ = controller.Run(ctx)
+		}()
+		defer func() {
+			cancel()
+			<-runDone
+		}()
+
+		// The controller reports unsupported and closes Ready. One iteration reads the state, the other the release.
+		synctest.Wait()
+		g.coord.runLoopIteration(ctx)
+		g.coord.runLoopIteration(ctx)
+		assert.Equal(t, gateFull, g.lastModel(t))
+		reported := g.coord.generateReportableState()
+		require.NotNil(t, reported.CPULimit)
+		assert.Equal(t, cpulimit.StateUnsupported, reported.CPULimit.State)
+		assert.Equal(t, agentclient.Healthy, reported.State)
+		assert.Equal(t, "Running", reported.Message)
+	})
+}
+
+func TestCPULimitGateLowerEffectiveQuota(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log, _ := loggertest.New("")
+		backend := &cpuQuotaBackend{quota: cpulimit.Quota{Kind: cpulimit.QuotaNone}, parentCPUs: 1}
+		controller := cpulimit.NewController(log, backend)
+		g := newCPULimitGate(t, controller)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		runDone := make(chan struct{})
+		go func() {
+			defer close(runDone)
+			_ = controller.Run(ctx)
+		}()
+		defer func() {
+			cancel()
+			<-runDone
+		}()
+
+		g.apply(t, "50", "default")
+		// The controller applies the cap and closes Ready. One iteration reads the state, the other the release.
+		synctest.Wait()
+		g.coord.runLoopIteration(ctx)
+		g.coord.runLoopIteration(ctx)
+
+		assert.Equal(t, gateFull, g.lastModel(t), "a lower quota on a parent does not hold the components")
+		reported := g.coord.generateReportableState()
+		require.NotNil(t, reported.CPULimit)
+		assert.Equal(t, cpulimit.StateApplied, reported.CPULimit.State)
+		assert.Equal(t, cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2}, reported.CPULimit.ActiveQuota)
+		assert.Equal(t, cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 1}, reported.CPULimit.EffectiveQuota)
+		assert.Equal(t, agentclient.Healthy, reported.State)
+		assert.Equal(t, "Running", reported.Message)
+	})
+}
+
+func TestCPULimitGateFailedRemoval(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		log, _ := loggertest.New("")
+		backend := &cpuQuotaBackend{quota: cpulimit.Quota{Kind: cpulimit.QuotaNone}}
+		controller := cpulimit.NewController(log, backend)
+		g := newCPULimitGate(t, controller)
+
+		ctx, cancel := context.WithCancel(t.Context())
+		runDone := make(chan struct{})
+		go func() {
+			defer close(runDone)
+			_ = controller.Run(ctx)
+		}()
+		defer func() {
+			cancel()
+			<-runDone
+		}()
+
+		g.apply(t, "50", "default")
+		// The controller applies the cap and closes Ready. One iteration reads the state, the other the release.
+		synctest.Wait()
+		g.coord.runLoopIteration(ctx)
+		g.coord.runLoopIteration(ctx)
+		require.Equal(t, gateFull, g.lastModel(t))
+		modelsBefore := len(g.models)
+
+		backend.setRemoveErr(errors.New("remove failed"))
+		g.apply(t, "", "default")
+		synctest.Wait()
+		g.coord.runLoopIteration(ctx)
+
+		assert.Equal(t, gateFull, g.lastModel(t), "the components keep running")
+		assert.Len(t, g.models, modelsBefore+1, "the policy change sends one full model")
+		assert.False(t, g.coord.cpuLimitHeld)
+		assert.Nil(t, g.coord.cpuLimitStartTimer)
+		reported := g.coord.generateReportableState()
+		require.NotNil(t, reported.CPULimit)
+		assert.Equal(t, cpulimit.StateDegraded, reported.CPULimit.State)
+		assert.Equal(t, agentclient.Degraded, reported.State)
+		assert.Equal(t, removalFailedMessage, reported.Message)
+
+		// The controller retries the removal within a minute.
+		backend.setRemoveErr(nil)
+		time.Sleep(time.Minute)
+		synctest.Wait()
+		g.coord.runLoopIteration(ctx)
+
+		reported = g.coord.generateReportableState()
+		require.NotNil(t, reported.CPULimit)
+		assert.Equal(t, cpulimit.Snapshot{State: cpulimit.StateDisabled}, *reported.CPULimit)
+		assert.Equal(t, agentclient.Healthy, reported.State)
+		assert.Equal(t, "Running", reported.Message)
+		assert.Equal(t, gateFull, g.lastModel(t))
+	})
+}
+
+func TestCPULimitGateTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+		g.apply(t, "50", "default")
+		heldAt := time.Now()
+
+		// The time is fake inside the bubble, so the sleep does not slow down the test.
+		time.Sleep(cpuLimitStartTimeout - time.Second)
+		state, _ := g.health()
+		require.Equal(t, agentclient.Starting, state)
+		// A policy change while held does not restart the timer.
+		g.apply(t, "50", "other")
+
+		// The iteration waits for the timeout if it did not pass yet.
+		g.coord.runLoopIteration(t.Context())
+		assert.Equal(t, cpuLimitStartTimeout, time.Since(heldAt), "the timeout counts from the first hold")
+		state, msg := g.health()
+		assert.Equal(t, agentclient.Failed, state)
+		assert.Contains(t, msg, "CPU limit")
+		assert.Equal(t, [][]string{gateExempt, gateExempt}, g.models, "the components stay held after the timeout")
+
+		g.cpuLimit.closeReady()
+		g.coord.runLoopIteration(t.Context())
+		assert.Equal(t, []string{gateEndpointID, gateLogsOther, gateFleetID}, g.lastModel(t))
+		state, msg = g.health()
+		assert.Equal(t, agentclient.Healthy, state)
+		assert.Equal(t, "Running", msg)
+	})
+}
+
+func TestCPULimitGateTimerNeedsPolicy(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+
+		time.Sleep(2 * cpuLimitStartTimeout)
+		// Without a start timer, the iteration ends at the next component PID tick.
+		g.coord.runLoopIteration(t.Context())
+		state, msg := g.health()
+		assert.Equal(t, agentclient.Healthy, state)
+		assert.Equal(t, "Running", msg)
+	})
+}
+
+func TestCPULimitGateHoldsOTelConfig(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+		// The filestream input runs in the OTel runtime, so the OTel manager gets a component that the gate holds.
+		policy := func(logsOutput string) *config.Config {
+			return config.MustNewConfigFrom(fmt.Sprintf(`
+agent.limits.cpu: 50
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [localhost:9200]
+  other:
+    type: elasticsearch
+    hosts: [localhost:9200]
+inputs:
+  - id: logs
+    type: filestream
+    use_output: %s
+    _runtime_experimental: otel
+  - id: fleet
+    type: fleet-server
+    use_output: default
+receivers:
+  nop:
+exporters:
+  nop:
+service:
+  pipelines:
+    logs:
+      receivers: [nop]
+      exporters: [nop]
+`, logsOutput))
+		}
+		hasPipeline := func(u gateOTelUpdate) bool {
+			return u.cfg != nil && slices.Contains(u.cfg.AllKeys(), "service::pipelines::logs::receivers")
+		}
+
+		require.NoError(t, g.coord.processConfig(t.Context(), policy("default")))
+		require.NoError(t, g.coord.processConfig(t.Context(), policy("other")))
+		require.Len(t, g.otelUpdates, 2)
+		for _, u := range g.otelUpdates {
+			assert.Nil(t, u.cfg, "the otel config waits for the CPU cap")
+			assert.Empty(t, u.componentIDs, "the otel components wait for the CPU cap")
+		}
+		held := len(g.otelUpdates)
+
+		g.cpuLimit.closeReady()
+		g.coord.runLoopIteration(t.Context())
+		require.Len(t, g.otelUpdates, held+1, "the release sends one otel update")
+		released := g.otelUpdates[held]
+		assert.True(t, hasPipeline(released), "the release sends the otel config")
+		assert.Equal(t, []string{gateLogsOther}, released.componentIDs, "the release sends the latest otel components")
+
+		require.NoError(t, g.coord.processConfig(t.Context(), policy("default")))
+		require.Len(t, g.otelUpdates, held+2)
+		after := g.otelUpdates[held+1]
+		assert.True(t, hasPipeline(after), "a policy change after the release keeps the otel config")
+		assert.Equal(t, []string{gateLogsID}, after.componentIDs)
+	})
+}
+
+func TestCPULimitGateReadyAndTimeoutAtOnce(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		g := newCPULimitGate(t, &fakeCPULimitController{ready: make(chan struct{})})
+		g.apply(t, "50", "default")
+
+		// The time is fake inside the bubble, so the sleep does not slow down the test.
+		time.Sleep(cpuLimitStartTimeout)
+		g.cpuLimit.closeReady()
+		// The run loop can pick the timer although Ready is closed too.
+		g.coord.handleCPULimitStartTimeout(t.Context())
+		assert.Equal(t, gateFull, g.lastModel(t))
+		state, msg := g.health()
+		assert.Equal(t, agentclient.Healthy, state)
+		assert.Equal(t, "Running", msg)
 	})
 }

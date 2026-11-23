@@ -11,6 +11,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"go.opentelemetry.io/collector/component/componentstatus"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/component"
@@ -55,6 +56,12 @@ type State struct {
 	// the current policy that are configured to handle it. Unlike Components, this
 	// includes components that have not yet emitted a runtime state update.
 	PolicyConfiguredActionTypes map[string][]string `yaml:"policy_configured_action_types,omitempty"`
+
+	// CPULimit is the latest state of the CPU cap. It is nil only when the agent has no CPU limit controller. To know
+	// whether a cap is requested, use Configured.Enabled(), not the state name: while the agent removes its own quota
+	// after the cap is turned off, the state can be pending or degraded. EffectiveQuota is only shown: it never changes the
+	// health or when components start. It is never changed in place: a new state replaces the pointer.
+	CPULimit *cpulimit.Snapshot
 }
 
 type coordinatorOverrideState struct {
@@ -231,6 +238,10 @@ func (c *Coordinator) generateReportableState() (s State) {
 	s.Tags = slices.Clone(c.state.Tags)
 	s.UpgradeDetails = c.state.UpgradeDetails
 	s.PolicyApplied = c.state.PolicyApplied
+	if c.state.CPULimit != nil {
+		cpuLimit := *c.state.CPULimit
+		s.CPULimit = &cpuLimit
+	}
 	if len(c.state.PolicyConfiguredActionTypes) > 0 {
 		s.PolicyConfiguredActionTypes = make(map[string][]string, len(c.state.PolicyConfiguredActionTypes))
 		for typ, ids := range c.state.PolicyConfiguredActionTypes {
@@ -247,8 +258,13 @@ func (c *Coordinator) generateReportableState() (s State) {
 	// Ordering of state aggregation:
 	// - Override state, if present
 	// - Errors applying the configured policy (report Failed)
-	// - Errors reported by managers (report Failed)
+	// - Errors reported by managers (report Failed; a recoverable actions error reports Degraded)
+	// - Components held for the CPU cap for too long (report Failed, also over a recoverable actions error)
 	// - Errors in component/unit state (report Degraded)
+	// - CPU limit failures (report Degraded)
+	// - Components held for the CPU cap (report Starting)
+	// The Upgrade Watcher rolls back only on Failed, so a recoverable actions error must not hide the CPU start timeout.
+	cpuLimitStartFailed := c.cpuLimitStartTimedOut && s.CoordinatorState == agentclient.Healthy
 	if c.overrideState != nil {
 		// state has been overridden by an upgrade in progress
 		s.State = c.overrideState.state
@@ -268,7 +284,7 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.configMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Config manager: %s", c.configMgrErr.Error())
-	} else if c.actionsErr != nil {
+	} else if c.actionsErr != nil && (!cpuLimitStartFailed || !errors.IsRecoverable(c.actionsErr)) {
 		if errors.IsRecoverable(c.actionsErr) {
 			s.State = agentclient.Degraded
 			s.Message = fmt.Sprintf("Actions degraded: %s", c.actionsErr.Error())
@@ -279,12 +295,30 @@ func (c *Coordinator) generateReportableState() (s State) {
 	} else if c.varsMgrErr != nil {
 		s.State = agentclient.Failed
 		s.Message = fmt.Sprintf("Vars manager: %s", c.varsMgrErr.Error())
+	} else if cpuLimitStartFailed {
+		s.State = agentclient.Failed
+		s.Message = fmt.Sprintf("CPU limit not applied within %s, components are not started", cpuLimitStartTimeout)
 	} else if hasState(s.Components, client.UnitStateFailed) || translate.HasStatus(s.Collector, componentstatus.StatusFatalError) || translate.HasStatus(s.Collector, componentstatus.StatusPermanentError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a failed state"
 	} else if hasState(s.Components, client.UnitStateDegraded) || translate.HasStatus(s.Collector, componentstatus.StatusRecoverableError) {
 		s.State = agentclient.Degraded
 		s.Message = "1 or more components/units in a degraded state"
+	} else if c.state.CPULimit != nil && c.state.CPULimit.State == cpulimit.StateDegraded &&
+		s.CoordinatorState == agentclient.Healthy {
+		// Only a running coordinator reports it, so a starting, stopped or failed state is not replaced.
+		// The message goes to Fleet, so it has no error text: operating system errors may hold paths and unit names.
+		// The error is in State.CPULimit.
+		s.State = agentclient.Degraded
+		if c.state.CPULimit.Configured.Enabled() {
+			s.Message = "CPU limit is not enforced as requested"
+		} else {
+			// With the cap off, degraded means the removal of the agent quota failed.
+			s.Message = "The CPU quota of the Agent could not be removed"
+		}
+	} else if c.cpuLimitHeld && s.CoordinatorState == agentclient.Healthy {
+		s.State = agentclient.Starting
+		s.Message = "Waiting for the CPU limit before starting components"
 	} else {
 		// If no error conditions apply, the global state inherits the current
 		// Coordinator state.
@@ -292,6 +326,26 @@ func (c *Coordinator) generateReportableState() (s State) {
 		s.Message = s.CoordinatorMessage
 	}
 	return s
+}
+
+// setCPULimitState stores a copy of the newest CPU limit state. It asks for a state refresh only when a reported
+// value changed, so a recheck that finds nothing new does not broadcast the state again.
+// Must be called on the main Coordinator goroutine.
+func (c *Coordinator) setCPULimitState(s cpulimit.Snapshot) {
+	old := c.state.CPULimit
+	c.state.CPULimit = &s
+	switch {
+	case old == nil,
+		s.State != old.State,
+		s.Configured != old.Configured,
+		s.TargetCPUs != old.TargetCPUs,
+		s.ActiveQuota != old.ActiveQuota,
+		s.EffectiveQuota != old.EffectiveQuota,
+		s.Reason != old.Reason,
+		(s.Err == nil) != (old.Err == nil),
+		s.Err != nil && s.Err.Error() != old.Err.Error():
+		c.stateNeedsRefresh = true
+	}
 }
 
 // setCoordinatorState changes the overall state of the coordinator.

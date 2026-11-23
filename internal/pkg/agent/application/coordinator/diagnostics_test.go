@@ -20,6 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/go-sysinfo/types"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
@@ -624,6 +625,14 @@ func TestDiagnosticState(t *testing.T) {
 				RetryUntil:      &now,
 			},
 		},
+		CPULimit: &cpulimit.Snapshot{
+			State:          cpulimit.StateDegraded,
+			Configured:     cpuLimitPercent(t, 50),
+			TargetCPUs:     4,
+			ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2},
+			EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 1},
+			Err:            errors.New("quota mismatch"),
+		},
 	}
 
 	expected := fmt.Sprintf(`
@@ -653,6 +662,15 @@ upgrade_details:
     scheduled_at: %s
     download_rate: 123.56
     retry_until: %s
+cpu_limit:
+  state: degraded
+  configured_percent: 50
+  target_cpus: 4
+  active_quota: set
+  active_quota_cpus: 2
+  effective_quota: set
+  effective_quota_cpus: 1
+  error: quota mismatch
 `, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 
 	coord := &Coordinator{
@@ -666,6 +684,79 @@ upgrade_details:
 
 	result := hook.Hook(context.Background())
 	assert.YAMLEq(t, expected, string(result), "state diagnostic returned unexpected value")
+}
+
+func TestDiagnosticStateCPULimit(t *testing.T) {
+	tt := []struct {
+		id       string
+		cpuLimit cpulimit.Snapshot
+		expected string
+	}{
+		{
+			id:       "disabled",
+			cpuLimit: cpulimit.Snapshot{State: cpulimit.StateDisabled},
+			expected: `
+state: disabled
+configured_percent: 0
+target_cpus: 0
+active_quota: unknown
+effective_quota: unknown
+`,
+		},
+		{
+			id: "no effective quota",
+			cpuLimit: cpulimit.Snapshot{
+				State:          cpulimit.StatePending,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     2,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaNone},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaNone},
+			},
+			expected: `
+state: pending
+configured_percent: 50
+target_cpus: 2
+active_quota: none
+effective_quota: none
+`,
+		},
+		{
+			id: "unknown effective quota",
+			cpuLimit: cpulimit.Snapshot{
+				State:       cpulimit.StateApplied,
+				Configured:  cpuLimitPercent(t, 50),
+				TargetCPUs:  2,
+				ActiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2},
+			},
+			expected: `
+state: applied
+configured_percent: 50
+target_cpus: 2
+active_quota: set
+active_quota_cpus: 2
+effective_quota: unknown
+`,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.id, func(t *testing.T) {
+			coord := &Coordinator{
+				stateBroadcaster: broadcaster.New(State{CPULimit: &tc.cpuLimit}, 0, 0),
+			}
+
+			hook, ok := diagnosticHooksMap(coord)["state"]
+			require.True(t, ok, "diagnostic hooks should have an entry for state")
+
+			var output struct {
+				CPULimit yaml.Node `yaml:"cpu_limit"`
+			}
+			require.NoError(t, yaml.Unmarshal(hook.Hook(context.Background()), &output))
+			section, err := yaml.Marshal(&output.CPULimit)
+			require.NoError(t, err)
+			assert.YAMLEq(t, tc.expected, string(section))
+		})
+	}
 }
 
 func TestDiagnosticStateForAPM(t *testing.T) {
