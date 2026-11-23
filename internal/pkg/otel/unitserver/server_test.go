@@ -132,6 +132,30 @@ func TestServerStartError(t *testing.T) {
 	assert.Error(t, s.Start(t.Context()))
 }
 
+// A unit that is removed and added again gets a new config state index, so a
+// receiver that missed the removal still applies its new config.
+func TestConfigStateIdxNeverRepeats(t *testing.T) {
+	unit := func(schedule string) component.Unit {
+		return controlProtocolComponent("synthetics-default", schedule).Units[0]
+	}
+	key := unitKey{unitType: client.UnitTypeInput, id: "monitor-a"}
+	cu := &componentUnits{units: make(map[unitKey]*proto.UnitExpected)}
+
+	require.True(t, cu.update([]component.Unit{unit("@every 1m")}))
+	first := cu.units[key].ConfigStateIdx
+
+	require.True(t, cu.update([]component.Unit{unit("@every 2m")}))
+	changed := cu.units[key].ConfigStateIdx
+	assert.Greater(t, changed, first, "a config change should increase the index")
+
+	require.False(t, cu.update([]component.Unit{unit("@every 2m")}), "an unchanged config should not change the units")
+	assert.Equal(t, changed, cu.units[key].ConfigStateIdx)
+
+	require.True(t, cu.update(nil))
+	require.True(t, cu.update([]component.Unit{unit("@every 3m")}))
+	assert.Greater(t, cu.units[key].ConfigStateIdx, changed, "a re-added unit should get a new index")
+}
+
 // assertRejected checks that a client connecting without TLS, using the
 // component ID as the token, never receives units.
 func assertRejected(t *testing.T, address string, token string) {

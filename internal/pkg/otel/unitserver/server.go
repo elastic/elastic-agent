@@ -57,6 +57,11 @@ type componentUnits struct {
 	units map[unitKey]*proto.UnitExpected
 	// changed is closed and replaced whenever the units change.
 	changed chan struct{}
+	// configStateIdx is the last config state index given to a unit. It only
+	// grows, so a unit that is removed and added again gets a new index. The
+	// receiver applies a config only when its index changes, and it can miss
+	// the removal if the updates collapse or it reconnects in between.
+	configStateIdx uint64
 
 	token      string
 	clientCert *authority.Pair
@@ -245,18 +250,20 @@ func (cu *componentUnits) update(units []component.Unit) bool {
 		existing, ok := cu.units[key]
 		switch {
 		case !ok:
+			cu.configStateIdx++
 			cu.units[key] = &proto.UnitExpected{
 				Id:             unit.ID,
 				Type:           proto.UnitType(unit.Type),
 				State:          proto.State_HEALTHY,
-				ConfigStateIdx: 1,
+				ConfigStateIdx: cu.configStateIdx,
 				Config:         unit.Config,
 				LogLevel:       proto.UnitLogLevel(unit.LogLevel),
 			}
 			changed = true
 		case !gproto.Equal(existing.Config, unit.Config):
+			cu.configStateIdx++
 			existing.Config = unit.Config
-			existing.ConfigStateIdx++
+			existing.ConfigStateIdx = cu.configStateIdx
 			existing.LogLevel = proto.UnitLogLevel(unit.LogLevel)
 			changed = true
 		case existing.LogLevel != proto.UnitLogLevel(unit.LogLevel):
