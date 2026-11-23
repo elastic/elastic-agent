@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -235,20 +236,73 @@ func Logs() string {
 	return logsPath
 }
 
+const logsDirName = "logs"
+
+// buildLogsDirPattern matches the name of a build log directory: [<package-version>-]<commit>, where the
+// package version may carry build metadata (+build...) and the commit has the length of release.ShortCommit.
+// A build without a commit, such as a development build, does not match.
+var buildLogsDirPattern = regexp.MustCompile(fmt.Sprintf(`^(\d+\.\d+\.\d+(\+[0-9A-Za-z.]+)?(-[0-9A-Za-z.]+)*-)?[0-9a-f]{%d}$`, len(release.TrimCommit(strings.Repeat("0", 64)))))
+
+// IsBuildLogsDirName reports whether name looks like the name of the log directory of a build, see BuildLogsDirName.
+func IsBuildLogsDirName(name string) bool {
+	return buildLogsDirPattern.MatchString(name)
+}
+
+// BuildLogsRoot returns the directory that holds the log directory of each build, in the data directory of
+// the Agent installed in topDirPath.
+func BuildLogsRoot(topDirPath string) string {
+	return filepath.Join(DataFrom(topDirPath), logsDirName)
+}
+
+// BuildLogsDirName returns the name of the running build's directory under BuildLogsRoot: the name of its home
+// directory without the prefix, see buildName.
+func BuildLogsDirName() string {
+	return buildName(topPath)
+}
+
+// BuildLogs returns the directory the running build writes its logs to. Unlike Logs(), it is not affected by --path.logs, and diagnostics collects from it.
+// Unversioned homes (containers) keep logs inside the home.
+func BuildLogs() string {
+	if unversionedHome {
+		return filepath.Join(Home(), logsDirName)
+	}
+	return filepath.Join(BuildLogsRoot(topPath), BuildLogsDirName())
+}
+
+// BuildComponentsLogs returns the logs path of the Beats and beat receivers of the running build. It mirrors the
+// {home}/components/logs of the default layout, and its last element must stay "logs": Fleet integrations point
+// the request tracer files of an input to "../../logs/<input>/", which only resolves inside the logs path of the input
+// when it does.
+func BuildComponentsLogs() string {
+	return filepath.Join(BuildLogs(), "components", logsDirName)
+}
+
 // SetLogs updates the path for the logs.
 func SetLogs(path string) {
 	logsPath = path
 }
 
+// VersionedHomePrefix is the prefix of the names of the Agent home directories under data.
+const VersionedHomePrefix = "elastic-agent-"
+
+// versionedBuildName returns <version>-<commit>.
+func versionedBuildName() string {
+	return fmt.Sprintf("%s-%s", release.VersionWithSnapshot(), release.ShortCommit())
+}
+
+// buildName returns <version>-<commit>, or the legacy <commit> if no home directory with the version exists.
+func buildName(base string) string {
+	name := versionedBuildName()
+	_, err := os.Stat(filepath.Join(base, "data", VersionedHomePrefix+name))
+	if errors.Is(err, os.ErrNotExist) {
+		return release.ShortCommit()
+	}
+	return name
+}
+
 // VersionedHome returns a versioned path based on a TopPath and used commit.
 func VersionedHome(base string) string {
-	versionedHomePath := filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()))
-	_, err := os.Stat(versionedHomePath)
-	if errors.Is(err, os.ErrNotExist) {
-		// fallback to the legacy elastic-agent-<commit> path
-		versionedHomePath = filepath.Join(base, "data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()))
-	}
-	return versionedHomePath
+	return filepath.Join(base, "data", VersionedHomePrefix+buildName(base))
 }
 
 // Downloads returns the downloads directory for Agent
@@ -310,15 +364,15 @@ func retrieveExecutableDir() string {
 
 // isInsideData returns true when the exePath is inside of the current Agents data path.
 func isInsideData(exeDir string) bool {
-	expectedDirLegacy := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit())))
-	expectedDirWithVersion := binaryDir(filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit())))
+	expectedDirLegacy := binaryDir(filepath.Join("data", VersionedHomePrefix+release.ShortCommit()))
+	expectedDirWithVersion := binaryDir(filepath.Join("data", VersionedHomePrefix+versionedBuildName()))
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 
 // isInsideComponents returns true when the exeDir is inside of the current Agent's components directory.
 func isInsideComponents(exeDir string) bool {
-	expectedDirLegacy := filepath.Join("data", fmt.Sprintf("elastic-agent-%s", release.ShortCommit()), "components")
-	expectedDirWithVersion := filepath.Join("data", fmt.Sprintf("elastic-agent-%s-%s", release.VersionWithSnapshot(), release.ShortCommit()), "components")
+	expectedDirLegacy := filepath.Join("data", VersionedHomePrefix+release.ShortCommit(), "components")
+	expectedDirWithVersion := filepath.Join("data", VersionedHomePrefix+versionedBuildName(), "components")
 	return strings.HasSuffix(exeDir, expectedDirLegacy) || strings.HasSuffix(exeDir, expectedDirWithVersion)
 }
 

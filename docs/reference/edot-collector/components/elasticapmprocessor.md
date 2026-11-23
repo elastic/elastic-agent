@@ -73,8 +73,6 @@ exporters:
     endpoints:
       - ${ELASTIC_ENDPOINT}
     api_key: ${ELASTIC_API_KEY}
-    mapping:
-      mode: otel
 
 service:
   pipelines:

@@ -15,9 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
-
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	upgradeErrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -31,77 +29,19 @@ func IsLocal(source string) bool {
 	return strings.HasPrefix(source, "file://") || strings.HasPrefix(source, "/")
 }
 
-type fileOps struct {
-	copyFile func(dst io.Writer, src io.Reader) (int64, error)
-	openFile func(name string, flag int, perm os.FileMode) (*os.File, error)
+type FileOps struct {
+	CopyFile func(dst io.Writer, src io.Reader) (int64, error)
+	OpenFile func(name string, flag int, perm os.FileMode) (*os.File, error)
 }
 
-func defaultFileOps() fileOps {
-	return fileOps{
-		copyFile: io.Copy,
-		openFile: os.OpenFile,
+func defaultFileOps() FileOps {
+	return FileOps{
+		CopyFile: io.Copy,
+		OpenFile: os.OpenFile,
 	}
 }
 
-type downloadFunc func(ctx context.Context, source, dst string) error
-
-func downloadWithRetries(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source string, dst string, downloadFn downloadFunc) error {
-	cancelDeadline := time.Now().Add(config.Timeout)
-	cancelCtx, cancel := context.WithDeadline(ctx, cancelDeadline)
-	defer cancel()
-
-	upgradeDetails.SetRetryUntil(&cancelDeadline)
-
-	expBo := backoff.NewExponentialBackOff()
-	expBo.InitialInterval = config.RetrySleepInitDuration
-	boCtx := backoff.WithContext(expBo, cancelCtx)
-
-	var attempt uint
-	opFn := func() error {
-		attempt++
-		log.Infof("download attempt %d", attempt)
-		if err := downloadFn(cancelCtx, source, dst); err != nil {
-			if upgradeErrors.IsPermanentHTTPError(err) {
-				return backoff.Permanent(err)
-			}
-			if upgradeErrors.IsDiskSpaceError(err) {
-				log.Infof("insufficient disk space error detected, stopping retries")
-				return backoff.Permanent(err)
-			}
-			var agentErr errors.Error
-			if goerrors.As(err, &agentErr) && agentErr.Type() == errors.TypeFilesystem {
-				log.Infof("filesystem error detected, stopping retries")
-				return backoff.Permanent(err)
-			}
-			return err
-		}
-		return nil
-	}
-
-	opFailureNotificationFn := func(err error, retryAfter time.Duration) {
-		log.Warnf("download attempt %d failed: %s; retrying in %s.",
-			attempt, err.Error(), retryAfter)
-		upgradeDetails.SetRetryableError(err)
-	}
-
-	if err := backoff.RetryNotify(opFn, boCtx, opFailureNotificationFn); err != nil {
-		return err
-	}
-
-	upgradeDetails.SetRetryableError(nil)
-	upgradeDetails.SetRetryUntil(nil)
-	return nil
-}
-
-func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops fileOps) (err error) {
-	defer func() {
-		if err != nil {
-			if removeErr := os.Remove(targetPath); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Warnf("failed to cleanup %s: %v", targetPath, removeErr)
-			}
-		}
-	}()
-
+func download(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, client *http.Client, sourceURI string, targetPath string, ops FileOps) (err error) {
 	if client == nil {
 		client, err = config.Client(
 			httpcommon.WithAPMHTTPInstrumentation(),
@@ -120,7 +60,7 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 		return errors.New(err, fmt.Sprintf("building request %s failed", sourceURI), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI))
 	}
 
-	targetFile, err := ops.openFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	targetFile, err := ops.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return goerrors.Join(errors.New(fmt.Sprintf("creating %s failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath)), err)
 	}
@@ -156,29 +96,25 @@ func download(ctx context.Context, log *logger.Logger, config *artifact.Config, 
 	dp := newDownloadProgressReporter(sourceURI, config.Timeout, fileSize, observers...)
 	dp.Report(ctx)
 
-	_, err = ops.copyFile(targetFile, io.TeeReader(resp.Body, dp))
+	written, err := ops.CopyFile(targetFile, io.TeeReader(resp.Body, dp))
 	if err != nil {
 		reportedErr := err
-		if upgradeErrors.IsDiskSpaceError(err) {
-			reportedErr = upgradeErrors.ErrInsufficientDiskSpace
+		if upgradeErrors.IsDiskSpaceLowError(err) {
+			reportedErr = upgradeErrors.DiskSpaceLowError{}
 		}
 		dp.ReportFailed(reportedErr)
 		return goerrors.Join(errors.New(fmt.Sprintf("copying %s to %s failed", sourceURI, targetPath), errors.TypeNetwork, errors.M(errors.MetaKeyURI, sourceURI)), err)
+	}
+	if err := targetFile.Truncate(written); err != nil {
+		dp.ReportFailed(err)
+		return errors.New(err, fmt.Sprintf("truncating %s to downloaded size failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 	dp.ReportComplete()
 
 	return nil
 }
 
-func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops fileOps) (err error) {
-	defer func() {
-		if err != nil {
-			if removeErr := os.Remove(targetPath); removeErr != nil && !os.IsNotExist(removeErr) {
-				log.Warnf("failed to cleanup %s: %v", targetPath, removeErr)
-			}
-		}
-	}()
-
+func copyFile(sourcePath string, targetPath string, ops FileOps) (err error) {
 	sourcePath = strings.TrimPrefix(sourcePath, "file://")
 
 	sourceInfo, err := os.Stat(sourcePath)
@@ -194,33 +130,34 @@ func copyFile(log *logger.Logger, sourcePath string, targetPath string, ops file
 		return nil
 	}
 
-	sourceFile, err := ops.openFile(sourcePath, os.O_RDONLY, 0)
+	sourceFile, err := ops.OpenFile(sourcePath, os.O_RDONLY, 0)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("opening %s file failed", sourcePath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, sourcePath))
 	}
 	defer sourceFile.Close()
 
-	targetFile, err := ops.openFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, packagePermissions)
+	targetFile, err := ops.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY, packagePermissions)
 	if err != nil {
 		return errors.New(err, fmt.Sprintf("creating %s file failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 	defer targetFile.Close()
 
-	if _, err = ops.copyFile(targetFile, sourceFile); err != nil {
+	written, err := ops.CopyFile(targetFile, sourceFile)
+	if err != nil {
 		return err
+	}
+	if err := targetFile.Truncate(written); err != nil {
+		return errors.New(err, fmt.Sprintf("truncating %s to copied size failed", targetPath), errors.TypeFilesystem, errors.M(errors.MetaKeyPath, targetPath))
 	}
 
 	return nil
 }
 
-func Fetch(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source, targetPath string) (err error) {
+func Fetch(ctx context.Context, log *logger.Logger, config *artifact.Config, upgradeDetails *details.Details, source, targetPath string, ops FileOps) (err error) {
 	if IsLocal(source) {
-		err = copyFile(log, source, targetPath, defaultFileOps())
+		err = copyFile(source, targetPath, ops)
 	} else {
-		err = downloadWithRetries(ctx, log, config, upgradeDetails, source, targetPath,
-			func(ctx context.Context, source, dst string) error {
-				return download(ctx, log, config, upgradeDetails, nil, source, dst, defaultFileOps())
-			})
+		err = download(ctx, log, config, upgradeDetails, nil, source, targetPath, ops)
 	}
 
 	if err != nil {

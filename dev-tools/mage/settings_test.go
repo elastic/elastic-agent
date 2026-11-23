@@ -239,24 +239,6 @@ func TestSettingsWithMethods(t *testing.T) {
 		assert.Equal(t, "group1,group2", modified.IntegrationTest.Groups)
 		assert.Empty(t, original.IntegrationTest.Groups)
 	})
-
-	t.Run("WithAgentBuildDir", func(t *testing.T) {
-		original := DefaultSettings()
-
-		modified := original.WithAgentBuildDir("/build/dir")
-
-		assert.Equal(t, "/build/dir", modified.IntegrationTest.AgentBuildDir)
-		assert.Empty(t, original.IntegrationTest.AgentBuildDir)
-	})
-
-	t.Run("WithTestBinaryName", func(t *testing.T) {
-		original := DefaultSettings()
-
-		modified := original.WithTestBinaryName("test-binary")
-
-		assert.Equal(t, "test-binary", modified.IntegrationTest.BinaryName)
-		assert.Empty(t, original.IntegrationTest.BinaryName)
-	})
 }
 
 func TestSettingsBinaryExt(t *testing.T) {
@@ -882,7 +864,6 @@ func TestLoadSettings(t *testing.T) {
 		t.Setenv("INSTANCE_PROVISIONER", "kind")
 		t.Setenv("TEST_PLATFORMS", "linux/amd64")
 		t.Setenv("TEST_GROUPS", "default")
-		t.Setenv("TEST_BINARY_NAME", "test-binary")
 		t.Setenv("TEST_INTEG_TIMESTAMP", "true")
 		t.Setenv("TEST_RUN_UNTIL_FAILURE", "true")
 		t.Setenv("TEST_INTEG_CLEAN_ON_EXIT", "false")
@@ -900,7 +881,6 @@ func TestLoadSettings(t *testing.T) {
 		assert.Equal(t, "kind", settings.IntegrationTest.InstanceProvisioner)
 		assert.Equal(t, "linux/amd64", settings.IntegrationTest.Platforms)
 		assert.Equal(t, "default", settings.IntegrationTest.Groups)
-		assert.Equal(t, "test-binary", settings.IntegrationTest.BinaryName)
 		assert.True(t, settings.IntegrationTest.TimestampEnabled)
 		assert.True(t, settings.IntegrationTest.RunUntilFailure)
 		assert.False(t, settings.IntegrationTest.CleanOnExit)

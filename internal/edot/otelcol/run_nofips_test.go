@@ -19,6 +19,11 @@ import (
 )
 
 func TestStartCollector(t *testing.T) {
+	// The sigv4auth extension resolves AWS credentials when its config is validated.
+	// Provide static ones so the default credential chain doesn't fall back to EC2 IMDS.
+	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key-id")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret-access-key")
+
 	testCases := []struct {
 		configFile           string
 		expectedErrorMessage string
@@ -45,11 +50,14 @@ func TestStartCollector(t *testing.T) {
 			wg := startCollector(context.Background(), t, collector, tc.expectedErrorMessage)
 
 			if tc.expectedErrorMessage == "" {
+				// Starting all components can take well over 10s on slow CI runners: e.g. every
+				// Prometheus scrape manager resolves the host FQDN on start, which blocks for
+				// several seconds where hostname DNS lookups time out (macOS GitHub runners).
 				assert.Eventually(t, func() bool {
 					return otelcol.StateRunning == collector.GetState()
-				}, 10*time.Second, 200*time.Millisecond)
+				}, 30*time.Second, 200*time.Millisecond)
+				collector.Shutdown()
 			}
-			collector.Shutdown()
 			wg.Wait()
 			assert.Equal(t, otelcol.StateClosed, collector.GetState())
 		})

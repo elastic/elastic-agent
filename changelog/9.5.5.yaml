@@ -1,0 +1,285 @@
+version: 9.5.5
+entries:
+    - kind: enhancement
+      summary: Allow overriding Elastic Agent hostname via ELASTIC_AGENT_HOSTNAME environment variable
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15686
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1784542898
+      file:
+        name: 1784542898-allow-overriding-elastic-agent-hostname-via-elastic_agent_hostname-environment-variable.yaml
+        checksum: 56ff706822dbdc70de0d31c034d8bab5f9b1772b
+    - kind: feature
+      summary: Add regression test for Kubernetes metrics RBAC deadlock (#15666).
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15900
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/15666
+      impact: ""
+      action: ""
+      timestamp: 1785319944
+      file:
+        name: 1785319944-k8s-rbac-deadlock-regression-test.yaml
+        checksum: 2800de26e367bbe457386953de8166052780bd63
+    - kind: bug-fix
+      summary: Fix temporary Fleet Server HTTP codes 429 and 503 from failing an upgrade
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/15934
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1785561405
+      file:
+        name: 1785561405-fix-temporary-fleet-error-failing-upgrade.yaml
+        checksum: 00a666b0e5c2969652bbfd9907f174068596c33b
+    - kind: bug-fix
+      summary: revert non-ironbank container images to ubi9
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16396
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1787851588
+      file:
+        name: 1787851588-revert-non-ironbank-container-images-to-ubi9.yaml
+        checksum: c526d01d9800eeaa8d4a6a342ab175e587a08d9e
+    - kind: enhancement
+      summary: Add enqueue_failed metrics to elasticmonitoringprocessor dropped count
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16420
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788165328
+      file:
+        name: 1788165328-edot_enqueue_failed_metrics.yaml
+        checksum: f5b70fdfbcccba8a7432088596fa6c08b3e2afcf
+    - kind: bug-fix
+      summary: fix diagnostics for otel components containing `/`
+      description: Components containing `/` in id or stream-id has been skipped from diagnostics
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16453
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788339094
+      file:
+        name: 1788339094-fix-diagnostics-for-otel-components.yaml
+        checksum: 5ca55dc430d0fba17b74fb74f2c1f2b8bedcc407
+    - kind: bug-fix
+      summary: Keep per-stream OTel diagnostics unique in the diagnostics archive
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16459
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16287
+      impact: ""
+      action: ""
+      timestamp: 1788347691
+      file:
+        name: 1788347691-fix-otel-diagnostics-stream-overwrite.yaml
+        checksum: f6c2633b60f2c99a59a8b615765f081ec66613fc
+    - kind: enhancement
+      summary: Update Go to 1.26.8
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16490
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788553536
+      file:
+        name: 1788553536-update-go-to-1.26.8.yaml
+        checksum: c79da92cf3e410b939458a977e4bfad404be4e58
+    - kind: feature
+      summary: Support the EDOT Collector kube-stack Helm chart on OpenShift
+      description: |
+        The new `kube-stack/openshift/values.yaml` file grants the minimum permissions
+        and the security settings that the EDOT Collector opentelemetry-kube-stack
+        requires to run on OpenShift. Apply it on top of the Kubernetes values file
+        (default or managed OTLP).
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16524
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1788777765
+      file:
+        name: 1788777765-edot-collector-kube-stack-openshift.yaml
+        checksum: 8f2d484ff6af5339da99f5acfc179c8b43ee4df6
+    - kind: bug-fix
+      summary: Fix Ironbank Dockerfile to restore module yml file permissions to 0644 after broad 0666 chmod.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16565
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789073037
+      file:
+        name: 1789073037-ironbank-fix-yml-permissions.yaml
+        checksum: 5329cb2100f67ac28bc95720a8e4a9fc60c3480c
+    - kind: bug-fix
+      summary: fix propagation of custom namespace for osquerybeat
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16624
+      issue:
+        - https://github.com/elastic/elastic-agent/issues/16609
+      impact: ""
+      action: ""
+      timestamp: 1789414944
+      file:
+        name: 1789414944-propagate-custom-namespace-for-osquerybeat.yaml
+        checksum: 621d182c274aa2c4555deca29c398fae33b945e3
+    - kind: enhancement
+      summary: Enable kafka exporter and receiver in FIPS builds
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16691
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789581976
+      file:
+        name: 1789581976-enable-kafka-exporter-and-receiver-in-fips-builds.yaml
+        checksum: e076f222629664f7c4ecf968571f3dc7f42111c3
+    - kind: enhancement
+      summary: Update OTel Collector components to v0.161.0
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16745
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789980231
+      file:
+        name: 1789980231-update-otel-components-to-v0.161.0.yaml
+        checksum: 9cc3353efbfffa16c8ea6833aba8cea2e6f6ab38
+    - kind: enhancement
+      summary: Support initial lookback for AWS CloudWatch logs in the EDOT Collector
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16745
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1789982424
+      file:
+        name: 1789982424-support-aws-cloudwatch-initial-lookback.yaml
+        checksum: 4d7d7f6b2b5cdc40e70ad449575671256af1c530
+    - kind: breaking-change
+      summary: The k8s_attributes processor in the EDOT Collector now emits stable Kubernetes semantic convention attribute names
+      description: |
+        The OTel Collector Contrib `k8s_attributes` processor was promoted to v1.0.0 (stable) in v0.161.0.
+        As part of this, the `processor.k8sattributes.EmitV1K8sConventions` and
+        `processor.k8sattributes.DontEmitV0K8sConventions` feature gates moved from alpha to beta and are
+        enabled by default. The processor now emits stable semantic convention attribute names
+        (e.g. singular `k8s.pod.label.*`, `k8s.pod.annotation.*`, `k8s.node.label.*`, `k8s.namespace.label.*`)
+        and no longer emits the legacy plural forms (e.g. `k8s.pod.labels.*`, `k8s.pod.annotations.*`).
+        See https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/processor/k8sattributesprocessor/README.md#semantic-conventions-compatibility
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16745
+      issue: []
+      impact: |
+        Dashboards, alerts, queries, ingest pipelines, or downstream processors that reference the legacy plural
+        attribute names (e.g. `k8s.pod.labels.*`) will stop matching data produced by the `k8s_attributes` processor.
+      action: |
+        Migrate to the stable attribute names, or temporarily restore the legacy names by disabling the gates.
+        Dual emission during a migration period is recommended:
+        `--feature-gates=-processor.k8sattributes.DontEmitV0K8sConventions,processor.k8sattributes.EmitV1K8sConventions`.
+        To emit only the legacy names, disable both gates.
+      timestamp: 1790068271
+      file:
+        name: 1790068271-k8s_attributes-processor-emits-stable-k8s-semconv-attribute-names.yaml
+        checksum: 9e3ce0a6ebe3eb4111d9297a34d5ff646b99ca31
+    - kind: bug-fix
+      summary: Removes unneeded Temporary Resource ID
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16792
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790189940
+      file:
+        name: 1790189940-autoops-remove-temp-resource-id.yaml
+        checksum: e81a93e94e8476be50b529a4087535b845afa90a
+    - kind: enhancement
+      summary: do not install manpages and docs in docker image
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16763
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790196670
+      file:
+        name: 1790196670-feat-docker-nodocs.yaml
+        checksum: 657ea4cdce5ee29d54a87cbd2c5ba407e153924b
+    - kind: bug-fix
+      summary: Drop unnecessary self-monitoring data points
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16805
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790245081
+      file:
+        name: 1790245081-self-monitoring-data-fixes.yaml
+        checksum: 18e29963d32fd1c5753d2414589e2481165cf7a0
+    - kind: bug-fix
+      summary: Fix unnecessary agent.download.retry_sleep_init_duration warning log on every policy change.
+      description: ""
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16819
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790282152
+      file:
+        name: 1790282152-fix-unnecessary-agent.download.retry_sleep_init_duration-warning-log-on-every-policy-change..yaml
+        checksum: 9cb11ab2423ce3002cb5bb3de7ff38462a773470
+    - kind: enhancement
+      summary: Run the EDOT daemon collector as non-root on OpenShift
+      description: |
+        The new `kube-stack/openshift/rootless-values.yaml` file runs the daemon
+        collector as non-root. An init container makes the filelog checkpoint
+        directory on the node writable by the collector.
+      component: elastic-agent
+      pr:
+        - https://github.com/elastic/elastic-agent/pull/16837
+      issue: []
+      impact: ""
+      action: ""
+      timestamp: 1790349506
+      file:
+        name: 1790349506-helm-edot-collector-openshift-rootless.yaml
+        checksum: 7aee4e3db1b51091465a961f3226ed29582593dd

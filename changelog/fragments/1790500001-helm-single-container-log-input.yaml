@@ -1,0 +1,17 @@
+kind: enhancement
+summary: Use a single glob filestream input for container logs in the Helm chart by default
+description: |
+  The elastic-agent Helm chart now collects container logs with a single filestream
+  input using a glob path (`/var/log/containers/*.log`, or `/var/log/pods/*/*/*.log*` with
+  `rotated_logs`) and enriches events with `add_kubernetes_metadata`, instead of one input
+  per container. The new `kubernetes.containers.logs.single_input` value controls it and
+  defaults to `true`. Set it to `false` to restore one input per container. The single input
+  takes over the state of the previous per-container inputs, so logs are not re-ingested on
+  upgrade. When `agent.presets.perNode.providers.kubernetes.namespace` is set, only the logs
+  of that namespace are collected.
+
+  The chart now fails to render with `single_input: true` if `kubernetes.containers.logs.vars`,
+  `kubernetes.namespace` or `kubernetes.onboardingID` reference a dynamic provider variable
+  (`${kubernetes.*}` or `${docker.*}`). Set `kubernetes.containers.logs.single_input` to `false`
+  in that case.
+component: elastic-agent

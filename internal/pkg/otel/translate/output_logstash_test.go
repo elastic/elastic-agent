@@ -9,8 +9,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
 )
 
 func TestLogStashToExporter(t *testing.T) {
@@ -110,7 +110,7 @@ ssl.curve_types: "P-256"
 			}
 
 			logger := logptest.NewTestingLogger(t, "test")
-			otelCfg, _, err := LogstashToOTelConfig(cfg, "", logger)
+			otelCfg, _, _, err := LogstashToOTelConfig(cfg, "", logger)
 			if err != nil {
 				t.Fatalf("error translating logstash output to logstash exporter config: %v", err)
 			}

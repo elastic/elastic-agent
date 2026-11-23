@@ -18,7 +18,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/go-ucfg"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/dispatcher"
@@ -39,6 +39,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/lazy"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker/retrier"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	otelmanager "github.com/elastic/elastic-agent/internal/pkg/otel/manager"
 	"github.com/elastic/elastic-agent/internal/pkg/queue"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -111,6 +112,9 @@ func New(
 		// If we are not running in a container, check and normalize the install descriptor before we start the agent
 		normalizeAgentInstalls(log, paths.Top(), time.Now(), initialUpdateMarker, availableRollbacksSource)
 	}
+	if err := upgrade.CleanupDiskSpaceReservations(cfg.Settings.DownloadConfig.TargetDirectory); err != nil {
+		log.Warnf("Error cleaning upgrade disk space reservations: %s", err)
+	}
 	upgrader, err := upgrade.NewUpgrader(log, cfg.Settings.DownloadConfig, cfg.Settings.Upgrade, agentInfo, new(upgrade.AgentWatcherHelper), availableRollbacksSource)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create upgrader: %w", err)
@@ -146,6 +150,9 @@ func New(
 	var composableManaged bool
 	var isManaged bool
 	var actionAcker acker.Acker
+	// hostInfo is shared by everything that reports the host information, so it's only gathered every check
+	// interval. The coordinator runs it.
+	hostInfo := hostinfo.NewWatcher(log.Named("hostinfo"), hostinfo.DefaultCheckInterval)
 	if testingMode {
 		log.Info("Elastic Agent has been started in testing mode and is managed through the control protocol")
 
@@ -241,7 +248,7 @@ func New(
 				return nil, nil, nil, fmt.Errorf("failed to create encrypted disk store: %w", err)
 			}
 			// TODO: stop using global state
-			managed, err = newManagedConfigManager(log, agentInfo, startupCfg, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, upgrader)
+			managed, err = newManagedConfigManager(log, agentInfo, startupCfg, cfg, store, runtime, fleetInitTimeout, paths.Top(), client, fleetAcker, actionAcker, retrier, stateStorage, actionQueue, availableRollbacksSource, hostInfo, upgrader)
 			if err != nil {
 				return nil, nil, nil, err
 			}
@@ -261,6 +268,7 @@ func New(
 		logLevel,
 		collectorLogger,
 		agentInfo,
+		hostInfo,
 		cfg.Settings.Collector,
 		otelmanager.CollectorStopTimeout,
 		nil,
@@ -269,7 +277,7 @@ func New(
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to create otel manager: %w", err)
 	}
-	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, compModifiers...)
+	coord := coordinator.New(log, cfg, logLevel, agentInfo, specs, reexec, upgrader, runtime, configMgr, varsManager, caps, monitor, isManaged, otelManager, actionAcker, initialUpgradeDetails, hostInfo, compModifiers...)
 	if managed != nil {
 		// the coordinator requires the config manager as well as in managed-mode the config manager requires the
 		// coordinator, so it must be set here once the coordinator is created
@@ -328,6 +336,19 @@ func normalizeAgentInstalls(log *logger.Logger, topDir string, now time.Time, in
 	_, err = upgrade.CleanAvailableRollbacks(log, rollbackSource, topDir, relHomePath, now, upgrade.PreserveActiveUpgradeVersions(initialUpdateMarker, upgrade.CleanupExpiredRollbacks))
 	if err != nil {
 		log.Warnf("Error cleaning available rollbacks: %s", err)
+	}
+}
+
+// CleanupOldBuildLogs removes the logs of old builds, keeping the running build (currentBuild) and the latest inactive one.
+// Containers (unversioned home) keep their existing layout and are skipped.
+// It is meant to run in its own goroutine, because removing files can take a while on Windows. It stops when ctx is done.
+// Errors are non-fatal and retried on the next startup.
+func CleanupOldBuildLogs(ctx context.Context, log *logger.Logger, topDir, currentBuild string) {
+	if !paths.IsVersionHome() {
+		return
+	}
+	if err := upgrade.CleanupBuildLogs(ctx, log, paths.BuildLogsRoot(topDir), currentBuild); err != nil {
+		log.Warnf("Error cleaning build logs: %s", err)
 	}
 }
 

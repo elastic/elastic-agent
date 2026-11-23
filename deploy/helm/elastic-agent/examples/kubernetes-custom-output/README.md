@@ -1,6 +1,6 @@
 # Example: Kubernetes Integration with default chart values
 
-In this example we install the built-in `kubernetes` integration with the default built-in values and a different agent output with ssl settings that allow to connect to an Elasticsearch cluster that is exposed with a self-signed certificate, namely `test`.
+In this example we install the built-in `kubernetes` integration with the default built-in values and a different agent output with ssl settings that allow connecting to an Elasticsearch cluster that is exposed with a self-signed certificate, namely `test`.
 
 ## Prerequisites:
 1. Build the dependencies of the Helm chart

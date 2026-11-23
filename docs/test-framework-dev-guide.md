@@ -170,18 +170,84 @@ share similar leavers as the packaging process.
      - `multipass`: Uses [Multipass](https://canonical.com/multipass) to
        create local VMs.
      - `kind`: Uses [Kind](https://kind.sigs.k8s.io/) to run Kubernetes
-       in Docker. This needs to be set if running Kubernetes integration
-       tests.
+       in Docker. Use this to run Kubernetes integration tests on Kind.
+     - `microshift`: Uses [MicroShift](https://microshift.io/) to run
+       OpenShift locally. Use this to run Kubernetes integration tests on
+       MicroShift.
      - `docker`: Runs each test batch in a local, systemd-enabled Docker
        container (with sshd) instead of a VM. It builds an Ubuntu image on first use and the
        runner drives the container over SSH exactly like a VM. Requires Docker.
+
+ - `STACK_PROVISIONER`: Sets the provisioner used to create the Elastic Stack
+   (Elasticsearch, Kibana, Fleet Server) the tests talk to. Possible values are:
+     - `stateful`: Provisions a cloud ESS deployment (the default). Requires an
+       ESS API key (`mage integration:auth`).
+     - `serverless`: Provisions a cloud serverless project. Also requires an ESS
+       API key.
+     - `external`: Uses an existing stack supplied via environment variables
+       (`ELASTICSEARCH_HOST`, `KIBANA_HOST`, `ELASTICSEARCH_USERNAME`,
+       `ELASTICSEARCH_PASSWORD`). It creates and deletes nothing, and needs no
+       cloud account or local stack. Useful in CI, where a stack is provisioned
+       separately before the tests run.
+     - `local`: Brings up a fully local stack with
+       [`elastic-package stack up`](https://github.com/elastic/elastic-package) —
+       no cloud account needed. Requires the `elastic-package` binary on `PATH`
+       (`go install github.com/elastic/elastic-package@latest`, or point
+       `ELASTIC_PACKAGE_BIN` at it). It uses a dedicated elastic-package profile
+       (`elastic-agent-integration`, override with `ELASTIC_PACKAGE_PROFILE`) so it
+       does not disturb a stack you may run yourself in the `default` profile.
+
+       The stack pulls Elastic images from `docker.elastic.co`, including the
+       package-registry image, which requires authentication. Run a one-time
+       `docker login docker.elastic.co` before first use. (elastic-package has no
+       supported way to skip the package-registry — Kibana depends on it — and its
+       image has no override, so authenticating is currently the simplest path.)
+
+   The `local` stack is designed to pair with the `docker` instance provisioner.
+   The local stack serves Elasticsearch/Kibana/Fleet over HTTPS with a self-signed
+   CA, so the runner:
+     - installs that CA into the test container's system trust store, so both the
+       test clients and the agent under test trust the stack with no `--insecure`
+       or per-test certificate configuration (both fall back to the system trust
+       store when no CA is configured); and
+     - attaches the test container to elastic-package's compose network, so the
+       container reaches the stack by service name (`https://elasticsearch:9200`,
+       `https://kibana:5601`, `https://fleet-server:8220`) — the names covered by
+       each service certificate's SANs, so TLS hostname verification passes; and
+     - relaxes a couple of Elasticsearch cluster settings on the single-node local
+       stack (disables disk-watermark-based allocation and raises the per-node shard
+       cap), since the suites create many data streams and would otherwise hit
+     `503 no_shard_available_action_exception`.
+
+   It also works with `mage integration:local`: host-mode tests use the stack's
+   published loopback endpoints and trust its CA via `SSL_CERT_FILE`, without
+   modifying the host's system trust store.
+
+   Remote stack provisioners work with both local and remote instance
+   provisioners. The local stack provisioner requires a local instance
+   provisioner with an implemented connectivity bridge; currently `docker` and
+   the host-local runner are supported. Multipass and Kind are rejected before
+   provisioning until their local-stack networking support is implemented.
+
+   On **macOS** you need to build a Linux package on the same arch as your host. 
+
+   Example (no cloud account required):
+   ```
+   PLATFORMS=linux/$(go env GOARCH) mage package
+   STACK_PROVISIONER=local INSTANCE_PROVISIONER=docker \
+     TEST_PLATFORMS="linux/$(go env GOARCH)/ubuntu/24.04" AGENT_VERSION="9.5.0-SNAPSHOT" \
+     TEST_PACKAGES=tar.gz mage integration:single TestSystemMetricsWithLogstashOutput
+   ```
 
 When running local mode integration tests, `BUILD_AGENT=true` will build the agent for the current platform before running.
 
 An example for running a single test, including packaging the artifacts for it is:
 ```
-DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package # create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
-INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME # Run TEST_NAME on a multipass VM
+# Create elastic-agent snapshot package (EXTERNAL=true and snapshot state from .package-version by default)
+DEV=true PACKAGES="tar.gz,rpm,deb" PLATFORMS="linux/amd64" mage package 
+
+# Run TEST_NAME on a multipass VM
+INSTANCE_PROVISIONER="multipass" TEST_PLATFORMS="linux/amd64" mage integration:single $TEST_NAME 
 ```
 
 ### TL;DR: Packaging and running tests
@@ -219,11 +285,11 @@ SNAPSHOT=true INSTANCE_PROVISIONER=kind mage -v integration:testKubernetesSingle
 
 #### Kubernetes oriented tests
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetes` to run kubernetes tests under the `testing/integration/k8s` folder for the default image on the default version of kubernetes (all previous commands will not run any kubernetes tests).
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetesMatrix` to run a matrix of kubernetes tests under the `testing/integration/k8s` folder for all image types and supported versions of kubernetes.
 
-- `INSTANCE_PROVISIONER=kind mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
+- `INSTANCE_PROVISIONER=[kind|microshift] mage integration:testKubernetesSingle [testName|all]` to execute a single test under the `testing/integration/k8s` folder. Only the selected test will be executed.
 
 #### Serverless oriented tests
 
@@ -253,7 +319,8 @@ between, and it can be very specific or not very specific.
 - `TEST_PLATFORMS="linux/amd64/ubuntu/20.04" mage integration:test` to execute tests only on Ubuntu 20.04 ARM64.
 - `TEST_PLATFORMS="windows/amd64/2022" mage integration:test` to execute tests only on Windows Server 2022.
 - `TEST_PLATFORMS="linux/amd64 windows/amd64/2022 mage integration:test` to execute tests on Linux AMD64 and Windows Server 2022.
-- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/arm64/1.36.1/wolfi" mage integration:testKubernetes` to execute kubernetes tests on Kubernetes version 1.36.1 with wolfi docker variant under kind cluster.
+- `INSTANCE_PROVISIONER="kind" TEST_PLATFORMS="kubernetes/amd64/1.36.1/wolfi" mage integration:testKubernetes` to execute Kubernetes tests on Kubernetes version 1.36.1 with the wolfi Docker variant under a Kind cluster.
+- `INSTANCE_PROVISIONER="microshift" TEST_PLATFORMS="kubernetes/amd64/1.35.0/basic" mage integration:testKubernetes` to execute Kubernetes tests on OpenShift version 4.22.0 (Kubernetes 1.35) with the basic Docker variant under a MicroShift cluster.
 
 > [!NOTE]
 > This only filters down the tests based on the platform. It will not execute a tests on a platform unless
@@ -262,12 +329,12 @@ between, and it can be very specific or not very specific.
 #### Selecting specific group
 
 By default, the runner will run all test groups. Each group runs on a dedicated machine instance. When working on groups of tests it's better to limit to a specific
-group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default upgrade-standalone"`
+group of tests instead of running all tests. This can be done by using the `TEST_GROUPS="default standalone-upgrade"`
 environment variable. This variable can take multiple groups with a space between.
 
 - `TEST_GROUPS="default" mage integration:test` to execute only tests in the "default" group.
-- `TEST_GROUPS="default upgrade-standalone" mage integration:test` to execute only tests in the "default" or
-"upgrade-standalone" group.
+- `TEST_GROUPS="default standalone-upgrade" mage integration:test` to execute only tests in the "default" or
+"standalone-upgrade" group.
 
 #### Passing additional go test flags
 
@@ -354,6 +421,10 @@ when running them manually, such as `ELASTICSEARCH_HOST`, `ELASTICSEARCH_USERNAM
 `TEST_INTEG_CLEAN_ON_EXIT=true|false` will determine whether mage artifacts and .integration-cache are cleaned on exit automatically. Defaults to `false` (no automatic cleanup) for local runs; CI sets this to `true` explicitly.
 
 ### Debugging tests
+
+For CI failures and diagnostics bundles, the repository ships agent skills (in [.agents/skills/](../.agents/skills/)):
+`elastic-agent-it-failure-rca` for root-causing integration test failures from CI and `elastic-agent-diagnostics` for
+analyzing diagnostics bundles.
 
 #### Connecting to VMs
 All VMs (including Windows) support connections via SSH, the framework
@@ -472,6 +543,10 @@ When an integration test fails the testing fixture will try its best to automati
 information of the installed Elastic Agent. In the case that diagnostics is collected the test runner will
 automatically transfer any collected diagnostics from the instance back to the running host. The results of the
 diagnostic collection are placed in `build/diagnostics`.
+Each bundle is named `<TestName>-<timestamp>-diagnostics.zip`, with `/` in subtest names replaced by `-`. The test name is
+the one the fixture was created with (`Fixture.FileNamePrefix`), which for suite-style tests can be the parent test.
+A test that runs several agents, for example Fleet Server and the agent under test, produces one bundle per agent.
+See [diagnostics.md](./diagnostics.md) for what is in a bundle.
 
 #### Gather diagnostics manually
 In the case that you want to run the integration testing suite and have it gather the diagnostics at the end of
@@ -528,53 +603,107 @@ the `github.com/elastic/elastic-agent/pkg/testing/define` package for the test
 framework's API and the `github.com/elastic/elastic-agent/pkg/testing/tools`
 package for helper utilities.
 
+### Writing stable tests
+
+The tests run on real VMs against a stack shared by all CI jobs, on hosts that differ in speed, distro and load. A test
+that passes locally can flake weeks later, so keep these in mind:
+
+- **Poll what you assert.** Wait for the value the assertion needs, not a weaker proxy: a file existing is not it having
+  content, and a successful Kibana policy update is not the agent having applied it (wait for the applied revision
+  with `tools.IsMinPolicyRevision`, using the revision returned by the update and comparing with `>=`).
+- **Read agent-local state locally.** The agent's document in Fleet only advances on check-in, which a test can't
+  force. If the value is in `elastic-agent status` (`Fixture.ExecStatus`), poll that.
+- **Budgets need headroom over the intervals that bound them.** Fleet Server's check-in long poll is 5 minutes by
+  default, so a wait for a Fleet-reported change must be longer than that. An outer context must exceed the sum of
+  the serial waits inside it.
+- **Assert on the `*assert.CollectT` inside `EventuallyWithT`**, not on the outer `t`, otherwise the first transient
+  error fails the test instead of being retried. Don't call `require` or `assert` on `t` from a goroutine that can
+  outlive the test, and use `t.Context()` rather than `context.Background()` so waits respect the test deadline.
+- **Produce your own data and filter on it.** Don't wait for ambient events (audit, network traffic) the test did not
+  cause, and filter Elasticsearch queries on values the test controls (namespace, tag, a generated message). Capture
+  a `@timestamp` lower bound *before* the action that produces the document.
+- **Don't assert exact counts of live data** (documents, components). Retries, restarts and runtime switches change
+  them. Use thresholds or poll until stable.
+- **Don't assume the runtime.** Beats may run as processes or as receivers in the collector. Set the runtime explicitly
+  when the test depends on it, see [hybrid-agent-beats-receivers.md](./hybrid-agent-beats-receivers.md).
+- **Don't assert a healthy agent when the config breaks something on purpose.** An unreachable output makes the agent
+  degraded at a nondeterministic moment. Use `integration.StartMockES` for a placeholder output, or
+  `Fixture.IsHealthyOrDegradedFromOutput`.
+- **Isolate from other tests.** Use `info.Namespace` for data, give cluster-global Elasticsearch objects test-specific
+  names, avoid fixed ports, and don't modify shared Fleet objects such as `fleet-default-output` on the shared stack.
+  Register cleanup with `t.Cleanup` so it also runs on failure, so a failed test doesn't leave an installed agent behind.
+- **Use the fixture.** Install and manage the agent with `Fixture` (`Install`, `Configure`, `Exec`) instead of
+  starting the binary by hand, so diagnostics are collected on failure.
+- **Skips** link an issue, come after `define.Require`, and are limited to the affected platform or version.
+
 ### Test group
 
-Every `define.Require` must define a `Group` that it belongs too. Each group is executed on a separate instance with all tests with in the same group executed
-on the same instance. Placing similar tests in the same group allows those tests to run on its own instance
-as well as provides a way for a developer to select a specific group of tests with `TEST_GROUP="{group-name}"`.
+Every `define.Require` must define a `Group` that it belongs to. Each group is executed on a separate instance with all tests within the same group executed
+on the same instance. Placing similar tests in the same group allows those tests to run on their own instance
+as well as provides a way for a developer to select a specific group of tests with `TEST_GROUPS="{group-name}"`.
 
 Grouping tests is another way of spreading out the testing load across multiple instances. The more groups that
 are defined the more instances will be provisioned to complete all tests. A balance between a small good set of
 groups is better than a ton of groups each executing a small set of tests, as the time to set up an instance can
-out weight the benefits of creating another group.
+outweigh the benefits of creating another group.
 
 #### Creating a new test group and Buildkite integration tests
 
-  When creating a new test group, it is important to add the new group to the job in the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
+  When creating a new test group, it is important to add the new group to the variant lists at the top of the `.buildkite/bk.integration.pipeline.yml` file. This will ensure that the new group is executed in the CI pipeline.
 
-  Add the new group to the `matrix` in the corresponding steps. The matrix is a list of all test groups that are executed in the step.
+  The groups are defined as YAML anchors (`windows_variants`, `linux_deb_variants`, `linux_rpm_variants`, `linux_arm_variants`),
+  which the tiered steps reference as the `variant` axis of their `matrix`. Add the new group to every list for a platform it should run on.
+  Some steps (for example the non-sudo ones) list only the `default` variant instead of an anchor, so check which tiers and steps should run the new group.
   Example:
 
   ```yaml
-  - label: "x86_64:sudo: {{matrix}}"
-        command: |
-          ...
-        artifact_paths:
-          - build/**
-        agents:
-          provider: "gcp"
-          machineType: "n1-standard-8"
-          image: "family/platform-ingest-elastic-agent-ubuntu-2404"
-        plugins:
-          - elastic/vault-secrets#v0.1.0:
-              path: "kv/ci-shared/platform-ingest/buildkite_analytics_token"
-              field: "token"
-              env_var: "BUILDKITE_ANALYTICS_TOKEN"
-          - test-collector#v1.11.0:
-              files: "build/TEST-*.xml"
-              format: "junit"
-              debug: true
-              annotation-link: true
-        matrix:
-          - default
-          - container
-          - fleet-upgrade-to-pr-build
-          - upgrade
-          - fleet
+  - linux_deb_variants: &linux_deb_variants
+    - container
+    - deb
+    - default
+    - your-new-group
+    # ...
+
+  - label: "linux:amd64:tier1:sudo:{{matrix.variant}}"
+    # ...
+    matrix:
+      setup:
+        variant: *linux_deb_variants
   ```
 
+  Test results are not collected in each of these steps: they upload `build/*` (including the JUnit `.xml` reports) as artifacts, and the single
+  `Aggregate test reports` step downloads them and runs the Buildkite `test-collector` plugin over `build/*.xml`.
+
   This requirement is temporary and will be removed once the Buildkite pipeline is updated to automatically detect new test groups.
+
+### CI tiers for extended/stateful testing
+
+`.buildkite/bk.integration.pipeline.yml` runs the "Stateful" (ESS-backed) Linux and Windows
+integration tests. To keep PR feedback fast while still getting broad OS coverage, the pipeline
+splits these tests into three tiers:
+
+- **Tier 1** — Runs on every pull request (`if: build.pull_request.id != null`). It exercises only
+  the default variant on the newest supported OS per platform (currently Ubuntu 24.04 for Linux,
+  Windows Server 2022 for Windows). This tier must stay small and fast, since it gates every PR.
+- **Tier 2** — Runs when relevant files change (`if_changed`, e.g. `.buildkite/**`, `magefile.go`,
+  `dev-tools/**`, `go.mod`/`go.sum`). It adds one additional OS per package family (for example
+  Debian 13 for `.deb` and RHEL 10 for `.rpm`) to catch packaging/tooling regressions without
+  running on every PR.
+- **Tier 3** — Runs only on a schedule or when triggered from the scheduler pipeline
+  (`build.source == "schedule"` or `BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG ==
+  "elastic-agent-pipeline-scheduler"`). This is the broadest matrix: it exercises the full set of
+  supported OS versions and package variants (including `stress`), and covers arm64 in addition to
+  amd64. Because it's the most expensive tier, it does not block PRs.
+
+When a new OS image is added to the support matrix (see the `IMAGE_*` environment variables at the
+top of `bk.integration.pipeline.yml`), it should generally be added to the tier 3 `matrix.setup.os`
+list first. Promote it to tier 2 or tier 1 only when it needs to run more frequently (e.g. it's
+becoming the new default, or it validates something that changes often).
+
+Image versions are timestamped VM image names (for example
+`platform-ingest-elastic-agent-ubuntu-2604-1789378451`) that are bumped automatically across all
+`.buildkite/*.yml` files by the `updatecli-bump-vm-images.yml` Updatecli pipeline
+(`.ci/updatecli/updatecli-bump-vm-images.yml`).
 
 ### Test namespaces
 
@@ -611,6 +740,11 @@ Use only when running Kubernetes tests. Uses local installed kind to create Kube
 
 - `INSTANCE_PROVISIONER="kind" mage integration:testKubernetes`
 
+### MicroShift Instance Provisioner
+Use only when running Kubernetes tests on OpenShift. Uses local installed MicroShift to create OpenShift clusters on the fly.
+
+- `INSTANCE_PROVISIONER="microshift" mage integration:testKubernetes`
+
 ### Docker Instance Provisioner
 Runs each test batch in a local, systemd-enabled Docker container (running `sshd`)
 instead of a VM. Because the container runs systemd as PID 1, the privileged
@@ -642,6 +776,16 @@ Notes:
   `/var/lib/containerd` are backed by volumes (removed with the container via
   `docker rm -fv`) because the nested daemon's overlay storage cannot stack on the
   container's own overlay rootfs.
+- **Known limitation — kernel audit tests (`TestAuditdCorrectBinaries`):** The Linux
+  kernel audit subsystem (`NETLINK_AUDIT`) restricts control operations such as
+  `AUDIT_GET` and `AUDIT_ADD_RULE` to processes running in the **initial PID namespace**.
+  Docker containers always run in their own PID namespace; even a fully `--privileged`
+  container cannot access the audit subsystem. Running with `--pid=host` would grant
+  access but is incompatible with the container design (systemd must be PID 1).
+  `TestAuditdCorrectBinaries` therefore cannot pass with the Docker instance provisioner
+  and must be run against a real VM (e.g. `INSTANCE_PROVISIONER=multipass`), a cloud
+  environment, or locally as root via `mage integration:local` (which runs directly on
+  the host in the initial PID namespace).
 
 ## Troubleshooting Tips
 

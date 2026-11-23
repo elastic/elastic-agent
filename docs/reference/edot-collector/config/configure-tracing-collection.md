@@ -42,8 +42,6 @@ exporters:
   elasticsearch/otel:
     endpoints: ["${env:ELASTIC_ENDPOINT}"]
     api_key: ${env:ELASTIC_API_KEY}
-    mapping:
-      mode: otel
 
 service:
   pipelines:
@@ -122,8 +120,6 @@ exporters:
     endpoints:
       - ${ELASTIC_ENDPOINT}
     api_key: ${ELASTIC_API_KEY}
-    mapping:
-      mode: otel
 
 service:
   pipelines:
@@ -289,8 +285,6 @@ exporters:
     endpoints:
       - ${ELASTIC_ENDPOINT}
     api_key: ${ELASTIC_API_KEY}
-    mapping:
-      mode: otel
 
 service:
   pipelines:

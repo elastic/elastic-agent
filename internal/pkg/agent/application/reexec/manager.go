@@ -5,9 +5,49 @@
 package reexec
 
 import (
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
+	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
+
+// The following are overridable in tests so the re-exec preconditions can be
+// exercised without manipulating the real process/installation state.
+var (
+	runningInstalled       = paths.RunningInstalled
+	runningUnderSupervisor = info.RunningUnderSupervisor
+	releaseUpgradeable     = release.Upgradeable
+)
+
+// CanReExec reports the checks shared by every action that re-executes the agent
+// process (RESTART, UPGRADE): the process must be running under the control of
+// the system supervisor (systemd/launchd/Windows service) so the re-execution is
+// recovered. It is composed by CanRestart and CanUpgrade rather than used
+// directly, so that action-specific preconditions live next to the shared one.
+func CanReExec() bool {
+	return runningUnderSupervisor()
+}
+
+// CanRestart reports whether a RESTART action can be performed. A restart has no
+// preconditions beyond the shared ones (CanReExec): it re-executes the current
+// binary in place without touching the installation layout, so a supervised
+// agent can be restarted regardless of how it was deployed — the install
+// sub-command, a DEB or an RPM package. Unsupervised processes (a bare
+// interactive binary, or an agent running as PID 1 in a container) are excluded
+// because a re-execution there would not be recovered by a supervisor.
+func CanRestart() bool {
+	return CanReExec()
+}
+
+// CanUpgrade reports whether an UPGRADE action can be performed. In addition to
+// the shared re-exec checks, an upgrade needs the installed layout (the
+// versioned directories, top-level symlink and upgrade watcher) created by the
+// install sub-command, so it is restricted to agents installed that way. A build
+// compiled specifically with upgrading enabled is always considered upgradeable.
+func CanUpgrade() bool {
+	return releaseUpgradeable() || (runningInstalled() && CanReExec())
+}
 
 // ExecManager is the interface that the global reexec manager implements.
 type ExecManager interface {

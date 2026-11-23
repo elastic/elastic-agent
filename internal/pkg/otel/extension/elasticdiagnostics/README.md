@@ -18,7 +18,7 @@ The extension accepts the `endpoint` as a sole parameter. The endpoint should be
 - Acts as a registrar and keeps track of common diagnostic hooks.
 - Collects profiles using `runtime/pprof`.
 - Collects internal telemetry exposed by the OTeL Collector.
-- Implements the `extensioncapabilities.ConfigWatcher` interface and stores the latest configuration of the running collector.
+- Implements the `extensioncapabilities.ConfigSnapshotWatcher` interface and stores the latest effective configuration of the running collector.
 - Listens for diagnostic requests and provides diagnostic data.
 - Routes Fleet actions to the beat receiver instance they target and returns the result.
 
@@ -27,6 +27,8 @@ The extension accepts the `endpoint` as a sole parameter. The endpoint should be
 ### Diagnostic hooks:
 - Individual beats register custom diagnostic hooks and these hooks are called when we run the elastic-agent diagnostics command.
 - Our extension stores these hooks and executes them everytime it gets a "diagnostics" request.
+- Registering a hook again for the same component and filename replaces the earlier one.
+- The extension is a `componentstatus.Watcher`: when the collector reports that a component has stopped, its hooks are dropped, so a receiver removed or restarted by a config reload is no longer referenced and no longer appears in diagnostics bundles.
 
 ### Request/Response format:
 - This extension runs an HTTP server and listens to new requests on `/diagnostics` path.

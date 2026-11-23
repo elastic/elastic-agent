@@ -11,8 +11,8 @@ import (
 	"os"
 	"sync"
 
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 )
@@ -173,7 +173,7 @@ func newEndpointTLSComponentModifier(log *logger.Logger, cache *tlsCache) func(c
 
 		unitCfg, err := component.ExpectedConfig(unitCfgMap)
 		if err != nil {
-			return nil, fmt.Errorf("EndpointTLSComponentModifier: could not covert modified config to expected config: %w", err)
+			return nil, fmt.Errorf("EndpointTLSComponentModifier: could not convert modified config to expected config: %w", err)
 		}
 
 		unit.Config = unitCfg

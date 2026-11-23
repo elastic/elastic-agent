@@ -14,12 +14,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestGetRetryConfig(t *testing.T) {
@@ -64,12 +67,12 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -100,15 +103,18 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -119,7 +125,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -134,11 +140,11 @@ api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -171,9 +177,12 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -184,7 +193,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -200,11 +209,11 @@ parameters:
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200?somekey=somevalue
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -237,9 +246,12 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -250,10 +262,42 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
+	})
+
+	t.Run("output parameters are retained on exporter endpoints and excluded from beatsauth endpoints", func(t *testing.T) {
+		cfg := config.MustNewConfigFrom(map[string]any{
+			"hosts":      []any{"es-1:9200", "es-2:9200", "es-3:9200"},
+			"parameters": map[string]any{"somekey": "somevalue"},
+		})
+
+		esExporterCfg, _, extensions, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		assert.Equal(
+			t,
+			[]string{
+				"http://es-1:9200?somekey=somevalue",
+				"http://es-2:9200?somekey=somevalue",
+				"http://es-3:9200?somekey=somevalue",
+			},
+			esExporterCfg["endpoints"],
+			"exporter endpoints must retain output parameters",
+		)
+
+		beatsAuthConfig := extensions["beatsauth/_agent-component/"].(map[string]any)
+		assert.Equal(
+			t,
+			[]string{
+				"http://es-1:9200",
+				"http://es-2:9200",
+				"http://es-3:9200",
+			},
+			beatsAuthConfig["endpoints"],
+			"beatsauth endpoints must exclude unsupported output parameters",
+		)
 	})
 
 	t.Run("ssl setting of type []string can be a string", func(t *testing.T) {
@@ -261,18 +305,18 @@ logs_dynamic_pipeline:
 hosts: "localhost:9200"
 index: "some-index"
 api_key: "TiNAGG4BaaMdaH1tRfuU:KnR6yE41RrSowb0kQ0HWoA"
-ssl.certificate_authorities: "/not/a/real/path/ca.pem"
+ssl.certificate_authorities: "testdata/certs/rootCA.crt"
 ssl.supported_protocols: "TLSv1.3"
-ssl.cipher_suites: "ECDHE-ECDSA-AES-256-CBC-SHA"
+ssl.cipher_suites: "ECDHE-ECDSA-AES-128-GCM-SHA256"
 ssl.curve_types: "P-256"
 `
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 retry:
   enabled: true
   initial_interval: 1s
@@ -305,9 +349,12 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 max_conns_per_host: 1
 api_key: VGlOQUdHNEJhYU1kYUgxdFJmdVU6S25SNnlFNDFSclNvd2Iwa1EwSFdvQQ==
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -318,7 +365,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config ")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -338,6 +385,8 @@ preset: %s
 `
 
 		commonOTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -366,13 +415,13 @@ logs_index: some-index
 password: changeme
 user: elastic
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
 `
 
@@ -396,6 +445,7 @@ sending_queue:
   queue_size: 6400
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -410,15 +460,18 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 8
-  queue_size: 25600
+  num_consumers: 5
+  queue_size: 16000
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
 				presetName: "scale",
 				output: `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -459,14 +512,15 @@ sending_queue:
   queue_size: 6400
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
 include_source_on_error: true
 logs_dynamic_id:
-  enabled: true
-logs_dynamic_pipeline:
   enabled: true
  `,
 			},
@@ -486,6 +540,7 @@ sending_queue:
   queue_size: 4100
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 			{
@@ -504,6 +559,7 @@ sending_queue:
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
  `,
 			},
 		}
@@ -511,7 +567,7 @@ suppress_conflict_errors: true
 		for _, test := range tests {
 			t.Run("config translation w/"+test.presetName, func(t *testing.T) {
 				cfg := config.MustNewConfigFrom(fmt.Sprintf(commonBeatCfg, test.presetName))
-				got, _, err := ESToOTelConfig(cfg, "", logger)
+				got, _, _, err := ESToOTelConfig(cfg, "", logger)
 				require.NoError(t, err, "error translating elasticsearch output to OTel ES exporter type")
 				expOutput := newFromYamlString(t, test.output)
 				compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -539,12 +595,12 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -575,15 +631,18 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -594,7 +653,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -620,12 +679,12 @@ headers:
   X-Bar-Header: bar`
 
 		OTelCfg := `
+auth:
+  authenticator: beatsauth/_agent-component/
 endpoints:
   - http://localhost:9200/foo/bar
   - http://localhost:9300/foo/bar
 logs_index: some-index
-logs_dynamic_pipeline:
-  enabled: true
 max_conns_per_host: 60
 password: changeme
 retry:
@@ -638,15 +697,18 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 120
+  num_consumers: 61
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 user: elastic
 headers:
   X-Header-1: foo
   X-Bar-Header: bar
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 compression: gzip
 compression_params:
   level: 1
@@ -657,7 +719,7 @@ logs_dynamic_pipeline:
   enabled: true
  `
 		cfg := config.MustNewConfigFrom(beatCfg)
-		got, _, err := ESToOTelConfig(cfg, "", logger)
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
 		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
@@ -677,6 +739,8 @@ index: "some-index"
 compression_level: %d`
 
 	otelConfig := `
+auth:
+  authenticator: beatsauth/_agent-component/
 logs_dynamic_pipeline:
   enabled: true
 endpoints:
@@ -714,11 +778,14 @@ sending_queue:
     sizer: items
   block_on_overflow: true
   enabled: true
-  num_consumers: 4
+  num_consumers: 3
   queue_size: 3200
   wait_for_result: true
 suppress_conflict_errors: true
+timeout: 1m30s
 bulk_response_filter_path: errors,items.*.error,items.*.status,items.*.failure_store
+version_detection:
+  enabled: false
 {{ if gt . 0 }}
 compression: gzip
 compression_params:
@@ -729,14 +796,12 @@ compression: none
 include_source_on_error: true
 logs_dynamic_id:
   enabled: true
-logs_dynamic_pipeline:
-  enabled: true
 `
 
 	for level := range 9 {
 		t.Run(fmt.Sprintf("compression-level-%d", level), func(t *testing.T) {
 			cfg := config.MustNewConfigFrom(fmt.Sprintf(compressionConfig, level))
-			got, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+			got, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 			var otelBuffer bytes.Buffer
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
@@ -766,10 +831,25 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 			cfg, err := config.NewConfigFrom(c.cfg)
 			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
 
-			_, _, err = ESToOTelConfig(cfg, "", logger)
+			_, _, _, err = ESToOTelConfig(cfg, "", logger)
 			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}
+}
+
+func TestESToOTelConfigRejectsHostURLCredentials(t *testing.T) {
+	cfg := config.MustNewConfigFrom(map[string]any{
+		"hosts": []any{"https://user:secret@es.example:9200"},
+	})
+
+	_, _, _, err := ESToOTelConfig(cfg, "", logp.NewNopLogger())
+	require.ErrorContains(
+		t,
+		err,
+		"credentials in Elasticsearch host URLs are unsupported; configure username and password separately",
+		"URL-embedded credentials must be rejected during translation",
+	)
+	assert.NotContains(t, err.Error(), "secret", "translation error must not expose the URL password")
 }
 
 func TestCalcNamedPresetSizing(t *testing.T) {
@@ -794,8 +874,8 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:      4,
 			batchSize:     1600,
 			floor:         12800,
-			wantQueueSize: 25600, // 2*1600*8=25600 > floor 12800
-			wantConsumers: 8,
+			wantQueueSize: 16000, // 2*1600*5=16000 > floor 12800
+			wantConsumers: 5,
 		},
 		{
 			name:      "latency preset floor kicks in without cap",
@@ -812,7 +892,7 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:      30,
 			batchSize:     1600,
 			floor:         3200,
-			wantQueueSize: maxQueueEvents,                  // 2*1600*60=192000 > 64000
+			wantQueueSize: maxQueueEvents,                  // 2*1600*31=99200 > 64000
 			wantConsumers: max(1, maxQueueEvents/(2*1600)), // 20
 		},
 		{
@@ -820,7 +900,7 @@ func TestCalcNamedPresetSizing(t *testing.T) {
 			maxConns:  30,
 			batchSize: 1600,
 			floor:     maxQueueEvents + 10000, // hypothetical: preset floor above memory ceiling
-			// formula 192000 > 64000: cap to 64000, numConsumers=20;
+			// formula 99200 > 64000: cap to 64000, numConsumers=20;
 			// then floor 74000 > 64000: apply floor and recalculate
 			wantQueueSize: maxQueueEvents + 10000,
 			wantConsumers: max(1, (maxQueueEvents+10000)/(2*1600)),
@@ -872,4 +952,241 @@ func compareAndAssert(t *testing.T, expectedOutput *confmap.Conf, gotOutput *con
 	require.NoError(t, err)
 
 	assert.Equal(t, string(want), string(got))
+}
+
+func TestGetBeatsAuthExtensionConfigIncludesEndpointsAndAuthentication(t *testing.T) {
+	t.Setenv("ELASTICSEARCH_AUTH_HOST", "es.example")
+
+	source := map[string]any{
+		"hosts": []any{
+			"${ELASTICSEARCH_AUTH_HOST}:9200",
+			"es-secondary.example:9201",
+		},
+		"protocol":                    "https",
+		"path":                        "/elastic",
+		"parameters":                  map[string]any{"routing": "state loader"},
+		"username":                    "heartbeat",
+		"password":                    "secret",
+		"headers":                     map[string]any{"X-State-Loader": "true"},
+		"proxy_url":                   "http://proxy.example:8080",
+		"idle_connection_timeout":     "17s",
+		"ssl.certificate_authorities": "testdata/certs/rootCA.crt",
+		"ssl.certificate":             "testdata/certs/client.crt",
+		"ssl.key":                     "testdata/certs/client-unencrypted.key",
+		"ssl.verification_mode":       "strict",
+		"bulk_max_size":               123,
+		"compression_level":           9,
+		"index":                       "exporter-only",
+		"pipeline":                    "exporter-only",
+		"timeout":                     "42s",
+	}
+
+	cfg, err := config.NewConfigFrom(source)
+	require.NoError(t, err, "source output config must be valid")
+
+	got, err := getBeatsAuthExtensionConfig(cfg)
+	require.NoError(t, err, "beatsauth config must translate")
+
+	assert.Equal(
+		t,
+		[]string{
+			"https://es.example:9200/elastic",
+			"https://es-secondary.example:9201/elastic",
+		},
+		got["endpoints"],
+		"beatsauth must contain resolved endpoints without unsupported output parameters",
+	)
+
+	assert.Equal(
+		t,
+		map[string]any{
+			"headers": []map[string]string{{
+				"key":   "X-State-Loader",
+				"value": "true",
+			}},
+			"password": "secret",
+			"username": "heartbeat",
+		},
+		got["auth"],
+		"beatsauth must own output authentication and headers",
+	)
+}
+
+func TestHeartbeatElasticsearchAuthDelegatesTransportSettings(t *testing.T) {
+	const (
+		outputName         = "default"
+		trustedFingerprint = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		caSHA256           = "GkPh2Lqh6eDoIatcr5AlZTAIKcIz/AWC61lrWgRwwe8="
+	)
+	output := map[string]any{
+		"hosts":                      []any{"localhost:9200"},
+		"preset":                     "throughput",
+		"proxy_disable":              true,
+		"proxy_headers":              map[string]any{"X-Proxy": "value"},
+		"ssl.ca_sha256":              []any{caSHA256},
+		"ssl.ca_trusted_fingerprint": trustedFingerprint,
+		"ssl.verification_mode":      "certificate",
+	}
+	comp := &component.Component{
+		ID:         "heartbeat-default",
+		InputType:  "synthetics/http",
+		OutputType: "elasticsearch",
+		OutputName: outputName,
+		InputSpec: &component.InputRuntimeSpec{
+			BinaryName: "elastic-otel-collector",
+			Spec: component.InputSpec{
+				Command: &component.CommandSpec{Args: []string{"heartbeat"}},
+			},
+		},
+		Units: []component.Unit{{
+			ID:     "heartbeat-default",
+			Type:   client.UnitTypeOutput,
+			Config: component.MustExpectedConfig(output),
+		}},
+	}
+
+	_, _, extensions, _, err := getExporterConfigForComponent(
+		comp,
+		otelcomponent.MustNewType("elasticsearch"),
+		logp.NewNopLogger(),
+	)
+	require.NoError(t, err, "Heartbeat translation must accept transport and TLS settings")
+
+	beatsAuthID := getBeatsAuthExtensionID(outputName).String()
+	beatsAuth, ok := extensions[beatsAuthID].(map[string]any)
+	require.True(t, ok, "Heartbeat translation must generate the output-scoped beatsauth extension")
+	assert.Equal(t, []string{"http://localhost:9200"}, beatsAuth["endpoints"], "beatsauth must contain output endpoints")
+	assert.Equal(t, "15s", beatsAuth["idle_connection_timeout"], "beatsauth must retain the effective throughput-preset idle timeout")
+	assert.Equal(t, true, beatsAuth["proxy_disable"], "beatsauth must retain proxy_disable")
+	assert.Equal(t, map[string]any{"X-Proxy": "value"}, beatsAuth["proxy_headers"], "beatsauth must retain proxy_headers")
+
+	tlsConfig, ok := beatsAuth["ssl"].(map[string]any)
+	require.True(t, ok, "beatsauth must retain TLS settings")
+	assert.Equal(t, trustedFingerprint, tlsConfig["ca_trusted_fingerprint"], "beatsauth must retain the trusted CA fingerprint")
+	assert.Equal(t, []any{caSHA256}, tlsConfig["ca_sha256"], "beatsauth must retain CA SHA-256 pins")
+	assert.Equal(t, uint64(2), tlsConfig["verification_mode"], "beatsauth must retain certificate verification mode")
+}
+
+func TestGetBeatsAuthExtensionConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		outputCfg     map[string]any
+		expected      map[string]any
+		expectedError string
+	}{
+		{
+			name:      "empty config",
+			outputCfg: map[string]any{},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"timeout":                 "1m30s",
+			},
+		},
+		{
+			name: "with proxy_url and timeout",
+			outputCfg: map[string]any{
+				"proxy_url": "http://proxy.example.com:8080",
+				"timeout":   "2m",
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"proxy_url":               "http://proxy.example.com:8080",
+				"timeout":                 "2m0s",
+			},
+		},
+		{
+			name: "with API key",
+			outputCfg: map[string]any{
+				"api_key": "id:key",
+			},
+			expected: map[string]any{
+				"auth": map[string]any{
+					"api_key": "aWQ6a2V5",
+				},
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"timeout":                 "1m30s",
+			},
+		},
+		{
+			name: "with ssl enabled",
+			outputCfg: map[string]any{
+				"ssl.enabled": true,
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"ssl": map[string]interface{}{
+					"ca_sha256":                  []interface{}{},
+					"ca_trusted_fingerprint":     "",
+					"certificate":                "",
+					"certificate_authorities":    []interface{}{},
+					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
+					"cipher_suites":              []interface{}{},
+					"disable_legacy_pem_support": false,
+					"curve_types":                []interface{}{},
+					"enabled":                    true,
+					"key":                        "",
+					"key_passphrase":             "",
+					"key_passphrase_path":        "",
+					"renegotiation":              int64(0),
+					"supported_protocols":        []interface{}{},
+					"verification_mode":          uint64(0),
+				},
+				"timeout": "1m30s",
+			},
+		},
+		{
+			name: "with ssl enabled and verification_mode certificate",
+			outputCfg: map[string]any{
+				"ssl.enabled":           true,
+				"ssl.verification_mode": "certificate",
+			},
+			expected: map[string]any{
+				"continue_on_error":       true,
+				"idle_connection_timeout": "3s",
+				"proxy_disable":           false,
+				"ssl": map[string]interface{}{
+					"ca_sha256":                  []interface{}{},
+					"ca_trusted_fingerprint":     "",
+					"certificate":                "",
+					"certificate_authorities":    []interface{}{},
+					"certificate_reload":         map[string]interface{}{"enabled": nil, "reload_interval": "0s"},
+					"cipher_suites":              []interface{}{},
+					"disable_legacy_pem_support": false,
+					"curve_types":                []interface{}{},
+					"enabled":                    true,
+					"key":                        "",
+					"key_passphrase":             "",
+					"key_passphrase_path":        "",
+					"renegotiation":              int64(0),
+					"supported_protocols":        []interface{}{},
+					"verification_mode":          uint64(2),
+				},
+				"timeout": "1m30s",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(tt.outputCfg)
+			require.NoError(t, err)
+
+			actual, err := getBeatsAuthExtensionConfig(cfg)
+			if tt.expectedError != "" {
+				require.Error(t, err)
+				assert.Equal(t, tt.expectedError, err.Error())
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, actual)
+			}
+		})
+	}
 }

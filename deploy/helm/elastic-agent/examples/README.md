@@ -7,6 +7,8 @@ Here is a collection of example configurations for the eck-integrations chart.
 - [System - custom authlogs path](kubernetes-default/README.md)
 - [Kubernetes - only container logs](kubernetes-only-logs/README.md)
 - [Kubernetes - only hints autodiscover](kubernetes-hints-autodiscover/README.md)
+- [Kubernetes - OpenShift](kubernetes-openshift/README.md)
+- [Kubernetes - OpenShift unprivileged](kubernetes-openshift-unprivileged/README.md)
 - [Nginx - custom integration](nginx-custom-integration/README.md)
 - [Multiple Integrations](multiple-integrations/README.md)
 - [ECK - Kubernetes - defaults](eck/README.md)

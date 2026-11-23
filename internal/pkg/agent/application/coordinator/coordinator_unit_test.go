@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -40,8 +42,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/reload"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -64,6 +66,7 @@ import (
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 	"github.com/elastic/elastic-agent/pkg/utils/broadcaster"
@@ -693,6 +696,67 @@ inputs:
 	}
 }
 
+func TestCoordinatorPolicyAppliedNotSetOnComponentModelError(t *testing.T) {
+	// PolicyApplied must only become true once a policy has been successfully
+	// turned into a component model. If generateComponentModel fails, callers
+	// relying on PolicyApplied (e.g. the upgrade action handler waiting for
+	// Endpoint to appear) must keep waiting for a usable policy instead of
+	// concluding no component is configured.
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	logger := logp.NewLogger("testing")
+
+	agentInfo, err := info.NewAgentInfo(t.Context(), false)
+	require.NoError(t, err)
+
+	stateChan := make(chan State, 1)
+	configChan := make(chan ConfigChange, 1)
+	varsChan := make(chan []*transpiler.Vars, 1)
+	coord := &Coordinator{
+		logger: logger,
+		state: State{
+			CoordinatorState:   agentclient.Healthy,
+			CoordinatorMessage: "Running",
+		},
+		stateBroadcaster: &broadcaster.Broadcaster[State]{InputChan: stateChan},
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+			varsManagerUpdate:   varsChan,
+		},
+		runtimeMgr:         &fakeRuntimeManager{},
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		ast:                emptyAST(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+		agentInfo:          agentInfo,
+	}
+
+	// Invalid EQL condition makes generateComponentModel fail.
+	cfg := config.MustNewConfigFrom(`
+inputs:
+  - type: filestream
+    condition: invalidExpression
+`)
+	cfgChange := &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	require.Error(t, coord.componentModelErr)
+	assert.False(t, coord.state.PolicyApplied, "PolicyApplied must stay false when component model generation fails")
+	<-stateChan // drain the Failed state update
+
+	// A subsequent valid policy should succeed and set PolicyApplied.
+	cfg = config.MustNewConfigFrom("")
+	cfgChange = &configChange{cfg: cfg}
+	configChan <- cfgChange
+	coord.runLoopIteration(ctx)
+
+	assert.NoError(t, coord.componentModelErr)
+	assert.True(t, coord.state.PolicyApplied, "PolicyApplied must be set once a policy is applied successfully")
+}
+
 func TestCoordinatorPolicyChangeUpdatesMonitorReloader(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it generates the right component model and sends it to the
@@ -980,6 +1044,117 @@ service:
 	assert.Nil(t, otelConfig, "empty policy should cause otel manager to get nil config")
 }
 
+func TestCoordinatorPolicyChangeUpdatesComponentAgentInfo(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+
+	originalValue := features.IncludeTagsInEvents()
+	t.Cleanup(func() {
+		err := features.Apply(config.MustNewConfigFrom(map[string]any{
+			"agent.features.include_tags_in_events.enabled": originalValue,
+		}))
+		require.NoError(t, err)
+	})
+
+	configChan := make(chan ConfigChange, 1)
+	var components []pkgcomponent.Component
+	runtimeManager := &fakeRuntimeManager{
+		updateCallback: func(comp []pkgcomponent.Component) error {
+			components = comp
+			return nil
+		},
+	}
+	coord := &Coordinator{
+		logger:           logp.NewLogger("testing"),
+		agentInfo:        &info.AgentInfo{},
+		stateBroadcaster: broadcaster.New(State{}, 0, 0),
+		managerChans: managerChans{
+			configManagerUpdate: configChan,
+		},
+		runtimeMgr:         runtimeManager,
+		otelMgr:            &fakeOTelManager{},
+		vars:               emptyVars(t),
+		componentPIDTicker: time.NewTicker(time.Second * 30),
+		secretMarkerFunc:   testSecretMarkerFunc,
+	}
+
+	newPolicy := func(enabled bool, tags string) *config.Config {
+		return config.MustNewConfigFrom(fmt.Sprintf(`
+agent:
+  features:
+    include_tags_in_events:
+      enabled: %t
+  tags: %s
+outputs:
+  default:
+    type: elasticsearch
+inputs:
+  - id: test-input
+    type: filestream
+    use_output: default
+`, enabled, tags))
+	}
+
+	// applyPolicy sends the policy and returns the agent info of the component model
+	// that the runtime manager gets.
+	applyPolicy := func(cfg *config.Config) (*proto.AgentInfo, error) {
+		components = nil
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		if !cfgChange.acked {
+			return nil, errors.New("policy change was not acked")
+		}
+		if cfgChange.err != nil {
+			return nil, fmt.Errorf("policy change failed: %w", cfgChange.err)
+		}
+		if len(components) != 1 {
+			return nil, fmt.Errorf("got %d components, want 1", len(components))
+		}
+		if components[0].AgentInfo == nil {
+			return nil, errors.New("component has no agent info")
+		}
+		return components[0].AgentInfo, nil
+	}
+
+	// The steps run in sequence on one coordinator. Each step depends on the previous one.
+	t.Run("sends the tags to the components", func(t *testing.T) {
+		policy := newPolicy(true, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, proto.AgentManagedMode_MANAGED, agentInfo.GetMode())
+		assert.Equal(t, []string{"production"}, agentInfo.GetTags())
+	})
+
+	t.Run("sends a new tag", func(t *testing.T) {
+		policy := newPolicy(true, "[production, team-payments]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"production", "team-payments"}, agentInfo.GetTags())
+	})
+
+	t.Run("clears the tags when the policy has none", func(t *testing.T) {
+		policy := newPolicy(true, "[]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Empty(t, agentInfo.GetTags())
+	})
+
+	t.Run("sends the tags again when they come back", func(t *testing.T) {
+		policy := newPolicy(true, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"production"}, agentInfo.GetTags())
+	})
+
+	t.Run("drops the tags when the feature is off", func(t *testing.T) {
+		policy := newPolicy(false, "[production]")
+		agentInfo, err := applyPolicy(policy)
+		require.NoError(t, err)
+		assert.Empty(t, agentInfo.GetTags(), "the tags are not sent when include_tags_in_events is off")
+	})
+}
+
 func TestCoordinatorPolicyChangeUpdatesRuntimeAndOTelManagerWithOtelComponents(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it generates the right component model and sends components
@@ -1250,17 +1425,79 @@ inputs:
 		assert.False(t, filestreamInOtel, "Dynamic filestream input should NOT be in otel manager")
 	})
 
+	t.Run("dynamic input using only static variables stays on the otel runtime", func(t *testing.T) {
+		// Reset state from previous test runs
+		updated = false
+		otelUpdated = false
+		components = nil
+		otelConfig = nil
+
+		// Track components sent to otel manager
+		var otelComponents []pkgcomponent.Component
+		otelManager.updateComponentCallback = func(comp []pkgcomponent.Component) error {
+			otelComponents = comp
+			return nil
+		}
+
+		// The input only references a variable declared as static, so even though it is rendered
+		// from a dynamic provider it can't cause configuration reloads and must stay on otel.
+		cfg := config.MustNewConfigFrom(`
+agent.internal.runtime.filebeat.filestream: otel
+agent.internal.runtime.dynamic_inputs:
+  default: process
+  static_variables:
+    - local_dynamic.group
+outputs:
+  default:
+    type: elasticsearch
+    hosts:
+      - localhost:9200
+inputs:
+  - id: static-filestream-input
+    type: filestream
+    path: "/var/log/${local_dynamic.group}.log"
+    use_output: default
+`)
+
+		vars, err := transpiler.NewVarsWithProcessors("local_dynamic-1", map[string]interface{}{
+			"local_dynamic": map[string]interface{}{
+				"group": "shared",
+				"path":  "/var/log/test.log",
+			},
+		}, "local_dynamic", nil, nil, "", "local_dynamic")
+		require.NoError(t, err)
+		coord.vars = []*transpiler.Vars{vars}
+		coord.varsMgr = &fakeVarsManager{}
+
+		cfgChange := &configChange{cfg: cfg}
+		configChan <- cfgChange
+		coord.runLoopIteration(ctx)
+		assert.True(t, cfgChange.acked, "Coordinator should ACK a successful policy change")
+		assert.NoError(t, cfgChange.err, "config processing shouldn't report an error")
+
+		var filestreamInOtel bool
+		for _, comp := range otelComponents {
+			if strings.Contains(comp.ID, "filestream") {
+				filestreamInOtel = true
+				assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager,
+					"input using only static variables should stay on the otel runtime")
+				assert.False(t, comp.Dynamic, "component should not be marked as dynamic")
+			}
+		}
+		for _, comp := range components {
+			assert.NotContains(t, comp.ID, "filestream",
+				"input using only static variables should not be moved to the process runtime")
+		}
+		assert.True(t, filestreamInOtel, "filestream input should be handled by the otel manager")
+	})
+
 }
 
 func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it creates a working directory for the component, keeps that working directory as the component
 	// moves to a different runtime, then deletes it after the component is stopped.
-	top := paths.Top()
-	paths.SetTop(t.TempDir())
-	t.Cleanup(func() {
-		paths.SetTop(top)
-	})
+	pathstest.SetTop(t, t.TempDir())
 
 	logger := logp.NewLogger("testing")
 
@@ -1918,7 +2155,7 @@ func TestCoordinatorInitiatesUpgrade(t *testing.T) {
 	}
 
 	// Call upgrade and make sure the upgrade manager receives an Upgrade call
-	err := coord.Upgrade(ctx, "1.2.3", "", nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
+	err := coord.Upgrade(ctx, "1.2.3", nil, nil, WithSkipVerifyOverride(false), WithSkipDefaultPgp(false))
 	assert.True(t, upgradeMgr.upgradeCalled, "Coordinator Upgrade should call upgrade manager Upgrade")
 	assert.Equal(t, upgradeMgr.upgradeErr, err, "Upgrade should report upgrade manager error")
 
@@ -2072,14 +2309,12 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {
-	cfgPath := paths.Config()
-	defer paths.SetConfig(cfgPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tmpConfig := t.TempDir()
-	paths.SetConfig(tmpConfig)
+	pathstest.SetConfig(t, tmpConfig)
 	agentConfigFile := paths.ConfigFile()
 
 	var unenrollCalled bool
@@ -2232,14 +2467,12 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 }
 
 func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
-	cfgPath := paths.Config()
-	defer paths.SetConfig(cfgPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tmpConfig := t.TempDir()
-	paths.SetConfig(tmpConfig)
+	pathstest.SetConfig(t, tmpConfig)
 	agentConfigFile := paths.ConfigFile()
 
 	var unenrollCalled bool
@@ -2597,7 +2830,7 @@ func (m *mockUpgradeManager) Reload(cfg *config.Config) error {
 	return nil
 }
 
-func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (m *mockUpgradeManager) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, details *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...upgrade.Option) (_ reexec.ShutdownCallbackFn, err error) {
 	return nil, m.upgradeErr
 }
 
@@ -2614,72 +2847,97 @@ func (m *mockUpgradeManager) MarkerWatcher() upgrade.MarkerWatcher {
 }
 
 func TestCoordinator_Upgrade_InsufficientDiskSpaceError(t *testing.T) {
-	log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
-
-	mockUpgradeManager := &mockUpgradeManager{
-		upgradeErr: fmt.Errorf("wrapped: %w", upgradeErrors.ErrInsufficientDiskSpace),
+	diskSpaceLowErr := upgradeErrors.DiskSpaceLowError{
+		"need 1 GB at /data",
+		"need 500 MB at /downloads",
 	}
-
-	initialState := State{
-		CoordinatorState:   agentclient.Healthy,
-		CoordinatorMessage: "Running",
-	}
-
-	coord := &Coordinator{
-		state:              initialState,
-		logger:             log,
-		upgradeMgr:         mockUpgradeManager,
-		stateBroadcaster:   broadcaster.New(initialState, 64, 32),
-		overrideStateChan:  make(chan *coordinatorOverrideState),
-		upgradeDetailsChan: make(chan *details.Details),
-	}
-
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	overrideStates := []agentclient.State{}
-	go func() {
-		state1 := <-coord.overrideStateChan
-		overrideStates = append(overrideStates, state1.state)
-
-		state2 := <-coord.overrideStateChan
-		if state2 != nil {
-			overrideStates = append(overrideStates, state2.state)
-		}
-
-		wg.Done()
-	}()
-
-	upgradeDetails := []*details.Details{}
-	go func() {
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
-		wg.Done()
-	}()
-
-	err := coord.Upgrade(t.Context(), "", "", nil)
-	require.Error(t, err)
-	require.Equal(t, err, upgradeErrors.ErrInsufficientDiskSpace)
-
-	wg.Wait()
-
-	require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
-
-	require.Equal(t, []*details.Details{
+	testCases := []struct {
+		name        string
+		upgradeErr  error
+		expectedErr error
+	}{
 		{
-			TargetVersion: "",
-			State:         details.StateRequested,
-			ActionID:      "",
+			name:        "disk space low joined with os error",
+			upgradeErr:  fmt.Errorf("wrapped: %w", errors.Join(upgradeErrors.OS_DiskSpaceErrors[0], diskSpaceLowErr)),
+			expectedErr: diskSpaceLowErr,
 		},
 		{
-			TargetVersion: "",
-			State:         details.StateFailed,
-			Metadata: details.Metadata{
-				FailedState: details.StateRequested,
-				ErrorMsg:    upgradeErrors.ErrInsufficientDiskSpace.Error(),
-			},
+			name:        "disk space low",
+			upgradeErr:  fmt.Errorf("wrapped: %w", diskSpaceLowErr),
+			expectedErr: diskSpaceLowErr,
 		},
-	}, upgradeDetails)
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log, _ := loggertest.New("coordinator-insufficient-disk-space-test")
+
+			mockUpgradeManager := &mockUpgradeManager{
+				upgradeErr: tc.upgradeErr,
+			}
+
+			initialState := State{
+				CoordinatorState:   agentclient.Healthy,
+				CoordinatorMessage: "Running",
+			}
+
+			coord := &Coordinator{
+				state:              initialState,
+				logger:             log,
+				upgradeMgr:         mockUpgradeManager,
+				stateBroadcaster:   broadcaster.New(initialState, 64, 32),
+				overrideStateChan:  make(chan *coordinatorOverrideState),
+				upgradeDetailsChan: make(chan *details.Details),
+			}
+
+			wg := sync.WaitGroup{}
+			wg.Add(2)
+
+			overrideStates := []agentclient.State{}
+			go func() {
+				state1 := <-coord.overrideStateChan
+				overrideStates = append(overrideStates, state1.state)
+
+				state2 := <-coord.overrideStateChan
+				if state2 != nil {
+					overrideStates = append(overrideStates, state2.state)
+				}
+
+				wg.Done()
+			}()
+
+			upgradeDetails := []*details.Details{}
+			go func() {
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				upgradeDetails = append(upgradeDetails, <-coord.upgradeDetailsChan)
+				wg.Done()
+			}()
+
+			err := coord.Upgrade(t.Context(), "", nil, nil)
+			require.Error(t, err)
+			require.Equal(t, tc.expectedErr, err)
+
+			wg.Wait()
+
+			require.Equal(t, []agentclient.State{agentclient.Upgrading}, overrideStates)
+
+			require.Equal(t, []*details.Details{
+				{
+					TargetVersion: "",
+					State:         details.StateRequested,
+					ActionID:      "",
+				},
+				{
+					TargetVersion: "",
+					State:         details.StateFailed,
+					Metadata: details.Metadata{
+						FailedState: details.StateRequested,
+						ErrorMsg:    tc.expectedErr.Error(),
+					},
+				},
+			}, upgradeDetails)
+		})
+	}
 }
 
 func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
@@ -2707,7 +2965,7 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 	}
 
 	t.Run("no change when DynamicInputs is empty", func(t *testing.T) {
-		runtimeCfg := &pkgcomponent.RuntimeConfig{DynamicInputs: ""}
+		runtimeCfg := &pkgcomponent.RuntimeConfig{}
 		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
 		assert.Equal(t, pkgcomponent.OtelRuntimeManager, comp.RuntimeManager)
@@ -2715,7 +2973,9 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 
 	t.Run("no change when component is not dynamic", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
+			DynamicInputs: pkgcomponent.DynamicInputsConfig{
+				Default: string(pkgcomponent.ProcessRuntimeManager),
+			},
 		}
 		comp := otelSupportedComponent(false)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
@@ -2724,11 +2984,38 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 
 	t.Run("dynamic component switches to the configured runtime", func(t *testing.T) {
 		runtimeCfg := &pkgcomponent.RuntimeConfig{
-			DynamicInputs: string(pkgcomponent.ProcessRuntimeManager),
+			DynamicInputs: pkgcomponent.DynamicInputsConfig{
+				Default: string(pkgcomponent.ProcessRuntimeManager),
+			},
 		}
 		comp := otelSupportedComponent(true)
 		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &comp)
-		assert.Equal(t, pkgcomponent.RuntimeManager(runtimeCfg.DynamicInputs), comp.RuntimeManager)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, comp.RuntimeManager)
+	})
+
+	t.Run("per beat and per input type overrides are honored", func(t *testing.T) {
+		runtimeCfg := &pkgcomponent.RuntimeConfig{
+			DynamicInputs: pkgcomponent.DynamicInputsConfig{
+				Default: string(pkgcomponent.ProcessRuntimeManager),
+				Filebeat: pkgcomponent.BeatRuntimeConfig{
+					// the input type override keeps this component on the otel runtime
+					InputType: map[string]string{"filestream": string(pkgcomponent.OtelRuntimeManager)},
+				},
+			},
+		}
+
+		filestream := otelSupportedComponent(true)
+		filestream.InputSpec = &pkgcomponent.InputRuntimeSpec{BinaryName: "filebeat"}
+		filestream.InputType = "filestream"
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &filestream)
+		assert.Equal(t, pkgcomponent.OtelRuntimeManager, filestream.RuntimeManager)
+
+		// another filebeat input type falls back to the global default
+		logInput := otelSupportedComponent(true)
+		logInput.InputSpec = &pkgcomponent.InputRuntimeSpec{BinaryName: "filebeat"}
+		logInput.InputType = "log"
+		maybeOverrideRuntimeForComponent(logger, runtimeCfg, &logInput)
+		assert.Equal(t, pkgcomponent.ProcessRuntimeManager, logInput.RuntimeManager)
 	})
 
 	t.Run("default configuration leaves dynamic otel components on otel runtime", func(t *testing.T) {
@@ -2740,26 +3027,29 @@ func TestMaybeOverrideRuntimeForComponent(t *testing.T) {
 }
 
 func TestGetDynamicInputs(t *testing.T) {
+	log, _ := loggertest.New("get-dynamic-inputs")
 
-	t.Run("returns empty map when inputToDynamicProvider is nil", func(t *testing.T) {
-		result := getDynamicInputs(nil)
+	t.Run("returns empty map when renderedInputs is nil", func(t *testing.T) {
+		result := getDynamicInputs(log, nil, nil)
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
 
-	t.Run("returns empty map when inputToDynamicProvider is empty", func(t *testing.T) {
-		result := getDynamicInputs(map[string]string{})
+	t.Run("returns empty map when renderedInputs is empty", func(t *testing.T) {
+		result := getDynamicInputs(log, map[string]transpiler.RenderedInputInfo{}, nil)
 		assert.NotNil(t, result)
 		assert.Empty(t, result)
 	})
 
 	t.Run("identifies inputs with dynamic provider variables", func(t *testing.T) {
 		// The `local_dynamic` provider is registered via import side effect above
-		inputToDynamicProvider := map[string]string{
-			"static-input":  "",              // no dynamic provider
-			"dynamic-input": "local_dynamic", // uses local_dynamic provider
+		renderedInputs := map[string]transpiler.RenderedInputInfo{
+			// no dynamic provider
+			"static-input": {DynamicProvider: ""},
+			// uses local_dynamic provider
+			"dynamic-input": {DynamicProvider: "local_dynamic", ProviderVars: []string{"local_dynamic.id"}},
 		}
-		result := getDynamicInputs(inputToDynamicProvider)
+		result := getDynamicInputs(log, renderedInputs, nil)
 		assert.NotNil(t, result)
 		// The static-input should NOT be marked as dynamic (empty provider)
 		assert.False(t, result["static-input"], "static-input should not be marked as dynamic")
@@ -2769,13 +3059,134 @@ func TestGetDynamicInputs(t *testing.T) {
 
 	t.Run("inputs with non-dynamic provider variables are not marked dynamic", func(t *testing.T) {
 		// The env provider is a context provider, not a dynamic provider
-		inputToDynamicProvider := map[string]string{
-			"env-input": "env",
+		renderedInputs := map[string]transpiler.RenderedInputInfo{
+			"env-input": {DynamicProvider: "env", ProviderVars: []string{"env.SOME_VAR"}},
 		}
-		result := getDynamicInputs(inputToDynamicProvider)
+		result := getDynamicInputs(log, renderedInputs, nil)
 		assert.NotNil(t, result)
 		// The env provider is a context provider, not a dynamic provider
 		// So this input should NOT be marked as dynamic
 		assert.False(t, result["env-input"], "env-input should not be marked as dynamic")
+	})
+
+	t.Run("static_variables", func(t *testing.T) {
+		tests := map[string]struct {
+			providerVars    []string
+			staticVariables []string
+			wantDynamic     bool
+		}{
+			"exact match excludes the input": {
+				providerVars:    []string{"local_dynamic.group"},
+				staticVariables: []string{"local_dynamic.group"},
+				wantDynamic:     false,
+			},
+			"path prefix match excludes the input": {
+				providerVars:    []string{"local_dynamic.node.name", "local_dynamic.node.labels.app"},
+				staticVariables: []string{"local_dynamic.node"},
+				wantDynamic:     false,
+			},
+			"prefix must end on a path separator": {
+				providerVars:    []string{"local_dynamic.nodename"},
+				staticVariables: []string{"local_dynamic.node"},
+				wantDynamic:     true,
+			},
+			"a single uncovered variable keeps the input dynamic": {
+				providerVars:    []string{"local_dynamic.group", "local_dynamic.id"},
+				staticVariables: []string{"local_dynamic.group"},
+				wantDynamic:     true,
+			},
+			"no recorded variables keeps the input dynamic": {
+				providerVars:    nil,
+				staticVariables: []string{"local_dynamic.group"},
+				wantDynamic:     true,
+			},
+			"empty static_variables keeps the current behavior": {
+				providerVars:    []string{"local_dynamic.group"},
+				staticVariables: nil,
+				wantDynamic:     true,
+			},
+		}
+
+		for name, tt := range tests {
+			t.Run(name, func(t *testing.T) {
+				result := getDynamicInputs(log, map[string]transpiler.RenderedInputInfo{
+					"input-1": {DynamicProvider: "local_dynamic", ProviderVars: tt.providerVars},
+				}, tt.staticVariables)
+				assert.Equal(t, tt.wantDynamic, result["input-1"])
+			})
+		}
+	})
+}
+
+type recordingReExecManager struct {
+	called bool
+}
+
+func (r *recordingReExecManager) ReExec(_ reexec.ShutdownCallbackFn, _ ...string) {
+	r.called = true
+}
+
+func TestCoordinator_Restart(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	action := &fleetapi.ActionRestart{ActionID: "r1", ActionType: fleetapi.ActionTypeRestart}
+
+	t.Run("not restartable returns ErrNotRestartable and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			// buffered so SetOverrideState (via ReExec) never blocks without a run loop
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canRestart:        func() bool { return false },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrNotRestartable)
+		assert.False(t, reexecMgr.called, "should not re-exec when not restartable")
+	})
+
+	t.Run("restartable triggers re-exec and override state", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			canRestart:        func() bool { return true },
+			reexecMgr:         reexecMgr,
+			logger:            logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.NoError(t, err)
+		assert.True(t, reexecMgr.called, "should re-exec when restartable")
+
+		select {
+		case os := <-coord.overrideStateChan:
+			require.NotNil(t, os, "restart should set an override state")
+			assert.Equal(t, agentclient.Stopping, os.state)
+		default:
+			t.Fatal("expected an override state to be set")
+		}
+	})
+
+	t.Run("containerized environment returns ErrContainerNotSupported and does not re-exec", func(t *testing.T) {
+		reexecMgr := &recordingReExecManager{}
+		platformSpecs, _ := pkgcomponent.NewRuntimeSpecs(pkgcomponent.PlatformDetail{
+			Platform: pkgcomponent.Platform{OS: pkgcomponent.Container},
+		}, nil)
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			// canRestart would otherwise allow the restart (a containerized agent
+			// runs under an init such as tini and appears supervised), so this
+			// proves the container guard takes precedence.
+			canRestart: func() bool { return true },
+			reexecMgr:  reexecMgr,
+			specs:      platformSpecs,
+			logger:     logp.NewLogger("testing"),
+		}
+
+		err := coord.Restart(ctx, action)
+		require.ErrorIs(t, err, ErrContainerNotSupported)
+		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
 	})
 }

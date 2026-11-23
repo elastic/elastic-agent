@@ -16,6 +16,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/elastic/elastic-agent/internal/pkg/release"
+	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/version"
 )
@@ -300,7 +302,9 @@ func previousMinor(currentVersion string, upgradeableVersions []*version.ParsedS
 	}
 
 	for _, v := range upgradeableVersions {
-		if v.Prerelease() != "" || v.BuildMetadata() != "" {
+		// Accept plain GA releases and IAR versions (independent artifact releases with build
+		// metadata matching ^build\d{12}), consistent with findRequiredVersions.
+		if v.Prerelease() != "" || (v.BuildMetadata() != "" && !v.IsIndependentRelease()) {
 			continue
 		}
 		if v.Major() == current.Major() && v.Minor() < current.Minor() {
@@ -355,4 +359,34 @@ func InstallChecksAllowed(unprivileged bool, versions ...*version.ParsedSemVer) 
 		}
 	}
 	return true
+}
+
+// WritesBuildLogs reports whether the Agent of the fixture writes its logs to a build log directory under data/logs.
+// Only the builds of the code under test do, released and snapshot builds from the artifacts repository,
+// even of the same version, keep their logs in their installation directory.
+func WritesBuildLogs(f *atesting.Fixture) bool {
+	return f.FetchedFromLocalBuild()
+}
+
+// BuildLogsDirName returns the name of the log directory under data/logs of the build of a fixture with the
+// given version, whose binary reports the given version information. The directory is named after the home
+// directory of the build without its prefix: <version>-<commit>. The version is the one of the fixture, which a
+// repackaged build changes in its package version and manifest, so it can differ from the one of the binary
+// it is made from.
+//
+// This is the name of a build that was installed or upgraded to by a build that names its home directories like
+// this one. See InstalledBuildLogsDirName for a build that was upgraded to by an older release.
+func BuildLogsDirName(fixtureVersion string, binary atesting.AgentBinaryVersion) string {
+	return fixtureVersion + "-" + release.TrimCommit(binary.Commit)
+}
+
+// InstalledBuildLogsDirName returns the name of the log directory of a build that is installed in topPath. An
+// upgrade from an older release creates the home directory of the new build with the legacy name, which has
+// only the commit, and the build then names its log directory after it, see BuildLogsDirName.
+func InstalledBuildLogsDirName(topPath, fixtureVersion string, binary atesting.AgentBinaryVersion) string {
+	name := BuildLogsDirName(fixtureVersion, binary)
+	if _, err := os.Stat(filepath.Join(topPath, "data", "elastic-agent-"+name)); err != nil {
+		return release.TrimCommit(binary.Commit)
+	}
+	return name
 }

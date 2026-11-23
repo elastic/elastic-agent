@@ -19,14 +19,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/gofrs/flock"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
@@ -335,6 +337,8 @@ agent.download:
   install_path: "/sonic_screwdriver"
   drop_path: "/gallifrey"
   retry_sleep_init_duration: 10s
+  reserve_diskspace:
+    enabled: true
   timeout: 30s
   proxy_url: "http://trenzalore:1234"
   proxy_headers:
@@ -427,11 +431,12 @@ agent.download:
 
 	enabled := true
 	want := artifact.Config{
-		SourceURI:              "https://tardis.elastic.co/downloads/",
+		Sources:                []string{"https://tardis.elastic.co/downloads/"},
 		TargetDirectory:        "/tardis",
 		InstallPath:            "/sonic_screwdriver",
 		DropPath:               "/gallifrey",
 		RetrySleepInitDuration: 10 * time.Second,
+		ReserveDiskSpace:       artifact.ReserveDiskSpaceConfig{Enabled: true},
 
 		HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 			TLS: &tlscommon.Config{
@@ -584,7 +589,7 @@ agent.download:
 			err = u.Reload(cfg)
 			require.NoError(t, err, "error reloading config")
 
-			assert.Equal(t, tc.sourceURL, u.settings.SourceURI)
+			assert.Equal(t, []string{tc.sourceURL}, u.settings.Sources)
 			if tc.proxyURL != "" {
 				require.NotNilf(t, u.settings.Proxy.URL,
 					"ProxyURI should not be nil, want %s", tc.proxyURL)
@@ -1045,14 +1050,19 @@ type mockArtifactDownloader struct {
 	returnError       error
 	returnArchivePath string
 	fleetServerURI    string
+	fleetTransport    httpcommon.HTTPTransportSettings
 }
 
-func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
+func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
 	return m.returnArchivePath, m.returnError
 }
 
 func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
 	m.fleetServerURI = fleetServerURI
+}
+
+func (m *mockArtifactDownloader) withFleetTransport(fleetTransport httpcommon.HTTPTransportSettings) {
+	m.fleetTransport = fleetTransport
 }
 
 type mockUnpacker struct {
@@ -1077,8 +1087,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	type upgraderMocker func(upgrader *Upgrader, archivePath string, versionedHome string)
 
 	type testCase struct {
-		isDiskSpaceErrorResult    bool
+		isDiskSpaceLowErrorResult bool
 		expectedError             error
+		expectDiskSpaceLowError   bool
 		upgraderMocker            upgraderMocker
 		upgradeOpts               []Option
 		checkArchiveCleanup       bool
@@ -1088,8 +1099,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 
 	testCases := map[string]testCase{
 		"should return error and cleanup downloaded archive if downloadArtifact fails after download is complete": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError:       testError,
@@ -1103,8 +1114,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error if getPackageMetadata fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1120,8 +1131,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails before extracting": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1149,8 +1160,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded archive if unpack fails after extracting": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1182,8 +1193,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyActionStore fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1217,8 +1228,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if copyRunDirectory fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{}
 				upgrader.artifactDownloader = &mockArtifactDownloader{
@@ -1256,8 +1267,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact and extracted archive if changeSymlink fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1300,8 +1311,8 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should return error and cleanup downloaded artifact if writeUpgradeMarker fails": {
-			isDiskSpaceErrorResult: false,
-			expectedError:          testError,
+			isDiskSpaceLowErrorResult: false,
+			expectedError:             testError,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnArchivePath: archivePath,
@@ -1331,8 +1342,9 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			},
 		},
 		"should add disk space error to the error chain if downloadArtifact fails with disk space error": {
-			isDiskSpaceErrorResult: true,
-			expectedError:          upgradeErrors.ErrInsufficientDiskSpace,
+			isDiskSpaceLowErrorResult: true,
+			expectedError:             testError,
+			expectDiskSpaceLowError:   true,
 			upgraderMocker: func(upgrader *Upgrader, archivePath string, versionedHome string) {
 				upgrader.artifactDownloader = &mockArtifactDownloader{
 					returnError: testError,
@@ -1437,7 +1449,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 			require.NoError(t, os.MkdirAll(paths.Data(), 0755))
 
 			mockAgentInfo := info.NewMockAgent(t)
@@ -1463,12 +1475,14 @@ func TestUpgradeErrorHandling(t *testing.T) {
 			err = os.WriteFile(filepath.Join(baseDir, "versionedHome"), []byte("test"), 0o600)
 			require.NoError(t, err)
 
-			upgrader.isDiskSpaceErrorFunc = func(err error) bool {
-				return tc.isDiskSpaceErrorResult
+			upgrader.isDiskSpaceLowErrorFunc = func(err error) bool {
+				return tc.isDiskSpaceLowErrorResult
 			}
 
-			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, "", nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
+			_, err = upgrader.Upgrade(context.Background(), "9.0.0", false, nil, nil, details.NewDetails("9.0.0", details.StateRequested, "test"), true, true, nil, tc.upgradeOpts...)
 			require.ErrorIs(t, err, tc.expectedError)
+			var diskSpaceLowErr upgradeErrors.DiskSpaceLowError
+			require.Equal(t, tc.expectDiskSpaceLowError, errors.As(err, &diskSpaceLowErr))
 
 			// If the downloaded archive needs to be cleaned up assert that it is indeed cleaned up, if not assert that it still exists. The downloaded archive is a mock file that is created for all tests cases.
 			if tc.checkArchiveCleanup {
@@ -1497,9 +1511,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 
 	// Use the package-local helper so the live install lands at the exact path
 	// paths.VersionedHome() will resolve to inside Upgrader.Upgrade — passing
@@ -1557,7 +1569,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 		return nil
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil, details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.NoError(t, err, "upgrade must self-heal the corrupt live .ttl and complete")
 
 	markers, malformed, getAllErr := realRegistry.GetAll()
@@ -1578,9 +1590,7 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// Write initial active.commit pointing to the current binary.
@@ -1637,7 +1647,7 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 		return err
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil,
 		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.Error(t, err, "InvokeWatcher failure must cause Upgrade to return error")
 
@@ -1664,9 +1674,7 @@ func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// Write initial active.commit so the S3 disk-read path is exercised.
@@ -1709,7 +1717,7 @@ func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
 	}
 	upgrader.rollbackInstall = func(_ context.Context, _ *logger.Logger, _, _, _ string, _ ttl.Source) error { return nil }
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil,
 		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.Error(t, err, "changeSymlink failure must cause Upgrade to return error")
 
@@ -1724,9 +1732,7 @@ func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, agentCommitFile), []byte(release.Commit()), 0o600))
@@ -1766,7 +1772,7 @@ func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
 		returnUnpackResult: UnpackResult{Hash: "aabbcc", VersionedHome: actualVersionedHome},
 	}
 
-	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, "", nil,
+	_, err = upgrader.Upgrade(context.Background(), "99.0.0", false, nil, nil,
 		details.NewDetails("99.0.0", details.StateRequested, "test"), true, true, nil)
 	require.Error(t, err, "mismatch between predicted and actual unpack destination must return an error")
 	assert.Contains(t, err.Error(), "unpack placed files at", "error must identify the destination mismatch")
@@ -1843,7 +1849,7 @@ func TestCopyActionStore(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			newHome := filepath.Join(baseDir, "new_home")
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 
 			actionStorePath := paths.AgentActionStoreFile()
 			actionStateStoreYamlPath := paths.AgentStateStoreYmlFile()
@@ -1928,7 +1934,7 @@ func TestCopyRunDirectory(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 
 			oldRunPath := filepath.Join(baseDir, "old_dir", "run")
 			oldRunFile := filepath.Join(oldRunPath, "file.txt")
@@ -1972,6 +1978,10 @@ func (m *mockSender) Send(ctx context.Context, method, path string, params url.V
 func (m *mockSender) URI() string {
 	return "mockURI"
 }
+
+func (m *mockSender) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{Timeout: time.Second}
+}
 func TestSetClient(t *testing.T) {
 	log, _ := loggertest.New("test")
 	upgrader := &Upgrader{
@@ -1981,4 +1991,19 @@ func TestSetClient(t *testing.T) {
 
 	upgrader.SetClient(&mockSender{})
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
+	require.Equal(t, httpcommon.HTTPTransportSettings{Timeout: time.Second}, upgrader.artifactDownloader.(*mockArtifactDownloader).fleetTransport)
+}
+
+func TestSetClientURISurvivesReload(t *testing.T) {
+	log, _ := loggertest.New("test")
+	upgrader := &Upgrader{
+		log:                log,
+		artifactDownloader: &mockArtifactDownloader{},
+	}
+
+	sender := &mockSender{}
+	upgrader.SetClient(sender)
+	require.NoError(t, upgrader.Reload(config.MustNewConfigFrom("")))
+	require.Equal(t, sender.URI(), upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
+	require.Equal(t, sender.Transport(), upgrader.artifactDownloader.(*artifactDownloader).fleetTransport)
 }

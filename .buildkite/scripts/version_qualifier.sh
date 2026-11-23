@@ -3,7 +3,7 @@
 # An opinionated approach to managing the Elastic Qualifier for the DRA in a Google Bucket
 # instead of using a Buildkite env variable.
 
-if [[ -n "$VERSION_QUALIFIER" ]]; then
+if [[ -n "${VERSION_QUALIFIER:-}" ]]; then
   echo "~~~ VERSION_QUALIFIER externally set to [$VERSION_QUALIFIER]"
   return 0
 fi

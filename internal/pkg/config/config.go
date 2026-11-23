@@ -9,9 +9,10 @@ import (
 	"io"
 	"maps"
 	"os"
+	"slices"
 
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/go-ucfg"
 )
@@ -199,6 +200,15 @@ func (c *Config) Merge(from interface{}, opts ...interface{}) error {
 	if err != nil {
 		return err
 	}
+	if m, ok := from.(map[string]interface{}); ok {
+		// A raw map must go through NewConfigFrom so the skip keys (inputs, outputs) are not resolved by ucfg.
+		// Otherwise a variable like ${agent.id} that exists in this config is expanded before the transpiler
+		// sees it, which breaks conditions such as `${agent.id} == 'x'`.
+		from, err = NewConfigFrom(m, opts...)
+		if err != nil {
+			return err
+		}
+	}
 	cfg, ok := from.(*Config)
 	if ok {
 		// can merge both together
@@ -240,6 +250,17 @@ func (c *Config) Clone() (*Config, error) {
 
 // ToMapStr takes the config and transform it into a map[string]interface{}
 func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
+	return c.toMapStr(nil, opts...)
+}
+
+// ToMapStrReleasing is ToMapStr for a config that won't be read for the released skip keys
+// again: they are moved into the returned map instead of being merged back, which would
+// otherwise keep a second copy of every input of a large policy alive.
+func (c *Config) ToMapStrReleasing(release ...string) (map[string]interface{}, error) {
+	return c.toMapStr(release)
+}
+
+func (c *Config) toMapStr(release []string, opts ...interface{}) (map[string]interface{}, error) {
 	if len(opts) == 0 {
 		opts = newDefaultOptions()
 	}
@@ -280,7 +301,9 @@ func (c *Config) ToMapStr(opts ...interface{}) (map[string]interface{}, error) {
 				return nil, fmt.Errorf("error removing skip key %s: %w", skip, err)
 			}
 			skippedKeys[skip] = subUnpacked
-			skippedKeysOrig[skip] = subCfg
+			if !slices.Contains(release, skip) {
+				skippedKeysOrig[skip] = subCfg
+			}
 		}
 	}
 

@@ -183,7 +183,7 @@ func TestExpectedConfig(t *testing.T) {
 					},
 				},
 			},
-			Err: errors.New("decoding error: decoding failed due to the following error(s):\n\n'meta' expected a map or struct, got \"slice\""),
+			Err: errors.New("decoding error: 'meta' expected a map or struct, got \"slice\""),
 		},
 	}
 
@@ -208,4 +208,117 @@ func TestExpectedConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExpectedConfigFlattenedDataStream(t *testing.T) {
+	cfg := map[string]interface{}{
+		"id":                  "input-1",
+		"type":                "filestream",
+		"data_stream.dataset": "unit.dataset",
+		"data_stream": map[string]interface{}{
+			"namespace": "unit.namespace",
+		},
+		"streams": []interface{}{
+			map[string]interface{}{
+				"id":                    "stream-1",
+				"data_stream.type":      "logs",
+				"data_stream.namespace": "stream.namespace",
+				"data_stream":           map[string]interface{}{"dataset": "stream.dataset"},
+			},
+		},
+	}
+	got, err := ExpectedConfig(cfg)
+	require.NoError(t, err)
+	require.Equal(t, "unit.dataset", got.DataStream.Dataset)
+	require.Equal(t, "unit.namespace", got.DataStream.Namespace)
+	require.Len(t, got.Streams, 1)
+	require.Equal(t, "stream.dataset", got.Streams[0].DataStream.Dataset)
+	require.Equal(t, "logs", got.Streams[0].DataStream.Type)
+	require.Equal(t, "stream.namespace", got.Streams[0].DataStream.Namespace)
+
+	// conflicting nested and flattened values must still be rejected
+	cfg["data_stream"] = map[string]interface{}{"dataset": "other"}
+	_, err = ExpectedConfig(cfg)
+	require.ErrorContains(t, err, "duplicated key 'datastream.dataset'")
+
+	// non-scalar values are rejected, as unpacking them with go-ucfg did
+	cfg["data_stream"] = map[string]interface{}{}
+	cfg["data_stream.dataset"] = []interface{}{"x"}
+	_, err = ExpectedConfig(cfg)
+	require.ErrorContains(t, err, "can not convert '[]interface {}' into 'string' accessing 'data_stream.dataset'")
+}
+
+func TestDeDotDataStream(t *testing.T) {
+	t.Run("nil ds filled from source", func(t *testing.T) {
+		got, err := deDotDataStream(nil, map[string]interface{}{
+			"data_stream": map[string]interface{}{
+				"dataset":   "ds",
+				"type":      "logs",
+				"namespace": "ns",
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "ds", got.Dataset)
+		require.Equal(t, "logs", got.Type)
+		require.Equal(t, "ns", got.Namespace)
+	})
+
+	t.Run("existing ds fields preserved when source empty", func(t *testing.T) {
+		ds := &proto.DataStream{Dataset: "existing", Type: "metrics", Namespace: "default"}
+		got, err := deDotDataStream(ds, map[string]interface{}{})
+		require.NoError(t, err)
+		require.Equal(t, "existing", got.Dataset)
+		require.Equal(t, "metrics", got.Type)
+		require.Equal(t, "default", got.Namespace)
+	})
+
+	t.Run("source overrides empty ds fields", func(t *testing.T) {
+		ds := &proto.DataStream{Type: "logs"}
+		got, err := deDotDataStream(ds, map[string]interface{}{
+			"data_stream": map[string]interface{}{
+				"dataset":   "myds",
+				"namespace": "myns",
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "myds", got.Dataset)
+		require.Equal(t, "logs", got.Type)
+		require.Equal(t, "myns", got.Namespace)
+	})
+
+	t.Run("conflicting dataset returns error", func(t *testing.T) {
+		ds := &proto.DataStream{Dataset: "a"}
+		_, err := deDotDataStream(ds, map[string]interface{}{
+			"data_stream": map[string]interface{}{"dataset": "b"},
+		})
+		require.ErrorContains(t, err, "duplicated key 'datastream.dataset'")
+	})
+
+	t.Run("conflicting type returns error", func(t *testing.T) {
+		ds := &proto.DataStream{Type: "logs"}
+		_, err := deDotDataStream(ds, map[string]interface{}{
+			"data_stream": map[string]interface{}{"type": "metrics"},
+		})
+		require.ErrorContains(t, err, "duplicated key 'datastream.type'")
+	})
+
+	t.Run("conflicting namespace returns error", func(t *testing.T) {
+		ds := &proto.DataStream{Namespace: "a"}
+		_, err := deDotDataStream(ds, map[string]interface{}{
+			"data_stream": map[string]interface{}{"namespace": "b"},
+		})
+		require.ErrorContains(t, err, "duplicated key 'datastream.namespace'")
+	})
+
+	t.Run("flattened keys in source", func(t *testing.T) {
+		got, err := deDotDataStream(nil, map[string]interface{}{
+			"data_stream.dataset":   "flat_ds",
+			"data_stream.type":      "logs",
+			"data_stream.namespace": "flat_ns",
+		})
+		require.NoError(t, err)
+		require.Equal(t, "flat_ds", got.Dataset)
+		require.Equal(t, "logs", got.Type)
+		require.Equal(t, "flat_ns", got.Namespace)
+	})
 }

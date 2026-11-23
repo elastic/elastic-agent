@@ -16,7 +16,7 @@ import (
 	"runtime"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	"github.com/elastic/elastic-agent/pkg/testing/common"
@@ -48,6 +48,10 @@ func (p *provisioner) SetLogger(l common.Logger) {
 
 func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeVM
+}
+
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationLocal
 }
 
 // Supported returns true if multipass supports this OS.

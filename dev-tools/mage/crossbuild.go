@@ -20,7 +20,7 @@ import (
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
 
-	"github.com/elastic/elastic-agent-libs/file"
+	"github.com/elastic/beats/v7/pkg/file"
 	"github.com/elastic/elastic-agent/dev-tools/packaging"
 )
 
@@ -206,6 +206,8 @@ func CrossBuildImage(cfg *Settings, platform string) (string, error) {
 	case platform == "linux/s390x":
 		tagSuffix = "s390x-debian11"
 	case strings.HasPrefix(platform, "linux"):
+		tagSuffix = "main-debian11"
+	case platform == "windows/amd64" || platform == "windows/386":
 		tagSuffix = "main-debian11"
 	case platform == "windows/arm64":
 		tagSuffix = "windows-arm64-debian12"

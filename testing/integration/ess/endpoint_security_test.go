@@ -30,10 +30,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/redact"
-	"github.com/elastic/elastic-agent-libs/testing/certutil"
-	"github.com/elastic/elastic-agent-libs/testing/proxytest"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/redact"
+	"github.com/elastic/beats/v7/pkg/testing/certutil"
+	"github.com/elastic/beats/v7/pkg/testing/proxytest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -819,7 +819,7 @@ func TestEndpointSecurityNonDefaultBasePath(t *testing.T) {
 		}
 		for _, c := range state.Components {
 			if strings.Contains(c.Message,
-				"Elastic Defend requires Elastic Agent be installed at the default installation path") {
+				"Elastic Defend requires Elastic Agent to be installed at the default installation path") {
 				return true
 			}
 		}
@@ -878,9 +878,9 @@ func TestEndpointSecurityUnprivileged(t *testing.T) {
 
 	c := fixture.Client()
 
-	errMsg := "Elastic Defend requires Elastic Agent be running as root"
+	errMsg := "Elastic Defend requires Elastic Agent to be running as root"
 	if runtime.GOOS == define.Windows {
-		errMsg = "Elastic Defend requires Elastic Agent be running as Administrator or SYSTEM"
+		errMsg = "Elastic Defend requires Elastic Agent to be running as Administrator or SYSTEM"
 	}
 	require.Eventually(t, func() bool {
 		err := c.Connect(ctx)
@@ -1263,7 +1263,7 @@ func TestForceInstallOverProtectedPolicy(t *testing.T) {
 
 func TestInstallDefendWithMTLSandEncCertKey(t *testing.T) {
 	stack := define.Require(t, define.Requirements{
-		Group: integration.FleetEndpointSecurity,
+		Group: integration.FleetEndpointSecurityMTLS,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation

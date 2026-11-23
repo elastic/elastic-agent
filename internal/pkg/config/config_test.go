@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/go-ucfg"
 )
@@ -110,6 +110,15 @@ func TestToMapStr(t *testing.T) {
 	if diff != "" {
 		t.Error(diff)
 	}
+
+	t.Run("releasing", func(t *testing.T) {
+		c := MustNewConfigFrom(input)
+		observed, err := c.ToMapStrReleasing("inputs")
+		require.NoError(t, err)
+		assert.Empty(t, cmp.Diff(expected, observed))
+		assert.False(t, c.Agent.HasField("inputs"), "released key must not be merged back")
+		assert.True(t, c.Agent.HasField("outputs"))
+	})
 }
 
 func TestCommaParsing(t *testing.T) {
@@ -417,6 +426,69 @@ func TestConfigMerge(t *testing.T) {
 			err := s.Into.Merge(s.From)
 			require.NoError(t, err)
 			assert.Equal(t, s.Result, s.Into)
+		})
+	}
+}
+
+// TestConfigMergeKeepsInputVariables ensures variables in inputs and outputs are left for the transpiler when
+// merging a policy, even when they reference a path that exists in the agent's own config (e.g. agent.id).
+func TestConfigMergeKeepsInputVariables(t *testing.T) {
+	policy := func() map[string]interface{} {
+		return map[string]interface{}{
+			"inputs": []interface{}{
+				map[string]interface{}{
+					"id":        "synthetics",
+					"condition": "${agent.id} == 'abc'",
+					"streams": []interface{}{
+						map[string]interface{}{"condition": "${agent.logging.level} == 'info'"},
+					},
+				},
+			},
+			"outputs": map[string]interface{}{
+				"default": map[string]interface{}{"type": "elasticsearch", "api_key": "${agent.id}"},
+			},
+		}
+	}
+
+	tests := []struct {
+		name string
+		from func(t *testing.T) interface{}
+	}{
+		{
+			name: "raw map",
+			from: func(t *testing.T) interface{} { return policy() },
+		},
+		{
+			name: "config built with NewConfigFrom",
+			from: func(t *testing.T) interface{} {
+				c, err := NewConfigFrom(policy())
+				require.NoError(t, err)
+				return c
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			base, err := NewConfigFrom(map[string]interface{}{
+				"agent": map[string]interface{}{
+					"id":      "e1eef1e7-b4d8-4d65-85be-5dc49fc5d6eb",
+					"logging": map[string]interface{}{"level": "info"},
+				},
+			})
+			require.NoError(t, err)
+			require.NoError(t, base.Merge(tc.from(t)))
+
+			m, err := base.ToMapStr()
+			require.NoError(t, err)
+
+			input := m["inputs"].([]interface{})[0].(map[string]interface{})
+			assert.Equal(t, "${agent.id} == 'abc'", input["condition"])
+			stream := input["streams"].([]interface{})[0].(map[string]interface{})
+			assert.Equal(t, "${agent.logging.level} == 'info'", stream["condition"])
+			output := m["outputs"].(map[string]interface{})["default"].(map[string]interface{})
+			assert.Equal(t, "${agent.id}", output["api_key"])
+			// the rest of the config is still resolved as usual
+			assert.Equal(t, "e1eef1e7-b4d8-4d65-85be-5dc49fc5d6eb", m["agent"].(map[string]interface{})["id"])
 		})
 	}
 }

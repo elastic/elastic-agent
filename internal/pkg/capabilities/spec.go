@@ -7,7 +7,7 @@ package capabilities
 import (
 	"fmt"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // capabilitiesList deserializes a YAML list of capabilities into organized

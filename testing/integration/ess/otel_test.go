@@ -40,16 +40,16 @@ import (
 
 	"github.com/testcontainers/testcontainers-go"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
+	"github.com/elastic/beats/v7/pkg/mapstr"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommontest"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	aTesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
-	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v9"
 	mockes "github.com/elastic/mock-es/pkg/api"
 	"github.com/elastic/sarama"
 )
@@ -2280,7 +2280,6 @@ extensions:
       key: /nonexistent.key
       key_passphrase: null
       key_passphrase_path: null
-      verification_mode: none
 receivers:
   metricbeatreceiver:
     metricbeat:
@@ -2520,7 +2519,6 @@ func TestLogReloading(t *testing.T) {
 outputs:
   default:
     type: elasticsearch
-    preset: latency
     hosts:
       - %s
     preset: balanced
@@ -2680,6 +2678,7 @@ exporters:
       queue_size: 3200
       wait_for_result: true
 processors:
+  elasticmonitoringprocessor: {}
   beat/1:
     processors:
       - add_host_metadata: null
@@ -2688,6 +2687,7 @@ service:
   pipelines:
     metrics:
       receivers: [elasticmonitoringreceiver]
+      processors: [elasticmonitoringprocessor]
       exporters: [elasticmonitoringconnector]
     logs:
       receivers: [elasticmonitoringconnector]
@@ -3004,6 +3004,187 @@ agent.grpc:
 	cancel()
 }
 
+// TestOtelElasticsearchStorageWithElasticsearchAuth verifies that the
+// elasticsearch_storage extension persists the cel input state in
+// Elasticsearch when authenticating through the elasticsearchauth extension.
+func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
+	info := define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+		OS: []define.OS{
+			// {Type: define.Windows}, we don't support otel on Windows yet
+			{Type: define.Linux},
+			{Type: define.Darwin},
+		},
+		Stack: &define.Stack{},
+	})
+
+	esEndpoint, err := integration.GetESHost()
+	require.NoError(t, err, "error getting elasticsearch endpoint")
+	esApiKey := createESApiKey(t, info.ESClient)
+
+	// Unique input ID: it names the agentless-state-<id> index, so concurrent
+	// runs against the same stack do not observe each other's state.
+	inputID := "cel-esauth-" + strings.ReplaceAll(uuid.Must(uuid.NewV4()).String(), "-", "")
+	stateIndex := "agentless-state-" + inputID
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), 30*time.Second)
+		defer cancel()
+
+		res, err := info.ESClient.Indices.Delete(
+			[]string{stateIndex},
+			info.ESClient.Indices.Delete.WithContext(ctx),
+			info.ESClient.Indices.Delete.WithIgnoreUnavailable(true),
+		)
+		if err != nil {
+			t.Logf("failed to delete state index %s: %v", stateIndex, err)
+			return
+		}
+		defer res.Body.Close()
+		if res.IsError() {
+			t.Logf("failed to delete state index %s: %s", stateIndex, res.String())
+		}
+	})
+
+	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	type otelConfigOptions struct {
+		ESEndpoint string
+		ESApiKey   string
+		InputID    string
+		PathHome   string
+	}
+
+	otelConfigTemplate := `
+extensions:
+  elasticsearchauth/state:
+    endpoints:
+      - {{.ESEndpoint}}
+    api_key: {{.ESApiKey}}
+  elasticsearch_storage:
+    auth:
+      authenticator: elasticsearchauth/state
+receivers:
+  filebeatreceiver:
+    filebeat:
+      inputs:
+        - type: cel
+          id: {{.InputID}}
+          enabled: true
+          interval: 1s
+          resource.url: http://unused.invalid
+          state:
+            cursor:
+              sequence: 0
+          program: |
+            {
+              "events": [{
+                "message": "cel-state-test",
+                "sequence": state.cursor.sequence
+              }],
+              "cursor": {
+                "sequence": int(state.cursor.sequence) + 1
+              }
+            }
+    queue.mem.flush.timeout: 0s
+    setup.template.enabled: false
+    storage: elasticsearch_storage
+    path.home: {{.PathHome}}
+exporters:
+  debug:
+service:
+  extensions:
+    - elasticsearchauth/state
+    - elasticsearch_storage
+  pipelines:
+    logs:
+      receivers:
+        - filebeatreceiver
+      exporters:
+        - debug
+  telemetry:
+    metrics:
+      level: none
+agent.grpc.port: 0
+`
+	var otelConfigBuffer bytes.Buffer
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	require.NoError(t, fixture.Prepare(ctx))
+
+	require.NoError(t,
+		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
+			otelConfigOptions{
+				ESEndpoint: esEndpoint,
+				ESApiKey:   esApiKey.Encoded,
+				InputID:    inputID,
+				PathHome:   fixture.WorkDir(),
+			}))
+
+	require.NoError(t, fixture.Configure(ctx, otelConfigBuffer.Bytes()))
+
+	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
+	require.NoError(t, err, "cannot prepare Elastic-Agent command")
+
+	// The state store is only enabled for the listed input types.
+	cmd.Env = append(os.Environ(), "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES=cel")
+
+	output := &strings.Builder{}
+	cmd.Stderr = output
+	cmd.Stdout = output
+
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() {
+		cancel()
+		_ = cmd.Wait()
+		if t.Failed() {
+			t.Log("Elastic-Agent output:")
+			t.Log(output.String())
+		}
+	})
+
+	require.Eventually(t, func() bool {
+		if err := fixture.IsHealthy(ctx); err != nil {
+			t.Logf("waiting for agent healthy: %s", err.Error())
+			return false
+		}
+		return true
+	}, 1*time.Minute, 1*time.Second, "agent did not become healthy")
+
+	// Wait for the CEL input's incremented cursor to be persisted in
+	// Elasticsearch through the elasticsearchauth authenticator.
+	require.EventuallyWithT(t,
+		func(ct *assert.CollectT) {
+			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
+			defer findCancel()
+
+			docs, err := estools.GetAllLogsForIndexWithContext(findCtx, info.ESClient, stateIndex)
+			require.NoError(ct, err, "searching %s", stateIndex)
+			require.Equal(ct, 1, docs.Hits.Total.Value, "expected single state document in %s", stateIndex)
+
+			v, ok := docs.Hits.Hits[0].Source["v"].(map[string]any)
+			require.True(ct, ok, "expected state document 'v' object in %s", stateIndex)
+
+			cursor, ok := v["cursor"].(map[string]any)
+			require.True(ct, ok, "expected state document 'v.cursor' object in %s", stateIndex)
+
+			seq, ok := cursor["sequence"].(float64)
+			require.True(ct, ok, "expected numeric 'v.cursor.sequence' in %s", stateIndex)
+
+			require.GreaterOrEqual(
+				ct,
+				seq,
+				float64(1),
+				"expected incremented cursor sequence in %s", stateIndex,
+			)
+		},
+		1*time.Minute, 1*time.Second, "expected incremented cursor state in %s", stateIndex)
+
+	cancel()
+}
+
 // httpJSONCursorMockServer is a test HTTP server for the httpjson input that
 // tracks the "since" cursor parameter across requests and restarts.
 type httpJSONCursorMockServer struct {
@@ -3115,6 +3296,12 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 		Stack: &define.Stack{},
 	})
 
+	const (
+		oauthClientID     = "kafka-test-client"
+		oauthClientSecret = "kafka-test-secret" //nolint:gosec // G101: dummy secret for the mock OAuth2 token server
+	)
+	tokenServer := newOAuth2TokenMockServer(t, oauthClientID, oauthClientSecret)
+
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get current file path")
 	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
@@ -3142,16 +3329,25 @@ services:
 	tableTests := []struct {
 		name                string
 		runtimeExperimental string
+		namespace           string
+		saslMechanism       string
 	}{
-		{name: "agent", runtimeExperimental: "process"},
-		{name: "otel", runtimeExperimental: "otel"},
+		{name: "agent", runtimeExperimental: "process", namespace: "process", saslMechanism: "SCRAM-SHA-256"},
+		{name: "otel", runtimeExperimental: "otel", namespace: "otel", saslMechanism: "SCRAM-SHA-256"},
+		// Beats process runtime cannot fetch OAuth2 tokens yet, so OAUTHBEARER is otel-only.
+		{name: "otel-oauth2", runtimeExperimental: "otel", namespace: "otel-oauth2", saslMechanism: "OAUTHBEARER"},
 	}
 
 	for _, tt := range tableTests {
 		type otelConfigOptions struct {
 			RuntimeExperimental string
+			Namespace           string
 			Broker              string
 			CaCert              string
+			SaslMechanism       string
+			TokenURL            string
+			ClientID            string
+			ClientSecret        string
 		}
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -3170,7 +3366,7 @@ inputs:
       period: 1s
       data_stream:
         dataset: e2e
-        namespace: {{.RuntimeExperimental}}
+        namespace: {{.Namespace}}
 outputs:
   default:
     type: kafka
@@ -3186,10 +3382,19 @@ outputs:
       supported_protocols:
        - TLSv1.3
       verification_mode: full
+    protocol: https
+{{- if eq .SaslMechanism "OAUTHBEARER"}}
+    sasl.mechanism: OAUTHBEARER
+    auth:
+      oauth2client:
+        client_id: {{.ClientID}}
+        client_secret: {{.ClientSecret}}
+        token_url: "{{.TokenURL}}"
+{{- else}}
     username: beats
     password: KafkaTest
-    protocol: https
-    sasl.mechanism: SCRAM-SHA-256
+    sasl.mechanism: {{.SaslMechanism}}
+{{- end}}
     headers:
     - some-key: some-value
     - some-key: another-value
@@ -3205,8 +3410,13 @@ agent.monitoring:
 			template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 				otelConfigOptions{
 					RuntimeExperimental: tt.runtimeExperimental,
+					Namespace:           tt.namespace,
 					Broker:              "localhost:9093",
 					CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
+					SaslMechanism:       tt.saslMechanism,
+					TokenURL:            tokenServer.URL,
+					ClientID:            oauthClientID,
+					ClientSecret:        oauthClientSecret,
 				}))
 
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -3246,7 +3456,7 @@ agent.monitoring:
 		consumer, err := sarama.NewConsumer([]string{"localhost:9094"}, sarama.NewConfig())
 		require.NoError(t, err)
 
-		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.runtimeExperimental, 0, sarama.OffsetNewest)
+		partitionConsumer, err := consumer.ConsumePartition("metrics-e2e-"+tt.namespace, 0, sarama.OffsetNewest)
 		require.NoError(t, err)
 
 		// Make sure find the logs
@@ -3270,6 +3480,10 @@ agent.monitoring:
 				}
 			}, 2*time.Minute, 5*time.Second,
 			"Expected at least 1 document")
+
+		if tt.saslMechanism == "OAUTHBEARER" {
+			require.Greater(t, tokenServer.RequestCount(), int64(0), "oauth2client should have fetched a token from the mock token endpoint")
+		}
 
 		cancel()
 		_ = cmd.Wait()
@@ -3805,4 +4019,82 @@ func parseFirstJSONLine(data []byte) mapstr.M {
 		return m
 	}
 	return nil
+}
+
+// oauth2TokenMockServer is a client-credentials token endpoint used by
+// TestSystemMetricsWithKafkaOutput. It returns an unsecured JWT that the
+// Kafka test broker's OAUTHBEARER unsecured validator will accept.
+type oauth2TokenMockServer struct {
+	URL          string
+	server       *httptest.Server
+	mu           sync.Mutex
+	requestCount int64
+	clientID     string
+	clientSecret string
+}
+
+func newOAuth2TokenMockServer(t *testing.T, clientID, clientSecret string) *oauth2TokenMockServer {
+	t.Helper()
+	mock := &oauth2TokenMockServer{
+		clientID:     clientID,
+		clientSecret: clientSecret,
+	}
+
+	mock.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mock.mu.Lock()
+		mock.requestCount++
+		mock.mu.Unlock()
+
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		_ = r.ParseForm()
+		user, pass, ok := r.BasicAuth()
+		if !ok {
+			user = r.Form.Get("client_id")
+			pass = r.Form.Get("client_secret")
+		}
+		if user != mock.clientID || pass != mock.clientSecret {
+			http.Error(w, `{"error":"invalid_client"}`, http.StatusUnauthorized)
+			return
+		}
+		if r.Form.Get("grant_type") != "client_credentials" {
+			http.Error(w, `{"error":"unsupported_grant_type"}`, http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token": unsecuredJWT("beats", time.Hour),
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		})
+	}))
+	mock.URL = mock.server.URL
+	t.Cleanup(mock.server.Close)
+
+	return mock
+}
+
+func (m *oauth2TokenMockServer) RequestCount() int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.requestCount
+}
+
+// unsecuredJWT builds an alg=none JWT that Kafka's OAUTHBEARER unsecured
+// validator accepts. The empty signature segment (trailing ".") is required.
+func unsecuredJWT(sub string, ttl time.Duration) string {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	now := time.Now()
+	payload, err := json.Marshal(map[string]any{
+		"sub": sub,
+		"iat": now.Unix(),
+		"exp": now.Add(ttl).Unix(),
+	})
+	if err != nil {
+		return ""
+	}
+	return header + "." + base64.RawURLEncoding.EncodeToString(payload) + "."
 }

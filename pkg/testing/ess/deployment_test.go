@@ -159,7 +159,7 @@ func Test_generateCreateDeploymentRequestBody(t *testing.T) {
                       "zone_count": 1,
                       "size": {
                         "resource": "memory",
-                        "value": 1024
+                        "value": 2048
                       }
                     }
                   ],

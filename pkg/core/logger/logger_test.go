@@ -10,11 +10,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
@@ -94,13 +96,8 @@ func TestNewNamedLogger(t *testing.T) {
 	const name = "test-component"
 
 	tmp := t.TempDir()
-	topPath, logsPath := paths.Top(), paths.Logs()
-	paths.SetTop(tmp)
-	paths.SetLogs(filepath.Join(tmp, DefaultLogDirectory))
-	t.Cleanup(func() {
-		paths.SetTop(topPath)
-		paths.SetLogs(logsPath)
-	})
+	pathstest.SetTop(t, tmp)
+	pathstest.SetLogs(t, filepath.Join(tmp, "logs"))
 
 	log, err := NewNamedLogger(name, DefaultLoggingConfig(), DefaultEventLoggingConfig())
 	require.NoError(t, err)
@@ -113,7 +110,7 @@ func TestNewNamedLogger(t *testing.T) {
 	err = log.Core().Sync()
 	require.NoError(t, err)
 
-	logGlob := filepath.Join(paths.Home(), DefaultLogDirectory, name+"-*.ndjson")
+	logGlob := filepath.Join(paths.BuildLogs(), name+"-*.ndjson")
 	logMatches, err := filepath.Glob(logGlob)
 	require.NoError(t, err)
 	require.NotEmpty(t, logMatches, "normal log file should exist at %s", logGlob)
@@ -122,7 +119,7 @@ func TestNewNamedLogger(t *testing.T) {
 	assert.Contains(t, string(normalData), "normal message", "normal log file should contain normal message")
 	assert.NotContains(t, string(normalData), "event message", "event message should not leak into normal log file")
 
-	eventGlob := filepath.Join(paths.Home(), DefaultLogDirectory, "events", name+"-event-log-*.ndjson")
+	eventGlob := filepath.Join(paths.BuildLogs(), "events", name+"-event-log-*.ndjson")
 	eventMatches, err := filepath.Glob(eventGlob)
 	require.NoError(t, err)
 	require.NotEmpty(t, eventMatches, "event log file should exist at %s", eventGlob)

@@ -21,6 +21,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/process"
@@ -45,6 +46,27 @@ const (
 	isAgentlessEnvName          = "ELASTIC_AGENT_IS_AGENTLESS"
 	stateStoreInputTypesEnvName = "AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES"
 )
+
+// pathArgs returns the flags that give the component its own data path and, for a Beat, its logs path next to
+// the Agent logs of this build. Components that are not Beats, such as fleet-server and the profiling
+// collectors, and unversioned homes (containers) keep the default logs path.
+func pathArgs(workDir, beatName string) []string {
+	args := []string{"-E", "path.data=" + workDir}
+	if beatName != "" && paths.IsVersionHome() {
+		args = append(args, "-E", "path.logs="+paths.BuildComponentsLogs())
+	}
+	return args
+}
+
+// hostnameOverrideArgs returns ["--hostname", h] when beatName is a standard
+// libbeat binary that supports the flag and h is non-empty, otherwise nil.
+// Cloudbeat is intentionally excluded from ELASTIC_AGENT_HOSTNAME propagation.
+func hostnameOverrideArgs(beatName, h string) []string {
+	if beatName == "" || beatName == "cloudbeat" || h == "" {
+		return nil
+	}
+	return []string{"--hostname", h}
+}
 
 func (m actionMode) String() string {
 	switch m {
@@ -431,8 +453,9 @@ func (c *commandRuntime) start(comm Communicator) error {
 	}
 	args := c.monitor.EnrichArgs(c.current.ID, c.getSpecBinaryName(), cmdSpec.Args)
 
-	// differentiate data paths
-	args = append(args, "-E", "path.data="+workDir)
+	args = append(args, pathArgs(workDir, c.current.BeatName())...)
+
+	args = append(args, hostnameOverrideArgs(c.current.BeatName(), hostinfo.Override())...)
 
 	// reset checkin state before starting the process.
 	c.lastCheckin = time.Time{}

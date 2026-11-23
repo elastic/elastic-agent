@@ -20,9 +20,9 @@ import (
 	"github.com/kardianos/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -53,15 +53,21 @@ agent:
     rollback:
       window: 10m
 `
+
+// fastWatcherCfgWithShortRollbackWindow expires the rollback after the grace period has ended, so that it is
+// removed by the periodic cleanup in the running agent and not by the watcher at the end of the grace period.
+// The grace period is counted from the upgrade marker and must leave enough time for the test to observe the
+// upgrade watcher: on slow Windows VMs it takes the agent 20+ seconds to restart after the upgrade, and
+// PerformUpgrade only starts looking for the UPG_WATCHING state after that.
 const fastWatcherCfgWithShortRollbackWindow = `
 agent:
   logging.level: debug
   upgrade:
     watcher:
-      grace_period: 30s
+      grace_period: 2m
       error_check.interval: 5s
     rollback:
-      window: 1m
+      window: 3m
       cleanup_interval: 10s
 `
 
@@ -193,6 +199,11 @@ inputs:
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
 	assert.NoError(t, err)
+
+	// the logs of the build that was rolled back from are kept
+	endVersionInfo, err := endFixture.ExecVersion(ctx)
+	require.NoError(t, err)
+	requireBuildLogs(t, startFixture.WorkDir(), upgradetest.BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary))
 }
 
 // TestStandaloneUpgradeRollbackOnRestarts tests the scenario where upgrading to a new version
@@ -200,7 +211,7 @@ inputs:
 // rolled back to the previous version.
 func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -283,7 +294,7 @@ func TestStandaloneUpgradeRollbackOnRestarts(t *testing.T) {
 // rolled back to the previous version and that Fleet reports the correct informations
 func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 		Stack: &define.Stack{},
@@ -337,7 +348,7 @@ func TestFleetManagedUpgradeRollbackOnRestarts(t *testing.T) {
 // See https://github.com/elastic/elastic-agent/issues/12910
 func TestFleetManagedUpgradeRollback(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetUpgrade,
 		Local: false,
 		Sudo:  true,
 		Stack: &define.Stack{},
@@ -474,7 +485,7 @@ type rollbackTriggerFunc func(ctx context.Context, t *testing.T, client client.C
 // of Agent, a manual rollback is triggered. It checks that the Agent is rolled back to the previous version.
 func TestStandaloneUpgradeManualRollback(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -499,7 +510,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 			rollbackTrigger: func(ctx context.Context, t *testing.T, client client.Client, startFixture, endFixture *atesting.Fixture) {
 				assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
-				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
 				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
 				t.Logf("received output %s from upgrade command", retVal)
 			},
@@ -541,7 +552,7 @@ func TestStandaloneUpgradeManualRollback(t *testing.T) {
 				}, 4*time.Minute, 10*time.Second)
 				t.Log("elastic agent is out of grace period.")
 				t.Logf("sending version=%s rollback=%v upgrade to agent", startFixture.Version(), true)
-				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+				retVal, err := client.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
 				require.NoError(t, err, "error triggering manual rollback to version %s", startFixture.Version())
 				t.Logf("received output %s from upgrade command", retVal)
 			},
@@ -593,7 +604,7 @@ func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
 		func(ctx context.Context, t *testing.T, c client.Client, startFixture, endFixture *atesting.Fixture) {
 			assertListRollbacks(ctx, t, startFixture, time.Now().Add(10*time.Minute))
 			t.Logf("sending rollback: version=%s rollback=%v", startFixture.Version(), true)
-			retVal, err := c.Upgrade(ctx, startFixture.Version(), true, "", false, false)
+			retVal, err := c.Upgrade(ctx, startFixture.Version(), true, nil, false, false)
 			require.NoError(t, err, "rollback should succeed")
 			t.Logf("rollback output: %s", retVal)
 		},
@@ -610,7 +621,7 @@ func TestStandaloneUpgradeReplayedRollback(t *testing.T) {
 	defer replayClient.Disconnect()
 
 	t.Logf("Sending replayed rollback to version %s (simulating Fleet re-send)", fromFixture.Version())
-	retVal, err := replayClient.Upgrade(ctx, fromFixture.Version(), true, "", false, false)
+	retVal, err := replayClient.Upgrade(ctx, fromFixture.Version(), true, nil, false, false)
 	require.NoError(t, err, "replayed rollback should not error")
 	t.Logf("replayed rollback output: %s", retVal)
 
@@ -645,7 +656,7 @@ func assertListRollbacks(ctx context.Context, t *testing.T, startFixture *atesti
 
 func TestCleanupRollbacks(t *testing.T) {
 	define.Require(t, define.Requirements{
-		Group: integration.Upgrade,
+		Group: integration.UpgradeRollback,
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
 	})
@@ -683,7 +694,12 @@ func TestCleanupRollbacks(t *testing.T) {
 				require.EventuallyWithT(t, func(collect *assert.CollectT) {
 					t.Logf("checking if the rollback directory %q has been cleaned...", oldAgentVersionedHome)
 					assert.NoDirExists(collect, oldAgentVersionedHome, "old rollback should have been cleaned up after expiration")
-				}, 1*time.Minute, 10*time.Second)
+				}, 2*time.Minute, 10*time.Second)
+
+				// the logs of the old build outlive its installation directory
+				oldVersionInfo, err := upgrades[upgradeIndex].from.ExecVersion(t.Context())
+				require.NoError(t, err)
+				requireBuildLogs(t, installedFixture.WorkDir(), upgradetest.BuildLogsDirName(upgrades[upgradeIndex].from.Version(), oldVersionInfo.Binary))
 			},
 		},
 		{
@@ -832,6 +848,11 @@ func managedRollbackRestartTest(ctx context.Context, t *testing.T, info *define.
 	err = upgradetest.CheckHealthyAndVersion(ctx, from, startVersionInfo.Binary)
 	assert.NoError(t, err)
 
+	// the logs of the build that was rolled back from are kept
+	// (an older release keeps its logs in its installation directory, so there is nothing to keep)
+	if upgradetest.WritesBuildLogs(to) {
+		requireBuildLogs(t, from.WorkDir(), upgradetest.BuildLogsDirName(to.Version(), endVersionInfo.Binary))
+	}
 }
 
 func standaloneRollbackRestartTest(ctx context.Context, t *testing.T, startFixture *atesting.Fixture, endFixture *atesting.Fixture) {
@@ -922,6 +943,18 @@ func standaloneRollbackTest(ctx context.Context, t *testing.T, startFixture *ate
 	// version, otherwise it's possible that it was rolled back to the original version
 	err = upgradetest.CheckHealthyAndVersion(ctx, startFixture, startVersionInfo.Binary)
 	assert.NoError(t, err)
+
+	// the logs of the build that was rolled back from are kept
+	// (an older release keeps its logs in its installation directory, so there is nothing to keep)
+	if upgradetest.WritesBuildLogs(endFixture) {
+		requireBuildLogs(t, startFixture.WorkDir(), upgradetest.BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary))
+	}
+
+	// when both builds have this feature, the diagnostics of the restored Agent include the logs of the build
+	// that was rolled back from
+	if upgradetest.WritesBuildLogs(startFixture) && upgradetest.WritesBuildLogs(endFixture) {
+		requireDiagnosticsBuildLogs(ctx, t, startFixture, upgradetest.BuildLogsDirName(endFixture.Version(), endVersionInfo.Binary))
+	}
 }
 
 func restartAgentNTimes(t *testing.T, noOfRestarts int, sleepBetweenIterations time.Duration) {

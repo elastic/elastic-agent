@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/pkg/testing/common"
 )
@@ -62,6 +62,10 @@ func NewServerlessProvisioner(ctx context.Context, cfg ProvisionerConfig) (commo
 
 func (prov *ServerlessProvisioner) Name() string {
 	return ProvisionerServerless
+}
+
+func (prov *ServerlessProvisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationRemote
 }
 
 // SetLogger sets the logger for the

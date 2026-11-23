@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/confmap"
-	"go.opentelemetry.io/collector/confmap/xconfmap"
 	"go.opentelemetry.io/collector/exporter"
 	"go.opentelemetry.io/collector/exporter/exportertest"
 	"go.opentelemetry.io/collector/extension"
@@ -38,12 +37,12 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"go.uber.org/zap/zaptest"
 
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/testing/proxytest"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommontest"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
 	"github.com/elastic/beats/v7/x-pack/otel/oteltest"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/testing/proxytest"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommontest"
 	agentComponent "github.com/elastic/elastic-agent/pkg/component"
 	mockes "github.com/elastic/mock-es/pkg/api"
 )
@@ -252,7 +251,7 @@ func TestCATrustedFingerPrint(t *testing.T) {
 }
 
 // tests verification mode
-// The test scenarios are taken from https://github.com/elastic/elastic-agent-libs/blob/main/transport/tlscommon/tls_config_test.go#L495
+// The test scenarios are taken from TestVerificationMode in https://github.com/elastic/beats/blob/main/pkg/transport/tlscommon/tls_config_test.go
 func TestVerificationMode(t *testing.T) {
 	testcases := map[string]struct {
 		verificationMode string
@@ -607,14 +606,7 @@ func newAuthenticator(t *testing.T, config beatsauthextension.Config) extension.
 func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exporter.Logs) {
 
 	f := elasticsearchexporter.NewFactory()
-	cfg := &elasticsearchexporter.Config{
-		Mapping: elasticsearchexporter.MappingsSettings{
-			// we have to set allowed modes
-			// this is set on default config in ES exporter but it is not a public type
-			Mode:         "bodymap",
-			AllowedModes: []string{"bodymap", "ecs", "none", "otel", "raw"},
-		},
-	}
+	cfg := f.CreateDefaultConfig().(*elasticsearchexporter.Config)
 
 	esConf := confmap.NewFromStringMap(exporterCfg)
 
@@ -622,7 +614,7 @@ func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exp
 	require.NoError(t, esConf.Unmarshal(cfg), "error unmarshalling user config into ES config")
 
 	// validate the config
-	require.NoError(t, xconfmap.Validate(cfg))
+	require.NoError(t, confmap.Validate(cfg))
 
 	settings := exportertest.NewNopSettings(component.MustNewType(esExporterName))
 
@@ -674,6 +666,7 @@ func getLogRecord(t *testing.T) plog.Logs {
 	logs := plog.NewLogs()
 	resourceLogs := logs.ResourceLogs().AppendEmpty()
 	scopeLogs := resourceLogs.ScopeLogs().AppendEmpty()
+	scopeLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
 	logRecords := scopeLogs.LogRecords()
 	logRecord := logRecords.AppendEmpty()
 	body := pcommon.NewValueMap()

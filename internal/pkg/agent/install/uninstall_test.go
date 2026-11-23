@@ -7,7 +7,6 @@ package install
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,12 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/schollz/progressbar/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -29,6 +27,11 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	pkgfleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 )
+
+// noopProgressDescriber is a no-op ProgressDescriber for use in tests.
+type noopProgressDescriber struct{}
+
+func (n *noopProgressDescriber) Describe(string) {}
 
 func Test_checkForUnprivilegedVault(t *testing.T) {
 	type postVaultInit func(t *testing.T, vaultPath string)
@@ -176,7 +179,7 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 	}}
 
 	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())
-	pt := progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
+	pt := &noopProgressDescriber{}
 	var agentID agentInfo = "testID"
 
 	for _, tc := range tests {
@@ -231,13 +234,13 @@ type MockNotifyFleetAuditUninstall struct {
 	Called bool
 }
 
-func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt *progressbar.ProgressBar, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) {
+func (m *MockNotifyFleetAuditUninstall) Call(ctx context.Context, log *logp.Logger, pt ProgressDescriber, cfg *configuration.Configuration, ai pkgfleetapi.AgentInfo) {
 	m.Called = true
 }
 
 func TestSkipFleetAuditUnenroll(t *testing.T) {
 	log := &logp.Logger{}
-	pt := &progressbar.ProgressBar{}
+	pt := &noopProgressDescriber{}
 	cfg := &configuration.Configuration{}
 	var agentID agentInfo = "testID"
 
@@ -266,4 +269,31 @@ func TestSkipFleetAuditUnenroll(t *testing.T) {
 		)
 	}
 
+}
+
+func TestRemovePathContext(t *testing.T) {
+	t.Run("removes the path", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "remove-me")
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "sub"), 0o755))
+
+		require.NoError(t, RemovePathContext(t.Context(), logp.NewNopLogger(), dir))
+
+		assert.NoDirExists(t, dir)
+	})
+
+	t.Run("a done context stops before removing anything", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "keep-me")
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		err := RemovePathContext(ctx, logp.NewNopLogger(), dir)
+
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.DirExists(t, dir)
+	})
+
+	t.Run("a path that does not exist is not an error", func(t *testing.T) {
+		assert.NoError(t, RemovePathContext(t.Context(), logp.NewNopLogger(), filepath.Join(t.TempDir(), "missing")))
+	})
 }

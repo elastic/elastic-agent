@@ -120,6 +120,7 @@ Validate and initialise the defined agent presets
 {{- range $presetName, $presetVal := $.Values.agent.presets -}}
 {{- include "elasticagent.preset.mutate.unprivileged" (list $ $presetVal) -}}
 {{- include "elasticagent.preset.mutate.fleet" (list $ $presetVal) -}}
+{{- include "elasticagent.preset.mutate.browsercas" (list $ $presetVal) -}}
 {{- $presetMode := ($presetVal).mode -}}
 {{- if eq $.Values.agent.fleet.enabled false -}}
 {{- $presetInputs := dig "_inputs" (list) $presetVal -}}
@@ -211,6 +212,24 @@ Mutate an agent preset based on agent.unprivileged
 {{- $_ := set $presetSecurityContextCapabilities "add" $presetSecurityContextCapabilitiesAdd -}}
 {{- else -}}
 {{- $_ := set $presetSecurityContext "runAsUser" 0 }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Mutate an agent preset to mount the Secret in agent.browserCAs and point ELASTIC_AGENT_BROWSER_CA at it,
+so that the complete image variants import its CAs into the browser trust store
+*/}}
+{{- define "elasticagent.preset.mutate.browsercas" -}}
+{{- $ := index . 0 -}}
+{{- $preset := index . 1 -}}
+{{- with ($.Values.agent.browserCAs).secretName -}}
+{{- $mountPath := "/etc/elastic-agent/browser-cas" -}}
+{{- $volume := dict "name" "browser-cas" "secret" (dict "secretName" .) -}}
+{{- $volumeMount := dict "name" "browser-cas" "mountPath" $mountPath "readOnly" true -}}
+{{- $env := dict "name" "ELASTIC_AGENT_BROWSER_CA" "value" $mountPath -}}
+{{- include "elasticagent.preset.mutate.volumes" (list $preset (dict "extraVolumes" (list $volume))) -}}
+{{- include "elasticagent.preset.mutate.volumemounts" (list $preset (dict "extraVolumeMounts" (list $volumeMount))) -}}
+{{- include "elasticagent.preset.mutate.envs" (list $preset (dict "extraEnvs" (list $env))) -}}
 {{- end -}}
 {{- end -}}
 
@@ -323,6 +342,66 @@ app.kubernetes.io/name: {{ include "elasticagent.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/version: {{ .Values.agent.version}}
 {{- end }}
+
+{{/*
+Returns "true" when the cluster is OpenShift, controlled by agent.openshift.enabled:
+  auto  - detect via .Capabilities.APIVersions (default)
+  true  - always treat as OpenShift
+  false - never treat as OpenShift
+*/}}
+{{- define "elasticagent.isOpenShift" -}}
+{{- $mode := toString (dig "openshift" "enabled" "auto" .Values.agent) -}}
+{{- if eq $mode "true" -}}true
+{{- else if eq $mode "false" -}}
+{{- else if .Capabilities.APIVersions.Has "security.openshift.io/v1" -}}true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Name of the custom SCC for the unprivileged OpenShift case
+*/}}
+{{- define "elasticagent.scc.name" -}}
+{{- printf "agent-scc-unprivileged-%s-%s" .Release.Name .Release.Namespace | lower | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+OpenShift SCC ClusterRole to bind for the agent service accounts
+*/}}
+{{- define "elasticagent.scc.clusterRole" -}}
+{{- if .Values.agent.unprivileged -}}
+system:openshift:scc:{{ include "elasticagent.scc.name" . }}
+{{- else -}}
+system:openshift:scc:privileged
+{{- end -}}
+{{- end -}}
+
+{{/*
+Whether any agent preset runs with host network
+*/}}
+{{- define "elasticagent.hostNetwork" -}}
+{{- $hostNetwork := false -}}
+{{- range $presetName, $presetVal := .Values.agent.presets -}}
+{{- if ($presetVal).hostNetwork -}}
+{{- $hostNetwork = true -}}
+{{- end -}}
+{{- end -}}
+{{- $hostNetwork -}}
+{{- end -}}
+
+{{/* Whether any agent preset explicitly requests a host port. */}}
+{{- define "elasticagent.allowHostPorts" -}}
+{{- $hostPorts := false -}}
+{{- range $preset := .Values.agent.presets -}}
+{{- range $container := concat (list $preset) ($preset.extraContainers | default list) ($preset.initContainers | default list) -}}
+{{- range $port := $container.ports -}}
+{{- if $port.hostPort -}}
+{{- $hostPorts = true -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $hostPorts -}}
+{{- end -}}
 
 {{- define "elasticagent.init.valueFrom" -}}
 {{- $ := index . 0 -}}

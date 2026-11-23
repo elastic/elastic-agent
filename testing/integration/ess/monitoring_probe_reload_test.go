@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -78,7 +78,9 @@ func (runner *MonitoringRunner) SetupSuite() {
 		Privileged:     true,
 	}
 
-	ctx, cancel := context.WithTimeout(runner.T().Context(), 3*time.Minute)
+	// 5 minutes: agent install can take 2+ minutes on slow machines (e.g. Lima/QEMU),
+	// leaving insufficient time for the subsequent package install with a 3-minute budget.
+	ctx, cancel := context.WithTimeout(runner.T().Context(), 5*time.Minute)
 	defer cancel()
 
 	policyResp, agentID, err := tools.InstallAgentWithPolicy(ctx, runner.T(), installOpts, runner.agentFixture, runner.info.KibanaClient, basePolicy)
@@ -105,7 +107,10 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	require.NoError(runner.T(), err)
 
-	_, err = client.Do(req)
+	resp, err := client.Do(req)
+	if resp != nil {
+		resp.Body.Close()
+	}
 	require.Error(runner.T(), err)
 
 	overrideUpdateRequest := kibana.AgentPolicyUpdateRequest{

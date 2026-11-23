@@ -7,13 +7,17 @@ package retrier
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 
-	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
 )
 
@@ -46,13 +50,12 @@ func TestRetrier(t *testing.T) {
 	ctx, cn := context.WithCancel(context.Background())
 	defer cn()
 
-	log, _ := logger.New("", false)
-
 	tests := []struct {
 		name             string
 		actions          []fleetapi.Action
 		acker            *testAcker
 		expectedAckCalls int
+		expectedDropped  []string
 	}{
 		{
 			name:    "no error",
@@ -73,6 +76,7 @@ func TestRetrier(t *testing.T) {
 			actions:          []fleetapi.Action{&fleetapi.ActionUnknown{ActionID: "1"}},
 			acker:            &testAcker{errResponse: errBar},
 			expectedAckCalls: 3,
+			expectedDropped:  []string{"1"},
 		},
 		{
 			name: "partial error",
@@ -108,6 +112,8 @@ func TestRetrier(t *testing.T) {
 			ctx, cn := context.WithCancel(ctx)
 			defer cn()
 
+			log, obsLogs := loggertest.New(tc.name)
+
 			acker := tc.acker
 			if acker == nil {
 				acker = &testAcker{}
@@ -132,6 +138,15 @@ func TestRetrier(t *testing.T) {
 			diff := cmp.Diff(tc.expectedAckCalls, acker.called)
 			if diff != "" {
 				t.Fatal(diff)
+			}
+
+			dropLogs := obsLogs.
+				FilterMessageSnippet("ack retrier: dropping ack").
+				FilterLevelExact(zapcore.WarnLevel).
+				All()
+			require.Len(t, dropLogs, len(tc.expectedDropped))
+			for i, id := range tc.expectedDropped {
+				assert.Contains(t, dropLogs[i].Message, fmt.Sprintf("action id %q", id))
 			}
 		})
 	}

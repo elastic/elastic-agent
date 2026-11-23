@@ -7,13 +7,176 @@
 package translate
 
 import (
+	"net/url"
 	"testing"
+	"time"
 
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/confmap"
 
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
+
+func TestKafkaOAuth2Translation(t *testing.T) {
+	input := `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+auth:
+  oauth2client:
+    client_id: my-client
+    client_secret: my-secret
+    token_url: https://example.com/oauth2/token
+    timeout: 10s
+    endpoint_params:
+      foo: bar,join
+      new: info
+`
+	expectedMap := map[string]any{
+		"brokers":   []string{"kafka1:9092"},
+		"client_id": "beats",
+		"logs": map[string]any{
+			"topic":    "static-topic",
+			"encoding": "raw",
+		},
+		"metadata": map[string]any{
+			"refresh_interval": 10 * time.Minute,
+		},
+		"producer": map[string]any{
+			"compression": "gzip",
+			"compression_params": map[string]any{
+				"level": 4,
+			},
+			"max_message_bytes": 1000000,
+			"required_acks":     1,
+		},
+		"protocol_version": "2.1.0",
+		"retry_on_failure": map[string]any{
+			"initial_interval": 1 * time.Second,
+			"max_interval":     60 * time.Second,
+		},
+		"sending_queue": map[string]any{
+			"batch": map[string]any{
+				"flush_timeout": "10s",
+				"max_size":      2048,
+				"sizer":         "items",
+				"min_size":      1600,
+			},
+			"enabled":           true,
+			"queue_size":        3200,
+			"block_on_overflow": true,
+			"wait_for_result":   true,
+		},
+		"timeout":      10 * time.Second,
+		"dial_timeout": 30 * time.Second,
+		"auth": map[string]any{
+			"sasl": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+				"mechanism":                "OAUTHBEARER",
+				"oauthbearer_token_source": "oauth2client/_agent-component/default",
+			},
+		},
+		"record_partitioner": map[string]any{
+			"extension": "kafkapartitioner/_agent-component/default",
+		},
+	}
+
+	cfg, err := config.NewConfigFrom(input)
+	require.NoError(t, err, "error creating kafka config")
+	gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+	require.NoError(t, err, "error translating kafka to kafka exporter")
+	require.Equal(t, expectedMap, gotMap)
+	require.Nil(t, processorCfg)
+	require.Equal(t, map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+		"client_id":     "my-client",
+		"client_secret": "my-secret",
+		"token_url":     "https://example.com/oauth2/token",
+		"timeout":       "10s",
+		"endpoint_params": map[string]any{
+			"foo": "bar,join",
+			"new": "info",
+		},
+	}, extensionCfg["oauth2client/_agent-component/default"])
+
+	oauth2Cfg, ok := oauth2clientauthextension.NewFactory().CreateDefaultConfig().(*oauth2clientauthextension.Config)
+	require.True(t, ok)
+	extCfgMap, ok := extensionCfg["oauth2client/_agent-component/default"].(map[string]any)
+	require.True(t, ok)
+	require.NoError(t, confmap.NewFromStringMap(extCfgMap).Unmarshal(oauth2Cfg))
+	require.Equal(t, 10*time.Second, oauth2Cfg.Timeout)
+	require.Equal(t, 5*time.Minute, oauth2Cfg.ExpiryBuffer)
+	require.Equal(t, url.Values{"foo": {"bar", "join"}, "new": {"info"}}, oauth2Cfg.EndpointParams)
+}
+
+func TestKafkaOAuthRequiresOauthConfig(t *testing.T) {
+	testCases := []struct {
+		name    string
+		input   string
+		wantErr string
+	}{
+		{
+			name: "missing auth",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+`,
+			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
+		},
+		{
+			name: "empty auth",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+auth: {}
+`,
+			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
+		},
+		{
+			name: "unsupported auth type",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+auth:
+  unknown:
+    client_id: my-client
+`,
+			wantErr: "unsupported oauth config",
+		},
+		{
+			name: "multiple auth types",
+			input: `
+hosts: ["kafka1:9092"]
+topic: static-topic
+sasl.mechanism: OAUTHBEARER
+auth:
+  oauth2client:
+    client_id: my-client
+    client_secret: my-secret
+    token_url: https://example.com/oauth2/token
+  unknown:
+    client_id: other
+`,
+			wantErr: "auth must specify a single oauth type",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, err := config.NewConfigFrom(tc.input)
+			require.NoError(t, err, "error creating kafka config")
+			gotMap, processorCfg, extensionCfg, err := KafkaToOTelConfig(cfg, "default", logp.NewNopLogger())
+			require.Error(t, err)
+			require.ErrorContains(t, err, tc.wantErr)
+			require.Nil(t, gotMap)
+			require.Nil(t, processorCfg)
+			require.Nil(t, extensionCfg)
+		})
+	}
+}
 
 func TestKafkaKerberosTranslation(t *testing.T) {
 	testCases := []struct {
@@ -98,7 +261,7 @@ kerberos:
 			cfg, err := config.NewConfigFrom(tc.input)
 			require.NoError(t, err, "error creating kafka config")
 
-			gotMap, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
+			gotMap, _, _, err := KafkaToOTelConfig(cfg, "", logp.NewNopLogger())
 			require.NoError(t, err, "error translating kafka to kafka exporter")
 
 			gotKerberos, ok := gotMap["auth"]

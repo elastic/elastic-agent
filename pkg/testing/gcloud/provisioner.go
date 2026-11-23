@@ -66,6 +66,10 @@ func (p *provisioner) Type() common.ProvisionerType {
 	return common.ProvisionerTypeVM
 }
 
+func (p *provisioner) Location() common.ProvisionerLocation {
+	return common.ProvisionerLocationRemote
+}
+
 // Supported returns true when the provisioner supports the given OS.
 func (p *provisioner) Supported(os define.OS) bool {
 	_, ok := findOSLayout(os)

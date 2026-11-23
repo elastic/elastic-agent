@@ -13,7 +13,7 @@ import (
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	agentclient "github.com/elastic/elastic-agent/pkg/control/v2/client"
@@ -25,6 +25,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -96,6 +97,8 @@ type FleetGateway struct {
 	actionCh           chan []fleetapi.Action
 	rollbackSource     ttl.ReadOnlySource
 	compression        string
+	// hostInfo provides the host information sent on check-in.
+	hostInfo hostinfo.Source
 }
 
 // New creates a new fleet gateway
@@ -108,6 +111,7 @@ func New(
 	stateFetcher StateFetcher,
 	cfg *configuration.FleetCheckin,
 	source ttl.ReadOnlySource,
+	hostInfo hostinfo.Source,
 ) (*FleetGateway, error) {
 	scheduler := scheduler.NewPeriodicJitter(defaultGatewaySettings.Duration, defaultGatewaySettings.Jitter)
 	st := defaultGatewaySettings
@@ -122,6 +126,7 @@ func New(
 		stateStore,
 		stateFetcher,
 		source,
+		hostInfo,
 	)
 	if err != nil {
 		return nil, err
@@ -140,6 +145,7 @@ func newFleetGatewayWithScheduler(
 	stateStore stateStore,
 	stateFetcher StateFetcher,
 	source ttl.ReadOnlySource,
+	hostInfo hostinfo.Source,
 ) (*FleetGateway, error) {
 	return &FleetGateway{
 		log:            log,
@@ -153,6 +159,7 @@ func newFleetGatewayWithScheduler(
 		errCh:          make(chan error),
 		actionCh:       make(chan []fleetapi.Action, 1),
 		rollbackSource: source,
+		hostInfo:       hostInfo,
 	}, nil
 }
 
@@ -388,7 +395,7 @@ func convertToCheckinComponents(logger *logp.Logger, components []runtime.Compon
 }
 
 func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, time.Duration, error) {
-	ecsMeta, err := info.Metadata(ctx, f.log)
+	ecsMeta, err := info.Metadata(ctx, f.hostInfo)
 	if err != nil {
 		f.log.Error(errors.New("failed to load metadata", err))
 		return nil, 0, err

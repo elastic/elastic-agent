@@ -14,10 +14,12 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
@@ -107,7 +109,7 @@ func TestMigrateToEncryptedConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			//setup begin
 			top := t.TempDir()
-			paths.SetTop(top)
+			pathstest.SetTop(t, top)
 
 			vaultPath := paths.AgentVaultPath()
 			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath), vault.WithUnprivileged(true))
@@ -202,7 +204,7 @@ func TestErrorMigrateToEncryptedConfig(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			//setup begin
 			top := t.TempDir()
-			paths.SetTop(top)
+			pathstest.SetTop(t, top)
 
 			vaultPath := paths.AgentVaultPath()
 			err := secret.CreateAgentSecret(ctx, vault.WithVaultPath(vaultPath), vault.WithUnprivileged(true))

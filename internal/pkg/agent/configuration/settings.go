@@ -15,6 +15,7 @@ import (
 // SettingsConfig is an collection of agent settings configuration.
 type SettingsConfig struct {
 	ID                 string                          `yaml:"id" config:"id" json:"id"`
+	Tags               []string                        `yaml:"tags,omitempty" config:"tags,omitempty" json:"tags,omitempty"`
 	DownloadConfig     *artifact.Config                `yaml:"download" config:"download" json:"download"`
 	ProcessConfig      *process.Config                 `yaml:"process" config:"process" json:"process"`
 	GRPC               *GRPCConfig                     `yaml:"grpc" config:"grpc" json:"grpc"`
@@ -24,6 +25,7 @@ type SettingsConfig struct {
 	Upgrade            *UpgradeConfig                  `yaml:"upgrade" config:"upgrade" json:"upgrade"`
 	Collector          *CollectorConfig                `yaml:"collector" config:"collector" json:"collector"`
 	Internal           *InternalConfig                 `yaml:"internal" config:"internal" json:"internal"`
+	Synthetics         *SyntheticsConfig               `yaml:"synthetics,omitempty" config:"synthetics,omitempty" json:"synthetics,omitempty"`
 
 	// standalone config
 	Reload              *ReloadConfig `config:"reload" yaml:"reload" json:"reload"`

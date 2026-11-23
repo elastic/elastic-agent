@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	c "github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	c "github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
@@ -24,8 +24,9 @@ const (
 // httpcommon.HTTPTransportSettings so we can handle the  HTTPTransportSettings
 // config separately during *Config.Unpack
 type configWithoutHTTPTransportSettings struct {
-	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-	SourceURI string `json:"sourceURI" config:"sourceURI"`
+	// Sources: an ordered list of source URIs for retrieving upgrade artifacts
+	// defaults to official Elastic artifact registry if unspecified
+	Sources []string `json:"sources" config:"sources"`
 
 	// TargetDirectory: path to the directory containing downloaded packages
 	TargetDirectory string `json:"targetDirectory" config:"target_directory"`
@@ -44,12 +45,20 @@ type configWithoutHTTPTransportSettings struct {
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	// This key is, for some reason, problematic
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
+
+	ReserveDiskSpace ReserveDiskSpaceConfig `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+}
+
+// ReserveDiskSpaceConfig controls the upgrade disk space reservation.
+type ReserveDiskSpaceConfig struct {
+	Enabled bool `yaml:"enabled" config:"enabled"`
 }
 
 // Config is a configuration used for verifier and downloader
 type Config struct {
-	// SourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-	SourceURI string `json:"sourceURI" config:"sourceURI"`
+	// Sources: an ordered list of source URIs for retrieving upgrade artifacts
+	// defaults to official Elastic artifact registry if unspecified
+	Sources []string `json:"sources" config:"sources"`
 
 	// TargetDirectory: path to the directory containing downloaded packages
 	TargetDirectory string `json:"targetDirectory" config:"target_directory"`
@@ -68,6 +77,8 @@ type Config struct {
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 
+	ReserveDiskSpace ReserveDiskSpaceConfig `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
@@ -75,16 +86,19 @@ type Config struct {
 func DefaultConfig() *Config {
 	transport := httpcommon.DefaultHTTPTransportSettings()
 
-	// Elastic Agent binary is rather large and based on the network bandwidth it could take some time
-	// to download the full file. 120 minutes is a very large value, but we really want it to finish.
+	// Timeout for a single continuing download. Elastic Agent binary is rather
+	// large and based on the network bandwidth it could take some time to
+	// download the full file. 120 minutes is a very large value, but we really
+	// want it to finish.
 	// The HTTP download will log progress in the case that it is taking a while to download.
 	transport.Timeout = 120 * time.Minute
 
 	return &Config{
-		SourceURI:              DefaultSourceURI,
+		Sources:                []string{DefaultSourceURI},
 		TargetDirectory:        paths.Downloads(),
 		InstallPath:            paths.Install(),
 		RetrySleepInitDuration: 30 * time.Second,
+		ReserveDiskSpace:       ReserveDiskSpaceConfig{Enabled: true},
 		HTTPTransportSettings:  transport,
 	}
 }
@@ -121,14 +135,29 @@ func (c *Config) Unpack(cfg *c.C) error {
 		return err
 	}
 
+	if !cfg.HasField("sources") && cfg.HasField("sourceURI") {
+		// Older configs may still have a deprecated sourceURI.
+		sourceURI, err := cfg.String("sourceURI", -1)
+		if err != nil {
+			return err
+		}
+		if sourceURI != "" {
+			tmp.Sources = []string{sourceURI}
+		}
+	}
+
 	// A non-positive RetrySleepInitDuration would be passed straight to
 	// cenkalti/backoff's InitialInterval, which then yields 0 from NextBackOff()
 	// and turns transient download failures into a tight retry loop. Clamp to
 	// the default so a misconfigured policy can't cause that.
 	if tmp.RetrySleepInitDuration <= 0 {
 		def := DefaultConfig().RetrySleepInitDuration
-		logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
-			tmp.RetrySleepInitDuration, def)
+		// Only warn when the field was explicitly set to a bad value. When it is
+		// absent the zero value is the default, which is not a user misconfiguration.
+		if cfg.HasField("retry_sleep_init_duration") {
+			logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
+				tmp.RetrySleepInitDuration, def)
+		}
 		tmp.RetrySleepInitDuration = def
 	}
 

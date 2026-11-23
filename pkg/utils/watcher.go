@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
+	"github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 )
 
 // GetWatcherPIDs returns the PID's of any running `elastic-agent watch` process.

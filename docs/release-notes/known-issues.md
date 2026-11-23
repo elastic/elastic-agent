@@ -23,6 +23,76 @@ Known issues are significant defects or limitations that may impact your impleme
 % Workaround description.
 % :::
 
+:::{dropdown} Events are dropped with HTTP 413 errors on the OTel runtime
+
+**Applies to: {{agent}} 9.5.0 and later**
+
+On October 28, 2026, a known issue was discovered where {{agent}} drops events when a bulk request to {{es}} is too large. {{es}}, or a proxy in front of it, rejects the request with `413 Request Entity Too Large`, and the OTel runtime drops the whole batch. The OTel runtime is the default for Filebeat inputs in {{agent}} 9.5. The process runtime, which was the default before, splits the batch and retries it, so no data is lost.
+
+Events from other inputs that use the same output and are in the same batch are dropped too. This mostly happens with inputs that send very large documents, such as Active Directory Entity Analytics. Lowering `bulk_max_size` does not help if single documents are large.
+
+**Symptoms**
+
+- The agent logs show `flush failed (413)` and `Exporting failed. Dropping data`.
+- Data is missing in {{es}}.
+- {{fleet}} might show the agent as **Degraded** with `Elasticsearch request failed: 413 Request Entity Too Large`. The status goes back to **Healthy** after the next successful request, so do not rely on it.
+
+**Workaround**
+
+Switch Filebeat to the process runtime. This applies to all Filebeat inputs in the agent policy.
+
+For {{fleet}}-managed agents:
+
+1. In {{kib}}, go to **Fleet** → **Agent policies** and open the policy of the affected agent.
+
+2. On the **Settings** tab, expand **Advanced settings** and find **Advanced internal YAML settings**.
+
+3. Enter the following, then select **Save changes**:
+
+    ```yaml
+    runtime:
+      filebeat:
+        default: process
+    ```
+
+    If the field already has content, add these lines to it instead of replacing it.
+
+For standalone agents, add this to `elastic-agent.yml`:
+
+```yaml
+agent:
+  internal.runtime.filebeat.default: process
+```
+
+Events that were already dropped cannot be recovered. After you upgrade to a version with the fix, remove this setting.
+
+For more information, check [Issue #17612](https://github.com/elastic/elastic-agent/issues/17612).
+:::
+
+:::{dropdown} Elastic Agent crash-loop when a remote Elasticsearch monitoring output is configured.
+
+**Applies to: {{agent}} 9.4.6, 9.5.3**
+
+On August 28, 2026, a known issue was discovered where {{agent}} can enter a crash-restart loop immediately after startup
+or after a policy update when the agent policy is configured to use a remote {{es}} output .
+The {{agent}} crashes with:
+
+```shell
+panic: runtime error: index out of range [-1] in diagnostics.addSecretMarkers and exits with status INVALIDARGUMENT
+```
+making {{agent}} unreachable. A fix will be included in {{agent}} 9.4.7 and 9.5.4.
+
+**Workaround**
+
+In {{fleet}}, navigate to the affected agent policy and change the Output for agent monitoring from the remote {{es}}
+output to the local (default) {{es}} output. This prevents the corrupted policy from being generated.
+
+For agents already stuck in a crash loop, stop the agent service and delete `state.enc` from the {{agent}} `data` directory,
+then restart. Restarting clears the corrupted state without requiring re-enrollment.
+
+For more information, check [Issue #7739](https://github.com/elastic/fleet-server/issues/7739).
+:::
+
 ::::{dropdown} Kafka Kerberos authentication is dropped when using the OTel runtime
 
 **Applies to: {{agent}} 9.4.0 to 9.4.5, 9.5.0 to 9.5.1**
@@ -42,6 +112,35 @@ Alternatively, set `_runtime_experimental: process` on the affected inputs.
 
 For more information, check [Issue #16118](https://github.com/elastic/elastic-agent/issues/16118).
 ::::
+
+:::{dropdown} GCP integration data collected through Pub/Sub is silently dropped on the OTel runtime
+
+**Applies to: {{agent}} 9.5.0 to 9.5.1**
+
+On August 5, 2026, a known issue was discovered where the Filebeat OTel runtime converts values with the Go type `map[string]string` to the string `unknown type: map[string]string` instead of an object. When the destination data stream maps the field as an object, {{es}} rejects the document with a `document_parsing_exception`.
+
+The GCP Pub/Sub input uses a `map[string]string` value for the top-level `labels` field. As a result, this issue affects all GCP integration data streams collected through Pub/Sub, including `gcp.audit`, `gcp.vpcflow`, and `gcp.firewall`.
+
+**Symptoms**
+
+{{fleet}} reports the {{agent}} status as **Healthy**, and agent logs do not contain related errors. The Pub/Sub subscription consumes and acknowledges messages, so no backlog appears. If the destination data stream has the Failure Store enabled, the rejected documents are redirected there and the bulk response reports success. The only visible symptom is that no new documents are searchable.
+
+**Workaround**
+
+Force Filebeat to use the process runtime instead of the OTel runtime:
+
+```yaml
+agent:
+  internal.runtime.filebeat.default: process
+```
+
+**Resolution**
+
+Upgrade to {{agent}} 9.5.2 or later.
+
+For more information, check [Issue #52460](https://github.com/elastic/beats/issues/52460).
+:::
+
 :::{dropdown} Osquery live and scheduled query results are missing in Kibana on {{agent}} 9.5.0
 
 **Applies to: {{agent}} 9.5.0**
@@ -56,7 +155,7 @@ Agents using policies created before osquery_manager 1.30 added the `query_profi
 
 Pin Osquerybeat back to the process runtime on the {{fleet}} agent policy using the `osquery_manager` integration:
 
-1. In {{kib}}, go to **Fleet > Agent policies** and open the agent policy.
+1. In {{kib}}, go to **Fleet** → **Agent policies** and open the agent policy.
 
 2. On the **Settings** tab, expand **Advanced settings** and locate **Advanced internal YAML settings**.
 
@@ -86,18 +185,51 @@ On 9.5.0, browser monitors on {{fleet}}-managed private locations fail for two i
 Both issues are addressed in 9.5.1. There is no supported workaround on 9.5.0 that restores browser monitors without changing the agent version.
 ::::
 
-::::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
+:::{dropdown} {{agent}} restarts repeatedly in containers after a {{fleet}} policy update
 
 **Applies to: {{agent}} 9.3.7, 9.3.8, 9.4.3, 9.4.4**
 
 On July 9, 2026, a known issue was discovered where {{agent}} can restart repeatedly when it is deployed in a {{fleet}}-managed container. When it processes a policy update, the agent uses the default logging values instead of the configuration already active in the container. It incorrectly detects a logging change, restarts and repeats this process indefinitely.
 
+This restart does not increment the container restart count. On Linux, the agent replaces its own process image in place (`execve`), so the PID and container stay alive while the agent loops. Confirm the issue by counting the initialization banner in the agent logs — a healthy agent prints it once, a looping agent prints it tens or hundreds of times within minutes:
+
+```bash
+grep -c 'agent container initialisation - chown paths' <agent-container-logs>
+```
+
 **Workaround**
 
-Make the policy's logging outputs match the container configuration. In the agent policy's **Advanced settings**, set `agent_logging_to_stderr` to `true` and `agent_logging_to_files` to `false`.
+Update the agent policy to set `agent.logging.to_stderr` to `true` and `agent.logging.to_files` to `false`, so the policy matches the container's logging configuration. Use the {{fleet}} API to apply these settings:
+
+```bash
+curl -u <user>:<password> \
+  -X PUT https://<kibana-host>/api/fleet/agent_policies/<policy-id> \
+  -H 'Content-Type: application/json' \
+  -H 'kbn-xsrf: true' \
+  -d '{
+    "name": "<policy-name>",
+    "namespace": "<policy-namespace>",
+    "overrides": {
+      "agent": {
+        "logging": {
+          "to_stderr": true,
+          "to_files": false
+        }
+      }
+    }
+  }'
+```
+
+The `name` and `namespace` values are required by the API and must match the existing policy. Retrieve them first with a GET request to `/api/fleet/agent_policies/<policy-id>`.
+
+After updating the policy, clear the agent state to break the loop. An agent already looping replays the cached policy action faster than a {{fleet}} check-in interval, so the corrected policy never reaches it. Clear the state by removing `/usr/share/elastic-agent/state/fleet.yml` — from inside the running container, from the mounted volume on the host, or by recreating the container. Alternatively, set the `FLEET_FORCE=1` environment variable and restart to force re-enrollment regardless of existing state.
+
+**Alternative workaround**
+
+Instead of updating the agent policy with the API call, you can prevent the loop from occurring by setting the `LOGS_PATH` environment variable on the container before it starts. This stops the container entrypoint from injecting a logging configuration, so no mismatch between the container and the policy can occur. Note that when `LOGS_PATH` is set, agent logs are written to files rather than stderr.
 
 For more information, check [Issue #15432](https://github.com/elastic/elastic-agent/issues/15432).
-::::
+:::
 
 :::{dropdown} {{agent}} logs a "failed to unmarshal checkin actions" error on almost every {{fleet}} check-in
 
@@ -202,7 +334,7 @@ On March 5, 2026, a known issue was discovered that prevents {{agent}} 9.3.0 and
 - The OSQuery Manager integration is installed.
 - The host or agent service is restarted.
 
-Users will see error failing with an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent logs files:
+Users will see an error containing `lchown /Library/Elastic/Agent/data/elastic-agent-9.3.1-2ec825/components/osquery.app: operation not permitted` in `/Library/Elastic/Agent/co.elastic.elastic-agent.err.log` or other agent log files:
 
 ```json
 {"log.level":"error","@timestamp":"2026-02-25T07:19:14.101Z","log.origin":{"function":"github.com/elastic/elastic-agent/internal/pkg/agent/cmd.logReturn","file.name":"cmd/run.go","file.line":152}, "message":"failed to perform permission changes on path /Library/Elastic/Agent: cannot update ownership of \"/Library/Elastic/Agent\": lchown /Library/Elastic/Agent/data/elastic-agent-9.2.5-df1a8d/components/osquery.app: operation not permitted","log.source":"elastic-agent","ecs.version":"1.6.0"}

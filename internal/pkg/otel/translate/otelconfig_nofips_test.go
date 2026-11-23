@@ -7,12 +7,22 @@
 package translate
 
 import (
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/collector/confmap"
 
-	"github.com/elastic/elastic-agent-libs/config"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/mapstr"
+	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/pkg/component"
 )
 
 func TestBeatsAuthExtensionKerberos(t *testing.T) {
@@ -48,6 +58,7 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 					"enable_krb5_fast": false,
 					"service_name":     "",
 					"keytab":           "",
+					"krb5_conf":        "",
 				},
 				"proxy_disable": false,
 			},
@@ -69,4 +80,220 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
+	agentInfo := &proto.AgentInfo{Id: "agent-1"}
+	beatProcessorID := "beat/_agent-component/beat-metrics-monitoring"
+	beatMetricsConfig := map[string]any{
+		"id":         "test",
+		"use_output": "default",
+		"type":       "beat/metrics",
+		"streams": []any{
+			map[string]any{
+				"id": "test-1",
+				"data_stream": map[string]any{
+					"dataset": "generic-1",
+				},
+				"hosts":      "http://localhost:5066",
+				"metricsets": []interface{}{"stats"},
+				"period":     "60s",
+			},
+		},
+	}
+	expectedBeatMetricConfig := map[string]any{
+		"include_metadata": true,
+		"metricbeat": map[string]any{
+			"modules": []map[string]any{
+				{
+					"data_stream": map[string]any{"dataset": "generic-1"},
+					"hosts":       "http://localhost:5066",
+					"id":          "test-1",
+					"index":       "metrics-generic-1-default",
+					"metricsets":  []interface{}{"stats"},
+					"period":      "60s",
+					"processors": []any{
+						mapstr.M{
+							"add_agent_metadata": mapstr.M{
+								"data_stream": mapstr.M{
+									"dataset":   "generic-1",
+									"namespace": "default",
+									"type":      "metrics",
+								},
+								"elastic_agent": mapstr.M{
+									"id":       agentInfo.GetId(),
+									"snapshot": agentInfo.GetSnapshot(),
+									"version":  agentInfo.GetVersion(),
+								},
+								"input_id":  "test",
+								"stream_id": "test-1",
+							},
+						},
+					},
+					"module": "beat",
+				},
+			},
+		},
+		"path": map[string]any{
+			"home": paths.Components(),
+			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+			"logs": paths.BuildComponentsLogs(),
+		},
+		"queue": map[string]any{
+			"mem": map[string]any{
+				"events": float64(3200),
+				"flush": map[string]any{
+					"min_events": float64(1600),
+					"timeout":    "10s",
+				},
+			},
+		},
+		"logging": map[string]any{
+			"with_fields": map[string]any{
+				"component": map[string]any{
+					"binary":  "metricbeat",
+					"dataset": "elastic_agent.metricbeat",
+					"type":    "beat/metrics",
+					"id":      "beat-metrics-monitoring",
+				},
+				"log": map[string]any{
+					"source": "beat-metrics-monitoring",
+				},
+			},
+		},
+		"http": map[string]any{
+			"enabled": false,
+		},
+		"management.otel.enabled": true,
+	}
+
+	model := &component.Model{
+		Components: []component.Component{
+			{
+				ID:         "beat-metrics-monitoring",
+				InputType:  "beat/metrics",
+				OutputType: "kafka",
+				OutputName: "default",
+				AgentInfo:  agentInfo,
+				InputSpec: &component.InputRuntimeSpec{
+					BinaryName: "elastic-otel-collector",
+					Spec: component.InputSpec{
+						Command: &component.CommandSpec{
+							Args: []string{"metricbeat"},
+						},
+					},
+				},
+				Units: []component.Unit{
+					{
+						ID:     "beat/metrics-monitoring",
+						Type:   client.UnitTypeInput,
+						Config: component.MustExpectedConfig(beatMetricsConfig),
+					},
+					{
+						ID:   "beat/metrics-default",
+						Type: client.UnitTypeOutput,
+						Config: component.MustExpectedConfig(map[string]any{
+							"type":                       "kafka",
+							"hosts":                      []any{"127.0.0.1:9022"},
+							"topic":                      "static-topic",
+							"queue.mem.events":           3200,
+							"queue.mem.flush.min_events": 1600,
+							"queue.mem.flush.timeout":    "10s",
+							"sasl.mechanism":             "OAUTHBEARER",
+							"auth": map[string]any{
+								"oauth2client": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+									"client_id":                   "my-client",
+									"client_secret":               "my-secret",
+									"__mark_redact_client_secret": true,
+									"token_url":                   "https://example.com/oauth2/token",
+								},
+							},
+						}),
+					},
+				},
+			},
+		},
+	}
+
+	expectedConfig := confmap.NewFromStringMap(map[string]any{
+		"exporters": map[string]any{
+			"kafka/_agent-component/default": map[string]any{
+				"brokers":      []string{"127.0.0.1:9022"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
+				"logs": map[string]any{
+					"topic":    "static-topic",
+					"encoding": "raw",
+				},
+				"metadata": map[string]any{
+					"refresh_interval": 10 * time.Minute,
+				},
+				"producer": map[string]any{
+					"compression": "gzip",
+					"compression_params": map[string]any{
+						"level": 4,
+					},
+					"max_message_bytes": 1000000,
+					"required_acks":     1,
+				},
+				"protocol_version": "2.1.0",
+				"retry_on_failure": map[string]any{
+					"initial_interval": 1 * time.Second,
+					"max_interval":     60 * time.Second,
+				},
+				"sending_queue": map[string]any{
+					"batch": map[string]any{
+						"flush_timeout": "10s",
+						"max_size":      2048,
+						"sizer":         "items",
+						"min_size":      1600,
+					},
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
+				},
+				"timeout": 10 * time.Second,
+				"auth": map[string]any{
+					"sasl": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+						"mechanism":                "OAUTHBEARER",
+						"oauthbearer_token_source": "oauth2client/_agent-component/default",
+					},
+				},
+				"record_partitioner": map[string]any{
+					"extension": "kafkapartitioner/_agent-component/default",
+				},
+			},
+		},
+		"extensions": map[string]any{
+			"kafkapartitioner/_agent-component/default": map[string]any{},
+			"oauth2client/_agent-component/default": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
+				"client_id":     "my-client",
+				"client_secret": "my-secret",
+				"token_url":     "https://example.com/oauth2/token",
+			},
+		},
+		"processors": map[string]any{
+			beatProcessorID: map[string]any{
+				"processors": GetDefaultProcessors("metricbeat"),
+			},
+		},
+		"receivers": map[string]any{
+			"metricbeatreceiver/_agent-component/beat-metrics-monitoring/beat/metrics-monitoring-test-1": expectedBeatMetricConfig,
+		},
+		"service": map[string]any{
+			"extensions": []any{"kafkapartitioner/_agent-component/default", "oauth2client/_agent-component/default"},
+			"pipelines": map[string]any{
+				"logs/_agent-component/beat-metrics-monitoring": map[string][]string{
+					"exporters":  {"kafka/_agent-component/default"},
+					"processors": {beatProcessorID},
+					"receivers":  {"metricbeatreceiver/_agent-component/beat-metrics-monitoring/beat/metrics-monitoring-test-1"},
+				},
+			},
+		},
+	})
+
+	actualConf, err := GetOtelConfig(model, logp.NewNopLogger())
+	require.NoError(t, err)
+	assert.Equal(t, expectedConfig.ToStringMap(), actualConf.ToStringMap())
 }

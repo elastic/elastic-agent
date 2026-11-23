@@ -15,8 +15,9 @@ const (
 )
 
 var (
-	AgentKustomizePath = filepath.Join("testdata", "elastic-agent-kustomize.yaml")
-	AgentHelmChartPath = filepath.Join("..", "..", "..", "deploy", "helm", "elastic-agent")
+	AgentKustomizePath          = filepath.Join("testdata", "elastic-agent-kustomize.yaml")
+	AgentKustomizeOpenShiftPath = filepath.Join("testdata", "elastic-agent-kustomize-openshift.yaml")
+	AgentHelmChartPath          = filepath.Join("..", "..", "..", "deploy", "helm", "elastic-agent")
 
 	KubeStackChartPath = filepath.Join("testdata", KubeStackChartName)
 )

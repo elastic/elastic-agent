@@ -14,20 +14,12 @@ steps:
       message: "${BUILDKITE_MESSAGE}"
       env:
         TARGET_ENV: staging
-        SERVICE: agentless-controller
-        CONTAINER_NAME: agentless-controller
-        CHECK_RECONCILE_ERROR_PERCENTAGE: true
-        CHECK_CONTAINER_RESTART_COUNT: true
-        CHECK_LOG_ERROR_RATE: true
-        CHECK_SLO: true
-        CHECK_SLO_TAG: agentless-controller
-        CHECK_SLO_BURN_RATE_THRESHOLD: 0.1
-        MAX_ERROR_PERCENT: 10
+        SERVICE: agentless
         SERVICE_VERSION: ${SERVICE_VERSION:0:12}
         CHECK_SYNTHETICS: true
         CHECK_SYNTHETICS_TAG: agentless-quality-gate
         CHECK_SYNTHETICS_MINIMUM_RUNS: 2
-        CHECK_SYNTHETICS_MAX_POLL: 70
+        CHECK_SYNTHETICS_MAX_POLL: 100
         CHECK_SYNTHETICS_POLL_INTERVAL: "180s"
         MAX_FAILURES: 1
         DEPLOYMENT_SLICES: ${DEPLOYMENT_SLICES:-""}

@@ -4,15 +4,22 @@
     "config:recommended"
   ],
   "cloneSubmodules": true,
+  "gitIgnoredAuthors": [
+    "github-actions[bot]@users.noreply.github.com",
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
   "dependencyDashboard": true,
   "enabledManagers": [
     "gomod",
     "github-actions",
     "pip_requirements",
-    "pre-commit"
+    "pre-commit",
+    "buildkite",
+    "custom.regex"
   ],
   "baseBranchPatterns": [
     "main",
+    "9.6",
     "9.5",
     "9.4",
     "8.19"
@@ -33,6 +40,19 @@
     "enabled": true
   },
   "packageRules": [
+    {
+      "description": [
+        "Major updates: only on main and the last branch of the previous major",
+        "managed-by: update-renovate-branches"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "matchBaseBranches": [
+        "!/^(main|8\\.19)$/"
+      ],
+      "enabled": false
+    },
     {
       "description": "Go modules: schedule, labels, PR limit, branch prefix, and post-update tidy",
       "matchManagers": [
@@ -131,18 +151,86 @@
       "enabled": false
     },
     {
-      "description": "Disabled: beats (git submodule), sarama (manual path handling), OTel packages (own release cycle)",
+      "description": "Disabled: beats (git submodule), sarama (manual path handling), OTel packages (own release cycle), internal imports.",
       "matchManagers": [
         "gomod"
       ],
       "matchPackageNames": [
-        "/^github\\.com/elastic/beats//",
+        "/^github\\.com/elastic/beats/",
         "/^github\\.com/elastic/sarama$/",
         "/^go\\.opentelemetry\\.io//",
         "/^github\\.com/open-telemetry//",
-        "/^github\\.com/elastic/opentelemetry-collector-components//"
+        "/^github\\.com/elastic/opentelemetry-collector-components//",
+        "/^github\\.com/elastic/elastic-agent/"
       ],
       "enabled": false
+    },
+    {
+      "description": "go.yaml.in/yaml: block the v3 -> v4 major. The internal/edot module reaches github.com/pb33f/libopenapi (via prometheus, pinned by the Prometheus receiver) which is built against go.yaml.in/yaml/v4 v4.0.0-rc.6 and does not compile against v4.0.0. Because internal/edot replaces github.com/elastic/elastic-agent with the root module, a root-module requirement on v4.0.0 is pulled into internal/edot by MVS and breaks its build. Re-enable once libopenapi (or the pinned Prometheus) builds against go.yaml.in/yaml/v4 v4.0.0.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^go\\.yaml\\.in/yaml/"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "fleet-server: block every non-digest update type. The nested github.com/elastic/fleet-server/pkg/api module declares no major suffix and publishes no tagged versions, so Renovate misreads the fleet-server repository tags (v9.x) and proposes a nonexistent /v9 module path. Pseudo-versions (digest) are the only valid updates.",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch",
+        "pin",
+        "pinDigest",
+        "bump",
+        "rollback",
+        "replacement",
+        "lockFileMaintenance",
+        "lockfileUpdate"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "fleet-server: digest updates only on main; release branches keep the pseudo-version they shipped with",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "matchBaseBranches": [
+        "!/^main$/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "fleet-server: digest updates at most once a month, in their own group so the schedule is not merged into the weekly elastic group branch",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchPackageNames": [
+        "/^github\\.com/elastic/fleet-server/"
+      ],
+      "matchUpdateTypes": [
+        "digest"
+      ],
+      "groupName": "fleet-server",
+      "schedule": [
+        "before 3am on the first day of the month"
+      ]
     },
     {
       "description": "GitHub Actions: weekly Sunday updates",
@@ -193,6 +281,50 @@
         "changelog:dependencies"
       ],
       "prConcurrentLimit": 5
+    },
+    {
+      "description": "Buildkite plugins: one weekly grouped PR, so a pipeline change is reviewed and rolled back as a unit",
+      "matchManagers": [
+        "buildkite",
+        "custom.regex"
+      ],
+      "groupName": "buildkite-plugins",
+      "schedule": [
+        "on sunday"
+      ],
+      "prConcurrentLimit": 5
+    },
+    {
+      "description": "Disabled: elastic/gcp-secret-manager is pinned to the v1.3.0-elastic fork tag, which has no upstream successor and is not comparable as semver",
+      "matchManagers": [
+        "buildkite",
+        "custom.regex"
+      ],
+      "matchPackageNames": [
+        "/^elastic/gcp-secret-manager/"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Distributed oblt-aw client triggers — pins owned by distribute-client-workflow",
+      "enabled": false,
+      "matchFileNames": [
+        ".github/workflows/trigger-*-aw-*.yml"
+      ]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Buildkite plugins pinned inside .buildkite shell scripts that upload pipelines dynamically; the buildkite manager only looks at YAML files.",
+      "managerFilePatterns": [
+        "/^\\.buildkite/.+\\.sh$/"
+      ],
+      "matchStrings": [
+        "-\\s+(?<depName>[\\w.-]+/[\\w.-]+)#(?<currentValue>v[^:\\s]+):"
+      ],
+      "datasourceTemplate": "github-tags",
+      "packageNameTemplate": "{{{depName}}}-buildkite-plugin"
     }
   ]
 }

@@ -17,15 +17,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/pkg/limits"
+	"github.com/elastic/go-ucfg"
 )
 
 // GenerateMonitoringCfgFn is a function that can inject information into the model generation process.
@@ -38,16 +39,16 @@ type HeadersProvider interface {
 type RuntimeManager string
 
 type RuntimeConfig struct {
-	Default                 string            `yaml:"default" config:"default" json:"default"`
-	Auditbeat               BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
-	Filebeat                BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
-	Heartbeat               BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
-	Metricbeat              BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
-	Osquerybeat             BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
-	Packetbeat              BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
-	DynamicInputs           string            `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
-	Output                  map[string]string `yaml:"output" config:"output" json:"output"`
-	OtelPartialConfigReload bool              `yaml:"otel_partial_config_reload" config:"otel_partial_config_reload" json:"otel_partial_config_reload"`
+	Default                 string              `yaml:"default" config:"default" json:"default"`
+	Auditbeat               BeatRuntimeConfig   `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat                BeatRuntimeConfig   `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat               BeatRuntimeConfig   `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat              BeatRuntimeConfig   `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat             BeatRuntimeConfig   `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat              BeatRuntimeConfig   `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	DynamicInputs           DynamicInputsConfig `yaml:"dynamic_inputs" config:"dynamic_inputs" json:"dynamic_inputs"`
+	Output                  map[string]string   `yaml:"output" config:"output" json:"output"`
+	OtelPartialConfigReload bool                `yaml:"otel_partial_config_reload" config:"otel_partial_config_reload" json:"otel_partial_config_reload"`
 }
 
 type BeatRuntimeConfig struct {
@@ -55,10 +56,156 @@ type BeatRuntimeConfig struct {
 	InputType map[string]string `yaml:",inline,omitempty" config:",inline,omitempty" json:",inline,omitempty"`
 }
 
+// DynamicInputsConfig controls the runtime used by components that contain dynamic inputs,
+// that is, inputs rendered from a dynamic variable provider. Such components can cause
+// frequent configuration reloads, which are expensive for the otel collector, so they can be
+// moved to a different runtime.
+//
+// The resolved value is the runtime a dynamic component running under the otel runtime should
+// be moved to. An empty value means the feature is disabled and components are left alone.
+//
+// For backwards compatibility the configuration also accepts the legacy scalar form
+// (`dynamic_inputs: process`), which is equivalent to setting only `default`.
+type DynamicInputsConfig struct {
+	Default     string            `yaml:"default" config:"default" json:"default"`
+	Auditbeat   BeatRuntimeConfig `yaml:"auditbeat" config:"auditbeat" json:"auditbeat"`
+	Filebeat    BeatRuntimeConfig `yaml:"filebeat" config:"filebeat" json:"filebeat"`
+	Heartbeat   BeatRuntimeConfig `yaml:"heartbeat" config:"heartbeat" json:"heartbeat"`
+	Metricbeat  BeatRuntimeConfig `yaml:"metricbeat" config:"metricbeat" json:"metricbeat"`
+	Osquerybeat BeatRuntimeConfig `yaml:"osquerybeat" config:"osquerybeat" json:"osquerybeat"`
+	Packetbeat  BeatRuntimeConfig `yaml:"packetbeat" config:"packetbeat" json:"packetbeat"`
+	// StaticVariables lists dynamic provider variables that cannot change at runtime, and
+	// therefore don't make an input dynamic. Entries match a variable name exactly or as a
+	// '.'-separated path prefix, so `kubernetes.node` covers `kubernetes.node.name` but not
+	// `kubernetes.nodename`. Trailing '.' characters are trimmed when the configuration is
+	// read, so `kubernetes.node.` is equivalent to `kubernetes.node`.
+	StaticVariables []string `yaml:"static_variables" config:"static_variables" json:"static_variables"`
+}
+
+// dynamicInputsConfigFields mirrors DynamicInputsConfig, but without the custom unpacking
+// methods, so it can be used as the unpack target without recursing forever.
+type dynamicInputsConfigFields DynamicInputsConfig
+
+// Unpack implements the go-ucfg Unpacker interface. It accepts both the legacy scalar form
+// (`dynamic_inputs: process`), which sets Default, and the full map form.
+func (d *DynamicInputsConfig) Unpack(value interface{}) error {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case string:
+		d.Default = v
+		return nil
+	case map[string]interface{}:
+		cfg, err := ucfg.NewFrom(v)
+		if err != nil {
+			return fmt.Errorf("failed to read dynamic_inputs configuration: %w", err)
+		}
+		// start from the current value so defaults set by DefaultRuntimeConfig are preserved
+		fields := dynamicInputsConfigFields(*d)
+		if err := cfg.Unpack(&fields); err != nil {
+			return fmt.Errorf("failed to unpack dynamic_inputs configuration: %w", err)
+		}
+		*d = DynamicInputsConfig(fields)
+		d.normalize()
+		return nil
+	default:
+		return fmt.Errorf("dynamic_inputs must be a string or an object, got %T", value)
+	}
+}
+
+// UnmarshalYAML mirrors Unpack for the yaml code path, so that both the legacy scalar form
+// and the map form are accepted when the runtime configuration is read from YAML directly.
+func (d *DynamicInputsConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	var str string
+	if err := unmarshal(&str); err == nil {
+		d.Default = str
+		return nil
+	}
+	// start from the current value so defaults set by DefaultRuntimeConfig are preserved
+	fields := dynamicInputsConfigFields(*d)
+	if err := unmarshal(&fields); err != nil {
+		return err
+	}
+	*d = DynamicInputsConfig(fields)
+	d.normalize()
+	return nil
+}
+
+// normalize cleans up configuration values after unpacking. Trailing '.' characters are
+// trimmed from static variable entries, so `kubernetes.node.` matches the same variables
+// as `kubernetes.node`.
+func (d *DynamicInputsConfig) normalize() {
+	for i, static := range d.StaticVariables {
+		d.StaticVariables[i] = strings.TrimRight(static, ".")
+	}
+}
+
+// beatRuntimeConfig returns the per-beat configuration for beatName, or nil for an unknown beat.
+func (d *DynamicInputsConfig) beatRuntimeConfig(beatName string) *BeatRuntimeConfig {
+	switch beatName {
+	case "auditbeat":
+		return &d.Auditbeat
+	case "filebeat":
+		return &d.Filebeat
+	case "heartbeat":
+		return &d.Heartbeat
+	case "metricbeat":
+		return &d.Metricbeat
+	case "osquerybeat":
+		return &d.Osquerybeat
+	case "packetbeat":
+		return &d.Packetbeat
+	default:
+		return nil
+	}
+}
+
+// RuntimeManagerForDynamicInput returns the runtime manager that components with dynamic
+// inputs should be moved to, or "" if they should be left alone.
+//
+// The precedence is: the beat's per-input-type value, the beat's default, the top-level
+// default, disabled.
+func (d *DynamicInputsConfig) RuntimeManagerForDynamicInput(beatName string, inputType string) RuntimeManager {
+	if beatConfig := d.beatRuntimeConfig(beatName); beatConfig != nil {
+		if manager, ok := beatConfig.InputType[inputType]; ok && manager != "" {
+			return RuntimeManager(manager)
+		}
+		if beatConfig.Default != "" {
+			return RuntimeManager(beatConfig.Default)
+		}
+	}
+	return RuntimeManager(d.Default)
+}
+
+// validate checks that the configured runtime managers and static variables are valid.
+// It is intentionally unexported so that go-ucfg doesn't pick it up as a Validator; it is
+// called from RuntimeConfig.Validate instead.
+func (d *DynamicInputsConfig) validate() error {
+	if err := validateRuntimeManager(d.Default, true); err != nil {
+		return err
+	}
+	for _, beatConfig := range []BeatRuntimeConfig{d.Auditbeat, d.Filebeat, d.Heartbeat, d.Metricbeat, d.Osquerybeat, d.Packetbeat} {
+		if err := validateRuntimeManager(beatConfig.Default, true); err != nil {
+			return err
+		}
+		for _, val := range beatConfig.InputType {
+			if err := validateRuntimeManager(val, false); err != nil {
+				return err
+			}
+		}
+	}
+	for _, static := range d.StaticVariables {
+		if strings.TrimSpace(static) == "" {
+			return errors.New("static_variables entries must not be empty")
+		}
+	}
+	return nil
+}
+
 func DefaultRuntimeConfig() *RuntimeConfig {
 	return &RuntimeConfig{
 		Default:                 string(DefaultRuntimeManager),
-		DynamicInputs:           "",
+		DynamicInputs:           DefaultDynamicInputsConfig(),
 		OtelPartialConfigReload: true,
 		Auditbeat: BeatRuntimeConfig{
 			Default: string(OtelRuntimeManager),
@@ -92,31 +239,54 @@ func DefaultRuntimeConfig() *RuntimeConfig {
 	}
 }
 
-func (r *RuntimeConfig) Validate() error {
-	validateRuntime := func(val string, allowEmpty bool) error {
-		if allowEmpty && val == "" {
-			return nil
-		}
-		switch RuntimeManager(val) {
-		case "", OtelRuntimeManager, ProcessRuntimeManager:
-			return nil
-		default:
-			return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
-				val, OtelRuntimeManager, ProcessRuntimeManager)
-		}
+// DefaultDynamicInputsConfig returns the default dynamic inputs configuration, which leaves
+// the feature disabled.
+func DefaultDynamicInputsConfig() DynamicInputsConfig {
+	return DynamicInputsConfig{
+		Default: "",
+		// go-ucfg sets the inline maps while unpacking, having them in the default makes
+		// testing easier
+		Auditbeat:   BeatRuntimeConfig{InputType: make(map[string]string)},
+		Filebeat:    BeatRuntimeConfig{InputType: make(map[string]string)},
+		Heartbeat:   BeatRuntimeConfig{InputType: make(map[string]string)},
+		Metricbeat:  BeatRuntimeConfig{InputType: make(map[string]string)},
+		Osquerybeat: BeatRuntimeConfig{InputType: make(map[string]string)},
+		Packetbeat:  BeatRuntimeConfig{InputType: make(map[string]string)},
 	}
-	if err := validateRuntime(r.Default, false); err != nil {
+}
+
+// validateRuntimeManager checks that val names a supported runtime manager. When allowEmpty
+// is true an empty value means "not set at this level" and is accepted.
+func validateRuntimeManager(val string, allowEmpty bool) error {
+	if allowEmpty && val == "" {
+		return nil
+	}
+	switch RuntimeManager(val) {
+	case "", OtelRuntimeManager, ProcessRuntimeManager:
+		return nil
+	default:
+		return fmt.Errorf("invalid runtime manager: %s, must be either %s or %s",
+			val, OtelRuntimeManager, ProcessRuntimeManager)
+	}
+}
+
+func (r *RuntimeConfig) Validate() error {
+	if err := validateRuntimeManager(r.Default, false); err != nil {
 		return err
 	}
 	for _, beatConfig := range []BeatRuntimeConfig{r.Auditbeat, r.Filebeat, r.Heartbeat, r.Metricbeat, r.Osquerybeat, r.Packetbeat} {
-		if err := validateRuntime(beatConfig.Default, true); err != nil {
+		if err := validateRuntimeManager(beatConfig.Default, true); err != nil {
 			return err
 		}
 		for _, val := range beatConfig.InputType {
-			if err := validateRuntime(val, false); err != nil {
+			if err := validateRuntimeManager(val, false); err != nil {
 				return err
 			}
 		}
+	}
+
+	if err := r.DynamicInputs.validate(); err != nil {
+		return fmt.Errorf("invalid dynamic_inputs configuration: %w", err)
 	}
 
 	allowedOutput := []string{"elasticsearch", "logstash", "kafka"}
@@ -124,7 +294,7 @@ func (r *RuntimeConfig) Validate() error {
 		if !slices.Contains(allowedOutput, name) {
 			return fmt.Errorf("%s output is not supported", name)
 		}
-		if err := validateRuntime(runtime, false); err != nil {
+		if err := validateRuntimeManager(runtime, false); err != nil {
 			return err
 		}
 	}
@@ -329,6 +499,9 @@ type Component struct {
 	// Component-level configuration
 	Component *proto.Component `yaml:"component,omitempty"`
 
+	// Agent info the component should use.
+	AgentInfo *proto.AgentInfo `yaml:"agent_info,omitempty"`
+
 	OutputStatusReporting *StatusReporting `yaml:"-"`
 
 	// LastConfiguredAt records when the component was last configured.
@@ -344,7 +517,8 @@ func (c Component) MarshalYAML() (interface{}, error) {
 	if c.Err != nil {
 		c.ErrMsg = c.Err.Error()
 	}
-	return c, nil
+	type componentAlias Component // alias breaks the MarshalYAML recursion in yaml.v3
+	return componentAlias(c), nil
 }
 
 func (c *Component) MarshalJSON() ([]byte, error) {
@@ -461,9 +635,31 @@ func (c *Component) WorkDirPath(parentDirPath string) string {
 	return filepath.Join(parentDirPath, c.WorkDirName())
 }
 
+// validateComponentID verifies that joining parentDirPath with id stays strictly inside
+// parentDirPath. Both paths are resolved to absolute form before comparison so that
+// ".", "..", and multi-segment traversal are all normalised by the path library.
+func validateComponentID(parentDirPath, id string) error {
+	if id == "" {
+		return errors.New("component ID must not be empty")
+	}
+	absParent, err := filepath.Abs(parentDirPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve runtime directory %q: %w", parentDirPath, err)
+	}
+	absCandidate := filepath.Clean(filepath.Join(absParent, id))
+	rel, err := filepath.Rel(absParent, absCandidate)
+	if err != nil || rel == "." || strings.HasPrefix(rel, "..") {
+		return fmt.Errorf("component ID %q must resolve strictly inside the runtime directory", id)
+	}
+	return nil
+}
+
 // PrepareWorkDir prepares the component working directory under the provided parent path. This involves creating
 // it under the right ownership and ACLs. This method is idempotent.
 func (c *Component) PrepareWorkDir(parentDirPath string) error {
+	if err := validateComponentID(parentDirPath, c.ID); err != nil {
+		return err
+	}
 	uid, gid := os.Geteuid(), os.Getegid()
 	path := c.WorkDirPath(parentDirPath)
 	err := os.MkdirAll(path, workDirPathMod)
@@ -486,6 +682,9 @@ func (c *Component) PrepareWorkDir(parentDirPath string) error {
 
 // RemoveWorkDir removes the component working directory under the provided parent path. This method is idempotent.
 func (c *Component) RemoveWorkDir(parentDirPath string) error {
+	if err := validateComponentID(parentDirPath, c.ID); err != nil {
+		return err
+	}
 	return os.RemoveAll(c.WorkDirPath(parentDirPath))
 }
 
@@ -553,8 +752,14 @@ func (r *RuntimeSpecs) ToComponents(
 	headers HeadersProvider,
 	currentServiceCompInts map[string]uint64,
 	dynamicInputs map[string]bool,
+	opts ...ComponentsOption,
 ) ([]Component, error) {
-	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers, dynamicInputs)
+	var options componentsOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	components, err := r.PolicyToComponents(policy, runtimeCfg, ll, headers, dynamicInputs, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -575,7 +780,7 @@ func (r *RuntimeSpecs) ToComponents(
 
 		if monitoringCfg != nil {
 			// monitoring is enabled
-			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers, map[string]bool{})
+			monitoringComps, err := r.PolicyToComponents(monitoringCfg, runtimeCfg, ll, headers, map[string]bool{}, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("failed to generate monitoring components: %w", err)
 			}
@@ -591,11 +796,55 @@ func (r *RuntimeSpecs) ToComponents(
 		}
 	}
 
+	// every unit configuration of the model has been generated (or reused); drop the cached
+	// ones that are no longer part of it
+	options.cache.Sweep()
+
 	return components, nil
 }
 
-func unitForInput(input inputI, id string) Unit {
-	cfg, cfgErr := ExpectedConfig(input.config)
+// ComponentsOption configures how components are generated from a policy.
+type ComponentsOption func(*componentsOptions)
+
+type componentsOptions struct {
+	cache     *ExpectedConfigCache
+	agentInfo *proto.AgentInfo
+}
+
+// WithExpectedConfigCache reuses the unit configurations generated by a previous call for the
+// inputs and outputs that did not change. ToComponents drops the entries that are not part of
+// the generated model when it succeeds. The cache must only be used by one caller at a time.
+func WithExpectedConfigCache(cache *ExpectedConfigCache) ComponentsOption {
+	return func(o *componentsOptions) {
+		o.cache = cache
+	}
+}
+
+// WithAgentInfo sets the agent info of every component.
+// Every component of the model shares agentInfo so the caller must not modify it after the call.
+func WithAgentInfo(agentInfo *proto.AgentInfo) ComponentsOption {
+	return func(o *componentsOptions) {
+		o.agentInfo = agentInfo
+	}
+}
+
+// componentsShared holds the values shared by every component generated from one policy.
+type componentsShared struct {
+	// features is the proto form of the feature flags. It is generated once and shared by
+	// every component of the model; nothing modifies it after generation (its source is
+	// already shared by every call of Flags.AsProto).
+	features *proto.Features
+	// agentInfo is shared by every component of the model. Nothing modifies it after generation
+	// (its source is owned by the caller, which must not modify it).
+	agentInfo *proto.AgentInfo
+	// componentConfig is converted for every component, as modifiers (InjectAPMConfig)
+	// modify the component's proto in place.
+	componentConfig *ComponentConfig
+	cache           *ExpectedConfigCache
+}
+
+func unitForInput(input inputI, id string, cache *ExpectedConfigCache) Unit {
+	cfg, cfgErr := cache.ExpectedConfig(input.config)
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeInput,
@@ -605,8 +854,8 @@ func unitForInput(input inputI, id string) Unit {
 	}
 }
 
-func unitForOutput(output outputI, id string) Unit {
-	cfg, cfgErr := ExpectedConfig(output.Config)
+func unitForOutput(output outputI, id string, cache *ExpectedConfigCache) Unit {
+	cfg, cfgErr := cache.ExpectedConfig(output.Config)
 	return Unit{
 		ID:       id,
 		Type:     client.UnitTypeOutput,
@@ -622,8 +871,7 @@ func unitForOutput(output outputI, id string) Unit {
 func (r *RuntimeSpecs) componentsForInputType(
 	inputType string,
 	output outputI,
-	featureFlags *features.Flags,
-	componentConfig *ComponentConfig,
+	shared componentsShared,
 	runtimeConfig *RuntimeConfig,
 ) []Component {
 	var components []Component
@@ -642,6 +890,9 @@ func (r *RuntimeSpecs) componentsForInputType(
 			componentID = inputType
 		}
 
+		if componentErr == nil {
+			componentErr = validateComponentID(paths.Run(), componentID)
+		}
 		if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 			// This output is unsupported.
 			componentErr = ErrOutputNotSupported
@@ -657,7 +908,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 				}
 				unitsForRuntimeManager[input.runtimeManager] = append(
 					unitsForRuntimeManager[input.runtimeManager],
-					unitForInput(input, unitID),
+					unitForInput(input, unitID, shared.cache),
 				)
 				hasDynamicInputs = hasDynamicInputs || input.dynamic
 			}
@@ -670,7 +921,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 			units := unitsForRuntimeManager[runtimeManager]
 			if len(units) > 0 {
 				// Populate the output units for this component
-				units = append(units, unitForOutput(output, componentID))
+				units = append(units, unitForOutput(output, componentID, shared.cache))
 				components = append(components, Component{
 					ID:                    componentID,
 					Err:                   componentErr,
@@ -681,8 +932,9 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Units:                 units,
 					RuntimeManager:        runtimeManager,
 					Dynamic:               hasDynamicInputs,
-					Features:              featureFlags.AsProto(),
-					Component:             componentConfig.AsProto(),
+					Features:              shared.features,
+					AgentInfo:             shared.agentInfo,
+					Component:             shared.componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
 					LastConfiguredAt:      time.Now(),
 				})
@@ -702,6 +954,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 				componentID = fmt.Sprintf("%s-%s", inputType, input.id)
 			}
 
+			var componentErr error
+			if err := validateComponentID(paths.Run(), componentID); err != nil {
+				componentErr = err
+			}
 			if componentErr == nil && !containsStr(inputSpec.Spec.Outputs, output.OutputType) {
 				// This output is unsupported.
 				componentErr = ErrOutputNotSupported
@@ -714,10 +970,10 @@ func (r *RuntimeSpecs) componentsForInputType(
 			var units []Unit
 			if input.enabled {
 				unitID := GetOutputUnitId(componentID)
-				units = append(units, unitForInput(input, unitID))
+				units = append(units, unitForInput(input, unitID, shared.cache))
 
 				// each component gets its own output, because of unit isolation
-				units = append(units, unitForOutput(output, componentID))
+				units = append(units, unitForOutput(output, componentID, shared.cache))
 				components = append(components, Component{
 					ID:                    componentID,
 					Err:                   componentErr,
@@ -728,8 +984,9 @@ func (r *RuntimeSpecs) componentsForInputType(
 					Units:                 units,
 					RuntimeManager:        input.runtimeManager,
 					Dynamic:               input.dynamic,
-					Features:              featureFlags.AsProto(),
-					Component:             componentConfig.AsProto(),
+					Features:              shared.features,
+					AgentInfo:             shared.agentInfo,
+					Component:             shared.componentConfig.AsProto(),
 					OutputStatusReporting: extractStatusReporting(output.Config),
 					LastConfiguredAt:      time.Now(),
 				})
@@ -741,8 +998,7 @@ func (r *RuntimeSpecs) componentsForInputType(
 
 func (r *RuntimeSpecs) componentsForOutput(
 	output outputI,
-	featureFlags *features.Flags,
-	componentConfig *ComponentConfig,
+	shared componentsShared,
 	runtimeConfig *RuntimeConfig,
 ) []Component {
 	var components []Component
@@ -752,7 +1008,7 @@ func (r *RuntimeSpecs) componentsForOutput(
 		// from running then it will be in the Component's Err field and
 		// we will report it later. The only thing we skip is a component/s
 		// with no units.
-		typeComponents := r.componentsForInputType(inputType, output, featureFlags, componentConfig, runtimeConfig)
+		typeComponents := r.componentsForInputType(inputType, output, shared, runtimeConfig)
 		for _, component := range typeComponents {
 			if len(component.Units) > 0 {
 				components = append(components, component)
@@ -762,6 +1018,19 @@ func (r *RuntimeSpecs) componentsForOutput(
 	return components
 }
 
+// agentSection returns a policy that only contains the top-level "agent" section (including any
+// flattened "agent.*" keys). Feature flags and limits live under it, so parsing the entire rendered
+// policy (with every rendered input) through go-ucfg on each component model refresh is wasted work.
+func agentSection(policy map[string]interface{}) map[string]interface{} {
+	section := make(map[string]interface{}, 1)
+	for k, v := range policy {
+		if k == "agent" || strings.HasPrefix(k, "agent.") {
+			section[k] = v
+		}
+	}
+	return section
+}
+
 // PolicyToComponents takes the policy and generates a component model.
 func (r *RuntimeSpecs) PolicyToComponents(
 	policy map[string]interface{},
@@ -769,9 +1038,17 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	ll logp.Level,
 	headers HeadersProvider,
 	dynamicInputs map[string]bool,
+	opts ...ComponentsOption,
 ) ([]Component, error) {
+	var options componentsOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	agentCfg := agentSection(policy)
+
 	// get feature flags from policy
-	featureFlags, err := features.Parse(policy)
+	featureFlags, err := features.Parse(agentCfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse feature flags from policy: %w", err)
 	}
@@ -792,7 +1069,7 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	sort.Strings(outputKeys)
 
 	// get agent limits from the policy
-	limits, err := limits.Parse(policy)
+	limits, err := limits.Parse(agentCfg)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse limits from policy: %w", err)
 	}
@@ -801,13 +1078,19 @@ func (r *RuntimeSpecs) PolicyToComponents(
 	componentConfig := &ComponentConfig{
 		Limits: ComponentLimits(*limits),
 	}
+	shared := componentsShared{
+		features:        featureFlags.AsProto(),
+		agentInfo:       options.agentInfo,
+		componentConfig: componentConfig,
+		cache:           options.cache,
+	}
 
 	var components []Component
 	for _, outputName := range outputKeys {
 		output := outputsMap[outputName]
 		if output.Enabled {
 			components = append(components,
-				r.componentsForOutput(output, featureFlags, componentConfig, runtimeCfg)...)
+				r.componentsForOutput(output, shared, runtimeCfg)...)
 		}
 	}
 
@@ -832,7 +1115,10 @@ func injectInputPolicyID(fleetPolicy map[string]interface{}, inputConfig map[str
 		// Note that if the interface conversion here fails, we do nothing because we don't
 		// know what type of object exists with the policy key.
 		if policyMap, ok := policyObj.(map[string]interface{}); ok {
+			// copy so the nested map of the policy handed to us is left untouched
+			policyMap = maps.Clone(policyMap)
 			policyMap["revision"] = revision
+			inputConfig["policy"] = policyMap
 		}
 	} else {
 		// If there was no policy object, then inject one with a revision key.
@@ -879,6 +1165,9 @@ func toIntermediate(
 		if !ok {
 			return nil, fmt.Errorf("invalid 'outputs.%s', expected a map not a %T", name, outputRaw)
 		}
+		// ParseOutput removes and injects keys; work on a copy so the policy handed to us is
+		// left untouched
+		output = maps.Clone(output)
 		parsedOutput, err := ParseOutput(name, output, ll, headers)
 		if err != nil {
 			return nil, err
@@ -902,6 +1191,9 @@ func toIntermediate(
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d', expected a map not a %T", idx, inputRaw)
 		}
+		// the keys consumed below are removed from the input before it becomes a unit
+		// configuration; work on a copy so the policy handed to us is left untouched
+		input = maps.Clone(input)
 		typeRaw, ok := input[typeKey]
 		if !ok {
 			return nil, fmt.Errorf("invalid 'inputs.%d', 'type' missing", idx)
@@ -1026,7 +1318,8 @@ func ParseOutput(outputName string, outputConfig map[string]any, ll logp.Level, 
 				if !ok {
 					return nil, fmt.Errorf("invalid 'outputs.headers', expected a map not a %T", outputConfig)
 				}
-				headers = existingHeaders
+				// copy so the nested map of the policy handed to us is left untouched
+				headers = maps.Clone(existingHeaders)
 			}
 
 			for headerName, headerVal := range agentHeaders {

@@ -123,9 +123,12 @@ inputs:
 #     endpoint:
 
 # agent.download:
-#   # source of the artifacts, requires elastic like structure and naming of the binaries
-#   # e.g /windows-x86.zip
-#   sourceURI: "https://artifacts.elastic.co/downloads/beats/"
+#   # an ordered list of source URIs for retrieving upgrade artifacts
+#   sources:
+#     - "https://artifacts.elastic.co/downloads/"
+#     - "https://fallback.example/downloads/"
+#   # sourceURI is a download source for an upgrade artifact. deprecated by sources, which overrides this value if both are present
+#   sourceURI: "https://artifacts.elastic.co/downloads/"
 #   # path to the directory containing downloaded packages
 #   target_directory: "${path.data}/downloads"
 #   # timeout for downloading package
@@ -136,6 +139,10 @@ inputs:
 #   # retry_sleep_init_duration is the duration to sleep for before the first retry attempt. This
 #   # duration will increase for subsequent retry attempts in a randomized exponential backoff manner.
 #   retry_sleep_init_duration: 30s
+#   # if reserve_diskspace is enabled, upgrade will check for available diskspace and attempt to
+#   # reserve the required amount upfront, failing the upgrade if there is insufficient diskspace.
+#   reserve_diskspace:
+#     enabled: true
 
 # agent.upgrade
 #   # rollback settings
@@ -150,6 +157,19 @@ inputs:
 #   # timeout for stopping processes. when process is not stopped by this timeout then the process.
 #   # is force killed
 #   stop_timeout: 30s
+
+# agent.synthetics.browser:
+#   # CAs that browser monitors trust: PEM files, or directories of *.crt and *.pem files.
+#   # In containers, ELASTIC_AGENT_BROWSER_CA replaces this list when it is set.
+#   # Requires certutil (in the complete images), Linux only.
+#   certificate_authorities: []
+#   certificate_reload:
+#     # check the CAs for changes while running, so none needs a restart
+#     enabled: true
+#     # Positive intervals below 1s use 1s and log a warning.
+#     # In containers, ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL overrides this interval;
+#     # setting the environment variable to 0 disables reloading.
+#     reload_interval: 30s
 
 # agent.grpc:
 #   # listen address for the GRPC server that spawned processes connect back to.
@@ -257,6 +277,13 @@ inputs:
 #  # ignored by Fleet managed agents, which always use encrypted config.
 #  encrypted_config:
 #    enabled: false
+#  # attach agent tags to every event collected by beats-based inputs.
+#  include_tags_in_events:
+#    enabled: false
+
+# Agent tags are attached to every event when include_tags_in_events is enabled.
+# In managed mode, Fleet sets this list from the policy.
+#agent.tags: []
 
 # Logging
 

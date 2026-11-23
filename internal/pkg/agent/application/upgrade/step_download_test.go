@@ -6,7 +6,10 @@ package upgrade
 
 import (
 	"bytes"
+	"compress/gzip"
+	"context"
 	"crypto/sha512"
+	goerrors "errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,14 +21,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
+	downloaderrors "github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils/fipsutils"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
@@ -37,12 +43,21 @@ import (
 func TestDownloadArtifact(t *testing.T) {
 	fipsutils.SkipIfFIPSOnly(t, "test uses an OpenPGP key which results in a SHA-1 violation")
 
-	originalDownloads := paths.Downloads()
-	t.Cleanup(func() {
-		paths.SetDownloads(originalDownloads)
-	})
+	pathstest.SetTop(t, t.TempDir())
+	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
-	archiveContent := []byte("signed artifact content")
+	// gzipArchive produces a valid gzip file so the disk space check can read
+	// a real (small) decompressed size from the trailing ISIZE bytes.
+	gzipArchive := func(t *testing.T, content string) []byte {
+		var buf bytes.Buffer
+		gzw := gzip.NewWriter(&buf)
+		_, err := io.WriteString(gzw, content)
+		require.NoError(t, err)
+		require.NoError(t, gzw.Close())
+		return buf.Bytes()
+	}
+
+	archiveContent := gzipArchive(t, "signed artifact content")
 	pgpKey, signature := pgptest.Sign(t, bytes.NewReader(archiveContent))
 	pgpSource := download.PgpSourceRawPrefix + string(pgpKey)
 	hashFile := []byte(fmt.Sprintf("%x %s", sha512.Sum512(archiveContent), "elastic-agent-1.2.3-linux-x86_64.tar.gz"))
@@ -50,7 +65,11 @@ func TestDownloadArtifact(t *testing.T) {
 	requestCountHandler := func(files map[string][]byte, requestCounts map[string]int) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
-			requestCounts[path]++
+			// Only count full downloads; the disk space check probes with
+			// HEAD and Range requests before the artifact is fetched.
+			if r.Method != http.MethodHead && r.Header.Get("Range") == "" {
+				requestCounts[path]++
+			}
 
 			file, ok := files[path]
 			if !ok {
@@ -58,7 +77,7 @@ func TestDownloadArtifact(t *testing.T) {
 				return
 			}
 
-			_, _ = w.Write(file)
+			http.ServeContent(w, r, path, time.Time{}, bytes.NewReader(file))
 		}
 	}
 
@@ -90,7 +109,7 @@ func TestDownloadArtifact(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()+".sha512"), hashFile, 0o644))
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()+".asc"), signature, 0o644))
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, filepath.Join(paths.Downloads(), fx.target.FileName()), artifactPath)
@@ -102,9 +121,9 @@ func TestDownloadArtifact(t *testing.T) {
 			name: "local-only sourceURI fails when local artifact is missing",
 			run: func(t *testing.T, fx *fixture) {
 				serverURL, requestCounts := newFileServer(t, nil)
-				fx.settings.SourceURI = serverURL
+				fx.settings.Sources = []string{serverURL}
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+t.TempDir(),
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + t.TempDir()},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "could not fetch artifact")
 				require.Empty(t, requestCounts)
@@ -118,10 +137,10 @@ func TestDownloadArtifact(t *testing.T) {
 				dropPath := t.TempDir()
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "could not fetch artifact sha512")
-				require.FileExists(t, artifactPath)
+				require.NoFileExists(t, artifactPath)
 				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
@@ -133,11 +152,11 @@ func TestDownloadArtifact(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()+".sha512"), hashFile, 0o644))
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()+".asc"), []byte("not a valid signature"), 0o644))
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "verification failed")
-				require.FileExists(t, artifactPath)
-				require.FileExists(t, download.AddHashExtension(artifactPath))
+				require.NoFileExists(t, artifactPath)
+				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
 		{
@@ -146,7 +165,7 @@ func TestDownloadArtifact(t *testing.T) {
 				dropPath := t.TempDir()
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, true, true, pgpSource)
 				require.NoError(t, err)
 				require.FileExists(t, artifactPath)
@@ -163,7 +182,7 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath + ".asc":    signature,
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, filepath.Join(paths.Downloads(), fx.target.FileName()), artifactPath)
@@ -180,7 +199,7 @@ func TestDownloadArtifact(t *testing.T) {
 				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
 				serverURL, requestCounts := newFileServer(t, nil)
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "could not fetch artifact from")
 				require.Equal(t, 1, requestCounts[remotePath])
@@ -197,12 +216,12 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath: archiveContent,
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "could not fetch artifact sha512")
 				require.Equal(t, 1, requestCounts[remotePath])
 				require.Equal(t, 1, requestCounts[remotePath+".sha512"])
-				require.FileExists(t, artifactPath)
+				require.NoFileExists(t, artifactPath)
 				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
@@ -216,14 +235,14 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath + ".asc":    []byte("not a valid signature"),
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.ErrorContains(t, err, "verification failed")
 				require.Equal(t, 1, requestCounts[remotePath])
 				require.Equal(t, 1, requestCounts[remotePath+".sha512"])
 				require.Equal(t, 1, requestCounts[remotePath+".asc"])
-				require.FileExists(t, artifactPath)
-				require.FileExists(t, download.AddHashExtension(artifactPath))
+				require.NoFileExists(t, artifactPath)
+				require.NoFileExists(t, download.AddHashExtension(artifactPath))
 			},
 		},
 		{
@@ -234,7 +253,7 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath: archiveContent,
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, true, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, 1, requestCounts[remotePath])
@@ -253,7 +272,7 @@ func TestDownloadArtifact(t *testing.T) {
 
 				serverURL, requestCounts := newFileServer(t, nil)
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Empty(t, requestCounts)
@@ -272,7 +291,7 @@ func TestDownloadArtifact(t *testing.T) {
 
 				serverURL, requestCounts := newFileServer(t, nil)
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Empty(t, requestCounts)
@@ -294,7 +313,7 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath + ".asc":    signature,
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, 1, requestCounts[remotePath])
@@ -302,6 +321,142 @@ func TestDownloadArtifact(t *testing.T) {
 				require.Equal(t, 1, requestCounts[remotePath+".asc"])
 				require.FileExists(t, artifactPath)
 				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "local-only sourceURI fails when disk space reservation fails",
+			run: func(t *testing.T, fx *fixture) {
+				dropPath := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return false, goerrors.New("disk space reservation failed")
+				}
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.Error(t, err)
+				require.NoFileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "local-only sourceURI succeeds when disk space reservation succeeds",
+			run: func(t *testing.T, fx *fixture) {
+				dropPath := t.TempDir()
+				require.NoError(t, os.WriteFile(filepath.Join(dropPath, fx.target.FileName()), archiveContent, 0o644))
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI fails when disk space reservation fails",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				reservationCalls := 0
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					reservationCalls++
+					if reservationCalls == 1 {
+						return true, nil
+					}
+					return false, goerrors.New("disk space reservation failed")
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				_, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.Error(t, err)
+				require.Empty(t, requestCounts)
+			},
+		},
+		{
+			name: "remote sourceURI succeeds when disk space reservation succeeds",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI retries when fetching upgrade size fails",
+			run: func(t *testing.T, fx *fixture) {
+				getUpgradeSizeCount := 0
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+					getUpgradeSizeCount++
+					if getUpgradeSizeCount == 1 {
+						return 0, 0, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, goerrors.New("transient failure"))
+					}
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+				}
+				var reservedArchiveSize uint64
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, archiveSize, _ uint64) (bool, error) {
+					reservedArchiveSize = archiveSize
+					return true, nil
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 2, getUpgradeSizeCount)
+				require.Equal(t, uint64(len(archiveContent)), reservedArchiveSize)
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "remote sourceURI is tried when fetching drop path upgrade size fails",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.DropPath = t.TempDir()
+				localURI := "file://" + filepath.ToSlash(filepath.Join(fx.settings.DropPath, fx.target.FileName()))
+				getUpgradeSizeCounts := make(map[string]int)
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, uri string) (uint64, uint64, error) {
+					getUpgradeSizeCounts[uri]++
+					if uri == localURI {
+						return 0, 0, goerrors.Join(downloaderrors.ErrFetchUpgradeSize, os.ErrNotExist)
+					}
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+				}
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				serverURL, requestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
+					fx.upgradeDetails, true, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, getUpgradeSizeCounts[localURI])
+				require.Equal(t, 1, getUpgradeSizeCounts[serverURL+remotePath])
+				require.Equal(t, 1, requestCounts[remotePath])
+				require.FileExists(t, artifactPath)
 			},
 		},
 		{
@@ -319,7 +474,7 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath + ".asc":    signature,
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, 1, requestCounts[remotePath])
@@ -329,6 +484,287 @@ func TestDownloadArtifact(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, archiveContent, got)
 				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "multiple remote sourceURIs stops at first source when it succeeds",
+			run: func(t *testing.T, fx *fixture) {
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				firstServerURL, firstRequestCounts := newFileServer(t, map[string][]byte{
+					remotePath:             archiveContent,
+					remotePath + ".sha512": hashFile,
+					remotePath + ".asc":    signature,
+				})
+				secondServerURL, secondRequestCounts := newFileServer(t, nil)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServerURL, secondServerURL}, fx.upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, firstRequestCounts[remotePath])
+				require.Equal(t, 1, firstRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, firstRequestCounts[remotePath+".asc"])
+				require.Empty(t, secondRequestCounts)
+				require.FileExists(t, artifactPath)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "multiple remote sourceURIs continues to second source on missing artifact",
+			run: func(t *testing.T, fx *fixture) {
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				firstServerURL, firstRequestCounts := newFileServer(t, nil)
+				secondServerURL, secondRequestCounts := newFileServer(t, map[string][]byte{
+					remotePath:             archiveContent,
+					remotePath + ".sha512": hashFile,
+					remotePath + ".asc":    signature,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServerURL, secondServerURL}, fx.upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, firstRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".asc"])
+				require.FileExists(t, artifactPath)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "multiple remote sourceURIs continues to second source on missing sha512",
+			run: func(t *testing.T, fx *fixture) {
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				firstServerURL, firstRequestCounts := newFileServer(t, map[string][]byte{
+					remotePath: archiveContent,
+				})
+				secondServerURL, secondRequestCounts := newFileServer(t, map[string][]byte{
+					remotePath:             archiveContent,
+					remotePath + ".sha512": hashFile,
+					remotePath + ".asc":    signature,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServerURL, secondServerURL}, fx.upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, firstRequestCounts[remotePath])
+				require.Equal(t, 1, firstRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, secondRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".asc"])
+				require.FileExists(t, artifactPath)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "multiple remote sourceURIs continues to second source on verification fail",
+			run: func(t *testing.T, fx *fixture) {
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				firstServerURL, firstRequestCounts := newFileServer(t, map[string][]byte{
+					remotePath:             archiveContent,
+					remotePath + ".sha512": hashFile,
+					remotePath + ".asc":    []byte("not a valid signature"),
+				})
+				secondServerURL, secondRequestCounts := newFileServer(t, map[string][]byte{
+					remotePath:             archiveContent,
+					remotePath + ".sha512": hashFile,
+					remotePath + ".asc":    signature,
+				})
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServerURL, secondServerURL}, fx.upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 1, firstRequestCounts[remotePath])
+				require.Equal(t, 1, firstRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, firstRequestCounts[remotePath+".asc"])
+				require.Equal(t, 1, secondRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".asc"])
+				require.FileExists(t, artifactPath)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+			},
+		},
+		{
+			name: "multiple remote sourceURIs check the drop path once",
+			run: func(t *testing.T, fx *fixture) {
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				firstServerURL, firstRequestCounts := newFileServer(t, nil)
+				secondServerURL, secondRequestCounts := newFileServer(t, nil)
+				fx.settings.DropPath = t.TempDir()
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServerURL, secondServerURL}, fx.upgradeDetails, false, true, pgpSource)
+				require.Error(t, err)
+				require.Equal(t, 1, firstRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath])
+				require.Equal(t, 1, strings.Count(err.Error(), "could not fetch artifact from file://"+fx.settings.DropPath))
+				require.NoFileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "multiple remote sourceURIs retries transient failures only",
+			run: func(t *testing.T, fx *fixture) {
+				fx.downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+					return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+				}
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+
+				firstRequestCounts := map[string]int{}
+				firstServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					firstRequestCounts[r.URL.Path]++
+					if firstRequestCounts[r.URL.Path] == 1 {
+						// fail transiently once before becoming a permanent failure
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				t.Cleanup(firstServer.Close)
+
+				secondRequestCounts := map[string]int{}
+				secondServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					secondRequestCounts[r.URL.Path]++
+					switch r.URL.Path {
+					case remotePath:
+						if secondRequestCounts[r.URL.Path] == 1 {
+							// fail first attempt only
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+						_, _ = w.Write(archiveContent)
+					case remotePath + ".sha512":
+						_, _ = w.Write(hashFile)
+					case remotePath + ".asc":
+						_, _ = w.Write(signature)
+					default:
+						w.WriteHeader(http.StatusNotFound)
+					}
+				}))
+				t.Cleanup(secondServer.Close)
+
+				upgradeDetails, retryUntil, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServer.URL, secondServer.URL}, upgradeDetails, false, true, pgpSource)
+				require.NoError(t, err)
+				require.Equal(t, 2, firstRequestCounts[remotePath])
+				require.Equal(t, 2, secondRequestCounts[remotePath])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".sha512"])
+				require.Equal(t, 1, secondRequestCounts[remotePath+".asc"])
+				require.FileExists(t, artifactPath)
+				require.FileExists(t, download.AddHashExtension(artifactPath))
+
+				require.NotZero(t, *retryUntil)
+				require.True(t, *retryUntilWasUnset)
+				require.NotEmpty(t, *retryErrorMsg)
+				require.Nil(t, upgradeDetails.Metadata.RetryUntil)
+				require.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
+			},
+		},
+		{
+			name: "multiple remote sourceURIs times out when every source keeps failing transiently",
+			run: func(t *testing.T, fx *fixture) {
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
+				fx.downloader.retryTimeout = 200 * time.Millisecond
+
+				remotePath := "/beats/elastic-agent/" + fx.target.FileName()
+				requests := map[string]int{}
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					requests[r.URL.Path]++
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
+				t.Cleanup(server.Close)
+
+				upgradeDetails, _, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{server.URL + "/first", server.URL + "/second"}, upgradeDetails, false, true, pgpSource)
+				require.Error(t, err)
+				require.Greater(t, requests["/first"+remotePath], 1)
+				require.Greater(t, requests["/second"+remotePath], 1)
+				require.NoFileExists(t, artifactPath)
+
+				// final error should include last error encountered for each source.
+				require.Contains(t, err.Error(), fmt.Sprintf("source %s/first failed: could not fetch artifact from %s/first", server.URL, server.URL))
+				require.Contains(t, err.Error(), fmt.Sprintf("source %s/second failed: could not fetch artifact from %s/second", server.URL, server.URL))
+
+				require.NotNil(t, upgradeDetails.Metadata.RetryUntil)
+				require.False(t, *retryUntilWasUnset)
+				require.NotEmpty(t, *retryErrorMsg)
+			},
+		},
+		{
+			name: "multiple remote sourceURIs stops when totalTimeout is exceeded before per-source retries complete",
+			run: func(t *testing.T, fx *fixture) {
+				fx.settings.Timeout = 10 * time.Second
+				fx.downloader.totalTimeout = 500 * time.Millisecond
+				fx.downloader.reserveDiskSpace = func(_ context.Context, _ string, _, _ uint64) (bool, error) {
+					return true, nil
+				}
+				testLogger, logs := loggertest.New(t.Name())
+				fx.downloader.log = testLogger
+
+				firstServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusInternalServerError)
+				}))
+				t.Cleanup(firstServer.Close)
+
+				secondServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					<-r.Context().Done()
+				}))
+				t.Cleanup(secondServer.Close)
+
+				upgradeDetails, _, _, _ := mockUpgradeDetails(fx.target.Version)
+
+				start := time.Now()
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstServer.URL, secondServer.URL}, upgradeDetails, false, true, pgpSource)
+				require.Less(t, time.Since(start), fx.settings.Timeout)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				firstAttempts := logs.FilterMessageSnippet("could not fetch artifact from " + firstServer.URL).All()
+				require.Len(t, firstAttempts, 1)
+				require.Contains(t, firstAttempts[0].Message, "unsuccessful status code: 500")
+				secondAttempts := logs.FilterMessageSnippet("could not fetch artifact from " + secondServer.URL).All()
+				require.Len(t, secondAttempts, 1)
+				require.Contains(t, secondAttempts[0].Message, context.DeadlineExceeded.Error())
+				require.NoFileExists(t, artifactPath)
+			},
+		},
+		{
+			name: "multiple remote sourceURIs stop retrying entirely when the target path cannot be written",
+			run: func(t *testing.T, fx *fixture) {
+				fx.downloader.retryTimeout = 200 * time.Millisecond
+				firstURL, firstRequests := newFileServer(t, nil)
+				secondURL, secondRequests := newFileServer(t, nil)
+
+				openAttempts := 0
+				fx.downloader.fileOps.OpenFile = func(string, int, os.FileMode) (*os.File, error) {
+					openAttempts++
+					return nil, os.ErrPermission
+				}
+				targetPath := filepath.Join(fx.settings.TargetDirectory, fx.target.FileName())
+				archiveReservation := getArchiveReservation(fx.settings.TargetDirectory)
+
+				upgradeDetails, _, retryUntilWasUnset, retryErrorMsg := mockUpgradeDetails(fx.target.Version)
+
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target,
+					[]string{firstURL, secondURL}, upgradeDetails, false, true, pgpSource)
+				require.Error(t, err)
+				require.ErrorContains(t, err, fmt.Sprintf("creating %s failed", archiveReservation))
+				require.Equal(t, targetPath, artifactPath)
+
+				require.Equal(t, 1, openAttempts)
+				require.Empty(t, firstRequests)
+				require.Empty(t, secondRequests)
+				require.NoFileExists(t, download.AddHashExtension(artifactPath))
+
+				require.NotNil(t, upgradeDetails.Metadata.RetryUntil)
+				require.False(t, *retryUntilWasUnset)
+				require.Empty(t, *retryErrorMsg)
 			},
 		},
 		{
@@ -346,7 +782,7 @@ func TestDownloadArtifact(t *testing.T) {
 
 				serverURL, requestCounts := newFileServer(t, nil)
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Empty(t, requestCounts)
@@ -369,7 +805,7 @@ func TestDownloadArtifact(t *testing.T) {
 					remotePath + ".asc":    signature,
 				})
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, serverURL,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{serverURL},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, 1, requestCounts[remotePath])
@@ -390,7 +826,7 @@ func TestDownloadArtifact(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, strippedName+".sha512"), strippedHashFile, 0o644))
 				require.NoError(t, os.WriteFile(filepath.Join(dropPath, strippedName+".asc"), signature, 0o644))
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "file://"+dropPath,
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{"file://" + dropPath},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, filepath.Join(paths.Downloads(), strippedName), artifactPath)
@@ -420,7 +856,7 @@ func TestDownloadArtifact(t *testing.T) {
 					VerificationMode: tlscommon.VerifyNone,
 				}
 
-				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, "",
+				artifactPath, err := fx.downloader.downloadArtifact(t.Context(), fx.target, []string{""},
 					fx.upgradeDetails, false, true, pgpSource)
 				require.NoError(t, err)
 				require.Equal(t, 1, requestCounts["/latest/8.14.0-SNAPSHOT.json"])
@@ -440,7 +876,7 @@ func TestDownloadArtifact(t *testing.T) {
 				targetVersion = tt.version
 			}
 
-			paths.SetDownloads(filepath.Join(t.TempDir(), "downloads"))
+			pathstest.SetDownloads(t, filepath.Join(t.TempDir(), "downloads"))
 
 			target, err := artifact.New("elastic-agent", false, targetVersion, "linux", "amd64")
 			require.NoError(t, err)
@@ -448,12 +884,16 @@ func TestDownloadArtifact(t *testing.T) {
 			settings := &artifact.Config{
 				TargetDirectory:        paths.Downloads(),
 				RetrySleepInitDuration: time.Millisecond,
+				ReserveDiskSpace:       artifact.ReserveDiskSpaceConfig{Enabled: true},
 				HTTPTransportSettings: httpcommon.HTTPTransportSettings{
 					Timeout: time.Second,
 				},
 			}
 			testLogger, _ := loggertest.New(t.Name())
 			downloader := newArtifactDownloader(settings, testLogger)
+			downloader.getUpgradeSize = func(_ context.Context, _ *artifact.Config, _ string) (uint64, uint64, error) {
+				return uint64(len(archiveContent)), uint64(len(archiveContent)), nil
+			}
 			downloader.getPGPSources = func(_ *logger.Logger, _ string, _ *agtversion.ParsedSemVer, pgpSources []string) []string {
 				return pgpSources
 			}
@@ -589,8 +1029,7 @@ func TestResolve(t *testing.T) {
 				fileName = strings.Replace(fileName, tt.version.String(), tt.version.VersionWithPrerelease(), 1)
 			}
 
-			upgradeDetails := details.NewDetails(tt.version.String(), details.StateRequested, "")
-			source, err := Resolve(t.Context(), &artifact.Config{}, target, tt.sourceURI, "beats/elastic-agent", fileName, upgradeDetails)
+			source, err := Resolve(target, tt.sourceURI, "beats/elastic-agent", fileName)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, source)
 		})
@@ -609,79 +1048,20 @@ func TestLatestSnapshotBuildID(t *testing.T) {
 			assert.NoError(t, err)
 		})
 
-		upgradeDetails, _, _, _ := mockUpgradeDetails(version)
-
+		upgradeDetails := details.NewDetails(version.String(), details.StateRequested, "")
 		buildID, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
 		require.NoError(t, err)
 		assert.Equal(t, "6d69ee76", buildID)
-	})
-
-	t.Run("success after one retry", func(t *testing.T) {
-		requests := 0
-		config := newMockResolveConfig(t, func(rw http.ResponseWriter, _ *http.Request) {
-			requests++
-			if requests == 1 {
-				rw.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			_, err := rw.Write(snapshotInfo)
-			assert.NoError(t, err)
-		})
-		config.RetrySleepInitDuration = 10 * time.Millisecond
-
-		upgradeDetails, upgradeDetailsRetryUntil, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(version)
-
-		buildID, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
-		require.NoError(t, err)
-		assert.Equal(t, "6d69ee76", buildID)
-		assert.Equal(t, 2, requests)
-
-		// Retry details were set while retrying and cleared upon success.
-		assert.NotZero(t, *upgradeDetailsRetryUntil)
-		assert.True(t, *upgradeDetailsRetryUntilWasUnset)
-		assert.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
-		assert.Nil(t, upgradeDetails.Metadata.RetryUntil)
-		assert.Empty(t, upgradeDetails.Metadata.RetryErrorMsg)
 	})
 
 	t.Run("failure not found", func(t *testing.T) {
-		requests := 0
 		config := newMockResolveConfig(t, func(rw http.ResponseWriter, _ *http.Request) {
-			requests++
 			rw.WriteHeader(http.StatusNotFound)
 		})
 
-		upgradeDetails, _, _, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(version)
-
+		upgradeDetails := details.NewDetails(version.String(), details.StateRequested, "")
 		_, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
 		require.ErrorContains(t, err, "not found")
-
-		// A 404 is a permanent error: no retries and no retryable error reported.
-		assert.Equal(t, 1, requests)
-		assert.Empty(t, *upgradeDetailsRetryErrorMsg)
-	})
-
-	t.Run("failure timeout", func(t *testing.T) {
-		config := newMockResolveConfig(t, func(rw http.ResponseWriter, _ *http.Request) {
-			rw.WriteHeader(http.StatusInternalServerError)
-		})
-		config.Timeout = time.Second
-		config.RetrySleepInitDuration = 10 * time.Millisecond
-
-		upgradeDetails, _, upgradeDetailsRetryUntilWasUnset, upgradeDetailsRetryErrorMsg := mockUpgradeDetails(version)
-
-		started := time.Now()
-		_, err := latestSnapshotBuildID(t.Context(), config, version, upgradeDetails)
-		elapsed := time.Since(started)
-
-		require.Error(t, err)
-		assert.Less(t, elapsed, 10*time.Second)
-
-		// Retry details remain set after exhausting the retry deadline.
-		require.NotNil(t, upgradeDetails.Metadata.RetryUntil)
-		assert.WithinDuration(t, started.Add(config.Timeout), *upgradeDetails.Metadata.RetryUntil, 500*time.Millisecond)
-		assert.False(t, *upgradeDetailsRetryUntilWasUnset)
-		assert.NotEmpty(t, *upgradeDetailsRetryErrorMsg)
 	})
 }
 

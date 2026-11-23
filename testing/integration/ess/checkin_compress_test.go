@@ -18,9 +18,9 @@ import (
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/testing/certutil"
-	"github.com/elastic/elastic-agent-libs/testing/proxytest"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/testing/certutil"
+	"github.com/elastic/beats/v7/pkg/testing/proxytest"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
@@ -33,7 +33,7 @@ import (
 // The agent will use a proxy when communicating with fleet-server; the proxy verifies that the Content-Encoding: gzip header is set on at least one checkin request
 func TestCheckinCompress(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,
@@ -117,7 +117,7 @@ func isAgentCheckinRequest(r *http.Request) bool {
 // confirming that compression: none survived enrollment.
 func TestEnrollPreservesCheckinConfig(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false,
 		Sudo:  true,

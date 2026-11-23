@@ -33,7 +33,7 @@ The `apikeyauth` extension is an Elastic-specific authentication method that val
 
 ### Bearer token authentication (`bearertokenauth`)
 
-The `bearertokenauth` extension is an contrib OpenTelemetry authentication method that supports static bearer tokens. This extension is useful for token-based authentication scenarios.
+The `bearertokenauth` extension is a contrib OpenTelemetry authentication method that supports static bearer tokens. This extension is useful for token-based authentication scenarios.
 
 ## Configuration examples
 

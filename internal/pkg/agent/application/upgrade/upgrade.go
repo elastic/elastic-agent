@@ -19,6 +19,7 @@ import (
 	filecopy "github.com/otiai10/copy"
 	"go.elastic.co/apm/v2"
 
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -69,8 +70,9 @@ var (
 )
 
 type artifactDownloadHandler interface {
-	downloadArtifact(ctx context.Context, target artifact.Artifact, sourceURI string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
+	downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error)
 	withFleetServerURI(fleetServerURI string)
+	withFleetTransport(fleetTransport httpcommon.HTTPTransportSettings)
 }
 type unpackHandler interface {
 	unpack(version, archivePath, dataDir string, flavor string) (UnpackResult, error)
@@ -116,28 +118,29 @@ type Upgrader struct {
 	agentInfo                info.Agent
 	upgradeable              bool
 	fleetServerURI           string
+	fleetTransport           httpcommon.HTTPTransportSettings
 	markerWatcher            MarkerWatcher
 	watcherHelper            WatcherHelper
 	availableRollbacksSource ttl.Source
 
 	// The following are abstractions for testability
-	artifactDownloader   artifactDownloadHandler
-	unpacker             unpackHandler
-	isDiskSpaceErrorFunc func(err error) bool
-	extractAgentVersion  func(metadata packageMetadata, upgradeVersion string) agentVersion
-	copyActionStore      copyActionStoreFunc
-	copyRunDirectory     copyRunDirectoryFunc
-	writeUpgradeMarker   writeUpgradeMarkerFunc
-	markUpgrade          markUpgradeFunc
-	changeSymlink        changeSymlinkFunc
-	rollbackInstall      rollbackInstallFunc
+	artifactDownloader      artifactDownloadHandler
+	unpacker                unpackHandler
+	isDiskSpaceLowErrorFunc func(err error) bool
+	extractAgentVersion     func(metadata packageMetadata, upgradeVersion string) agentVersion
+	copyActionStore         copyActionStoreFunc
+	copyRunDirectory        copyRunDirectoryFunc
+	writeUpgradeMarker      writeUpgradeMarkerFunc
+	markUpgrade             markUpgradeFunc
+	changeSymlink           changeSymlinkFunc
+	rollbackInstall         rollbackInstallFunc
 }
 
 // IsUpgradeable when agent is installed and running as a service or flag was provided.
 func IsUpgradeable() bool {
 	// only upgradeable if running from Agent installer and running under the
 	// control of the system supervisor (or built specifically with upgrading enabled)
-	return release.Upgradeable() || (paths.RunningInstalled() && info.RunningUnderSupervisor())
+	return reexec.CanUpgrade()
 }
 
 // NewUpgrader creates an upgrader which is capable of performing upgrade operation
@@ -153,7 +156,7 @@ func NewUpgrader(log *logger.Logger, settings *artifact.Config, upgradeConfig *c
 		availableRollbacksSource: ars,
 		artifactDownloader:       newArtifactDownloader(settings, log),
 		unpacker:                 newUnpacker(log),
-		isDiskSpaceErrorFunc:     upgradeErrors.IsDiskSpaceError,
+		isDiskSpaceLowErrorFunc:  upgradeErrors.IsDiskSpaceLowError,
 		extractAgentVersion:      extractAgentVersion,
 		copyActionStore:          copyActionStoreProvider(os.ReadFile, os.WriteFile),
 		copyRunDirectory:         copyRunDirectoryProvider(os.MkdirAll, filecopy.Copy),
@@ -170,11 +173,15 @@ func (u *Upgrader) SetClient(c fleetclient.Sender) {
 		u.log.Debug("client nil, resetting Fleet Server URI")
 		u.fleetServerURI = ""
 		u.artifactDownloader.withFleetServerURI("")
+		u.artifactDownloader.withFleetTransport(httpcommon.HTTPTransportSettings{})
 	}
 
 	u.fleetServerURI = c.URI()
 	u.log.Debugf("Set client changed URI to %s", u.fleetServerURI)
+	transport := c.Transport()
+	u.fleetTransport = transport
 	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
+	u.artifactDownloader.withFleetTransport(transport)
 }
 
 // Reload reloads the artifact configuration for the upgrader.
@@ -186,37 +193,39 @@ func (u *Upgrader) Reload(rawConfig *config.Config) error {
 		return fmt.Errorf("invalid config: %w", err)
 	}
 
-	// the source URI coming from fleet which uses a different naming.
-	type fleetCfg struct {
-		// FleetSourceURI: source of the artifacts, e.g https://artifacts.elastic.co/downloads/
-		FleetSourceURI string `json:"agent.download.source_uri" config:"agent.download.source_uri"`
-	}
-	fleetSourceURI := &fleetCfg{}
-	if err := rawConfig.UnpackTo(&fleetSourceURI); err != nil {
+	// the source URI coming from fleet which may use a different naming for sourceURI
+	fleetCfg := struct {
+		Sources   []string `json:"agent.download.sources" config:"agent.download.sources"`
+		SourceURI string   `json:"agent.download.source_uri" config:"agent.download.source_uri"`
+	}{}
+	if err := rawConfig.UnpackTo(&fleetCfg); err != nil {
 		return errors.New(err, "failed to unpack config during reload")
 	}
 
-	// fleet configuration takes precedence
-	if fleetSourceURI.FleetSourceURI != "" {
-		cfg.Settings.DownloadConfig.SourceURI = fleetSourceURI.FleetSourceURI
+	if len(fleetCfg.Sources) == 0 && fleetCfg.SourceURI != "" {
+		fleetCfg.Sources = []string{fleetCfg.SourceURI}
 	}
 
-	if cfg.Settings.DownloadConfig.SourceURI != "" {
-		u.log.Infof("Source URI changed from %q to %q",
-			u.settings.SourceURI,
-			cfg.Settings.DownloadConfig.SourceURI)
-	} else {
-		// source uri unset, reset to default
-		u.log.Infof("Source URI reset from %q to %q",
-			u.settings.SourceURI,
-			artifact.DefaultSourceURI)
-		cfg.Settings.DownloadConfig.SourceURI = artifact.DefaultSourceURI
+	// fleet configuration takes precedence.
+	if len(fleetCfg.Sources) > 0 {
+		cfg.Settings.DownloadConfig.Sources = fleetCfg.Sources
+		u.log.Infof("Download sources changed from %q to %q",
+			u.settings.Sources,
+			cfg.Settings.DownloadConfig.Sources)
+	} else if cfg.Settings.DownloadConfig.Sources == nil {
+		// Sources unset, reset to the default.
+		cfg.Settings.DownloadConfig.Sources = []string{artifact.DefaultSourceURI}
+		u.log.Infof("Download sources reset from %q to %q",
+			u.settings.Sources,
+			cfg.Settings.DownloadConfig.Sources)
 	}
 
 	u.settings = cfg.Settings.DownloadConfig
 	u.upgradeSettings = cfg.Settings.Upgrade
 
 	u.artifactDownloader = newArtifactDownloader(u.settings, u.log)
+	u.artifactDownloader.withFleetServerURI(u.fleetServerURI)
+	u.artifactDownloader.withFleetTransport(u.fleetTransport)
 
 	return nil
 }
@@ -268,7 +277,7 @@ func checkUpgrade(log *logger.Logger, currentVersion, newVersion agentVersion, m
 }
 
 // Upgrade upgrades running agent, function returns shutdown callback that must be called by reexec.
-func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sourceURI string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
+func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, sources []string, action *fleetapi.ActionUpgrade, det *details.Details, skipVerifyOverride bool, skipDefaultPgp bool, pgpBytes []string, opts ...Option) (_ reexec.ShutdownCallbackFn, err error) {
 
 	var uOpts upgradeOptions
 	for _, opt := range opts {
@@ -279,7 +288,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return u.rollbackToPreviousVersion(ctx, paths.Top(), time.Now(), version, action)
 	}
 
-	u.log.Infow("Upgrading agent", "version", version, "source_uri", sourceURI)
+	u.log.Infow("Upgrading agent", "version", version, "sources", sources)
 	var markerWritten bool
 	// postSymlinkPhase is set immediately after changeSymlink succeeds.
 	// Once the symlink points at the new install any failure must preserve the upgrade marker so the failure can be reported to Fleet, and restore active.commit if markUpgrade has already updated it.
@@ -308,10 +317,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	defer func() {
 		if err != nil {
 			// Add the disk space error to the error chain if it is a disk space error
-			// so that we can use errors.Is to check for it
-			if u.isDiskSpaceErrorFunc(err) {
-				err = goerrors.Join(err, upgradeErrors.ErrInsufficientDiskSpace)
+			// so that we can use errors.As to check for it
+			var diskSpaceLowErr upgradeErrors.DiskSpaceLowError
+			if u.isDiskSpaceLowErrorFunc(err) && !goerrors.As(err, &diskSpaceLowErr) {
+				err = goerrors.Join(err, upgradeErrors.DiskSpaceLowError{})
 			}
+
 			// If there is an error, we need to clean up downloads and any
 			// extracted agent files.
 			for _, path := range cleanupPaths {
@@ -405,7 +416,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		return nil, fmt.Errorf("failed to build agent artifact: %w", err)
 	}
 
-	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sourceURI, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	archivePath, err := u.artifactDownloader.downloadArtifact(ctx, target, sources, det, skipVerifyOverride, skipDefaultPgp, pgpBytes...)
+	cleanupPaths = append(cleanupPaths, getInstallReservation())
 
 	// If the artifactPath is not empty, then the artifact was downloaded.
 	// There may still be an error in the download process, so we need to add
@@ -470,6 +482,12 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 	}
 	availableRollbacks := getAvailableRollbacks(rollbackWindow, time.Now(), previous, current)
 
+	installReservation := getInstallReservation()
+
+	if err := shrinkDiskSpaceReservation(installReservation, int64(MarkerSize)); err != nil {
+		return nil, err
+	}
+
 	// Write the marker before unpacking so newVersionedHome is protected from cleanup during the upgrade.
 	// RollbacksAvailable is nil here: TTL entries are written after the symlink flips, and previous rollbacks were already removed at the start of Upgrade().
 	if err = u.writeUpgradeMarker(u.log, paths.Data(), time.Now(), current, previous, action, det, nil); err != nil {
@@ -488,6 +506,11 @@ func (u *Upgrader) Upgrade(ctx context.Context, version string, rollback bool, s
 		u.log.Warnf("error encountered when detecting used flavor with top path %q: %v", paths.Top(), err)
 	}
 	u.log.Debugf("detected used flavor: %q", detectedFlavor)
+
+	if err := os.Remove(installReservation); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("could not remove disk space reservation file %s: %w", installReservation, err)
+	}
+
 	unpackRes, err := u.unpacker.unpack(version, archivePath, paths.Data(), detectedFlavor)
 
 	// If VersionedHome is empty then unpack has not started unpacking the
@@ -825,24 +848,13 @@ func copyDir(l *logger.Logger, from, to string, ignoreErrs bool, fileDirCopy fil
 		}
 	}
 
-	// Try to detect if we are running with SSDs. If we are increase the copy concurrency,
-	// otherwise fall back to the default.
-	copyConcurrency := 1
-	hasSSDs, detectHWErr := install.HasAllSSDs()
-	if detectHWErr != nil {
-		l.Infow("Could not determine block storage type, disabling copy concurrency", "error.message", detectHWErr)
-	}
-	if hasSSDs {
-		copyConcurrency = runtime.NumCPU() * 4
-	}
-
 	return fileDirCopy(from, to, filecopy.Options{
 		OnSymlink: func(_ string) filecopy.SymlinkAction {
 			return filecopy.Shallow
 		},
 		Sync:         true,
 		OnError:      onErr,
-		NumOfWorkers: int64(copyConcurrency),
+		NumOfWorkers: install.CopyConcurrency,
 	})
 }
 
