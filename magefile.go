@@ -4407,7 +4407,6 @@ func getMacOSMajorVersion() (int, error) {
 	return majorVer, nil
 }
 
-<<<<<<< HEAD
 func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	// add otel:crossBuild as pre-build for packaging when OTEL_COMPONENT=true
 	buildTargets := make([]interface{}, 0, 2)
@@ -4419,9 +4418,6 @@ func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 }
 
 // loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
-=======
-// loadReleaseConfig loads mage Settings and requires NEXT_RELEASE for workflows.
->>>>>>> d33261d (ci(release): align patch bump with ingest-dev NEW_VERSION contract (#17835))
 func loadReleaseConfig() (*release.ReleaseConfig, error) {
 	settings, err := devtools.LoadSettings()
 	if err != nil {
