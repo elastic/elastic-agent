@@ -8,6 +8,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 	"text/template"
@@ -724,6 +725,18 @@ logs_dynamic_pipeline:
 		expOutput := newFromYamlString(t, OTelCfg)
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
+
+	t.Run("test max_retries negative", func(t *testing.T) {
+		cfg := config.MustNewConfigFrom(map[string]any{
+			"hosts":       []any{"localhost:9200"},
+			"max_retries": -1,
+		})
+		got, _, _, err := ESToOTelConfig(cfg, "", logger)
+		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
+		gotCfg := confmap.NewFromStringMap(got)
+		assert.Equal(t, true, gotCfg.Get("retry::enabled"))
+		assert.Equal(t, math.MaxInt32, gotCfg.Get("retry::max_retries"))
+	})
 }
 
 func TestCompressionConfig(t *testing.T) {
@@ -823,7 +836,6 @@ func TestToOTelConfig_CheckUnsupported(t *testing.T) {
 		{"allow_older_versions_false", map[string]any{"allow_older_versions": false}, "allow_older_versions:false is currently not supported"},
 		{"loadbalance_false", map[string]any{"loadbalance": false}, "loadbalance:false is currently not supported"},
 		{"non_indexable_policy", map[string]any{"non_indexable_policy": "x"}, "non_indexable_policy is currently not supported"},
-		{"max_retries_negative", map[string]any{"max_retries": -5}, "max_retries should be non-negative"},
 	}
 
 	for _, c := range cases {

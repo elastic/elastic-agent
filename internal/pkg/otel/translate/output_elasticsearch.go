@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/http"
 	"net/url"
 	"slices"
@@ -139,7 +140,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 	escfg := defaultOptions
 
 	// check for unsupported config
-	err = checkUnsupportedConfig(output)
+	err = checkUnsupportedConfig(output, logger)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -389,10 +390,16 @@ func getTotalNumConnections(cfg *config.C) int {
 }
 
 func getRetryConfig(escfg esToOTelOptions) map[string]any {
+	maxRetries := escfg.MaxRetries
+	if maxRetries < 0 {
+		// A negative max_retries means retrying until the events are published, which the exporter can't express.
+		maxRetries = math.MaxInt32
+	}
+
 	// Retries
 	retryCfg := map[string]any{
 		"enabled":                  true,
-		"max_retries":              escfg.MaxRetries,
+		"max_retries":              maxRetries,
 		"initial_interval":         escfg.Backoff.Init, // backoff.init
 		"max_interval":             escfg.Backoff.Max,  // backoff.max
 		"retry_on_status":          escfg.RetryOnStatus,
@@ -558,17 +565,14 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 }
 
 // log warning for unsupported config
-func checkUnsupportedConfig(cfg *config.C) error {
-	if cfg.HasField("indices") {
-		return fmt.Errorf("indices is currently not supported: %w", errors.ErrUnsupported)
-	} else if value, err := cfg.Bool("allow_older_versions", -1); err == nil && !value {
-		return fmt.Errorf("allow_older_versions:false is currently not supported: %w", errors.ErrUnsupported)
-	} else if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
-		return fmt.Errorf("loadbalance:false is currently not supported: %w", errors.ErrUnsupported)
+func checkUnsupportedConfig(cfg *config.C, logger *logp.Logger) error {
+	if cfg.HasField("allow_older_versions") {
+		logger.Warnf("allow_older_versions is deprecated and will be removed in a future version")
 	} else if cfg.HasField("non_indexable_policy") {
-		return fmt.Errorf("non_indexable_policy is currently not supported: %w", errors.ErrUnsupported)
-	} else if val, err := cfg.Int("max_retries", -1); err == nil && val < 0 {
-		return fmt.Errorf("max_retries should be non-negative: %w", errors.ErrUnsupported)
+		logger.Warnf("non_indexable_policy is deprecated and will be removed in a future version")
+	}
+	if value, err := cfg.Bool("loadbalance", -1); err == nil && !value {
+		return fmt.Errorf("loadbalance:false is currently not supported: %w", errors.ErrUnsupported)
 	}
 
 	return nil

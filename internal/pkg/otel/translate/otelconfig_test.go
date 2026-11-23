@@ -4548,14 +4548,13 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			expectedError: "unsupported configuration for elasticsearch:",
 		},
 		{
-			name:       "unsupported configuration - negative retries",
+			name:       "supported configuration - negative retries",
 			outputType: "elasticsearch",
 			outputCfg: map[string]any{
 				"type":        "elasticsearch",
 				"hosts":       []any{"localhost:9200"},
 				"max_retries": -1,
 			},
-			expectedError: "unsupported configuration for elasticsearch:",
 		},
 		{
 			name:       "supported configuration - 0 retries",
