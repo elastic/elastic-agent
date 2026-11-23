@@ -41,13 +41,26 @@ type lifecycleMeterProvider struct {
 	base  telemetry.MeterProvider
 	views []sdkmetric.View
 
-	mu   sync.Mutex
-	subs map[string]*componentMeters
+	mu    sync.Mutex
+	specs []readerSpec
+	subs  map[string]*componentMeters
+}
+
+// readerSpec records the temporality and aggregation selectors of one consumer
+// of component-scoped metrics. Readers do not re-aggregate Producer output, so
+// each consumer needs the data aggregated its own way; every sub-provider gets
+// one dedicated pipeline per spec (elastic/elastic-agent#18047).
+type readerSpec struct {
+	temporality sdkmetric.TemporalitySelector
+	aggregation sdkmetric.AggregationSelector
 }
 
 type componentMeters struct {
-	mp     *sdkmetric.MeterProvider
-	reader *sdkmetric.ManualReader
+	mp *sdkmetric.MeterProvider
+	// readers aggregate this component's metrics once per consumer registered
+	// via NewProducer, in registration order, each with that consumer's
+	// temporality and aggregation.
+	readers []*sdkmetric.ManualReader
 }
 
 func newLifecycleMeterProvider(views []sdkmetric.View) *lifecycleMeterProvider {
@@ -78,14 +91,21 @@ func (l *lifecycleMeterProvider) Meter(name string, opts ...metric.MeterOption) 
 	defer l.mu.Unlock()
 	sub, ok := l.subs[id]
 	if !ok {
-		reader := sdkmetric.NewManualReader()
-		mpOpts := []sdkmetric.Option{sdkmetric.WithReader(reader)}
+		readers := make([]*sdkmetric.ManualReader, len(l.specs))
+		mpOpts := make([]sdkmetric.Option, 0, len(l.specs)+1)
+		for i, spec := range l.specs {
+			readers[i] = sdkmetric.NewManualReader(
+				sdkmetric.WithTemporalitySelector(spec.temporality),
+				sdkmetric.WithAggregationSelector(spec.aggregation),
+			)
+			mpOpts = append(mpOpts, sdkmetric.WithReader(readers[i]))
+		}
 		if len(l.views) > 0 {
 			mpOpts = append(mpOpts, sdkmetric.WithView(l.views...))
 		}
 		sub = &componentMeters{
-			mp:     sdkmetric.NewMeterProvider(mpOpts...),
-			reader: reader,
+			mp:      sdkmetric.NewMeterProvider(mpOpts...),
+			readers: readers,
 		}
 		l.subs[id] = sub
 	}
@@ -115,24 +135,60 @@ func (l *lifecycleMeterProvider) LiveComponents() int {
 	return len(l.subs)
 }
 
-// Produce implements sdkmetric.Producer. It is registered on every reader that
-// feeds the base provider, so component-scoped metrics reach the same exporters
-// they did when a single MeterProvider owned them.
-func (l *lifecycleMeterProvider) Produce(ctx context.Context) ([]metricdata.ScopeMetrics, error) {
+// NewProducer registers a consumer of component-scoped metrics and returns the
+// sdkmetric.Producer to attach to that consumer's reader, so those metrics
+// reach the same exporters they did when a single MeterProvider owned them.
+// Readers do not re-aggregate Producer output, so the producer aggregates with
+// the given selectors to match the reader it feeds; nil selectors mean the SDK
+// defaults (cumulative, default aggregation). All producers must be created
+// before the first component meter: sub-provider pipelines are built from the
+// consumers known at that point, and a later producer would see no data.
+func (l *lifecycleMeterProvider) NewProducer(
+	temporality sdkmetric.TemporalitySelector,
+	aggregation sdkmetric.AggregationSelector,
+) sdkmetric.Producer {
+	if temporality == nil {
+		temporality = sdkmetric.DefaultTemporalitySelector
+	}
+	if aggregation == nil {
+		aggregation = sdkmetric.DefaultAggregationSelector
+	}
 	l.mu.Lock()
-	subs := make([]*componentMeters, 0, len(l.subs))
-	for _, sub := range l.subs {
+	defer l.mu.Unlock()
+	l.specs = append(l.specs, readerSpec{temporality: temporality, aggregation: aggregation})
+	return &componentMetricsProducer{lp: l, idx: len(l.specs) - 1}
+}
+
+// componentMetricsProducer implements sdkmetric.Producer for one consumer
+// registered via NewProducer: it collects that consumer's dedicated reader on
+// every live component sub-provider.
+type componentMetricsProducer struct {
+	lp  *lifecycleMeterProvider
+	idx int
+}
+
+func (p *componentMetricsProducer) Produce(ctx context.Context) ([]metricdata.ScopeMetrics, error) {
+	p.lp.mu.Lock()
+	subs := make([]*componentMeters, 0, len(p.lp.subs))
+	for _, sub := range p.lp.subs {
 		subs = append(subs, sub)
 	}
-	l.mu.Unlock()
+	p.lp.mu.Unlock()
 
 	var (
 		out  []metricdata.ScopeMetrics
 		errs []error
 	)
 	for _, sub := range subs {
+		if p.idx >= len(sub.readers) {
+			// The sub-provider was built before this consumer registered, so it
+			// has no pipeline for it. Does not happen in practice: every
+			// producer is created during factory construction, before any
+			// component creates a meter.
+			continue
+		}
 		var rm metricdata.ResourceMetrics
-		if err := sub.reader.Collect(ctx, &rm); err != nil {
+		if err := sub.readers[p.idx].Collect(ctx, &rm); err != nil {
 			// A component shut down between the snapshot above and this call
 			// collects as ErrReaderShutdown; that is expected, not an error.
 			if errors.Is(err, sdkmetric.ErrReaderShutdown) {

@@ -35,6 +35,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -95,6 +96,8 @@ type OTelManager struct {
 
 	// Agent info for otel config generation
 	agentInfo info.Agent
+	// hostInfo provides the host information used for otel config generation.
+	hostInfo hostinfo.Source
 
 	healthCheckExtComponentID string
 	collectorMetricsPort      int
@@ -152,6 +155,7 @@ func NewOTelManager(
 	collectorLogLevel logp.Level,
 	collectorLogger *logger.Logger,
 	agentInfo info.Agent,
+	hostInfo hostinfo.Source,
 	agentCollectorConfig *configuration.CollectorConfig,
 	stopTimeout time.Duration,
 	execFactory ExecutionFactory,
@@ -207,6 +211,7 @@ func NewOTelManager(
 		managerLogger:             managerLogger,
 		collectorLogger:           collectorLogger,
 		agentInfo:                 agentInfo,
+		hostInfo:                  hostInfo,
 		healthCheckExtComponentID: healthCheckExtComponentID,
 		collectorMetricsPort:      collectorMetricsPort,
 		errCh:                     make(chan error, 1), // holds at most one error
@@ -312,7 +317,7 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
-			mergedCfg, err := m.buildMergedConfig(cfgUpdate, m.agentInfo, m.managerLogger)
+			mergedCfg, err := m.buildMergedConfig(ctx, cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
 				reportErr(ctx, m.errCh, err)
@@ -452,12 +457,11 @@ func newLogLevelAfterConfigUpdate(cfgUpdate configUpdate, mergedCfg *confmap.Con
 
 // buildMergedConfig combines collector configuration with component-derived configuration.
 func (m *OTelManager) buildMergedConfig(
+	ctx context.Context,
 	cfgUpdate configUpdate,
 	agentInfo info.Agent,
 	logger *logp.Logger,
 ) (*confmap.Conf, error) {
-	mergedOtelCfg := confmap.New()
-
 	// Generate component otel config if there are components
 	var componentOtelCfg *confmap.Conf
 	if len(cfgUpdate.components) > 0 {
@@ -474,13 +478,20 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, nil
 	}
 
-	// Merge component config if it exists
+	// Conf.Merge deep-copies its source and re-flattens its destination, so every merge into a config with
+	// thousands of receivers copies all of it. To pay for that at most once, the component config is not merged
+	// into an empty config. It is built for this call only, so it is the base, and everything else (a handful of
+	// small pieces) is merged into a separate overlay, which is merged into the base once at the end.
+	// The overlay is built in the same order the pieces used to be merged into the base, and the base is the
+	// lowest priority layer, so the result is the same.
+	overlay := confmap.New()
+
 	if componentOtelCfg != nil {
-		if err := mergeWithExtensions(mergedOtelCfg, componentOtelCfg); err != nil {
-			return nil, fmt.Errorf("failed to merge component otel config: %w", err)
+		if err := seedOverlay(overlay, componentOtelCfg); err != nil {
+			return nil, fmt.Errorf("failed to seed the otel config overlay: %w", err)
 		}
 
-		if err := injectHeaderSetterExtension(mergedOtelCfg, agentInfo); err != nil {
+		if err := injectHeaderSetterExtension(overlay, agentInfo); err != nil {
 			return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
 		}
 
@@ -488,7 +499,8 @@ func (m *OTelManager) buildMergedConfig(
 			if mCfg.Enabled && mCfg.MonitorMetrics {
 				// Metrics monitoring is enabled, inject a receiver for the
 				// collector's internal telemetry.
-				if err := injectMonitoringReceiver(mergedOtelCfg, mCfg, agentInfo, cfgUpdate.components, logger); err != nil {
+				hostname := m.monitoringHostname(ctx)
+				if err := injectMonitoringReceiver(overlay, mCfg, agentInfo, hostname, cfgUpdate.components, logger); err != nil {
 					return nil, fmt.Errorf("merging internal telemetry config: %w", err)
 				}
 			}
@@ -499,37 +511,67 @@ func (m *OTelManager) buildMergedConfig(
 	// the service::extensions lists so that component-generated extensions (e.g.
 	// beatsauth) are not silently overwritten by the collector config's list.
 	if cfgUpdate.collectorCfg != nil {
-		if err := mergeWithExtensions(mergedOtelCfg, cfgUpdate.collectorCfg); err != nil {
+		if err := mergeWithExtensions(overlay, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
 	}
 
-	if err := injectDiagnosticsExtension(mergedOtelCfg); err != nil {
+	if err := injectDiagnosticsExtension(overlay); err != nil {
 		return nil, fmt.Errorf("failed to inject diagnostics: %w", err)
 	}
 
-	if err := injectMeterLifecycleExtension(mergedOtelCfg); err != nil {
+	if err := injectMeterLifecycleExtension(overlay); err != nil {
 		return nil, fmt.Errorf("failed to inject meter lifecycle extension: %w", err)
 	}
 
 	// if the otel log level is unset, use the most verbose level across agent and all units
 	minLogLevel := component.MinLogLevel(cfgUpdate.agentLogLevel, cfgUpdate.components)
-	if err := maybeInjectLogLevel(mergedOtelCfg, minLogLevel); err != nil {
+	if err := maybeInjectLogLevel(overlay, minLogLevel); err != nil {
 		return nil, err
 	}
 
 	// Inject health check extension with port 0 as a placeholder. The actual port is resolved
 	// per-start by the execution layer and passed to the collector via a CLI flag, where a
 	// confmap converter overrides the placeholder with the real port.
-	if err := injectHealthCheckV2Extension(mergedOtelCfg, m.healthCheckExtComponentID, 0); err != nil {
+	if err := injectHealthCheckV2Extension(overlay, m.healthCheckExtComponentID, 0); err != nil {
 		return nil, fmt.Errorf("failed to inject health check extension: %w", err)
 	}
 
-	if err := addCollectorMetricsReader(mergedOtelCfg, m.collectorMetricsPort); err != nil {
+	if err := addCollectorMetricsReader(overlay, m.collectorMetricsPort); err != nil {
 		return nil, fmt.Errorf("failed to add collector metrics reader: %w", err)
 	}
 
-	return mergedOtelCfg, nil
+	if componentOtelCfg == nil {
+		return overlay, nil
+	}
+
+	// This is a plain merge on purpose: the extensions in the overlay are already the union with the ones
+	// in the base.
+	if err := componentOtelCfg.Merge(overlay); err != nil {
+		return nil, fmt.Errorf("failed to merge component otel config: %w", err)
+	}
+	return componentOtelCfg, nil
+}
+
+// seedOverlay copies the parts of the component config that the steps merging into the overlay read, so that
+// they see what they would see when merging into the component config itself: the extensions, which
+// mergeWithExtensions needs to order, the exporters, which the monitoring receiver looks at, and the collector
+// telemetry, which the log level and the metrics readers depend on. They are small compared to the whole config.
+func seedOverlay(overlay, componentCfg *confmap.Conf) error {
+	seed := map[string]any{}
+	extensions, err := serviceExtensionsList(componentCfg)
+	if err != nil {
+		return err
+	}
+	if extensions != nil {
+		seed["service::extensions"] = extensions
+	}
+	for _, key := range []string{"exporters", "service::telemetry"} {
+		if componentCfg.IsSet(key) {
+			seed[key] = componentCfg.Get(key)
+		}
+	}
+	return overlay.Merge(confmap.NewFromStringMap(seed))
 }
 
 // maybeInjectLogLevel adds the given log level to the collector config if it's not set.
@@ -617,7 +659,19 @@ func generateUserAgent(agentInfo info.Agent) string {
 	return useragent.UserAgentWithBeatTelemetry("Agent", agentInfo.Version(), mode, unprivileged, release.FIPSDistribution(), uaOpts...)
 }
 
-func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
+// monitoringHostname returns the hostname for the collector's monitoring events: the agent's hostname, or the OS
+// hostname if the host information isn't available.
+func (m *OTelManager) monitoringHostname(ctx context.Context) string {
+	host, err := m.hostInfo.Get(ctx)
+	if err == nil {
+		return host.Hostname
+	}
+	m.managerLogger.Debugf("Failed to get the host information for monitoring events, using the OS hostname: %v", err)
+	name, _ := os.Hostname()
+	return name
+}
+
+func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, hostname string) map[string]any {
 	namespace := "default"
 	if monitoring.Namespace != "" {
 		namespace = monitoring.Namespace
@@ -651,14 +705,6 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 		},
 	}
 
-	var hostname string
-	ecsMetadata, err := agentInfo.ECSMetadata(logger)
-	if err == nil {
-		hostname = ecsMetadata.Host.Hostname
-	} else if name, err := os.Hostname(); err == nil {
-		hostname = name
-	}
-
 	if hostname != "" {
 		result["agent"].(map[string]any)["name"] = hostname
 		result["host"] = map[string]any{
@@ -669,8 +715,8 @@ func monitoringEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentIn
 	return result
 }
 
-func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, logger *logp.Logger) map[string]any {
-	tmpl := monitoringEventTemplate(monitoring, agentInfo, logger)
+func monitoringInputEventTemplate(monitoring *monitoringCfg.MonitoringConfig, agentInfo info.Agent, hostname string) map[string]any {
+	tmpl := monitoringEventTemplate(monitoring, agentInfo, hostname)
 	tmpl["data_stream"] = map[string]any{
 		"dataset":   "elastic_agent.filebeat_input",
 		"namespace": tmpl["data_stream"].(map[string]any)["namespace"],
@@ -719,6 +765,7 @@ func injectMonitoringReceiver(
 	config *confmap.Conf,
 	monitoring *monitoringCfg.MonitoringConfig,
 	agentInfo info.Agent,
+	hostname string,
 	components []component.Component,
 	logger *logp.Logger,
 ) error {
@@ -834,8 +881,8 @@ func injectMonitoringReceiver(
 		}
 		collectorCfg["connectors"] = map[string]any{
 			connectorID: map[string]any{
-				"event_template":       monitoringEventTemplate(monitoring, agentInfo, logger),
-				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, logger),
+				"event_template":       monitoringEventTemplate(monitoring, agentInfo, hostname),
+				"input_event_template": monitoringInputEventTemplate(monitoring, agentInfo, hostname),
 			},
 		}
 		collectorCfg["service"].(map[string]any)["pipelines"].(map[string]any)[logsPipelineID] = logsPipelineCfg

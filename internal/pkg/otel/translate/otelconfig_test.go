@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/require"
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -28,7 +30,7 @@ import (
 	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pipeline"
@@ -2920,6 +2922,30 @@ func TestGetOtelConfigElasticsearchStateStoreUsesBeatsAuth(t *testing.T) {
 	}
 }
 
+// TestGetOtelConfigExtensionsAreSortedAndDeduplicated checks that the extensions of all components end
+// up in one sorted list without duplicates, whatever the order of the components is.
+func TestGetOtelConfigExtensionsAreSortedAndDeduplicated(t *testing.T) {
+	// The first and last components share an output, so they share an extension.
+	compA := testFilebeatComp("filestream-a", "a")
+	compB := testFilebeatComp("filestream-b", "b")
+	compA2 := testFilebeatComp("filestream-a2", "a")
+	expected := []any{"beatsauth/_agent-component/a", "beatsauth/_agent-component/b"}
+
+	for name, components := range map[string][]component.Component{
+		"sorted":   {compA, compB, compA2},
+		"reversed": {compA2, compB, compA},
+		"shuffled": {compB, compA, compA2},
+	} {
+		t.Run(name, func(t *testing.T) {
+			conf, err := GetOtelConfig(&component.Model{Components: components}, logp.NewNopLogger())
+			require.NoError(t, err)
+			require.NotNil(t, conf)
+
+			require.Equal(t, expected, conf.Get("service::extensions"))
+		})
+	}
+}
+
 func TestGetOtelConfigWithGlobalPerProcessorFlags(t *testing.T) {
 	filebeatComp := testFilebeatComp("filestream-default", "default")
 
@@ -3933,6 +3959,78 @@ func TestGetInputsForUnitSyntheticsAPI(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, inputs, 1)
 	assert.Equal(t, "api", inputs[0].config["type"])
+}
+
+func TestRemoveRedactionMarkers(t *testing.T) {
+	cfg := map[string]any{
+		"password":               "secret",
+		"__mark_redact_password": true,
+		"nested": map[string]any{
+			"token":               "secret",
+			"__mark_redact_token": true,
+		},
+		"list": []any{
+			map[string]any{
+				"value":               "secret",
+				"__mark_redact_value": true,
+			},
+			"plain",
+		},
+		"untouched": "value",
+	}
+
+	removeRedactionMarkers(cfg)
+
+	assert.Equal(t, map[string]any{
+		"password": "secret",
+		"nested": map[string]any{
+			"token": "secret",
+		},
+		"list": []any{
+			map[string]any{
+				"value": "secret",
+			},
+			"plain",
+		},
+		"untouched": "value",
+	}, cfg)
+}
+
+func TestGetInputsForUnitRemovesRedactionMarkers(t *testing.T) {
+	unit := component.Unit{
+		ID:   "httpjson-unit",
+		Type: client.UnitTypeInput,
+		Config: component.MustExpectedConfig(map[string]any{
+			"id":   "test",
+			"type": "httpjson",
+			"streams": []any{
+				map[string]any{
+					"id": "test-1",
+					"request": map[string]any{
+						"transforms": []any{
+							map[string]any{
+								"set": map[string]any{
+									"target":              "header.Authorization",
+									"value":               "stream-secret",
+									"__mark_redact_value": true,
+								},
+							},
+						},
+					},
+				},
+			},
+		}),
+	}
+
+	inputs, err := getInputsForUnit(unit, "logs", &component.Component{InputType: "httpjson"}, nil)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+
+	transforms, ok := inputs[0].config["request"].(map[string]any)["transforms"].([]any)
+	require.True(t, ok)
+	set, ok := transforms[0].(map[string]any)["set"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, map[string]any{"target": "header.Authorization", "value": "stream-secret"}, set)
 }
 
 // TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
@@ -5331,6 +5429,20 @@ func TestInjectOsqueryConfig(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("redaction markers are removed from the injected osquery config", func(t *testing.T) {
+		unitWithSecret := component.Unit{
+			Config: component.MustExpectedConfig(map[string]any{
+				"osquery": map[string]any{
+					"options":               map[string]any{"tls_password": "secret"},
+					"__mark_redact_options": true,
+				},
+			}),
+		}
+		got := injectOsqueryConfig([]receiverInput{makeStream("result", true)}, unitWithSecret)
+		require.Len(t, got, 1)
+		assert.Equal(t, map[string]any{"options": map[string]any{"tls_password": "secret"}}, got[0].config["osquery"])
+	})
 }
 
 func TestGetReceiversConfigHostnameOverride(t *testing.T) {
@@ -5363,7 +5475,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	}
 
 	t.Run("env_set", func(t *testing.T) {
-		t.Setenv(util.EnvHostName, "override-node")
+		t.Setenv(hostinfo.EnvOverride, "override-node")
 
 		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
@@ -5378,7 +5490,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 
 	t.Run("env_set_whitespace_trimmed", func(t *testing.T) {
-		t.Setenv(util.EnvHostName, "  override-node  ")
+		t.Setenv(hostinfo.EnvOverride, "  override-node  ")
 
 		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
@@ -5393,7 +5505,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 	})
 
 	t.Run("env_unset", func(t *testing.T) {
-		t.Setenv(util.EnvHostName, "")
+		t.Setenv(hostinfo.EnvOverride, "")
 		result, err := getReceiversConfigForComponent(comp, nil, nil)
 		require.NoError(t, err)
 		require.NotEmpty(t, result)
@@ -5411,8 +5523,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 // unversioned: a home and a data path, no logs path. Files receivers write directly therefore resolve to the
 // default logs path. Versioned homes are covered by TestGetReceiversConfigForComponent.
 func TestGetReceiversConfigPathsContract(t *testing.T) {
-	paths.SetVersionHome(false)
-	t.Cleanup(func() { paths.SetVersionHome(true) })
+	pathstest.SetVersionHome(t, false)
 
 	comp := &component.Component{
 		ID:        "filestream-paths-contract-test",
