@@ -237,6 +237,7 @@ func TestBuildMergedConfigElasticsearchStorageAuthenticator(t *testing.T) {
 	})
 
 	t.Run("an elasticsearchauth extension is not started when the state store is disabled", func(t *testing.T) {
+		t.Cleanup(fbfeatures.ReinitForTest)
 		t.Setenv("AGENTLESS_ELASTICSEARCH_STATE_STORE_INPUT_TYPES", "")
 		fbfeatures.ReinitForTest()
 
