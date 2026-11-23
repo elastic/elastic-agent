@@ -180,6 +180,14 @@ Always assign the author to the pull request.
 Unless instructed otherwise, always add the `Team:Elastic-Agent-Control-Plane` label to the pull request.
 Unless instructed otherwise, always add the `backport-active-all` label to the pull request when fixing a bug.
 
+## Agent skills
+
+Skills live in [.agents/skills/](./.agents/skills/) and are symlinked into `.claude/skills/`:
+
+- `elastic-agent-it-failure-rca`: root-cause integration test failures from CI.
+- `elastic-agent-diagnostics`: analyze elastic-agent diagnostics bundles.
+- `integration-test-review`: review integration test changes for flakiness risks.
+
 ## Further documentation
 
 - [README.md](./README.md) — setup, packaging, dependency hygiene

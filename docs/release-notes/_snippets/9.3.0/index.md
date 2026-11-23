@@ -12,7 +12,7 @@ _This release also includes: [Breaking changes](/release-notes/breaking-changes.
 * Add support for downgrading a running Agent&#39;s privileges from Fleet. [#10231](https://github.com/elastic/elastic-agent/pull/10231)
 * Add awss3receiver to EDOT. [#10515](https://github.com/elastic/elastic-agent/pull/10515) [#604](https://github.com/elastic/obs-integration-team/issues/604)
 * Add awslogsencodingextension to EDOT. [#11107](https://github.com/elastic/elastic-agent/pull/11107)
-* Add opex to elastic-agent helm chart. This change adds the Opex-CCM support to the offical elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363)
+* Add opex to elastic-agent helm chart. This change adds the Opex-CCM support to the official elastic-agent helm chart deployment. [#9363](https://github.com/elastic/elastic-agent/pull/9363)
 * Add windowseventlogreceiver to EDOT. [#11418](https://github.com/elastic/elastic-agent/pull/11418)
 * Allow setting component runtime per input type. [#11186](https://github.com/elastic/elastic-agent/pull/11186)
 * Improve metrics monitoring coverage for OTel-based ingestion. [#11813](https://github.com/elastic/elastic-agent/pull/11813)

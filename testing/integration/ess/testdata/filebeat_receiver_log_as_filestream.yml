@@ -27,8 +27,6 @@ exporters:
       enabled: true
       wait_for_result: true # Avoid losing data on shutdown
       block_on_overflow: true
-    mapping:
-      mode: none
 
 service:
   pipelines:

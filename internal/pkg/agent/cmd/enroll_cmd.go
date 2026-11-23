@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"go.elastic.co/apm/v2"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -217,7 +217,7 @@ func (c *enrollCmd) writeDelayEnroll(streams *cli.IOStreams) error {
 	if err != nil {
 		return errors.New(
 			err,
-			"failed to marshall enrollment options",
+			"failed to marshal enrollment options",
 			errors.TypeConfig,
 			errors.M("path", enrollPath))
 	}

@@ -32,6 +32,7 @@ type TmplPolicy struct {
 	FleetProxyURL *string
 	SSL           *SSL
 	SourceURI     string
+	DownloadSSL   *SSL
 	CreatedAt     string
 	Output        struct {
 		APIKey string
@@ -153,7 +154,8 @@ const (
         "policy": {
           "agent": {
             "download": {
-              "sourceURI": "{{.SourceURI}}"
+              "sourceURI": "{{.SourceURI}}"{{ if ne .DownloadSSL nil }},
+              "ssl": {{ toJson .DownloadSSL }}{{ end }}
             },
             "monitoring": {
               "namespace": "default",
@@ -222,7 +224,8 @@ const (
         "policy": {
           "agent": {
             "download": {
-              "sourceURI": "{{.SourceURI}}"
+              "sourceURI": "{{.SourceURI}}"{{ if ne .DownloadSSL nil }},
+              "ssl": {{ toJson .DownloadSSL }}{{ end }}
             },
             "monitoring": {
               "namespace": "default",

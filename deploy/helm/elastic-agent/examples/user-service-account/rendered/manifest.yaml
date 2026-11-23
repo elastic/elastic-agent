@@ -22,10 +22,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 stringData:
 
   agent.yml: |-
@@ -266,10 +266,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 stringData:
 
   agent.yml: |-
@@ -311,6 +311,7 @@ stringData:
                 enabled: false
               default_matchers:
                 enabled: false
+              image_metadata_source: spec
               include_annotations:
               - elastic.co/dataset
               - elastic.co/namespace
@@ -599,10 +600,10 @@ kind: ClusterRole
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -682,10 +683,10 @@ kind: ClusterRole
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
   annotations:
     elastic-agent.k8s.elastic.co/cr: nginx
 rules:
@@ -787,10 +788,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-clusterWide-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 subjects:
   - kind: ServiceAccount
     name: user-sa-clusterWide
@@ -807,10 +808,10 @@ kind: ClusterRoleBinding
 metadata:
   name: agent-perNode-example-default
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 subjects:
   - kind: ServiceAccount
     name: user-sa-perNode
@@ -857,10 +858,10 @@ metadata:
   name: agent-pernode-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 spec:
   selector:
     matchLabels:
@@ -870,7 +871,7 @@ spec:
       labels:
         name: agent-pernode-example
       annotations:
-        checksum/config: eb52ed52cda3e3e4b23735fac21ce61f18005c2e5f0966ed7f6b37cfce171c53
+        checksum/config: 5ecda9fd60286464de91370ac63798f323488a83fd9b9b261413d88a11170b94
     spec:
       automountServiceAccountToken: true
       containers:
@@ -891,7 +892,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.7.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:
@@ -1041,10 +1042,10 @@ metadata:
   name: agent-clusterwide-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 spec:
   selector:
     matchLabels:
@@ -1075,7 +1076,7 @@ spec:
           value: /usr/share/elastic-agent/state
         - name: ELASTIC_NETINFO
           value: "false"
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.7.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         resources:

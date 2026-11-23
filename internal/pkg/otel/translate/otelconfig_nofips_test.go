@@ -7,7 +7,6 @@
 package translate
 
 import (
-	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
@@ -16,12 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/confmap"
 
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/pkg/component"
 )
@@ -84,7 +83,7 @@ func TestBeatsAuthExtensionKerberos(t *testing.T) {
 }
 
 func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
-	agentInfo := &info.AgentInfo{}
+	agentInfo := &proto.AgentInfo{Id: "agent-1"}
 	beatProcessorID := "beat/_agent-component/beat-metrics-monitoring"
 	beatMetricsConfig := map[string]any{
 		"id":         "test",
@@ -122,9 +121,9 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 									"type":      "metrics",
 								},
 								"elastic_agent": mapstr.M{
-									"id":       agentInfo.AgentID(),
-									"snapshot": agentInfo.Snapshot(),
-									"version":  agentInfo.Version(),
+									"id":       agentInfo.GetId(),
+									"snapshot": agentInfo.GetSnapshot(),
+									"version":  agentInfo.GetVersion(),
 								},
 								"input_id":  "test",
 								"stream_id": "test-1",
@@ -138,6 +137,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		"path": map[string]any{
 			"home": paths.Components(),
 			"data": filepath.Join(paths.Run(), "beat-metrics-monitoring"),
+			"logs": paths.BuildComponentsLogs(),
 		},
 		"queue": map[string]any{
 			"mem": map[string]any{
@@ -174,6 +174,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 				InputType:  "beat/metrics",
 				OutputType: "kafka",
 				OutputName: "default",
+				AgentInfo:  agentInfo,
 				InputSpec: &component.InputRuntimeSpec{
 					BinaryName: "elastic-otel-collector",
 					Spec: component.InputSpec{
@@ -201,9 +202,10 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 							"sasl.mechanism":             "OAUTHBEARER",
 							"auth": map[string]any{
 								"oauth2client": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
-									"client_id":     "my-client",
-									"client_secret": "my-secret",
-									"token_url":     "https://example.com/oauth2/token",
+									"client_id":                   "my-client",
+									"client_secret":               "my-secret",
+									"__mark_redact_client_secret": true,
+									"token_url":                   "https://example.com/oauth2/token",
 								},
 							},
 						}),
@@ -216,8 +218,9 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 	expectedConfig := confmap.NewFromStringMap(map[string]any{
 		"exporters": map[string]any{
 			"kafka/_agent-component/default": map[string]any{
-				"brokers":   []string{"127.0.0.1:9022"},
-				"client_id": "beats",
+				"brokers":      []string{"127.0.0.1:9022"},
+				"client_id":    "beats",
+				"dial_timeout": 30 * time.Second,
 				"logs": map[string]any{
 					"topic":    "static-topic",
 					"encoding": "raw",
@@ -245,7 +248,10 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 						"sizer":         "items",
 						"min_size":      1600,
 					},
-					"queue_size": 3200,
+					"enabled":           true,
+					"queue_size":        3200,
+					"block_on_overflow": true,
+					"wait_for_result":   true,
 				},
 				"timeout": 10 * time.Second,
 				"auth": map[string]any{
@@ -262,20 +268,9 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		"extensions": map[string]any{
 			"kafkapartitioner/_agent-component/default": map[string]any{},
 			"oauth2client/_agent-component/default": map[string]any{ //nolint:gosec // G101: test fixture, not a real credential
-				"client_certificate_key":      "",
-				"client_certificate_key_file": "",
-				"client_certificate_key_id":   "",
-				"client_id":                   "my-client",
-				"client_id_file":              "",
-				"client_secret":               "my-secret",
-				"client_secret_file":          "",
-				"endpoint_params":             url.Values(nil),
-				"expiry_buffer":               "5m0s",
-				"grant_type":                  "",
-				"tls": map[string]any{
-					"tpm": map[string]any{},
-				},
-				"token_url": "https://example.com/oauth2/token",
+				"client_id":     "my-client",
+				"client_secret": "my-secret",
+				"token_url":     "https://example.com/oauth2/token",
 			},
 		},
 		"processors": map[string]any{
@@ -298,7 +293,7 @@ func TestGetOtelConfigKafkaOAuth2(t *testing.T) {
 		},
 	})
 
-	actualConf, err := GetOtelConfig(model, agentInfo, logp.NewNopLogger())
+	actualConf, err := GetOtelConfig(model, logp.NewNopLogger())
 	require.NoError(t, err)
 	assert.Equal(t, expectedConfig.ToStringMap(), actualConf.ToStringMap())
 }

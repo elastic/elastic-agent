@@ -6,10 +6,10 @@ metadata:
   name: agent-netflow-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 stringData:
 
   agent.yml: |-
@@ -81,10 +81,10 @@ metadata:
   name: agent-netflow-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 spec:
   type: ClusterIP
   selector:
@@ -102,10 +102,10 @@ metadata:
   name: agent-netflow-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 spec:
   serviceName: agent-netflow-example-headless
   selector:
@@ -145,7 +145,7 @@ spec:
             secretKeyRef:
               key: api_key
               name: es-api-secret
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.7.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         ports:

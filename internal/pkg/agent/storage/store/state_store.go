@@ -334,7 +334,6 @@ func (s *StateStore) Queue() []fleetapi.ScheduledAction {
 // SaveAction atomically persists the action to disk and, on success, updates
 // the in-memory state. Concurrent reads always observe either the old or the
 // new action — never a partially committed state.
-// If the action is already current (same ID), the call is a no-op and returns nil.
 func (s *StateStore) SaveAction(a fleetapi.Action) error {
 	if isNilAction(a) {
 		return fmt.Errorf("cannot save nil action")
@@ -348,11 +347,6 @@ func (s *StateStore) SaveAction(a fleetapi.Action) error {
 
 	s.mx.Lock()
 	defer s.mx.Unlock()
-
-	// Skip if the action is already current.
-	if current := s.state.ActionSerializer.Action; current != nil && current.ID() == a.ID() {
-		return nil
-	}
 
 	// tmp is a shallow copy; safe because the write lock is held throughout.
 	tmp := s.state

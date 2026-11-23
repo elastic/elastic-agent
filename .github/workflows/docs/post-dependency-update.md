@@ -35,6 +35,8 @@ It runs on pushes to `dependabot/go_modules/**` or `renovate/*golang/**`. Indivi
 
 This workflow has write access and pushes directly to the dependency-update branch. It is documentation of the configured automation; it was not run as part of this documentation work.
 
+Because Renovate stops updating a branch once it sees commits from an author other than itself, the committer identity used here (`github-actions[bot]`) is listed under [`gitIgnoredAuthors`](https://docs.renovatebot.com/configuration-options/#gitignoredauthors) in [`renovate.json`](../../../renovate.json). If the identity configured in the `set up git user` step changes, update `gitIgnoredAuthors` too.
+
 ## Sources
 
 - Workflow: [`post-dependency-update.yml`](../post-dependency-update.yml)

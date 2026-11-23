@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	urlutil "github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	urlutil "github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/id"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -262,6 +262,11 @@ func (c *Client) URI() string {
 		return host + "/" + c.config.Path
 	}
 	return string(c.config.Protocol) + "://" + host + "/" + c.config.Path
+}
+
+// Transport returns the HTTP transport settings of the remote.
+func (c *Client) Transport() httpcommon.HTTPTransportSettings {
+	return c.config.Transport
 }
 
 // newClient creates a new API client.

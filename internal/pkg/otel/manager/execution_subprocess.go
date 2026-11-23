@@ -25,7 +25,7 @@ import (
 
 	runtimeLogger "github.com/elastic/elastic-agent/pkg/component/runtime"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/status"
@@ -245,8 +245,11 @@ func (r *subprocessExecution) getCollectorHealthCheckPort() (int, error) {
 }
 
 func removeManagedHealthCheckExtensionStatus(status *otelstatus.AggregateStatus, healthCheckExtensionID string) {
+	if status == nil || status.ComponentStatusMap == nil {
+		return
+	}
 	extensions, exists := status.ComponentStatusMap["extensions"]
-	if !exists {
+	if !exists || extensions == nil || extensions.ComponentStatusMap == nil {
 		return
 	}
 

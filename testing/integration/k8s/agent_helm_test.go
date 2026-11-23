@@ -293,7 +293,7 @@ func k8sStepDeployLogMarker(marker *logMarker) k8sTestStep {
 				Containers: []corev1.Container{
 					{
 						Name:    "marker",
-						Image:   "busybox",
+						Image:   "docker.io/library/busybox",
 						Command: []string{"sh", "-c", "echo " + marker.id},
 					},
 				},

@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [xcode-27]
+        os: [macos-15-intel, xcode-27]
         mage_target: ["test:unit", "test:unitEdot"]
     name: macos-unit-tests (${{ matrix.os }}, ${{ matrix.mage_target }})
     runs-on: ${{ matrix.os }}
@@ -48,4 +48,4 @@ jobs:
         run: make mage
 
       - name: mage ${{ matrix.mage_target }}
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}
+        run: RACE_DETECTOR=true mage ${{ matrix.mage_target }}

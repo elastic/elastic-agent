@@ -6,10 +6,10 @@ metadata:
   name: agent-autoops-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 
 ---
 # Source: elastic-agent/templates/agent/k8s/secret.yaml
@@ -19,10 +19,10 @@ metadata:
   name: agent-autoops-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 stringData:
 
   agent.yml: |-
@@ -84,10 +84,10 @@ metadata:
   name: agent-autoops-example-autoops
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 stringData:
   autoops-es-url: "https://ccm-test-eu-west-1.es.us-east-2.aws.elastic-cloud.com"
   otel-url: "https://otel.example.com:4318"
@@ -103,10 +103,10 @@ metadata:
   name: agent-autoops-example
   namespace: "default"
   labels:
-    helm.sh/chart: elastic-agent-9.6.0-SNAPSHOT
+    helm.sh/chart: elastic-agent-9.7.0-SNAPSHOT
     app.kubernetes.io/name: elastic-agent
     app.kubernetes.io/instance: example
-    app.kubernetes.io/version: 9.6.0
+    app.kubernetes.io/version: 9.7.0
 spec:
   selector:
     matchLabels:
@@ -163,7 +163,7 @@ spec:
               key: cloud-connected-mode-api-url
               name: agent-autoops-example-autoops
               optional: true
-        image: docker.elastic.co/elastic-agent/elastic-agent:9.6.0-SNAPSHOT
+        image: docker.elastic.co/elastic-agent/elastic-agent:9.7.0-SNAPSHOT
         imagePullPolicy: IfNotPresent
         name: agent
         securityContext:

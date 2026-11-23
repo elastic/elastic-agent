@@ -83,6 +83,10 @@ const (
 	// ECHDeployment group of tests. Used for tests that orchestrate ECH deployments.
 	ECHDeployment = "ech-deployment"
 
+	// HeartbeatComplete group of tests. Used for testing Heartbeat Synthetics
+	// with the elastic-agent-complete Docker image.
+	HeartbeatComplete = "heartbeat-complete"
+
 	// Stress test suite that contains tests that do not need to run on each PR.
 	Stress = "stress"
 )

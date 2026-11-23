@@ -24,13 +24,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/gofrs/uuid/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/testing/certutil"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/testing/certutil"
 	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -548,7 +548,7 @@ func PerformManagedUpgrade(
 	}
 
 	// wait for version
-	_, err = backoff.Retry(ctx, func() (string, error) {
+	_, _ = backoff.Retry(ctx, func() (string, error) {
 		t.Log("Getting Agent version...")
 		newVersion, err := fleettools.GetAgentVersion(ctx, kibClient, agentID)
 		if err != nil {

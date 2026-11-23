@@ -1,0 +1,5 @@
+kind: bug-fix
+summary: Guard against malformed health status payload and nil event panic in OTel collector
+description: |
+  Prevent runtime panics in Elastic Agent's OTel collector manager when receiving empty or malformed health status payloads lacking event data.
+component: elastic-agent

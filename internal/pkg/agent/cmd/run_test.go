@@ -16,11 +16,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
@@ -148,13 +150,10 @@ func TestRunLoadConfig(t *testing.T) {
 		},
 	}}
 
-	origCfgDir := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(origCfgDir) })
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
-			paths.SetConfig(dir)
+			pathstest.SetConfig(t, dir)
 			err := os.WriteFile(filepath.Join(dir, paths.DefaultConfigName), tt.file, 0o644)
 			require.NoError(t, err)
 
@@ -171,10 +170,9 @@ func TestCustomLogsPathCfgOverride(t *testing.T) {
 	const customPath = "/tmp/custom-logs"
 
 	paths.SetupFlags()
-	origLogsPath := paths.Logs()
+	pathstest.SetLogs(t, paths.Logs())
 	t.Cleanup(func() {
 		require.NoError(t, flag.CommandLine.Set("path.logs", ""))
-		paths.SetLogs(origLogsPath)
 	})
 	require.NoError(t, flag.CommandLine.Set("path.logs", customPath))
 
@@ -203,9 +201,7 @@ func TestCustomLogsPathCfgOverride(t *testing.T) {
 func TestTryDelayEnroll_ExitsOnCtxCancel(t *testing.T) {
 	testutils.InitStorage(t)
 
-	origCfgDir := paths.Config()
-	t.Cleanup(func() { paths.SetConfig(origCfgDir) })
-	paths.SetConfig(t.TempDir())
+	pathstest.SetConfig(t, t.TempDir())
 
 	// Reply with 503 on every request so the agent keeps retrying enrollment.
 	gotRequest := make(chan struct{}, 1)

@@ -112,23 +112,20 @@ jobs:
 
       - name: Create Pull Request
         if: steps.check_branch.outputs.branch_exists == 'false'
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "docs: update generated documentation for ${{ needs.check-latest.outputs.version }}"
-          title: "Update generated documentation for ${{ needs.check-latest.outputs.version }}"
+          title: "Update generated documentation"
           body: |
-            This PR updates the generated documentation based on the latest released version **${{ needs.check-latest.outputs.version }}**.
+            This PR refreshes generated documentation using released Elastic Agent data.
 
             ## Changes
-            - Updates Elastic Agent component tables
-            - Updates OpenTelemetry Collector Builder (OCB) configuration
-            - Uses data from the latest released version tag: `${{ needs.check-latest.outputs.version }}`
+            - Updates the Elastic Agent component table and OpenTelemetry Collector Builder (OCB) configuration from the latest repository-wide release.
+            - Updates sample links from the latest repository-wide release.
+            - Updates gateway configuration links from the latest patch release of each minor version that has a gateway sample.
 
-            ## References
-            - **Source go.mod**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/go.mod
-            - **Source components.yml**: https://github.com/elastic/elastic-agent/blob/${{ needs.check-latest.outputs.version }}/internal/edot/components.yml
-            - **Release tag**: https://github.com/elastic/elastic-agent/tree/${{ needs.check-latest.outputs.version }}
+            A single run can therefore update links for multiple release versions. See the diff for the exact versions and source tags involved.
 
             cc @elastic/ski-docs
 

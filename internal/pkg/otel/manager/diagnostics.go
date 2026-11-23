@@ -166,7 +166,8 @@ func diagnosticComponentIDsFromName(name string, components []component.Componen
 		if beatName == "" || receiverType != beatName+"receiver" {
 			continue
 		}
-		if suffix == comp.ID || strings.HasPrefix(suffix, comp.ID+"/") {
+		encodedID := translate.EncodeNameSegment(comp.ID)
+		if suffix == encodedID || strings.HasPrefix(suffix, encodedID+"/") {
 			componentIDs = append(componentIDs, comp.ID)
 		}
 	}
@@ -176,6 +177,7 @@ func diagnosticComponentIDsFromName(name string, components []component.Componen
 
 // streamIDForComponent returns the receiver-name suffix after the component ID.
 func streamIDForComponent(name, compID string) string {
+	compID = translate.EncodeNameSegment(compID)
 	_, suffix, found := strings.Cut(name, "/"+translate.OtelNamePrefix)
 	if !found || suffix == "" || suffix == compID {
 		return ""

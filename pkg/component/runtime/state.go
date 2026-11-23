@@ -88,6 +88,8 @@ type ComponentState struct {
 
 	expectedComponent    *proto.Component
 	expectedComponentIdx uint64
+
+	expectedAgentInfo *proto.AgentInfo
 }
 
 // expectedUnitState is the expected state of a unit.
@@ -134,6 +136,7 @@ func (s *ComponentState) Copy() (c ComponentState) {
 	c.Component = s.Component
 	c.ComponentIdx = s.ComponentIdx
 	c.expectedComponent = s.expectedComponent
+	c.expectedAgentInfo = s.expectedAgentInfo
 	c.expectedComponentIdx = s.expectedComponentIdx
 
 	return c
@@ -152,6 +155,12 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		touched[key] = true
 		expected, ok := s.expectedUnits[key]
 		if ok {
+			if expected.state == client.UnitStateStopped {
+				// re-added before the component confirmed the stop
+				expected.state = client.UnitStateHealthy
+				expected.configStateIdx++
+				changed = true
+			}
 			if expected.logLevel != unit.LogLevel {
 				expected.logLevel = unit.LogLevel
 				changed = true
@@ -203,6 +212,11 @@ func (s *ComponentState) syncExpected(comp *component.Component) bool {
 		changed = true
 		s.expectedComponentIdx++
 		s.expectedComponent = comp.Component
+	}
+
+	if !gproto.Equal(s.expectedAgentInfo, comp.AgentInfo) {
+		changed = true
+		s.expectedAgentInfo = comp.AgentInfo
 	}
 
 	return changed
@@ -438,6 +452,7 @@ func (s *ComponentState) toCheckinExpected() *proto.CheckinExpected {
 		FeaturesIdx:  s.expectedFeaturesIdx,
 		Component:    s.expectedComponent,
 		ComponentIdx: s.expectedComponentIdx,
+		AgentInfo:    s.expectedAgentInfo,
 	}
 }
 

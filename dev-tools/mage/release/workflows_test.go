@@ -58,9 +58,8 @@ const defaultBeatVersion = "9.5.0"
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.5.0",
+		NextRelease:             "9.5.0",
 		LatestRelease:           "9.4.3",
-		NextRelease:             "9.5.1",
 		NextProjectMinorVersion: "9.6.0",
 		NextProjectMinorBranch:  "9.6",
 		BaseBranch:              "main",
@@ -84,7 +83,6 @@ const defaultBeatVersion = "9.5.0"
 		"9.5",
 		"ff-prep-main-9.5.0",
 		"ff-release-9.5.0",
-		"ff-prep-next-patch-9.5.1",
 	}
 	for _, branch := range wantBranches {
 		exists, err := repo.BranchExists(branch)
@@ -102,6 +100,13 @@ const defaultBeatVersion = "9.5.0"
 	if docsBranchExists {
 		t.Error("expected ff-prep-main-docs-9.6.0 not to exist; docs belong in PR-A")
 	}
+	nextPatchExists, err := repo.BranchExists("ff-prep-next-patch-9.5.1")
+	if err != nil {
+		t.Fatalf("failed checking next-patch branch: %v", err)
+	}
+	if nextPatchExists {
+		t.Error("expected ff-prep-next-patch-9.5.1 not to exist; next-patch is owned by RunPatchRelease")
+	}
 
 	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", "version/version.go", `defaultBeatVersion = "9.6.0"`)
 	assertGitShowContains(t, tmpDir, "ff-prep-main-9.5.0", ".mergify.yml", "backport-9.5")
@@ -115,13 +120,9 @@ const defaultBeatVersion = "9.5.0"
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "version/version.go", `defaultBeatVersion = "9.5.0"`)
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "version/docs/version.asciidoc", ":stack-version: 9.5.0")
 	assertGitShowContains(t, tmpDir, "ff-release-9.5.0", "README.md", "/9.5/")
-
-	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "version/version.go", `defaultBeatVersion = "9.5.1"`)
-	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "version/docs/version.asciidoc", ":stack-version: 9.4.3")
-	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.1", "deploy/kubernetes/elastic-agent-managed-kubernetes.yaml", "elastic-agent:9.5.1")
 }
 
-func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
+func TestRunMajorMinorReleaseRejectsMismatchedNextRelease(t *testing.T) {
 	origMageUpdate := runMageUpdate
 	runMageUpdate = func() error { return nil }
 	t.Cleanup(func() { runMageUpdate = origMageUpdate })
@@ -148,9 +149,8 @@ func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.5.0",
+		NextRelease:             "9.5.0",
 		LatestRelease:           "9.4.3",
-		NextRelease:             "9.5.1",
 		NextProjectMinorVersion: "9.6.0",
 		BaseBranch:              "main",
 		ReleaseBranch:           "9.5",
@@ -161,7 +161,7 @@ func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
 
 	err = RunMajorMinorRelease(cfg)
 	if err == nil {
-		t.Fatal("expected RunMajorMinorRelease to fail when CURRENT_RELEASE mismatches main version")
+		t.Fatal("expected RunMajorMinorRelease to fail when NEXT_RELEASE mismatches main version")
 	}
 	if !strings.Contains(err.Error(), "does not match version on main") {
 		t.Fatalf("unexpected error: %v", err)
@@ -170,8 +170,7 @@ func TestRunMajorMinorReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
 
 func TestMajorMinorPrepLabels(t *testing.T) {
 	cfg := &ReleaseConfig{
-		CurrentRelease:          "9.5.0",
-		NextRelease:             "9.5.1",
+		NextRelease:             "9.5.0",
 		NextProjectMinorVersion: "9.6.0",
 		ReleaseBranch:           "9.5",
 		BaseBranch:              "main",
@@ -184,7 +183,6 @@ func TestMajorMinorPrepLabels(t *testing.T) {
 	}{
 		{name: "PR-A", labels: prAMainLabels(cfg.ReleaseBranch), want: mergeLabelFFDay},
 		{name: "PR-B", labels: prBReleaseLabels(), want: mergeLabelAfterBranch},
-		{name: "PR-D", labels: prDNextPatchLabels(), want: mergeLabelAfterRelease},
 	}
 	for _, tc := range casesLabels {
 		t.Run(tc.name+" labels", func(t *testing.T) {
@@ -249,9 +247,8 @@ const defaultBeatVersion = "9.5.1"
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.1",
-		LatestRelease:  "9.5.0",
 		NextRelease:    "9.5.2",
+		LatestRelease:  "9.5.1",
 		ReleaseBranch:  "9.5",
 		DryRun:         true,
 		GitAuthorName:  "Test User",
@@ -269,8 +266,7 @@ const defaultBeatVersion = "9.5.1"
 
 	wantBranches := []string{
 		"9.5",
-		"patch-release-9.5.1",
-		"ff-prep-next-patch-9.5.2",
+		"update-version-9.5.2",
 	}
 	for _, branch := range wantBranches {
 		exists, err := repo.BranchExists(branch)
@@ -282,13 +278,21 @@ const defaultBeatVersion = "9.5.1"
 		}
 	}
 
-	// PR-A: docs only — version.go unchanged from release branch.
-	assertGitShowContains(t, tmpDir, "patch-release-9.5.1", "version/version.go", `defaultBeatVersion = "9.5.1"`)
-	assertGitShowContains(t, tmpDir, "patch-release-9.5.1", "version/docs/version.asciidoc", ":stack-version: 9.5.1")
-	assertGitShowContains(t, tmpDir, "ff-prep-next-patch-9.5.2", "version/version.go", `defaultBeatVersion = "9.5.2"`)
+	exists, err := repo.BranchExists("patch-release-9.5.2")
+	if err != nil {
+		t.Fatalf("failed checking docs branch: %v", err)
+	}
+	if exists {
+		t.Errorf("patch must not create docs branch patch-release-9.5.2")
+	}
+
+	assertGitShowContains(t, tmpDir, "update-version-9.5.2", "version/version.go", `defaultBeatVersion = "9.5.2"`)
+	if cfg.LatestRelease != "9.5.1" {
+		t.Errorf("LatestRelease forced to previous patch = %s, want 9.5.1", cfg.LatestRelease)
+	}
 }
 
-func TestRunPatchReleaseRejectsMismatchedCurrentRelease(t *testing.T) {
+func TestRunPatchReleaseRejectsMismatchedNextRelease(t *testing.T) {
 	origMageUpdate := runMageUpdate
 	runMageUpdate = func() error { return nil }
 	t.Cleanup(func() { runMageUpdate = origMageUpdate })
@@ -328,9 +332,8 @@ const defaultBeatVersion = "9.5.1"
 	}
 
 	cfg := &ReleaseConfig{
-		CurrentRelease: "9.5.0",
-		LatestRelease:  "9.4.3",
-		NextRelease:    "9.5.1",
+		NextRelease:    "9.5.3",
+		LatestRelease:  "9.5.2",
 		ReleaseBranch:  "9.5",
 		DryRun:         true,
 		GitAuthorName:  "Test User",
@@ -339,35 +342,25 @@ const defaultBeatVersion = "9.5.1"
 
 	err = RunPatchRelease(cfg)
 	if err == nil {
-		t.Fatal("expected RunPatchRelease to fail when CURRENT_RELEASE mismatches branch version")
+		t.Fatal("expected RunPatchRelease to fail when branch version is not previous patch")
 	}
-	if !strings.Contains(err.Error(), "does not match version on branch") {
+	if !strings.Contains(err.Error(), "expects version") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestPatchPrepLabels(t *testing.T) {
-	cases := []struct {
-		name   string
-		labels []string
-		want   string
-	}{
-		{name: "PR-A patch", labels: patchBeforeBuildPRLabels(), want: mergeLabelBeforeBuild},
-		{name: "PR-B next", labels: prDNextPatchLabels(), want: mergeLabelAfterRelease},
+	labels := patchVersionBumpLabels()
+	if !slices.Contains(labels, mergeLabelAfterRelease) {
+		t.Errorf("patch bump labels should include %q, got %v", mergeLabelAfterRelease, labels)
 	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			if !slices.Contains(tc.labels, tc.want) {
-				t.Errorf("%s labels should include %q, got %v", tc.name, tc.want, tc.labels)
-			}
-		})
-	}
-
-	patchLabels := patchBeforeBuildPRLabels()
-	for _, want := range []string{"docs", "in progress", "release", "Team:Automation", "skip-changelog"} {
-		if !slices.Contains(patchLabels, want) {
-			t.Errorf("patch release labels should include %q, got %v", want, patchLabels)
+	for _, want := range []string{"release", "Team:Automation", "skip-changelog"} {
+		if !slices.Contains(labels, want) {
+			t.Errorf("patch bump labels should include %q, got %v", want, labels)
 		}
+	}
+	if slices.Contains(labels, "docs") {
+		t.Errorf("patch bump must not include docs label, got %v", labels)
 	}
 }
 

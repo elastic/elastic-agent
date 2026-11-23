@@ -12,7 +12,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 )
 
 // RuntimeComparisonIgnoredFields are fields that are expected to differ between
@@ -46,8 +46,8 @@ func AssertMapsEqual(t *testing.T, m1, m2 mapstr.M, ignoredFields []string, msg 
 		//if !hasKeyM1 && !hasKeyM2 {
 		//	assert.Failf(t, msg, "ignored field %q does not exist in either map, please remove it from the ignored fields", f)
 		//}
-		flatM1.Delete(f)
-		flatM2.Delete(f)
+		_ = flatM1.Delete(f)
+		_ = flatM2.Delete(f)
 	}
 	require.Zero(t, cmp.Diff(flatM1, flatM2), msg)
 }

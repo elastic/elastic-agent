@@ -68,7 +68,7 @@ jobs:
     - name: Run Updatecli in Apply mode
       uses: elastic/oblt-actions/updatecli/run@v1
       with:
-        command: apply --config .ci/updatecli/update-beats.yml --commit=false
+        command: pipeline apply --config .ci/updatecli/update-beats.yml --commit=false
         version-file: .updatecli-version
       env:
         BRANCH_NAME: ${{ matrix.branch }}
@@ -79,7 +79,7 @@ jobs:
         echo BEATS_NEW_VERSION=$(cat /tmp/.beats-new-version) >> "$GITHUB_ENV"
 
     - name: Create Pull Request
-      uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+      uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
       with:
         token: ${{ steps.github-token.outputs.token }}
         commit-message: "[${{ matrix.branch }}][Automation] Update elastic/beats to ${{ env.BEATS_NEW_VERSION }}"
