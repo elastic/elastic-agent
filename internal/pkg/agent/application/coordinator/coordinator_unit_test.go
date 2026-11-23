@@ -3361,9 +3361,9 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		}
 
 		select {
-		case os := <-coord.overrideStateChan:
-			require.NotNil(t, os, "uninstall should set an override state")
-			assert.Equal(t, agentclient.Stopping, os.state)
+		case override := <-coord.overrideStateChan:
+			require.NotNil(t, override, "uninstall should set an override state")
+			assert.Equal(t, agentclient.Stopping, override.state)
 		default:
 			t.Fatal("expected an override state to be set")
 		}
