@@ -90,6 +90,12 @@ func TestServer(t *testing.T) {
 		stopDrain()
 	}()
 
+	assert.Eventually(t, func() bool {
+		s.mx.Lock()
+		defer s.mx.Unlock()
+		return !s.components["synthetics-default"].lastCheckin.IsZero()
+	}, 10*time.Second, 10*time.Millisecond, "the receiver's check-in should be recorded")
+
 	units := map[string]*client.Unit{}
 	for range 2 {
 		change := waitForChange(t, changes)
@@ -130,6 +136,32 @@ func TestServerStartError(t *testing.T) {
 	s, err := New(log, "unix://"+filepath.Join(file, "units.sock"), &info.AgentInfo{}, 1024)
 	require.NoError(t, err)
 	assert.Error(t, s.Start(t.Context()))
+}
+
+// Missed check-ins count from the last check-in, or from when the component
+// was added if its receiver never checked in.
+func TestMissedCheckins(t *testing.T) {
+	log, _ := loggertest.New("unitserver")
+	s, err := New(log, "unix://"+filepath.Join(t.TempDir(), "units.sock"), &info.AgentInfo{}, 1024)
+	require.NoError(t, err)
+	const period = 50 * time.Millisecond
+
+	_, ok := s.MissedCheckins("synthetics-default", period)
+	assert.False(t, ok, "an unknown component has no check-ins")
+
+	s.Update([]component.Component{controlProtocolComponent("synthetics-default", "@every 1m")})
+	missed, ok := s.MissedCheckins("synthetics-default", period)
+	require.True(t, ok)
+	assert.Zero(t, missed, "a new component has missed no check-ins")
+
+	assert.Eventually(t, func() bool {
+		missed, _ := s.MissedCheckins("synthetics-default", period)
+		return missed >= 2
+	}, 10*time.Second, period/5, "a receiver that never checks in should miss check-ins")
+
+	s.checkedIn("synthetics-default")
+	missed, _ = s.MissedCheckins("synthetics-default", period)
+	assert.Zero(t, missed, "a check-in should reset the missed check-ins")
 }
 
 // A unit that is removed and added again gets a new config state index, so a

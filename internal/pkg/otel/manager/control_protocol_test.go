@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,6 +24,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/unitserver"
 	"github.com/elastic/elastic-agent/pkg/component"
+	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 )
 
@@ -160,4 +162,95 @@ func TestUpdateUnitServerRetriesStart(t *testing.T) {
 	assert.False(t, m.unitServerStarted, "a server that failed to start should be started again on the next update")
 	_, err = unitServer.ConnectionInfo(comp.ID)
 	assert.NoError(t, err, "the units should be kept even if the server isn't running")
+}
+
+// A component whose receiver doesn't check in is degraded, and fails with all
+// its units once the receiver missed maxReceiverCheckinMisses check-ins, as a
+// beat process would.
+func TestReportMissedCheckins(t *testing.T) {
+	log, _ := loggertest.New("test")
+	// A socket under a regular file can't be created, so the receiver can't
+	// check in.
+	file := filepath.Join(t.TempDir(), "file")
+	require.NoError(t, os.WriteFile(file, nil, 0o600))
+	unitServer, err := unitserver.New(log, "unix://"+filepath.Join(file, "units.sock"), &info.AgentInfo{}, 1024)
+	require.NoError(t, err)
+	const period = 50 * time.Millisecond
+	m := &OTelManager{
+		unitServer:               unitServer,
+		managerLogger:            log,
+		checkinPeriod:            period,
+		componentStateCh:         make(chan []runtime.ComponentComponentState, 100),
+		currentComponentStates:   make(map[string]runtime.ComponentComponentState),
+		collectorComponentStates: make(map[string]runtime.ComponentComponentState),
+	}
+
+	inputKey := runtime.ComponentUnitKey{UnitID: "monitor-a", UnitType: client.UnitTypeInput}
+	outputKey := runtime.ComponentUnitKey{UnitID: "output", UnitType: client.UnitTypeOutput}
+	comp := component.Component{
+		ID:             "synthetics/tcp-default",
+		RuntimeManager: component.OtelRuntimeManager,
+		InputSpec: &component.InputRuntimeSpec{
+			Spec: component.InputSpec{SingleReceiver: true, ControlProtocolUnits: true},
+		},
+		Units: []component.Unit{
+			{ID: inputKey.UnitID, Type: inputKey.UnitType, Config: component.MustExpectedConfig(map[string]any{"type": "synthetics/tcp"})},
+			{ID: outputKey.UnitID, Type: outputKey.UnitType, Config: component.MustExpectedConfig(map[string]any{"type": "elasticsearch"})},
+		},
+	}
+	m.components = []component.Component{comp}
+	m.updateUnitServer(t.Context(), m.components)
+	require.Error(t, m.unitServerErr)
+
+	// The collector reports the component as healthy, with the input unit not
+	// yet run by the receiver.
+	collectorState := runtime.ComponentComponentState{
+		Component: comp,
+		State: runtime.ComponentState{
+			State:   client.UnitStateHealthy,
+			Message: "Healthy",
+			Units: map[runtime.ComponentUnitKey]runtime.ComponentUnitState{
+				inputKey:  {State: client.UnitStateStarting},
+				outputKey: {State: client.UnitStateHealthy},
+			},
+		},
+	}
+	m.collectorComponentStates[comp.ID] = collectorState
+	m.currentComponentStates[comp.ID] = collectorState
+
+	// reported waits for the component to be reported in the given state.
+	reported := func(state client.UnitState) runtime.ComponentState {
+		var last runtime.ComponentState
+		require.Eventually(t, func() bool {
+			m.reportMissedCheckins(t.Context())
+			for {
+				select {
+				case updates := <-m.componentStateCh:
+					require.Len(t, updates, 1)
+					last = updates[0].State
+				default:
+					return last.State == state
+				}
+			}
+		}, 10*time.Second, period/5, "the component should be %s", state)
+		return last
+	}
+
+	degraded := reported(client.UnitStateDegraded)
+	assert.Contains(t, degraded.Message, "Degraded: the receiver missed")
+	assert.Contains(t, degraded.Message, "failed to start serving its units", "the message should say why the receiver can't check in")
+	assert.Equal(t, collectorState.State.Units, degraded.Units, "only the component should be degraded")
+
+	failed := reported(client.UnitStateFailed)
+	assert.Contains(t, failed.Message, "the receiver missed 3 check-ins")
+	require.Len(t, failed.Units, 2)
+	for key, unit := range failed.Units {
+		assert.Equal(t, client.UnitStateFailed, unit.State, "unit %s should fail with the component", key.UnitID)
+		assert.Equal(t, failed.Message, unit.Message)
+	}
+	assert.Equal(t, failed, m.currentComponentStates[comp.ID].State)
+	assert.Equal(t, client.UnitStateHealthy, m.collectorComponentStates[comp.ID].State.State, "the collector's state should be kept")
+
+	// A status update from the collector keeps the component failed.
+	assert.Equal(t, client.UnitStateFailed, m.withMissedCheckins(collectorState).State.State)
 }

@@ -11,8 +11,8 @@
 // the connection info in its config.
 //
 // The server only delivers configuration. Receivers report their status through
-// the collector like any other receiver, so the server ignores the observed state
-// they send back.
+// the collector like any other receiver, so the server only tracks when they
+// check in, which tells whether a receiver gets its units.
 package unitserver
 
 import (
@@ -24,6 +24,7 @@ import (
 	"io"
 	"slices"
 	"sync"
+	"time"
 
 	"github.com/gofrs/uuid/v5"
 	"google.golang.org/grpc"
@@ -62,6 +63,11 @@ type componentUnits struct {
 	// receiver applies a config only when its index changes, and it can miss
 	// the removal if the updates collapse or it reconnects in between.
 	configStateIdx uint64
+
+	// added is when the component was added, and lastCheckin when its receiver
+	// last checked in, zero if it never did.
+	added       time.Time
+	lastCheckin time.Time
 
 	token      string
 	clientCert *authority.Pair
@@ -203,9 +209,36 @@ func (s *Server) newComponentUnits() (*componentUnits, error) {
 	return &componentUnits{
 		units:      make(map[unitKey]*proto.UnitExpected),
 		changed:    make(chan struct{}),
+		added:      time.Now(),
 		token:      token.String(),
 		clientCert: clientCert,
 	}, nil
+}
+
+// MissedCheckins returns how many check-in periods have passed since the
+// receiver of a component last checked in, or since the component was added if
+// it never did. It returns false for unknown components.
+func (s *Server) MissedCheckins(componentID string, period time.Duration) (int, bool) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	cu, ok := s.components[componentID]
+	if !ok {
+		return 0, false
+	}
+	last := cu.lastCheckin
+	if last.IsZero() {
+		last = cu.added
+	}
+	return int(time.Since(last) / period), true
+}
+
+// checkedIn records a check-in from the receiver of a component.
+func (s *Server) checkedIn(componentID string) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+	if cu, ok := s.components[componentID]; ok {
+		cu.lastCheckin = time.Now()
+	}
 }
 
 // ConnectionInfo returns the connection info for a component's receiver, in the
@@ -322,9 +355,10 @@ func (s *Server) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 	}
 	chunking := slices.Contains(first.Supports, proto.ConnectionSupports_CheckinChunking)
 	s.logger.Debugf("OTel receiver for component %s connected", componentID)
+	s.checkedIn(componentID)
 
 	// The receiver reports its status through the collector, so observed
-	// check-ins are only read to notice when the stream ends.
+	// check-ins only tell that the receiver is still connected.
 	recvDone := make(chan error, 1)
 	go func() {
 		for {
@@ -332,6 +366,7 @@ func (s *Server) CheckinV2(server proto.ElasticAgent_CheckinV2Server) error {
 				recvDone <- err
 				return
 			}
+			s.checkedIn(componentID)
 		}
 	}()
 

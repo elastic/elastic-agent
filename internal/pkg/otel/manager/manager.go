@@ -156,6 +156,18 @@ type OTelManager struct {
 	// units. It starts with the first such component.
 	unitServer        *unitserver.Server
 	unitServerStarted bool
+	// unitServerErr is the error from the last attempt to start the unit server.
+	unitServerErr error
+	// checkinPeriod is how often the receivers that get units from the unit
+	// server must check in.
+	checkinPeriod time.Duration
+	// missedCheckins holds the check-ins missed by receivers that get units from
+	// the unit server, by component ID. Components whose receivers missed none
+	// are left out.
+	missedCheckins map[string]int
+	// collectorComponentStates are the component states from the last collector
+	// status, by component ID, before missed check-ins are applied.
+	collectorComponentStates map[string]runtime.ComponentComponentState
 }
 
 // NewOTelManager returns a OTelManager.
@@ -242,6 +254,7 @@ func NewOTelManager(
 		stopTimeout:       stopTimeout,
 		collectorLogLevel: collectorLogLevel,
 		unitServer:        unitServer,
+		checkinPeriod:     receiverCheckinPeriod,
 	}, nil
 }
 
@@ -255,6 +268,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	// waiting for the collector to exit
 	collectorStatusCh := make(chan *status.AggregateStatus, 1)
 	forceFetchStatusCh := make(chan struct{}, 1)
+	checkinTicker := time.NewTicker(m.receiverCheckinPeriod())
+	defer checkinTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -386,6 +401,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				forceFetchStatusCh <- struct{}{}
 			}
 
+		case <-checkinTicker.C:
+			// As the runtime manager does for beat processes, retry starting
+			// the server and check the check-ins periodically.
+			if !m.unitServerStarted {
+				m.updateUnitServer(ctx, m.components)
+			}
+			m.reportMissedCheckins(ctx)
+
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
 			if err != nil {
@@ -403,16 +426,19 @@ func (m *OTelManager) Run(ctx context.Context) error {
 // updateUnitServer sends the units of components with control protocol units to the
 // unit server, starting it for the first such component. The server is listening
 // once this returns, so the receivers started by the following collector config
-// can connect right away. If it fails to start, the next update tries again.
+// can connect right away. If it fails to start, the next update or check-in
+// period tries again.
 func (m *OTelManager) updateUnitServer(ctx context.Context, components []component.Component) {
 	if m.unitServer == nil {
 		return
 	}
 	if !m.unitServerStarted && slices.ContainsFunc(components, func(c component.Component) bool { return c.UsesControlProtocolUnits() }) {
 		if err := m.unitServer.Start(ctx); err != nil {
-			m.managerLogger.Errorf("failed to start the unit server, will retry on the next update: %v", err)
+			m.managerLogger.Errorf("failed to start the unit server, will retry: %v", err)
+			m.unitServerErr = err
 		} else {
 			m.unitServerStarted = true
+			m.unitServerErr = nil
 		}
 	}
 	// The units are kept even if the server isn't running, as the receiver
@@ -1102,6 +1128,14 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 
 	// Update the current collector status to the cleaned status (after dropping component states)
 	m.currentCollectorStatus = finalStatus
+
+	// Apply the check-ins missed by receivers that get units from the unit server
+	m.collectorComponentStates = make(map[string]runtime.ComponentComponentState, len(componentStates))
+	m.updateMissedCheckins()
+	for i, componentState := range componentStates {
+		m.collectorComponentStates[componentState.Component.ID] = componentState
+		componentStates[i] = m.withMissedCheckins(componentState)
+	}
 
 	// Handle component state updates
 	return m.processComponentStates(componentStates), nil
