@@ -29,6 +29,7 @@ require (
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/otlpjsonconnector v0.165.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/connector/routingconnector v0.165.1
+	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awss3exporter v0.165.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter v0.165.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter v0.165.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter v0.165.1
@@ -107,6 +108,7 @@ require (
 	github.com/KimMachineGun/automemlimit v1.0.1 // indirect
 	github.com/alexbrainman/sspi v0.0.0-20250919150558-7d374ff0d59e // indirect
 	github.com/aws/aws-sdk-go v1.55.8 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.5.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.96.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.60.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/kafka v1.63.0 // indirect
@@ -166,6 +168,7 @@ require (
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/dbauth v0.165.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/extension/internal/credentialsfile v0.165.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sinventory v0.165.1 // indirect
+	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchperresourceattr v0.165.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/expohisto v0.165.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl/contexts/xprofile v0.165.1 // indirect
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl/xottl v0.165.1 // indirect

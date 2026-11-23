@@ -93,6 +93,7 @@ import (
 	"github.com/elastic/opentelemetry-collector-components/processor/elasticinframetricsprocessor"
 
 	// Exporters:
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awss3exporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter"
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
@@ -262,6 +263,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			elasticsearchexporter.NewFactory(),
 			kafkaexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
+			awss3exporter.NewFactory(),
 			prometheusremotewriteexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),

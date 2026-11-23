@@ -1,4 +1,10 @@
 exporters:
+  awss3:
+    s3uploader:
+      region: us-east-1
+      s3_bucket: test
+      s3_prefix: test
+      compression: gzip
   debug:
   elasticsearch:
     endpoints:
@@ -272,6 +278,7 @@ service:
         - debug
         - elasticsearch
         - file
+        - awss3
         - otlp_grpc
       processors:
         - attributes

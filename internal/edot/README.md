@@ -87,6 +87,7 @@ This section provides a summary of components included in the Elastic Distributi
 
 | Component | Version |
 |---|---|
+| [awss3exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/awss3exporter/v0.165.1/exporter/awss3exporter/README.md) | v0.165.1 |
 | [debugexporter](https://github.com/open-telemetry/opentelemetry-collector/blob/exporter/debugexporter/v0.165.0/exporter/debugexporter/README.md) | v0.165.0 |
 | [elasticsearchexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/elasticsearchexporter/v0.165.1/exporter/elasticsearchexporter/README.md) | v0.165.1 |
 | [fileexporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/exporter/fileexporter/v0.165.1/exporter/fileexporter/README.md) | v0.165.1 |

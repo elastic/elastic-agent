@@ -260,6 +260,8 @@ github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.9 h1:oH1E0tjN0g+ZRusbX1dsuat
 github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.9/go.mod h1:3ZaQGigIoaS45x9HgnLZ4sP475Fs7QoxU3IsZX/J3h4=
 github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.14 h1:nX4dV32e7e2GSg60GojffG61w4tvYxVpvEGWfSlcImo=
 github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.23.14/go.mod h1:dNw78YbA0ylhEVJ1h84fPdtIiWkVTaszT7oHkE/cq5E=
+github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.5.2 h1:m6yX9Jn79iVBY5mMLx4Vy/9DbpIrLkPsmWD9Lq/m4HI=
+github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager v0.5.2/go.mod h1:7y/eRx3q8aL/k5z6hbFhTPiRRwwMzh5uvjL7Ypavx3E=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12 h1:W0yUUzKBA8SofGQ0yZafEUuZq9UxfvijRgdc6vcRQPA=
 github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.12/go.mod h1:xwKv6vwBNdpPFOxEm/ld4IODZK2s/1ksHvdBqLfH6Gs=
 github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.12 h1:lqSi8qvAnKC1vfosImdmOsuiJLr/jdybZX5299beB6Q=
@@ -1160,6 +1162,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometr
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/signaltometricsconnector v0.165.1/go.mod h1:vuwiYE1i3BHzEmQbWV1U9WuiL83A8R8zW+INGLC5hdA=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.165.1 h1:8hHLJTTEMYXFi+kTTH12BuELGwi/Niu4uttiRWPkqxY=
 github.com/open-telemetry/opentelemetry-collector-contrib/connector/spanmetricsconnector v0.165.1/go.mod h1:3muzMcsnnN+kVdjvQwiTwGf0+GU9CNkCqJG/BHZWPJI=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awss3exporter v0.165.1 h1:XHjgUZCdz3noWTd9tyHYECYzkemsYJ2zdlDHdcgrnfc=
+github.com/open-telemetry/opentelemetry-collector-contrib/exporter/awss3exporter v0.165.1/go.mod h1:UxHhC9SZ8y6bOsnJP+Du3c70vdPakgULAuFvC7AgEbI=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.165.1 h1:3Lk2m/u+ssab7A8DL0RC9xxyhp+SQUpjE78+ImM07j4=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/elasticsearchexporter v0.165.1/go.mod h1:eG1DgfNUE9FKAxXmIDbw95hflcitQFepDEzf+GTv8d4=
 github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter v0.165.1 h1:CGxsRXv2hPALkl189XQR8QtVX/UNJpvPeOqEr+7S4co=
@@ -1248,6 +1252,8 @@ github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcompone
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/sharedcomponent v0.165.1/go.mod h1:UH7yP74ygLnN60SR1ywyH5662FkgIo5pF7ffFJp82z4=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/sqlquery v0.165.1 h1:EGzNKpmVEGCwK0/dHCq3rFAFaVlg3ON1Nr9nzs0jHxM=
 github.com/open-telemetry/opentelemetry-collector-contrib/internal/sqlquery v0.165.1/go.mod h1:rbszMIBxma3gZNu8iMORJz/2RQ0vq4Md1n/E6wjG8YY=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchperresourceattr v0.165.1 h1:SKHqBbFDed7WYgv0mvwztXIsTMDL9ZUkSDoP6owyzIE=
+github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchperresourceattr v0.165.1/go.mod h1:XFEABNyUB0PuEzsFdC9E4OStPEbqj9HwDUoH/5QcAv4=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchpersignal v0.165.1 h1:5plve+gfnkA0Luh+xk/l5qs0z3MVVKcEaxKSZNlUBAI=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/batchpersignal v0.165.1/go.mod h1:UdifibTp6IqNTDvBfsb/d+m70JxA+H3Ix+bu3UE77ho=
 github.com/open-telemetry/opentelemetry-collector-contrib/pkg/core/xidutils v0.165.1 h1:uf5VY4wp/zmxVfzIc/d0jTYa7rUVI62rveTxV1joUy8=

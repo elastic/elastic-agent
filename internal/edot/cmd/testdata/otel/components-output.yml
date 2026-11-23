@@ -125,6 +125,11 @@ processors:
       metrics: Alpha
       traces: Alpha
 exporters:
+  - name: awss3
+    stability:
+      logs: Alpha
+      metrics: Alpha
+      traces: Alpha
   - name: debug
     stability:
       logs: Development
