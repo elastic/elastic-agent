@@ -270,11 +270,9 @@ steps:
     plugins:
       - *google_oidc_plugin
 
-  - wait: ~
-
   - label: ":wastebasket: Delete build artifacts"
     key: "delete_build_artifacts"
-    if: build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") == null || build.env("BUILDKITE_TRIGGERED_FROM_BUILD_PIPELINE_SLUG") != "independent-agent-release-staging"
+    depends_on: dra-publish
     command: "true"
     plugins:
       - elastic/vault-secrets#v0.1.1:
