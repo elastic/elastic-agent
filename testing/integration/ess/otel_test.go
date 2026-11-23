@@ -2837,7 +2837,9 @@ service:
 }
 
 func TestOtelElasticsearchStateStore_Agentless(t *testing.T) {
-	info := define.Require(t, define.Requirements{ //nolint:staticcheck // This needs to be the first statement in the test body
+	// This needs to be the first statement in the test body. staticcheck reports info as unused while the test is
+	// skipped (SA4006), but not on every platform, so nolintlint would report the directive as unused on the others.
+	info := define.Require(t, define.Requirements{ //nolint:staticcheck,nolintlint // see above
 		Group: integration.Default,
 		Local: true,
 		OS: []define.OS{
