@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -306,7 +308,7 @@ func TestRedactWithMarkers(t *testing.T) {
 					map[string]any{
 						"type":                              "test_input",
 						"redactKey":                         "secretValue",
-						redactionMarkerPrefix + "redactKey": true,
+						RedactionMarkerPrefix + "redactKey": true,
 					},
 				},
 				"outputs": map[string]any{
@@ -314,7 +316,7 @@ func TestRedactWithMarkers(t *testing.T) {
 						"type":                            "elasticsearch",
 						"api_key":                         "secretKey",
 						"redactOtherKey":                  "secretOutputValue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 			},
@@ -352,7 +354,7 @@ func TestRedactWithMarkers(t *testing.T) {
 											"set": map[string]any{
 												"target":                        "header.Authorization",
 												"value":                         "SSWS this-should-be-redacted",
-												redactionMarkerPrefix + "value": true,
+												RedactionMarkerPrefix + "value": true,
 											},
 										},
 										map[string]any{
@@ -370,7 +372,7 @@ func TestRedactWithMarkers(t *testing.T) {
 										"string_value": "mock_stream_config_name",
 									},
 								},
-								redactionMarkerPrefix + "mock_stream_config": true,
+								RedactionMarkerPrefix + "mock_stream_config": true,
 							},
 						},
 					},
@@ -592,11 +594,11 @@ func TestZipLogs(t *testing.T) {
 			expectedItems: []zippedItem{
 				{"logs/", true},
 				{"logs/elastic-agent-unknow/", true},
+				{"logs/elastic-agent-unknow/components/", true},
 				{"logs/elastic-agent-unknow/events/", true},
 				{"logs/elastic-agent-unknow/events/elastic-agent-events-log.ndjson", false},
 				{"logs/elastic-agent-unknow/sub-dir/", true},
 				{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
-				{"logs/elastic-agent-unknow/components/", true},
 			},
 		},
 
@@ -606,9 +608,9 @@ func TestZipLogs(t *testing.T) {
 			expectedItems: []zippedItem{
 				{"logs/", true},
 				{"logs/elastic-agent-unknow/", true},
+				{"logs/elastic-agent-unknow/components/", true},
 				{"logs/elastic-agent-unknow/sub-dir/", true},
 				{"logs/elastic-agent-unknow/sub-dir/log.ndjson", false},
-				{"logs/elastic-agent-unknow/components/", true},
 			},
 		},
 	}
@@ -639,17 +641,8 @@ func TestZipLogsComponentsLogs(t *testing.T) {
 		{"logs/elastic-agent-unknow/components/httpjson/http-request-trace-test.ndjson", false},
 	}
 
-	buf := new(bytes.Buffer)
-	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, filepath.Join(paths.HomeFrom(topPath), "components"), true, io.Discard))
-	require.NoError(t, w.Close())
-
-	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
-	require.NoError(t, err)
-	var observed []zippedItem
-	for _, f := range r.File {
-		observed = append(observed, zippedItem{Name: f.Name, IsDir: f.FileInfo().IsDir()})
-	}
+	bundle := zipLogsBundle(t, topPath, true)
+	observed := zippedItems(bundle)
 
 	// The components walk and the versioned-home walk emit entries in a different order than a strict
 	// depth-first walk would, so compare without ordering.
@@ -700,28 +693,14 @@ func TestZipLogsConflictingNames(t *testing.T) {
 	currentDir := filepath.Base(paths.HomeFrom(topPath))
 	oldDir := "elastic-agent-oldversion"
 
-	mkfile := func(path, content string) {
-		t.Helper()
-		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
-		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
-	}
-
 	// Current versioned home: agent log and two components all share the same filename.
-	mkfile(filepath.Join(dataPath, currentDir, "logs", "httpjson", "trace.ndjson"), "current-agent\n")
-	mkfile(filepath.Join(dataPath, currentDir, "components", "logs", "httpjson", "trace.ndjson"), "current-httpjson\n")
-	mkfile(filepath.Join(dataPath, currentDir, "components", "logs", "filestream", "trace.ndjson"), "current-filestream\n")
+	writeFile(t, filepath.Join(dataPath, currentDir, "logs", "httpjson", "trace.ndjson"), "current-agent\n")
+	writeFile(t, filepath.Join(dataPath, currentDir, "components", "logs", "httpjson", "trace.ndjson"), "current-httpjson\n")
+	writeFile(t, filepath.Join(dataPath, currentDir, "components", "logs", "filestream", "trace.ndjson"), "current-filestream\n")
 
 	// Old versioned home: same filenames repeated.
-	mkfile(filepath.Join(dataPath, oldDir, "logs", "httpjson", "trace.ndjson"), "old-agent\n")
-	mkfile(filepath.Join(dataPath, oldDir, "components", "logs", "httpjson", "trace.ndjson"), "old-httpjson\n")
-
-	buf := new(bytes.Buffer)
-	w := zip.NewWriter(buf)
-	require.NoError(t, zipLogs(w, time.Now(), topPath, filepath.Join(paths.HomeFrom(topPath), "components"), true, io.Discard))
-	require.NoError(t, w.Close())
-
-	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
-	require.NoError(t, err)
+	writeFile(t, filepath.Join(dataPath, oldDir, "logs", "httpjson", "trace.ndjson"), "old-agent\n")
+	writeFile(t, filepath.Join(dataPath, oldDir, "components", "logs", "httpjson", "trace.ndjson"), "old-httpjson\n")
 
 	want := map[string]string{
 		"logs/" + currentDir + "/httpjson/trace.ndjson":              "current-agent\n",
@@ -731,31 +710,17 @@ func TestZipLogsConflictingNames(t *testing.T) {
 		"logs/" + oldDir + "/components/httpjson/trace.ndjson":       "old-httpjson\n",
 	}
 
-	counts := make(map[string]int)
-	contents := make(map[string]string)
-	for _, f := range r.File {
-		counts[f.Name]++
-		if _, ok := want[f.Name]; ok {
-			rc, err := f.Open()
-			require.NoError(t, err)
-			data, err := io.ReadAll(rc)
-			rc.Close()
-			require.NoError(t, err)
-			contents[f.Name] = string(data)
-		}
-	}
+	bundle := zipLogsBundle(t, topPath, true)
+	contents := zippedContents(t, bundle)
 
 	for name, wantContent := range want {
-		assert.Equal(t, 1, counts[name], "entry %q should appear exactly once", name)
-		assert.Equal(t, wantContent, contents[name], "entry %q has wrong content", name)
+		assert.Equal(t, []string{wantContent}, contents[name], "entry %q should appear exactly once, with its own content", name)
 	}
 }
 
 func TestZipLogsUnversionedHome(t *testing.T) {
-	originalVersionHome := paths.IsVersionHome()
-	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
 	// Container layout: the home path is unversioned and logs live directly under the top path.
-	paths.SetVersionHome(false)
+	pathstest.SetVersionHome(t, false)
 
 	topPath := t.TempDir()
 	require.NoError(t, os.MkdirAll(filepath.Join(topPath, "logs"), 0o700))
@@ -788,9 +753,7 @@ func TestZipLogsUnversionedHome(t *testing.T) {
 // the configured data/state path (topPath) differs from the install home where
 // components run — both trees must appear in the bundle (see https://github.com/elastic/elastic-agent/issues/15771).
 func TestZipLogsUnversionedHomeDivergentComponents(t *testing.T) {
-	originalVersionHome := paths.IsVersionHome()
-	t.Cleanup(func() { paths.SetVersionHome(originalVersionHome) })
-	paths.SetVersionHome(false)
+	pathstest.SetVersionHome(t, false)
 
 	root := t.TempDir()
 
@@ -879,20 +842,8 @@ func (alwaysErrWriter) Write([]byte) (int, error) { return 0, errors.New("write 
 func zipLogsAndAssertFiles(t *testing.T, topPath string, excludeEvents bool, expected []zippedItem) {
 	t.Helper()
 
-	// Zip the logs directory.
-	buf := new(bytes.Buffer)
-	w := zip.NewWriter(buf)
-	componentsPath := filepath.Join(paths.HomeFrom(topPath), "components")
-	require.NoError(t, zipLogs(w, time.Now(), topPath, componentsPath, excludeEvents, io.Discard))
-	require.NoError(t, w.Close())
-
-	// Read back the contents.
-	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
-	require.NoError(t, err)
-	var observed []zippedItem
-	for _, f := range r.File {
-		observed = append(observed, zippedItem{Name: f.Name, IsDir: f.FileInfo().IsDir()})
-	}
+	bundle := zipLogsBundle(t, topPath, excludeEvents)
+	observed := zippedItems(bundle)
 
 	assert.Equal(t, expected, observed)
 	if t.Failed() {
@@ -1104,14 +1055,14 @@ func TestAddRedactionMarkers(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":                            "elasticsearch",
 						"api_key":                         "apikeyvalue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":                           "example",
 						"secret":                         "secretvalue",
-						redactionMarkerPrefix + "secret": true,
+						RedactionMarkerPrefix + "secret": true,
 					},
 				},
 			},
@@ -1147,14 +1098,14 @@ func TestAddRedactionMarkers(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":                            "elasticsearch",
 						"api_key":                         "apikeyvalue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":                           "example",
 						"secret":                         "secretvalue",
-						redactionMarkerPrefix + "secret": true,
+						RedactionMarkerPrefix + "secret": true,
 					},
 				},
 			},
@@ -1191,14 +1142,14 @@ func TestAddRedactionMarkers(t *testing.T) {
 					"default": map[string]interface{}{
 						"type":                            "elasticsearch",
 						"api_key":                         "apikeyvalue",
-						redactionMarkerPrefix + "api_key": true,
+						RedactionMarkerPrefix + "api_key": true,
 					},
 				},
 				"inputs": []interface{}{
 					map[string]interface{}{
 						"type":                           "example",
 						"secret":                         "secretvalue",
-						redactionMarkerPrefix + "secret": true,
+						RedactionMarkerPrefix + "secret": true,
 					},
 				},
 			},
@@ -1479,6 +1430,188 @@ func TestRedactEnv(t *testing.T) {
 				require.Contains(t, redacted, k)
 				require.Equal(t, v, redacted[k])
 			}
+		})
+	}
+}
+
+// zipLogsBundle collects the logs part of a diagnostics bundle for the Agent installed in topPath.
+func zipLogsBundle(t *testing.T, topPath string, excludeEvents bool) *zip.Reader {
+	t.Helper()
+
+	buf := new(bytes.Buffer)
+	w := zip.NewWriter(buf)
+	componentsPath := filepath.Join(paths.HomeFrom(topPath), "components")
+	require.NoError(t, zipLogs(w, time.Now(), topPath, componentsPath, excludeEvents, io.Discard))
+	require.NoError(t, w.Close())
+
+	r, err := zip.NewReader(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	require.NoError(t, err)
+	return r
+}
+
+// zippedItems returns the names of the entries of the bundle in archive order, and whether each one is a directory.
+func zippedItems(r *zip.Reader) []zippedItem {
+	var items []zippedItem
+	for _, f := range r.File {
+		items = append(items, zippedItem{Name: f.Name, IsDir: f.FileInfo().IsDir()})
+	}
+	return items
+}
+
+// zippedContents returns the content of every entry of the bundle by name. A name that is in the bundle more
+// than once has one content for each time, in archive order, and a directory has an empty content.
+func zippedContents(t *testing.T, r *zip.Reader) map[string][]string {
+	t.Helper()
+
+	contents := make(map[string][]string)
+	for _, f := range r.File {
+		rc, err := f.Open()
+		require.NoError(t, err)
+		data, err := io.ReadAll(rc)
+		require.NoError(t, rc.Close())
+		require.NoError(t, err)
+		contents[f.Name] = append(contents[f.Name], string(data))
+	}
+	return contents
+}
+
+// requireParentEntriesFirst checks that the entry of every directory is before the entries inside it.
+func requireParentEntriesFirst(t *testing.T, items []zippedItem) {
+	t.Helper()
+
+	seen := make(map[string]struct{})
+	for _, item := range items {
+		if i := strings.LastIndex(strings.TrimSuffix(item.Name, "/"), "/"); i >= 0 {
+			assert.Contains(t, seen, item.Name[:i+1], "the entry of the directory of %q must come before it", item.Name)
+		}
+		seen[item.Name] = struct{}{}
+	}
+}
+
+// writeFile creates a file with the content, together with its parent directories.
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+}
+
+func TestZipLogsBuildLogs(t *testing.T) {
+	// the running build, its home directory name is the one of the builds without a commit
+	const current = "logs/elastic-agent-unknow/"
+	const failed = "logs/elastic-agent-9.9.9-abcdef/"
+	dir := []string{""}
+
+	// buildLogs returns the log directory of the build with the name
+	buildLogs := func(topPath, build string) string { return filepath.Join(paths.BuildLogsRoot(topPath), build) }
+
+	tests := []struct {
+		name          string
+		excludeEvents bool
+		// needsPermissions skips the scenario when a directory cannot be made unreadable
+		needsPermissions bool
+		// setup creates the logs of the Agent installed in topPath, which has the installation directory of the running build
+		setup func(t *testing.T, topPath string)
+		// want is the content of the entries of the bundle by name, see zippedContents
+		want map[string][]string
+	}{
+		{
+			name: "collects the logs of a build that only has a build log directory",
+			setup: func(t *testing.T, topPath string) {
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "elastic-agent-watcher-20260101.ndjson"), "watch failed\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "components", "logs", "httpjson", "trace.ndjson"), "trace\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "events", "elastic-agent-event-log-20260101.ndjson"), "event\n")
+			},
+			want: map[string][]string{
+				"logs/": dir, current: dir, current + "components/": dir,
+				failed: dir, failed + "components/": dir, failed + "components/httpjson/": dir, failed + "events/": dir,
+				failed + "elastic-agent-watcher-20260101.ndjson":          {"watch failed\n"},
+				failed + "components/httpjson/trace.ndjson":               {"trace\n"},
+				failed + "events/elastic-agent-event-log-20260101.ndjson": {"event\n"},
+			},
+		},
+		{
+			name:          "leaves the events out when they are excluded",
+			excludeEvents: true,
+			setup: func(t *testing.T, topPath string) {
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "elastic-agent-watcher-20260101.ndjson"), "watch failed\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "events", "elastic-agent-event-log-20260101.ndjson"), "event\n")
+			},
+			want: map[string][]string{
+				"logs/": dir, current: dir, current + "components/": dir,
+				failed: dir, failed + "components/": dir,
+				failed + "elastic-agent-watcher-20260101.ndjson": {"watch failed\n"},
+			},
+		},
+		{
+			name: "collects both locations of the logs of a build",
+			setup: func(t *testing.T, topPath string) {
+				writeFile(t, filepath.Join(paths.HomeFrom(topPath), "logs", "elastic-agent-1.ndjson"), "installation\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, paths.BuildLogsDirName()), "elastic-agent-2.ndjson"), "build\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, paths.BuildLogsDirName()), "components", "logs", "httpjson", "trace.ndjson"), "trace\n")
+			},
+			want: map[string][]string{
+				"logs/": dir, current: dir, current + "components/": dir, current + "components/httpjson/": dir,
+				current + "elastic-agent-1.ndjson":           {"installation\n"},
+				current + "elastic-agent-2.ndjson":           {"build\n"},
+				current + "components/httpjson/trace.ndjson": {"trace\n"},
+			},
+		},
+		{
+			name:  "collects the installation directory when there are no build logs",
+			setup: func(*testing.T, string) {},
+			want:  map[string][]string{"logs/": dir, current: dir, current + "components/": dir},
+		},
+		{
+			name: "ignores files directly in the logs root",
+			setup: func(t *testing.T, topPath string) {
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "elastic-agent-watcher-20260101.ndjson"), "watch failed\n")
+				writeFile(t, filepath.Join(paths.BuildLogsRoot(topPath), "notes.txt"), "not a build\n")
+			},
+			want: map[string][]string{
+				"logs/": dir, current: dir, current + "components/": dir,
+				failed: dir, failed + "components/": dir,
+				failed + "elastic-agent-watcher-20260101.ndjson": {"watch failed\n"},
+			},
+		},
+		{
+			name: "ignores directories in the logs root that are not builds",
+			setup: func(t *testing.T, topPath string) {
+				writeFile(t, filepath.Join(buildLogs(topPath, "9.9.9-abcdef"), "elastic-agent-watcher-20260101.ndjson"), "watch failed\n")
+				writeFile(t, filepath.Join(buildLogs(topPath, "custom"), "elastic-agent-1.ndjson"), "not a build\n")
+			},
+			want: map[string][]string{
+				"logs/": dir, current: dir, current + "components/": dir,
+				failed: dir, failed + "components/": dir,
+				failed + "elastic-agent-watcher-20260101.ndjson": {"watch failed\n"},
+			},
+		},
+		{
+			name:             "reports a logs root that cannot be read and collects the rest",
+			needsPermissions: true,
+			setup: func(t *testing.T, topPath string) {
+				root := paths.BuildLogsRoot(topPath)
+				require.NoError(t, os.MkdirAll(root, 0o700))
+				require.NoError(t, os.Chmod(root, 0o000))
+				t.Cleanup(func() { _ = os.Chmod(root, 0o700) })
+			},
+			want: map[string][]string{"logs/": dir, current: dir, current + "components/": dir},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.needsPermissions && (runtime.GOOS == "windows" || os.Geteuid() == 0) {
+				t.Skip("cannot make a directory unreadable")
+			}
+			topPath := t.TempDir()
+			require.NoError(t, os.MkdirAll(paths.HomeFrom(topPath), 0o700))
+			tc.setup(t, topPath)
+
+			bundle := zipLogsBundle(t, topPath, tc.excludeEvents)
+
+			assert.Equal(t, tc.want, zippedContents(t, bundle))
+			requireParentEntriesFirst(t, zippedItems(bundle))
 		})
 	}
 }

@@ -7,40 +7,28 @@ package info
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/elastic/go-sysinfo"
+	"github.com/elastic/go-sysinfo/types"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
-	"github.com/elastic/elastic-agent/internal/pkg/testutils"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
-	"github.com/elastic/elastic-agent/pkg/features"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
-func TestECSMetadata(t *testing.T) {
+func TestNewECSMetadataAgent(t *testing.T) {
 	agentInfo := new(AgentInfo)
 	agentInfo.agentID = "fake-agent-id"
 	agentInfo.logLevelPolicy = "trace"
 	agentInfo.unprivileged = true
 
-	l := testutils.NewErrorLogger(t)
-	metadata, err := agentInfo.ECSMetadata(l)
-	require.NoError(t, err)
-
-	if assert.NotNil(t, metadata.Elastic, "metadata.Elastic must not be nil") {
-		assert.NotNil(t, metadata.Elastic.Agent, "metadata.Elastic.Agent must not be nil")
-	}
-
-	sysInfo, err := sysinfo.Host()
-	require.NoError(t, err)
-
-	info := sysInfo.Info()
-	hostname := util.GetHostName(features.FQDN(), info, sysInfo, l)
+	metadata := NewECSMetadata(agentInfo, hostinfo.Info{})
+	require.NotNil(t, metadata.Elastic, "metadata.Elastic must not be nil")
+	require.NotNil(t, metadata.Elastic.Agent, "metadata.Elastic.Agent must not be nil")
 
 	assert.Equal(t, agentInfo.agentID, metadata.Elastic.Agent.ID)
 	assert.Equal(t, release.Version(), metadata.Elastic.Agent.Version)
@@ -51,26 +39,48 @@ func TestECSMetadata(t *testing.T) {
 	assert.Equal(t, agentInfo.logLevelPolicy, metadata.Elastic.Agent.LogLevel)
 	assert.Equal(t, agentInfo.unprivileged, metadata.Elastic.Agent.Unprivileged)
 	assert.Equal(t, release.FIPSDistribution(), metadata.Elastic.Agent.FIPS)
+}
 
-	assert.Equal(t, info.Architecture, metadata.Host.Arch)
-	assert.Equal(t, hostname, metadata.Host.Hostname)
-	assert.Equal(t, strings.ToLower(hostname), metadata.Host.Name) // host.name is always lower-case
-	assert.Equal(t, info.UniqueID, metadata.Host.ID)
-	assert.Equal(t, info.IPs, metadata.Host.IP)
-	assert.Equal(t, info.MACs, metadata.Host.MAC)
-
-	var expectedMemory uint64
-	if memInfo, memErr := sysInfo.Memory(); memErr == nil && memInfo != nil {
-		expectedMemory = memInfo.Total
+func TestNewECSMetadata(t *testing.T) {
+	agentInfo := new(AgentInfo)
+	agentInfo.agentID = "fake-agent-id"
+	host := hostinfo.Info{
+		Hostname:      "My-Host.Example.com",
+		ID:            "host-id",
+		Architecture:  "x86_64",
+		KernelVersion: "6.8.0",
+		IPs:           []string{"10.0.0.1"},
+		MACs:          []string{"00:00:00:00:00:01"},
+		OS: types.OSInfo{
+			Family:   "debian",
+			Platform: "ubuntu",
+			Name:     "Ubuntu",
+			Version:  "24.04",
+			Codename: "noble",
+		},
+		MemoryTotal: 1024,
 	}
-	assert.Equal(t, expectedMemory, metadata.Host.Memory)
 
-	assert.Equal(t, info.OS.Family, metadata.OS.Family)
-	assert.Equal(t, info.KernelVersion, metadata.OS.Kernel)
-	assert.Equal(t, info.OS.Platform, metadata.OS.Platform)
-	assert.Equal(t, info.OS.Version, metadata.OS.Version)
-	assert.Equal(t, info.OS.Name, metadata.OS.Name)
-	assert.Equal(t, getFullOSName(info), metadata.OS.FullName)
+	metadata := NewECSMetadata(agentInfo, host)
+
+	assert.Equal(t, "fake-agent-id", metadata.Elastic.Agent.ID)
+	assert.Equal(t, &ecsmeta.HostECSMeta{
+		Arch:     "x86_64",
+		Hostname: "My-Host.Example.com",
+		Name:     "my-host.example.com", // host.name is always lower-case
+		ID:       "host-id",
+		IP:       []string{"10.0.0.1"},
+		MAC:      []string{"00:00:00:00:00:01"},
+		Memory:   1024,
+	}, metadata.Host)
+	assert.Equal(t, &ecsmeta.SystemECSMeta{
+		Family:   "debian",
+		Kernel:   "6.8.0",
+		Platform: "ubuntu",
+		Version:  "24.04",
+		Name:     "Ubuntu",
+		FullName: "Ubuntu noble(24.04)",
+	}, metadata.OS)
 }
 
 func TestInstalledFlavor(t *testing.T) {

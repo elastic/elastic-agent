@@ -21,6 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,13 +43,7 @@ import (
 func TestDownloadArtifact(t *testing.T) {
 	fipsutils.SkipIfFIPSOnly(t, "test uses an OpenPGP key which results in a SHA-1 violation")
 
-	originalTop := paths.Top()
-	originalDownloads := paths.Downloads()
-	t.Cleanup(func() {
-		paths.SetTop(originalTop)
-		paths.SetDownloads(originalDownloads)
-	})
-	paths.SetTop(t.TempDir())
+	pathstest.SetTop(t, t.TempDir())
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// gzipArchive produces a valid gzip file so the disk space check can read
@@ -880,7 +876,7 @@ func TestDownloadArtifact(t *testing.T) {
 				targetVersion = tt.version
 			}
 
-			paths.SetDownloads(filepath.Join(t.TempDir(), "downloads"))
+			pathstest.SetDownloads(t, filepath.Join(t.TempDir(), "downloads"))
 
 			target, err := artifact.New("elastic-agent", "", false, targetVersion, "linux", "amd64")
 			require.NoError(t, err)

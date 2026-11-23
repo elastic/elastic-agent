@@ -607,7 +607,6 @@ func newTestESExporter(t *testing.T, exporterCfg map[string]any) (ESexporter exp
 
 	f := elasticsearchexporter.NewFactory()
 	cfg := f.CreateDefaultConfig().(*elasticsearchexporter.Config)
-	cfg.Mapping.Mode = "bodymap" //nolint:staticcheck // we need it for testing
 
 	esConf := confmap.NewFromStringMap(exporterCfg)
 
@@ -667,6 +666,7 @@ func getLogRecord(t *testing.T) plog.Logs {
 	logs := plog.NewLogs()
 	resourceLogs := logs.ResourceLogs().AppendEmpty()
 	scopeLogs := resourceLogs.ScopeLogs().AppendEmpty()
+	scopeLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
 	logRecords := scopeLogs.LogRecords()
 	logRecord := logRecords.AppendEmpty()
 	body := pcommon.NewValueMap()
