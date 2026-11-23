@@ -666,6 +666,7 @@ func getLogRecord(t *testing.T) plog.Logs {
 	logs := plog.NewLogs()
 	resourceLogs := logs.ResourceLogs().AppendEmpty()
 	scopeLogs := resourceLogs.ScopeLogs().AppendEmpty()
+	scopeLogs.Scope().Attributes().PutStr("elastic.mapping.mode", "bodymap")
 	logRecords := scopeLogs.LogRecords()
 	logRecord := logRecords.AppendEmpty()
 	body := pcommon.NewValueMap()
