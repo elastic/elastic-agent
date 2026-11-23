@@ -5,6 +5,7 @@
 package info
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,6 +38,23 @@ func TestNewECSMetadataAgent(t *testing.T) {
 	assert.Equal(t, agentInfo.logLevelPolicy, metadata.Elastic.Agent.LogLevel)
 	assert.Equal(t, agentInfo.unprivileged, metadata.Elastic.Agent.Unprivileged)
 	assert.Equal(t, release.FIPSDistribution(), metadata.Elastic.Agent.FIPS)
+}
+
+func TestNewECSMetadataHasNoLimits(t *testing.T) {
+	agentInfo := new(AgentInfo)
+	agentInfo.agentID = "fake-agent-id"
+
+	data, err := json.Marshal(NewECSMetadata(agentInfo, hostinfo.Info{}))
+	require.NoError(t, err)
+
+	var decoded struct {
+		Elastic struct {
+			Agent map[string]any `json:"agent"`
+		} `json:"elastic"`
+	}
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	assert.Equal(t, "fake-agent-id", decoded.Elastic.Agent["id"])
+	assert.NotContains(t, decoded.Elastic.Agent, "limits")
 }
 
 func TestNewECSMetadata(t *testing.T) {

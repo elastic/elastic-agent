@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -32,6 +33,7 @@ import (
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/storage/store"
@@ -43,6 +45,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
 	"github.com/elastic/elastic-agent/pkg/fleetapi"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
@@ -1336,4 +1339,278 @@ func TestAvailableRollbacks(t *testing.T) {
 			}
 		})
 	}
+}
+
+// checkinLocalMetadata runs one check-in for each state and returns the raw local_metadata of each request.
+func checkinLocalMetadata(t *testing.T, states ...coordinator.State) []json.RawMessage {
+	log, _ := logger.New("fleet_gateway", false)
+	mockRollbacksSrc := ttl.NewMockReadOnlySource(t)
+	mockRollbacksSrc.EXPECT().GetAll().Return(nil, nil, nil)
+
+	var got []json.RawMessage
+	testClient := newTestingClient()
+	testClient.Answer(func(_ context.Context, _ http.Header, body io.Reader) (*http.Response, error) {
+		var req map[string]json.RawMessage
+		if err := json.NewDecoder(body).Decode(&req); err != nil {
+			return nil, err
+		}
+		got = append(got, req["local_metadata"])
+		return wrapStrToResp(http.StatusOK, `{}`), nil
+	})
+
+	i := 0
+	fetcher := NewCheckinStateFetcher(func() coordinator.State { return states[i] })
+	gateway, err := newFleetGatewayWithScheduler(log, defaultGatewaySettings, new(testAgentInfo), testClient, scheduler.NewStepper(), noop.New(), newStateStore(t, log), fetcher, mockRollbacksSrc, testHostInfo)
+	require.NoError(t, err)
+
+	for i = range states {
+		_, _, err := gateway.execute(t.Context())
+		require.NoError(t, err)
+		<-testClient.received
+	}
+	require.Len(t, got, len(states))
+	return got
+}
+
+// cpuLimitKeys returns the decoded local_metadata.elastic.agent.limits.cpu object.
+func cpuLimitKeys(t *testing.T, localMetadata json.RawMessage) map[string]any {
+	var decoded struct {
+		Elastic struct {
+			Agent struct {
+				Limits struct {
+					CPU map[string]any `json:"cpu"`
+				} `json:"limits"`
+			} `json:"agent"`
+		} `json:"elastic"`
+	}
+	require.NoError(t, json.Unmarshal(localMetadata, &decoded))
+	return decoded.Elastic.Agent.Limits.CPU
+}
+
+func cpuLimitPercent(t *testing.T, percent int) limits.CPULimit {
+	var l limits.CPULimit
+	require.NoError(t, l.Unpack(int64(percent)))
+	return l
+}
+
+func TestCheckinSendsCPULimitMetadata(t *testing.T) {
+	testcases := []struct {
+		name     string
+		snapshot cpulimit.Snapshot
+		want     map[string]any
+	}{
+		{
+			name: "cap off",
+			snapshot: cpulimit.Snapshot{
+				State: cpulimit.StateDisabled,
+			},
+			want: map[string]any{
+				"state": "disabled", "configured_percent": 0.0, "target_cpus": 0.0,
+				"active_quota": "unknown", "active_quota_cpus": 0.0,
+				"effective_quota": "unknown", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+		{
+			name: "applied cap",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     2,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2},
+			},
+			want: map[string]any{
+				"state": "applied", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "set", "active_quota_cpus": 2.0,
+				"effective_quota": "set", "effective_quota_cpus": 2.0, "reason": "",
+			},
+		},
+		{
+			name: "cap of 100 is a normal cap",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     cpuLimitPercent(t, 100),
+				TargetCPUs:     4,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+			},
+			want: map[string]any{
+				"state": "applied", "configured_percent": 100.0, "target_cpus": 4.0,
+				"active_quota": "set", "active_quota_cpus": 4.0,
+				"effective_quota": "set", "effective_quota_cpus": 4.0, "reason": "",
+			},
+		},
+		{
+			name: "effective quota lower than the active quota",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     2,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 1.5},
+			},
+			want: map[string]any{
+				"state": "applied", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "set", "active_quota_cpus": 2.0,
+				"effective_quota": "set", "effective_quota_cpus": 1.5, "reason": "",
+			},
+		},
+		{
+			name: "effective quota none",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StatePending,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     2,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaNone},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaNone, CPUs: 3},
+			},
+			want: map[string]any{
+				"state": "pending", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "none", "active_quota_cpus": 0.0,
+				"effective_quota": "none", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+		{
+			name: "effective quota unknown",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     2,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaUnknown, CPUs: 3},
+			},
+			want: map[string]any{
+				"state": "applied", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "set", "active_quota_cpus": 2.0,
+				"effective_quota": "unknown", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+		{
+			name: "pending before the CPU count is read",
+			snapshot: cpulimit.Snapshot{
+				State:      cpulimit.StatePending,
+				Configured: cpuLimitPercent(t, 25),
+			},
+			want: map[string]any{
+				"state": "pending", "configured_percent": 25.0, "target_cpus": 0.0,
+				"active_quota": "unknown", "active_quota_cpus": 0.0,
+				"effective_quota": "unknown", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+		{
+			name: "unsupported",
+			snapshot: cpulimit.Snapshot{
+				State:       cpulimit.StateUnsupported,
+				Configured:  cpuLimitPercent(t, 50),
+				TargetCPUs:  2,
+				ActiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaNone},
+				Reason:      "not running under systemd",
+			},
+			want: map[string]any{
+				"state": "unsupported", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "none", "active_quota_cpus": 0.0,
+				"effective_quota": "unknown", "effective_quota_cpus": 0.0, "reason": "not running under systemd",
+			},
+		},
+		{
+			name: "degraded",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StateDegraded,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     2,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+				Err:            errors.New("failed to inspect the CPU quota"),
+			},
+			want: map[string]any{
+				"state": "degraded", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "set", "active_quota_cpus": 4.0,
+				"effective_quota": "set", "effective_quota_cpus": 4.0, "reason": "",
+			},
+		},
+		{
+			name: "quota CPUs are sent as 0 when no quota is set",
+			snapshot: cpulimit.Snapshot{
+				State:       cpulimit.StatePending,
+				Configured:  cpuLimitPercent(t, 50),
+				TargetCPUs:  2,
+				ActiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaNone, CPUs: 3},
+			},
+			want: map[string]any{
+				"state": "pending", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "none", "active_quota_cpus": 0.0,
+				"effective_quota": "unknown", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+		{
+			name: "quota CPUs are sent as 0 when the quota is unknown",
+			snapshot: cpulimit.Snapshot{
+				State:       cpulimit.StatePending,
+				Configured:  cpuLimitPercent(t, 50),
+				TargetCPUs:  2,
+				ActiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaUnknown, CPUs: 3},
+			},
+			want: map[string]any{
+				"state": "pending", "configured_percent": 50.0, "target_cpus": 2.0,
+				"active_quota": "unknown", "active_quota_cpus": 0.0,
+				"effective_quota": "unknown", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+		{
+			name: "non-finite values are sent as 0",
+			snapshot: cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     cpuLimitPercent(t, 50),
+				TargetCPUs:     math.Inf(1),
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: math.NaN()},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: math.Inf(1)},
+			},
+			want: map[string]any{
+				"state": "applied", "configured_percent": 50.0, "target_cpus": 0.0,
+				"active_quota": "set", "active_quota_cpus": 0.0,
+				"effective_quota": "set", "effective_quota_cpus": 0.0, "reason": "",
+			},
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := checkinLocalMetadata(t, coordinator.State{CPULimit: &tc.snapshot})
+
+			assert.Equal(t, tc.want, cpuLimitKeys(t, got[0]))
+		})
+	}
+}
+
+func TestCheckinCPULimitMetadataIgnoresError(t *testing.T) {
+	snapshot := cpulimit.Snapshot{
+		State:       cpulimit.StateDegraded,
+		Configured:  cpuLimitPercent(t, 50),
+		TargetCPUs:  2,
+		ActiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+		Err:         errors.New("first failure"),
+	}
+	later := snapshot
+	later.Err = errors.New("second failure")
+
+	changed := later
+	changed.State = cpulimit.StatePending
+
+	got := checkinLocalMetadata(t,
+		coordinator.State{CPULimit: &snapshot}, coordinator.State{CPULimit: &later}, coordinator.State{CPULimit: &changed})
+
+	assert.Equal(t, string(got[0]), string(got[1]))
+	assert.NotEqual(t, string(got[1]), string(got[2]), "a change in a sent field must change the metadata")
+}
+
+func TestCheckinWithoutCPULimitControllerSendsNoLimits(t *testing.T) {
+	got := checkinLocalMetadata(t, coordinator.State{})
+
+	var decoded struct {
+		Elastic struct {
+			Agent map[string]any `json:"agent"`
+		} `json:"elastic"`
+	}
+	require.NoError(t, json.Unmarshal(got[0], &decoded))
+	assert.Contains(t, decoded.Elastic.Agent, "log_level")
+	assert.NotContains(t, decoded.Elastic.Agent, "limits")
 }

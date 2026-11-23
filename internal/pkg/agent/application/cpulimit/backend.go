@@ -40,7 +40,8 @@ type Inspection struct {
 
 // UnsupportedError reports that enforcement is unavailable on this host by design.
 type UnsupportedError struct {
-	// Reason explains why, for example "not running under systemd".
+	// Reason explains why, for example "not running under systemd". It is sent to Fleet, so it must be a short fixed
+	// text with no host details (no unit names, paths or errno text) and no wrapped error text.
 	Reason string
 }
 
