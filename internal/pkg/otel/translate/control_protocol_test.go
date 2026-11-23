@@ -5,6 +5,7 @@
 package translate
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -154,4 +155,116 @@ func BenchmarkGetComponentStateManyMonitors(b *testing.B) {
 		require.NoError(b, err)
 		require.Len(b, result.State.Units, monitors)
 	}
+}
+
+// A unit's status comes only from what the receiver reports for it, never from
+// the receiver's top-level status, which aggregates all its monitors.
+func TestGetComponentStateControlProtocolUnitStatus(t *testing.T) {
+	unit := func(id string, streams ...map[string]any) component.Unit {
+		anyStreams := make([]any, 0, len(streams))
+		for _, stream := range streams {
+			anyStreams = append(anyStreams, stream)
+		}
+		return component.Unit{
+			ID:   id,
+			Type: client.UnitTypeInput,
+			Config: component.MustExpectedConfig(map[string]any{
+				"id":      id,
+				"type":    "synthetics/browser",
+				"streams": anyStreams,
+			}),
+		}
+	}
+	// A monitor from the Synthetics app, reported under its stream ID. Only its
+	// first stream is a monitor.
+	appBrowser := unit("synthetics/browser-app",
+		map[string]any{"id": "app-monitor", "type": "browser", "origin": "ui"},
+		map[string]any{"id": "app-monitor-network", "data_stream": map[string]any{"dataset": "browser.network"}},
+		map[string]any{"id": "app-monitor-screenshot", "data_stream": map[string]any{"dataset": "browser.screenshot"}},
+	)
+	// A monitor from the integration, reported under its unit ID.
+	legacyBrowser := unit("synthetics/browser-legacy",
+		map[string]any{"id": "legacy-monitor", "type": "browser"},
+		map[string]any{"id": "legacy-monitor-network", "data_stream": map[string]any{"dataset": "browser.network"}},
+		map[string]any{"id": "legacy-monitor-screenshot", "data_stream": map[string]any{"dataset": "browser.screenshot"}},
+	)
+	failing := unit("synthetics/browser-failing", map[string]any{"id": "failing-monitor", "type": "browser", "origin": "ui"})
+	// A monitor the receiver hasn't run yet.
+	pending := unit("synthetics/browser-pending", map[string]any{"id": "pending-monitor", "type": "browser", "origin": "ui"})
+
+	comp := controlProtocolComponent()
+	comp.Units = []component.Unit{appBrowser, legacyBrowser, failing, pending}
+
+	inputStatus := func(inputs pcommon.Map, id string, status componentstatus.Status, err string) {
+		input := inputs.PutEmptyMap(id)
+		input.PutStr("status", status.String())
+		input.PutStr("error", err)
+	}
+	receiverKey := fmt.Sprintf("receiver:heartbeatreceiver/%ssynthetics/tcp-default/single", OtelNamePrefix)
+	pipelineStatus := func(receiver *componentstatus.Event) *status.AggregateStatus {
+		return &status.AggregateStatus{
+			Event:              receiver,
+			ComponentStatusMap: map[string]*status.AggregateStatus{receiverKey: {Event: receiver}},
+		}
+	}
+	unitState := func(t *testing.T, state runtime.ComponentComponentState, u component.Unit) runtime.ComponentUnitState {
+		unitState, ok := state.State.Units[runtime.ComponentUnitKey{UnitID: u.ID, UnitType: client.UnitTypeInput}]
+		require.True(t, ok, "no state for unit %s", u.ID)
+		return unitState
+	}
+
+	t.Run("reported", func(t *testing.T) {
+		attrs := pcommon.NewMap()
+		inputs := attrs.PutEmptyMap("inputs")
+		inputStatus(inputs, "app-monitor", componentstatus.StatusOK, "")
+		inputStatus(inputs, "synthetics/browser-legacy", componentstatus.StatusOK, "")
+		inputStatus(inputs, "failing-monitor", componentstatus.StatusPermanentError, "browser crashed")
+		// The receiver's top-level status is the worst of its monitors.
+		receiver := componentstatus.NewEvent(componentstatus.StatusPermanentError,
+			componentstatus.WithError(errors.New("browser crashed")), componentstatus.WithAttributes(attrs))
+
+		result, err := getComponentState(pipelineStatus(receiver), comp)
+		require.NoError(t, err)
+
+		app := unitState(t, result, appBrowser)
+		assert.Equal(t, client.UnitStateHealthy, app.State)
+		assert.Equal(t, map[string]any{"streams": map[string]map[string]string{
+			"app-monitor": {"error": "", "status": client.UnitStateHealthy.String()},
+		}}, app.Payload, "only the monitor's own stream should have a status")
+
+		legacy := unitState(t, result, legacyBrowser)
+		assert.Equal(t, client.UnitStateHealthy, legacy.State)
+		assert.Equal(t, map[string]any{"streams": map[string]map[string]string{
+			"legacy-monitor": {"error": "", "status": client.UnitStateHealthy.String()},
+		}}, legacy.Payload, "a status reported under the unit ID should belong to the monitor's stream")
+
+		failed := unitState(t, result, failing)
+		assert.Equal(t, client.UnitStateFailed, failed.State)
+		assert.Contains(t, failed.Message, "browser crashed")
+
+		notRun := unitState(t, result, pending)
+		assert.Equal(t, client.UnitStateStarting, notRun.State, "a unit the receiver doesn't report on shouldn't get another monitor's status")
+		assert.Equal(t, controlProtocolUnitNotReportedMessage, notRun.Message)
+	})
+
+	t.Run("receiver failed without per-input statuses", func(t *testing.T) {
+		receiver := componentstatus.NewEvent(componentstatus.StatusPermanentError, componentstatus.WithError(errors.New("failed to start")))
+		result, err := getComponentState(pipelineStatus(receiver), comp)
+		require.NoError(t, err)
+		for _, u := range comp.Units {
+			state := unitState(t, result, u)
+			assert.Equal(t, client.UnitStateFailed, state.State, "the receiver's own error should apply to unit %s", u.ID)
+			assert.Contains(t, state.Message, "failed to start")
+		}
+	})
+
+	t.Run("receiver healthy without per-input statuses", func(t *testing.T) {
+		result, err := getComponentState(pipelineStatus(componentstatus.NewEvent(componentstatus.StatusOK)), comp)
+		require.NoError(t, err)
+		for _, u := range comp.Units {
+			state := unitState(t, result, u)
+			assert.Equal(t, client.UnitStateStarting, state.State, "unit %s hasn't been run by the receiver", u.ID)
+			assert.Equal(t, controlProtocolUnitNotReportedMessage, state.Message)
+		}
+	})
 }
