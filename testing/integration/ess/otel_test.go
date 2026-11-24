@@ -3146,12 +3146,14 @@ extensions:
 
 	// The policy doesn't list elasticsearchauth/state in service::extensions. The agent adds it
 	// when it makes it the authenticator of the storage extension, so it running confirms that.
-	status, err := fixture.ExecStatus(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, status.Collector, "expected collector status")
-	extensions := status.Collector.ComponentStatusMap["extensions"]
-	require.NotNil(t, extensions, "expected extension statuses in the collector status")
-	assert.Contains(t, extensions.ComponentStatusMap, "extension:elasticsearchauth/state")
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		status, err := fixture.ExecStatus(ctx)
+		require.NoError(ct, err)
+		require.NotNil(ct, status.Collector, "expected collector status")
+		extensions := status.Collector.ComponentStatusMap["extensions"]
+		require.NotNil(ct, extensions, "expected extension statuses in the collector status")
+		require.Contains(ct, extensions.ComponentStatusMap, "extension:elasticsearchauth/state")
+	}, 1*time.Minute, 1*time.Second, "expected elasticsearchauth/state to run in the collector")
 
 	// Wait for the CEL input's incremented cursor to be persisted in
 	// Elasticsearch through the elasticsearchauth authenticator.
