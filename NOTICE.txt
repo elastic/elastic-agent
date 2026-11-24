@@ -757,7 +757,7 @@ Contents of probable licence file $GOMODCACHE/github.com/dolmen-go/contextio@v1.
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/beats/v7
-Version: v7.0.0-alpha2.0.20261120163632-b4b0aa4e506a
+Version: v7.0.0-alpha2.0.20261123204423-67f7497b6db0
 Licence type (autodetected): Elastic
 --------------------------------------------------------------------------------
 
@@ -82645,11 +82645,11 @@ Contents of probable licence file $GOMODCACHE/github.com/elastic/lunes@v0.2.2/LI
 
 --------------------------------------------------------------------------------
 Dependency : github.com/elastic/mito
-Version: v1.28.2
+Version: v1.29.0
 Licence type (autodetected): Apache-2.0
 --------------------------------------------------------------------------------
 
-Contents of probable licence file $GOMODCACHE/github.com/elastic/mito@v1.28.2/LICENSE:
+Contents of probable licence file $GOMODCACHE/github.com/elastic/mito@v1.29.0/LICENSE:
 
 
                                  Apache License
