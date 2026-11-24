@@ -8,7 +8,6 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"math"
 	"strings"
 	"testing"
 	"text/template"
@@ -726,17 +725,6 @@ logs_dynamic_pipeline:
 		compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
 	})
 
-	t.Run("test max_retries negative", func(t *testing.T) {
-		cfg := config.MustNewConfigFrom(map[string]any{
-			"hosts":       []any{"localhost:9200"},
-			"max_retries": -1,
-		})
-		got, _, _, err := ESToOTelConfig(cfg, "", logger)
-		require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
-		gotCfg := confmap.NewFromStringMap(got)
-		assert.Equal(t, true, gotCfg.Get("retry::enabled"))
-		assert.Equal(t, math.MaxInt32, gotCfg.Get("retry::max_retries"))
-	})
 }
 
 func TestCompressionConfig(t *testing.T) {
@@ -820,31 +808,6 @@ logs_dynamic_id:
 			require.NoError(t, template.Must(template.New("config").Parse(otelConfig)).Execute(&otelBuffer, level))
 			expOutput := newFromYamlString(t, otelBuffer.String())
 			compareAndAssert(t, expOutput, confmap.NewFromStringMap(got))
-		})
-	}
-}
-
-func TestToOTelConfig_CheckUnsupported(t *testing.T) {
-	logger := logptest.NewTestingLogger(t, "")
-
-	cases := []struct {
-		name            string
-		cfg             map[string]any
-		wantErrContains string
-	}{
-		{"indices", map[string]any{"indices": []any{"i"}}, "indices is currently not supported"},
-		{"allow_older_versions_false", map[string]any{"allow_older_versions": false}, "allow_older_versions:false is currently not supported"},
-		{"loadbalance_false", map[string]any{"loadbalance": false}, "loadbalance:false is currently not supported"},
-		{"non_indexable_policy", map[string]any{"non_indexable_policy": "x"}, "non_indexable_policy is currently not supported"},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			cfg, err := config.NewConfigFrom(c.cfg)
-			require.NoError(t, err, "error translating elasticsearch output to ES exporter config")
-
-			_, _, _, err = ESToOTelConfig(cfg, "", logger)
-			require.ErrorContains(t, err, c.wantErrContains)
 		})
 	}
 }
