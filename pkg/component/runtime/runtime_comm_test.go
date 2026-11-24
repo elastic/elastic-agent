@@ -20,9 +20,7 @@ import (
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/core/authority"
-	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/core/logger/loggertest"
-	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 type agentInfoMock struct {
@@ -61,9 +59,6 @@ func (a agentInfoMock) SetLogLevelPolicy(level string)     { panic("implement me
 func (a agentInfoMock) GetTags() []string                  { panic("implement me") }
 func (a agentInfoMock) SetTags(tags []string)              { panic("implement me") }
 func (a agentInfoMock) SetLogLevelOverride(_ context.Context, _ string) error {
-	panic("implement me")
-}
-func (a agentInfoMock) ECSMetadata(l *logger.Logger) (*ecsmeta.ECSMeta, error) {
 	panic("implement me")
 }
 

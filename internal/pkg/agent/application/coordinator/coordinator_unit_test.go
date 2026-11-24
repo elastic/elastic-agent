@@ -26,6 +26,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
@@ -1495,11 +1497,7 @@ func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
 	// Send a test policy to the Coordinator as a Config Manager update,
 	// verify it creates a working directory for the component, keeps that working directory as the component
 	// moves to a different runtime, then deletes it after the component is stopped.
-	top := paths.Top()
-	paths.SetTop(t.TempDir())
-	t.Cleanup(func() {
-		paths.SetTop(top)
-	})
+	pathstest.SetTop(t, t.TempDir())
 
 	logger := logp.NewLogger("testing")
 
@@ -2311,14 +2309,12 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {
-	cfgPath := paths.Config()
-	defer paths.SetConfig(cfgPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tmpConfig := t.TempDir()
-	paths.SetConfig(tmpConfig)
+	pathstest.SetConfig(t, tmpConfig)
 	agentConfigFile := paths.ConfigFile()
 
 	var unenrollCalled bool
@@ -2471,14 +2467,12 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 }
 
 func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
-	cfgPath := paths.Config()
-	defer paths.SetConfig(cfgPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	tmpConfig := t.TempDir()
-	paths.SetConfig(tmpConfig)
+	pathstest.SetConfig(t, tmpConfig)
 	agentConfigFile := paths.ConfigFile()
 
 	var unenrollCalled bool

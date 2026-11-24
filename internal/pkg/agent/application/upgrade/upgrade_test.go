@@ -19,6 +19,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/gofrs/flock"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/assert"
@@ -1048,6 +1050,7 @@ type mockArtifactDownloader struct {
 	returnError       error
 	returnArchivePath string
 	fleetServerURI    string
+	fleetTransport    httpcommon.HTTPTransportSettings
 }
 
 func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target artifact.Artifact, sources []string, upgradeDetails *details.Details, skipVerifyOverride, skipDefaultPgp bool, pgpBytes ...string) (_ string, err error) {
@@ -1056,6 +1059,10 @@ func (m *mockArtifactDownloader) downloadArtifact(ctx context.Context, target ar
 
 func (m *mockArtifactDownloader) withFleetServerURI(fleetServerURI string) {
 	m.fleetServerURI = fleetServerURI
+}
+
+func (m *mockArtifactDownloader) withFleetTransport(fleetTransport httpcommon.HTTPTransportSettings) {
+	m.fleetTransport = fleetTransport
 }
 
 type mockUnpacker struct {
@@ -1442,7 +1449,7 @@ func TestUpgradeErrorHandling(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 			require.NoError(t, os.MkdirAll(paths.Data(), 0755))
 
 			mockAgentInfo := info.NewMockAgent(t)
@@ -1504,9 +1511,7 @@ func TestUpgradeSelfHealsCorruptLiveTTL(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 
 	// Use the package-local helper so the live install lands at the exact path
 	// paths.VersionedHome() will resolve to inside Upgrader.Upgrade — passing
@@ -1585,9 +1590,7 @@ func TestUpgrade_RestoresActiveCommitAfterPostSymlinkFailure(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// Write initial active.commit pointing to the current binary.
@@ -1671,9 +1674,7 @@ func TestUpgrade_CleansMarkerOnPreSymlinkFailure(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	// Write initial active.commit so the S3 disk-read path is exercised.
@@ -1731,9 +1732,7 @@ func TestUpgrade_MismatchedUnpackDestination(t *testing.T) {
 	log, _ := loggertest.New(t.Name())
 
 	baseDir := t.TempDir()
-	origTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(origTop) })
-	paths.SetTop(baseDir)
+	pathstest.SetTop(t, baseDir)
 	require.NoError(t, os.MkdirAll(paths.Data(), 0o755))
 
 	require.NoError(t, os.WriteFile(filepath.Join(baseDir, agentCommitFile), []byte(release.Commit()), 0o600))
@@ -1850,7 +1849,7 @@ func TestCopyActionStore(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
 			newHome := filepath.Join(baseDir, "new_home")
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 
 			actionStorePath := paths.AgentActionStoreFile()
 			actionStateStoreYamlPath := paths.AgentStateStoreYmlFile()
@@ -1935,7 +1934,7 @@ func TestCopyRunDirectory(t *testing.T) {
 	for name, testCase := range testCases {
 		t.Run(name, func(t *testing.T) {
 			baseDir := t.TempDir()
-			paths.SetTop(baseDir)
+			pathstest.SetTop(t, baseDir)
 
 			oldRunPath := filepath.Join(baseDir, "old_dir", "run")
 			oldRunFile := filepath.Join(oldRunPath, "file.txt")
@@ -1979,6 +1978,10 @@ func (m *mockSender) Send(ctx context.Context, method, path string, params url.V
 func (m *mockSender) URI() string {
 	return "mockURI"
 }
+
+func (m *mockSender) Transport() httpcommon.HTTPTransportSettings {
+	return httpcommon.HTTPTransportSettings{Timeout: time.Second}
+}
 func TestSetClient(t *testing.T) {
 	log, _ := loggertest.New("test")
 	upgrader := &Upgrader{
@@ -1988,6 +1991,7 @@ func TestSetClient(t *testing.T) {
 
 	upgrader.SetClient(&mockSender{})
 	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*mockArtifactDownloader).fleetServerURI)
+	require.Equal(t, httpcommon.HTTPTransportSettings{Timeout: time.Second}, upgrader.artifactDownloader.(*mockArtifactDownloader).fleetTransport)
 }
 
 func TestSetClientURISurvivesReload(t *testing.T) {
@@ -1997,7 +2001,9 @@ func TestSetClientURISurvivesReload(t *testing.T) {
 		artifactDownloader: &mockArtifactDownloader{},
 	}
 
-	upgrader.SetClient(&mockSender{})
+	sender := &mockSender{}
+	upgrader.SetClient(sender)
 	require.NoError(t, upgrader.Reload(config.MustNewConfigFrom("")))
-	require.Equal(t, "mockURI", upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
+	require.Equal(t, sender.URI(), upgrader.artifactDownloader.(*artifactDownloader).fleetServerURI)
+	require.Equal(t, sender.Transport(), upgrader.artifactDownloader.(*artifactDownloader).fleetTransport)
 }
