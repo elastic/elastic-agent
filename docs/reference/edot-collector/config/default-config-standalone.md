@@ -315,7 +315,12 @@ The `elasticapm` processor replaces the deprecated `elastictrace` processor. If 
 
 The Gateway exports the data it receives to {{es}}.
 
-{applies_to}`edot_collector: ga 9.6+` It uses one exporter per destination API:
+#### One exporter per destination API
+```{applies_to}
+edot_collector: ga 9.6+
+```
+
+The Gateway uses one exporter per destination API:
 
 - Traces and logs go through the [`elasticsearch`] exporter, which writes to the {{es}} [bulk API](https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-bulk).
 - Metrics, including the pre-aggregated APM metrics that the [`elasticapm` connector] produces, go through the [`OTLP/HTTP`](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) exporter, which writes to the [{{es}} OTLP/HTTP endpoint](docs-content://manage-data/ingest/otlp-endpoint.md) on the `/_otlp` path.
@@ -342,11 +347,21 @@ exporters:
 
 The `/_otlp` endpoint is a native {{es}} ingest API: it stores records as it receives them and doesn't run the [`elasticapm` processor] or the [`elasticapm` connector]. Neither does the bulk API. The Gateway runs both components in its own pipelines before the export, so traces are enriched and pre-aggregated APM metrics are produced regardless of which exporter carries the data.
 
-{applies_to}`edot_collector: ga 9.6+` {applies_to}`stack: ga 9.6+` The API key in `ELASTIC_API_KEY` also needs `create_doc` and `auto_configure` privileges on `exemplars-*`, where `/_otlp` stores the [metric exemplars](docs-content://manage-data/ingest/otlp-endpoint.md#metric-exemplars) that arrive with metric data points.
+{applies_to}`stack: ga 9.6+` The API key in `ELASTIC_API_KEY` also needs `create_doc` and `auto_configure` privileges on `exemplars-*`, where `/_otlp` stores the [metric exemplars](docs-content://manage-data/ingest/otlp-endpoint.md#metric-exemplars) that arrive with metric data points.
 
-{applies_to}`edot_collector: ga 9.2-9.5` The Gateway exports all signals in OTel-native format through the `elasticsearch/otel` exporter.
+#### OTel-native export
+```{applies_to}
+edot_collector: ga 9.2-9.5
+```
 
-{applies_to}`edot_collector: ga 9.0-9.1` The Gateway exports data in two formats: OTel-native format through the `elasticsearch/otel` exporter, and Elastic Common Schema (ECS) format for infrastructure metrics through the `elasticsearch/ecs` exporter.
+The Gateway exports all signals in OTel-native format through the `elasticsearch/otel` exporter.
+
+#### OTel-native and ECS export
+```{applies_to}
+edot_collector: ga 9.0-9.1
+```
+
+The Gateway exports data in two formats: OTel-native format through the `elasticsearch/otel` exporter, and {{product.ecs}} format for infrastructure metrics through the `elasticsearch/ecs` exporter.
 
 ### Pipeline configuration
 
@@ -357,7 +372,7 @@ The service section defines separate pipelines for different telemetry types:
 - Traces pipeline
 - Aggregated OTel metrics pipeline, which receives from the [`elasticapm` connector]
 
-{applies_to}`edot_collector: ga 9.0-9.1` The configuration for these versions splits metrics into separate pipelines for OTel metrics and for ECS-formatted infrastructure metrics.
+{applies_to}`edot_collector: ga 9.0-9.1` Metrics are split into separate pipelines for OTel metrics and for ECS-formatted infrastructure metrics.
 
 Each pipeline connects specific receivers, processors, and exporters to handle different data types appropriately.
 
