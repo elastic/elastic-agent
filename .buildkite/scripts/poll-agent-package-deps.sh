@@ -39,28 +39,26 @@ mapfile -t DEPS < <(
 
 echo "--- :mag: Checking dependency versions for elastic-agent-package (branch=${BRANCH}, workflow=${WORKFLOW})"
 
-# --- Step 1: Get the version elastic-agent-package last built with -----------
-
-AGENT_PKG_LATEST_URL="${ARTIFACT_HOST}/elastic-agent-package/latest/${BRANCH}.json"
-AGENT_PKG_LATEST=$(curl -sf --retry 3 --retry-delay 5 "${AGENT_PKG_LATEST_URL}" 2>/dev/null || true)
+# --- Step 1: Load last-triggered dep build IDs from poller state -------------
 
 declare -A LAST_DEP_BUILD_IDS
 
-if [[ -n "${AGENT_PKG_LATEST}" ]]; then
-  AGENT_PKG_MANIFEST_URL=$(echo "${AGENT_PKG_LATEST}" | jq -r '.manifest_url')
-  echo "Last elastic-agent-package manifest: ${AGENT_PKG_MANIFEST_URL}"
+# Read the poller state file from GCS — this records the dep build IDs used by
+# the last triggered build. The agent-package DRA manifest only contains the
+# elastic-agent-package project (not dep projects), so reading build IDs from
+# there always returns null and causes every dep to compare as changed.
+POLLER_STATE_GCS_PATH="${GCS_BUCKET}/elastic-agent-package/poller-state/${BRANCH}.json"
+POLLER_STATE=$(gsutil cat "gs://${POLLER_STATE_GCS_PATH}" 2>/dev/null || true)
 
-  # Read dependency build IDs embedded in the last agent-package manifest
-  AGENT_PKG_MANIFEST=$(curl -sf --retry 3 --retry-delay 5 "${AGENT_PKG_MANIFEST_URL}" 2>/dev/null || true)
-  if [[ -n "${AGENT_PKG_MANIFEST}" ]]; then
-    for dep in "${DEPS[@]}"; do
-      build_id=$(echo "${AGENT_PKG_MANIFEST}" | jq -r --arg dep "${dep}" \
-        '.projects[$dep].build_id // empty' 2>/dev/null || true)
-      LAST_DEP_BUILD_IDS["${dep}"]="${build_id:-}"
-    done
-  fi
+if [[ -n "${POLLER_STATE}" ]]; then
+  echo "Last poller state loaded from gs://${POLLER_STATE_GCS_PATH}"
+  for dep in "${DEPS[@]}"; do
+    build_id=$(echo "${POLLER_STATE}" | jq -r --arg dep "${dep}" \
+      '.dep_build_ids[$dep] // empty' 2>/dev/null || true)
+    LAST_DEP_BUILD_IDS["${dep}"]="${build_id:-}"
+  done
 else
-  echo "No existing elastic-agent-package latest pointer found on branch ${BRANCH} — cold start, will trigger unconditionally."
+  echo "No poller state found at gs://${POLLER_STATE_GCS_PATH} — cold start, will trigger unconditionally."
 fi
 
 # --- Step 2: Check each dependency for newer versions -----------------------
@@ -89,7 +87,7 @@ for dep in "${DEPS[@]}"; do
   fi
 done
 
-if [[ "${HAS_NEWER}" == "false" && -n "${AGENT_PKG_LATEST}" ]]; then
+if [[ "${HAS_NEWER}" == "false" && -n "${POLLER_STATE}" ]]; then
   echo "All dependencies are up to date — nothing to do."
   exit 0
 fi
@@ -176,3 +174,22 @@ curl -sf \
     }')"
 
 echo "Triggered elastic-agent-package build on branch ${AGENT_PKG_BRANCH}."
+
+# --- Step 7: Save poller state to GCS -----------------------------------------
+# Record the dep build IDs used for this trigger so the next poll tick can
+# accurately detect whether anything has changed, without reading the DRA
+# manifest (which only contains elastic-agent-package, not the dep projects).
+
+echo "--- :gcloud: Saving poller state to gs://${POLLER_STATE_GCS_PATH}"
+# Build dep_build_ids object from CURRENT_BUILD_IDS associative array
+DEP_IDS_JSON="{}"
+for dep in "${DEPS[@]}"; do
+  bid="${CURRENT_BUILD_IDS[${dep}]:-}"
+  DEP_IDS_JSON=$(echo "${DEP_IDS_JSON}" | jq --arg k "${dep}" --arg v "${bid}" '. + {($k): $v}')
+done
+jq -n --argjson ids "${DEP_IDS_JSON}" '{dep_build_ids: $ids}' \
+  | gcloud storage cp \
+      --content-type=application/json \
+      --cache-control="no-store, no-cache, max-age=0" \
+      - \
+      "gs://${POLLER_STATE_GCS_PATH}"
