@@ -51,14 +51,10 @@ exporters:
     api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
     # tls:
     #   insecure_skip_verify: true
-    mapping:
-      mode: otel
   elasticsearch/ecs:
     endpoints:
       - ${ELASTIC_ENDPOINT} # Will be populated from environment variable
     api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
-    mapping:
-      mode: ecs
 
 service:
   pipelines:
