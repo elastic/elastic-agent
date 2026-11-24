@@ -15,6 +15,7 @@ import (
 	"github.com/elastic/go-sysinfo/types"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
 	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
@@ -84,24 +85,21 @@ func TestNewECSMetadata(t *testing.T) {
 }
 
 func TestInstalledFlavor(t *testing.T) {
-	prevTop := paths.Top()
-	t.Cleanup(func() { paths.SetTop(prevTop) })
-
 	t.Run("flavor recorded at install time", func(t *testing.T) {
 		top := t.TempDir()
-		paths.SetTop(top)
+		pathstest.SetTop(t, top)
 		require.NoError(t, os.WriteFile(filepath.Join(top, paths.FlavorFileName), []byte("servers\n"), 0o600))
 		assert.Equal(t, "servers", installedFlavor())
 	})
 
 	t.Run("no flavor recorded defaults to basic", func(t *testing.T) {
-		paths.SetTop(t.TempDir())
+		pathstest.SetTop(t, t.TempDir())
 		assert.Equal(t, "basic", installedFlavor())
 	})
 
 	t.Run("empty flavor file defaults to basic", func(t *testing.T) {
 		top := t.TempDir()
-		paths.SetTop(top)
+		pathstest.SetTop(t, top)
 		require.NoError(t, os.WriteFile(filepath.Join(top, paths.FlavorFileName), []byte("\n"), 0o600))
 		assert.Equal(t, "basic", installedFlavor())
 	})

@@ -20,6 +20,7 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact/download"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
@@ -54,9 +55,6 @@ func TestNewAgentArtifactUsesBuildFlavor(t *testing.T) {
 func TestDownloadArtifactOnlyUsesOwnFlavor(t *testing.T) {
 	fipsutils.SkipIfFIPSOnly(t, "test uses an OpenPGP key which results in a SHA-1 violation")
 
-	originalDownloads := paths.Downloads()
-	t.Cleanup(func() { paths.SetDownloads(originalDownloads) })
-
 	version := agtversion.NewParsedSemVer(1, 2, 3, "", "")
 
 	type artifactFiles struct {
@@ -83,7 +81,7 @@ func TestDownloadArtifactOnlyUsesOwnFlavor(t *testing.T) {
 
 	newDownloader := func(t *testing.T) *artifactDownloader {
 		t.Helper()
-		paths.SetDownloads(filepath.Join(t.TempDir(), "downloads"))
+		pathstest.SetDownloads(t, filepath.Join(t.TempDir(), "downloads"))
 		settings := &artifact.Config{
 			TargetDirectory:        paths.Downloads(),
 			RetrySleepInitDuration: time.Millisecond,
