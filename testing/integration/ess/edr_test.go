@@ -75,7 +75,7 @@ func TestEDRInstallRejectsServersFlavor(t *testing.T) {
 // work and then upgrades the agent to a new EDR build. The upgrade must only ever use the EDR
 // artifact, and everything verified before the upgrade must still hold after it.
 //
-// It needs the EDR packages of the build under test, built with FLAVOR=edr (or FLAVOR=basic,edr),
+// It needs the EDR packages of the build under test, built with FLAVORS=edr (or FLAVORS=basic,edr),
 // to be available next to the standard ones.
 func TestEDRFlavorInstallAndUpgrade(t *testing.T) {
 	info := define.Require(t, define.Requirements{

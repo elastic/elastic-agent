@@ -1207,7 +1207,7 @@ type CrossBuildSettings struct {
 	// DockerVariants is the comma-separated list of Docker variants (from DOCKER_VARIANTS env var)
 	DockerVariants string
 
-	// Flavors is the comma-separated list of flavors to build (from FLAVOR env var).
+	// Flavors is the comma-separated list of flavors to build (from FLAVORS env var).
 	// Accepted values: "basic", "edr". Defaults to "basic" when unset.
 	Flavors string
 
@@ -1637,7 +1637,7 @@ func (s *Settings) loadCrossBuildSettingsFromEnv() {
 	if v := os.Getenv("DOCKER_VARIANTS"); v != "" {
 		s.CrossBuild.DockerVariants = v
 	}
-	if v := os.Getenv("FLAVOR"); v != "" {
+	if v := os.Getenv("FLAVORS"); v != "" {
 		s.CrossBuild.Flavors = v
 	}
 	if v := os.Getenv("DEV_OS"); v != "" {
@@ -2087,7 +2087,7 @@ func (s *Settings) GetDockerVariants() []DockerVariant {
 	return variants
 }
 
-// GetFlavors returns the flavors to build, parsed from the FLAVOR env var.
+// GetFlavors returns the flavors to build, parsed from the FLAVORS env var.
 // Defaults to ["basic"] when unset.
 func (s *Settings) GetFlavors() []string {
 	v := s.CrossBuild.Flavors

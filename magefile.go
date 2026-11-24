@@ -678,7 +678,7 @@ func (Test) Coverage() error {
 // commit the downloaded binary was built at). Mixing the two produces
 // packages whose metadata disagrees with their binary contents.
 //
-// SNAPSHOT, FIPS, VERSION_QUALIFIER, FLAVOR, DOCKER_VARIANTS, AGENT_DROP_PATH, and
+// SNAPSHOT, FIPS, VERSION_QUALIFIER, FLAVORS, DOCKER_VARIANTS, AGENT_DROP_PATH, and
 // KEEP_ARCHIVE apply as documented on their respective settings.
 func Package(ctx context.Context) error {
 	cfg := devtools.SettingsFromContext(ctx)
@@ -740,7 +740,7 @@ func Package(ctx context.Context) error {
 	selectedFlavors := cfg.GetFlavors()
 	for _, f := range selectedFlavors {
 		if f != devtools.FlavorBasic && f != devtools.FlavorEDR {
-			return fmt.Errorf("unsupported FLAVOR %q, accepted values are %q and %q", f, devtools.FlavorBasic, devtools.FlavorEDR)
+			return fmt.Errorf("unsupported flavor %q, accepted values are %q and %q", f, devtools.FlavorBasic, devtools.FlavorEDR)
 		}
 	}
 	buildBasic := slices.Contains(selectedFlavors, devtools.FlavorBasic)
