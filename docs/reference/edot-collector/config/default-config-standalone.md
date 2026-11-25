@@ -56,7 +56,13 @@ The following sections describe the default pipelines by use cases.
 
 ### Direct ingestion into Elasticsearch
 
-For self-managed and {{ech}} stack deployment use cases, ingest OpenTelemetry data from the {{agent}} directly into {{es}} using the [`elasticsearch`] exporter.
+For self-managed and {{ech}} stack deployment use cases, ingest OpenTelemetry data from the {{agent}} directly into {{es}}.
+
+{applies_to}`edot_collector: ga 9.6+` Metrics go to the [{{es}} OTLP/HTTP endpoint](docs-content://manage-data/ingest/otlp-endpoint.md) on the `/_otlp` path through the [`OTLP/HTTP`](https://github.com/open-telemetry/opentelemetry-collector/tree/main/exporter/otlphttpexporter) exporter. Logs and traces go through the [`elasticsearch`] exporter.
+
+{applies_to}`edot_collector: ga 9.6+` {applies_to}`stack: ga 9.6+` The API key in `ELASTIC_API_KEY` also needs `create_doc` and `auto_configure` privileges on `exemplars-*`, where `/_otlp` stores the [metric exemplars](docs-content://manage-data/ingest/otlp-endpoint.md#metric-exemplars) that arrive with metric data points.
+
+{applies_to}`edot_collector: ga 9.0-9.5` All signals go through the [`elasticsearch`] exporter.
 
 Learn more about the configuration options for the `elasticsearch` exporter in the [corresponding documentation](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/elasticsearchexporter/README.md#configuration-options).
 
@@ -83,9 +89,11 @@ Data is exported directly to {{es}} using the [`elasticsearch`] exporter in `OTe
 
 The application pipeline in the {{agent}} receives data from OTel SDKs through the [`OTLP`] receiver. While logs and metrics are exported verbatim into {{es}}, traces require two additional components.
 
-{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](../components/elasticapmconnector.md) generates pre-aggregated APM metrics from tracing data.
+{applies_to}`edot_collector: ga 9.6+` Application traces and logs are ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter. Application metrics, and the pre-aggregated {{product.apm}} metrics that the `elasticapm` connector produces, go to the `/_otlp` endpoint through the `OTLP/HTTP` exporter.
 
-Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
+{applies_to}`edot_collector: ga 9.2` The [`elasticapm` processor](../components/elasticapmprocessor.md) enriches trace data with additional attributes that improve the user experience in the {{product.observability}} UIs. In addition, the [`elasticapm` connector](../components/elasticapmconnector.md) generates pre-aggregated {{product.apm}} metrics from tracing data.
+
+{applies_to}`edot_collector: ga 9.0-9.5` Application-related OTel data is ingested into {{es}} in OTel-native format using the [`elasticsearch`] exporter.
 
 :::{note}
 Both the `elasticapm` processor and the `elasticapm` connector are required for Elastic APM UIs to work properly. As they aren't included in the OpenTelemetry [Collector Contrib repository](https://github.com/open-telemetry/opentelemetry-collector-contrib), you can:
@@ -101,9 +109,13 @@ If you're running {{agent}} 9.x with Elastic Stack 8.18 or 8.19, use the depreca
 
 The host metrics pipeline uses the [`hostmetrics`] receiver to collect `disk`, `filesystem`, `cpu`, `memory`, `process` and `network` metrics for the corresponding host.
 
-For backwards compatibility, host metrics are translated into ECS-compatible system metrics using the [`elasticinframetrics`] processor. Finally, metrics are ingested in `ecs` format through the [`elasticsearch`] exporter.
+The [`resourcedetection`] processor enriches the metrics with meta information about the corresponding host and operating system.
 
-The [`resourcedetection`] processor enriches the metrics with meta information about the corresponding host and operating system. The [`attributes`] and [`resource`] processor are used to set some fields for proper routing of the ECS-based system metrics data into corresponding {{es}} data streams.
+{applies_to}`edot_collector: ga 9.6+` Host metrics are ingested in OTel-native format through the `/_otlp` endpoint using the `OTLP/HTTP` exporter.
+
+{applies_to}`edot_collector: ga 9.2-9.5` Host metrics are ingested in OTel-native format using the [`elasticsearch`] exporter.
+
+{applies_to}`edot_collector: ga 9.0-9.1` For backwards compatibility, host metrics are translated into ECS-compatible system metrics using the [`elasticinframetrics`] processor and ingested in `ecs` format through the [`elasticsearch`] exporter. The [`attributes`] and [`resource`] processors set some fields for proper routing of the ECS-based system metrics data into corresponding {{es}} data streams.
 
 :::{note}
 :applies_to: edot_collector: ga 9.2
