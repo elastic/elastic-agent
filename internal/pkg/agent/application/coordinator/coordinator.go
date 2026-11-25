@@ -994,36 +994,43 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 			waitErr <- cmd.Wait()
 		}()
 
-		select {
-		case exitErr := <-waitErr:
-			// RunningInstalled only checks the install marker, so it is a coarse
-			// signal: it stays true for an uninstall that failed before removing
-			// anything and for a partial failure that left the marker behind. In
-			// all those cases the uninstall did not complete. The failure itself is
-			// communicated to Fleet by the detached uninstaller (it acks the action
-			// with the error before the point of no return) and its step-by-step
-			// logs are in the collectable uninstall.log; log the child's exit status
-			// here too so the agent's own logs record the abnormal exit.
+		// handleExit runs once the child has exited. RunningInstalled only checks
+		// the install marker, so it is a coarse signal: it stays true for an
+		// uninstall that failed before removing anything and for a partial failure
+		// that left the marker behind. In all those cases the uninstall did not
+		// complete; the failure is communicated to Fleet by the detached
+		// uninstaller (it acks the action with the error before the point of no
+		// return) and detailed in the collectable uninstall.log, and the child's
+		// exit status is logged here too. The in-flight guard is released only here
+		// (after the child has exited), never while it is still alive, so a
+		// redelivery cannot start a second, concurrent uninstaller that would race
+		// this one and send a conflicting acknowledgement.
+		handleExit := func(exitErr error, clearOverride bool) {
 			if paths.RunningInstalled() {
-				c.logger.Warnw("Uninstall process exited but the agent is still installed; the uninstall did not complete, clearing Stopping state",
+				c.logger.Warnw("Uninstall process exited but the agent is still installed; the uninstall did not complete",
 					"uninstall.process.pid", cmd.Process.Pid,
 					"uninstall.process.error", exitErr)
-				c.ClearOverrideState()
-				// The uninstall failed before the point of no return and the agent
-				// remains installed; clear the in-flight marker so a redelivery of
-				// the same action can spawn a new uninstaller.
-				clearInFlight()
+				if clearOverride {
+					c.ClearOverrideState()
+				}
 			}
+			clearInFlight()
+		}
+
+		select {
+		case exitErr := <-waitErr:
+			handleExit(exitErr, true)
 		case <-time.After(uninstallReapTimeout):
-			// The detached uninstaller has not finished and the agent is still
-			// running after the timeout. Stop waiting so the agent does not report
-			// Stopping forever and a redelivery can trigger a new attempt; the
-			// possibly stuck child is left for the OS to reap.
-			c.logger.Warnw("Uninstall process did not finish within the timeout; clearing Stopping state",
+			// The detached uninstaller is still running after the timeout. Stop
+			// reporting Stopping so the agent does not appear stuck forever, but
+			// keep the in-flight guard: the child is still alive and owns the
+			// action, so a redelivery must not start a second uninstaller. Keep
+			// waiting below to release the guard once the child actually exits.
+			c.logger.Warnw("Uninstall process still running after the timeout; clearing Stopping state but keeping the in-flight guard until it exits",
 				"uninstall.process.pid", cmd.Process.Pid,
 				"timeout", uninstallReapTimeout)
 			c.ClearOverrideState()
-			clearInFlight()
+			handleExit(<-waitErr, false)
 		}
 	}()
 

@@ -3487,7 +3487,7 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		assert.False(t, spawned, "a different concurrent uninstall must not spawn a second uninstaller")
 	})
 
-	t.Run("reaping goroutine stops waiting after the timeout and clears state", func(t *testing.T) {
+	t.Run("timeout keeps the in-flight guard until the child exits so redelivery cannot start a second uninstaller", func(t *testing.T) {
 		tmpTop := t.TempDir()
 		pathstest.SetTop(t, tmpTop)
 		require.NoError(t, os.WriteFile(
@@ -3497,32 +3497,51 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		// Shorten the reap timeout so the hanging child trips it quickly.
 		defer overrideUninstallReapTimeout(50 * time.Millisecond)()
 
-		// A child that neither exits nor removes the service; cancelled at the end
-		// of the subtest so it does not leak.
+		// A child that neither exits nor removes the service; cancelled later to
+		// simulate it finally exiting (and to avoid leaking it).
 		cmdCtx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+		// overrideUninstallCmd's callback runs synchronously inside Uninstall, so a
+		// plain counter is safe here.
+		spawns := 0
 		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawns++
 			return hangingUninstallCmd(cmdCtx)
 		})
 		defer restore()
 
 		coord := &Coordinator{
-			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			overrideStateChan: make(chan *coordinatorOverrideState, 4),
 			specs:             linuxSpecs,
 			logger:            logp.NewLogger("testing"),
 			canRestart:        func() bool { return true },
 		}
 		require.NoError(t, coord.Uninstall(ctx, action))
 
-		// The child never finishes, so only the timeout path can clear the
-		// in-flight marker; its clearing proves the reaping goroutine stopped
-		// waiting instead of blocking on the stuck process.
+		// After the reap timeout (50ms) the reaping goroutine stops reporting
+		// Stopping but must RETAIN the in-flight guard, because the child is still
+		// alive. Wait past the timeout and assert the guard is still held.
+		require.Never(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 300*time.Millisecond, 25*time.Millisecond,
+			"the in-flight guard must be retained while the child is still alive")
+
+		// A redelivery while the child is still alive must be dropped (returns nil)
+		// and must not start a second, concurrent uninstaller.
+		require.NoError(t, coord.Uninstall(ctx, action))
+		assert.Equal(t, 1, spawns, "a redelivery must not start a second uninstaller")
+
+		// Once the child exits, the reaping goroutine releases the guard so a
+		// future uninstall can run.
+		cancel()
 		require.Eventuallyf(t, func() bool {
 			coord.uninstallMu.Lock()
 			defer coord.uninstallMu.Unlock()
 			return !coord.uninstalling
 		}, 10*time.Second, 10*time.Millisecond,
-			"reaping goroutine did not clear the in-flight flag after the timeout")
+			"the in-flight guard must be released after the child exits")
 	})
 
 }
