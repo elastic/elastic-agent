@@ -103,19 +103,18 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	// Set SASL and/or Kerberos authentication
 	auth := map[string]any{}
 	if strings.ToUpper(kConfig.Sasl.SaslMechanism) == "OAUTHBEARER" {
-
 		authCfg, err := config.Child("auth", -1)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
+			return nil, nil, nil, fmt.Errorf("auth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
 
 		fields := authCfg.GetFields()
 		if len(fields) == 0 {
-			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER")
+			return nil, nil, nil, fmt.Errorf("auth config is required when sasl.mechanism is OAUTHBEARER")
 		}
 
 		if len(fields) != 1 {
-			return nil, nil, nil, fmt.Errorf("auth must specify a single oauth type, got %v", fields)
+			return nil, nil, nil, fmt.Errorf("auth must specify a single authentication type, got %v", fields)
 		}
 
 		var tokenSourceID otelcomponent.ID
