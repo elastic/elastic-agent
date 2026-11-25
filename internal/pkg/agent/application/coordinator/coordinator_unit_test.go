@@ -3584,7 +3584,7 @@ func overrideUninstallReapTimeout(d time.Duration) func() {
 // sleeping helper below (cross-platform) and is killed when ctx is cancelled so
 // it does not leak past the test.
 func hangingUninstallCmd(ctx context.Context) *exec.Cmd {
-	// #nosec G204 -- test-only; re-invokes the test binary into a sleeping helper.
+	// #nosec G204 G702 -- test-only; arguments are constant and reference the test binary.
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run", "^TestUninstallSleepHelper$")
 	cmd.Env = append(os.Environ(), "GO_UNINSTALL_SLEEP_HELPER=1")
 	return cmd
