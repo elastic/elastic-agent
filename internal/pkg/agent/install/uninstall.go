@@ -140,6 +140,18 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 				log = origLog
 			}
 			defer closeUninstallLog()
+			// The failing steps (stop service, kill watcher, remove
+			// components/service) return the error and print it to the progress
+			// output rather than logging it through log, and the detached process
+			// has no stdout/stderr sink. Log the final error through the teed logger
+			// so uninstall.log records why a remote uninstall failed. This defer
+			// runs before closeUninstallLog (defers are LIFO), so it writes while
+			// the file is still open.
+			defer func() {
+				if err != nil {
+					log.Errorf("uninstall failed: %v", err)
+				}
+			}()
 			log.Infof("writing uninstall logs to %s", filepath.Join(paths.BuildLogs(), uninstallLogName))
 		}
 	}

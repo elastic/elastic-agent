@@ -44,6 +44,9 @@ func TestEnableUninstallFileLog(t *testing.T) {
 	require.NotNil(t, teed)
 
 	teed.Info("streamed-uninstall-line")
+	// The reason a uninstall fails is logged at error level (see Uninstall's
+	// deferred error log); make sure that level reaches the file too.
+	teed.Errorf("uninstall failed: %v", errors.New("boom"))
 	// The file must be readable (closed) before the install tree is removed, and
 	// closing must be idempotent (called explicitly and via defer).
 	closeLog()
@@ -54,6 +57,8 @@ func TestEnableUninstallFileLog(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "streamed-uninstall-line",
 		"the uninstaller log line must be streamed to the collectable log file")
+	assert.Contains(t, string(data), "uninstall failed: boom",
+		"the uninstall failure reason must be streamed to the collectable log file")
 }
 
 func Test_checkForUnprivilegedVault(t *testing.T) {
