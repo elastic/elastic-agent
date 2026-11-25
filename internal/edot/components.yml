@@ -36,6 +36,7 @@ core_components:
   - kubeletstatsreceiver
   - otlpreceiver
   - prometheusscrapereceiver
+  - prometheusremotewritev1receiver
 
 # Exporters
   - elasticsearchexporter
