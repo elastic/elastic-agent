@@ -938,6 +938,14 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 		"--path.config", configPath,
 		"--config", configFile,
 	}
+	// Forward the installation namespace so the detached uninstaller targets this
+	// agent's service and paths when it was installed into a non-default namespace
+	// (--develop or --namespace). --path.home lets the child auto-detect the
+	// namespace from the install directory name, but forwarding it explicitly
+	// keeps the uninstaller from ever falling back to the primary agent's service.
+	if ns := paths.InstallNamespace(); ns != "" {
+		args = append(args, "--namespace", ns)
+	}
 	if actionID != "" {
 		args = append(args, "--"+UninstallFleetAckActionIDFlag, actionID)
 	}

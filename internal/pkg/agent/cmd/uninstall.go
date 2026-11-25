@@ -46,11 +46,25 @@ Unless -f is used this command will ask confirmation before performing removal.
 	cmd.Flags().String(coordinator.UninstallFleetAckActionIDFlag, "", "Fleet UNINSTALL action ID to acknowledge after uninstalling")
 	_ = cmd.Flags().MarkHidden(coordinator.UninstallFleetAckActionIDFlag)
 
+	// Hidden: forwarded by the agent when a Fleet UNINSTALL action targets an
+	// agent installed into a non-default namespace (--develop or --namespace), so
+	// the detached uninstaller removes that agent's service and paths rather than
+	// the primary agent's.
+	cmd.Flags().String(flagInstallNamespace, "", "Uninstall the Elastic Agent installed in this namespace")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace)
+
 	return cmd
 }
 
 func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	var err error
+
+	// Resolve the namespace before touching any namespace-dependent path (service
+	// name, display name, Top()) so we operate on the intended installation when
+	// it lives in a non-default namespace.
+	if namespace, _ := cmd.Flags().GetString(flagInstallNamespace); namespace != "" {
+		paths.SetInstallNamespace(namespace)
+	}
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {

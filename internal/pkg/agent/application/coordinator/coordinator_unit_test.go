@@ -3337,6 +3337,8 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		assert.Contains(t, gotArgs, "--path.home")
 		assert.Contains(t, gotArgs, "--path.config")
 		assert.Contains(t, gotArgs, "--config")
+		// In the default namespace nothing extra is forwarded.
+		assert.NotContains(t, gotArgs, "--namespace")
 		for i, a := range gotArgs {
 			switch a {
 			case "--path.home", "--path.config", "--config":
@@ -3360,6 +3362,53 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		// read of the global paths finishes before this subtest returns and the
 		// pathstest cleanup (and the next subtest) restores the global paths —
 		// avoiding a data race.
+		require.Eventuallyf(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 10*time.Second, 10*time.Millisecond,
+			"reaping goroutine did not clear the in-flight flag")
+	})
+
+	t.Run("forwards the installation namespace to the detached uninstaller", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+		// The agent is installed into a non-default namespace; the detached
+		// uninstaller must target that agent's service and paths, not the primary
+		// agent's, so the namespace is forwarded explicitly.
+		pathstest.SetInstallNamespace(t, paths.DevelopmentNamespace)
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		var gotArgs []string
+		restore := overrideUninstallCmd(func(_ string, args ...string) *exec.Cmd {
+			gotArgs = args
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		require.NoError(t, coord.Uninstall(ctx, action))
+
+		var nsValue string
+		for i, a := range gotArgs {
+			if a == "--namespace" {
+				require.Less(t, i+1, len(gotArgs), "--namespace must have a value")
+				nsValue = gotArgs[i+1]
+			}
+		}
+		assert.Equal(t, paths.DevelopmentNamespace, nsValue,
+			"the installation namespace must be forwarded to the detached uninstaller")
+
+		// Let the reaping goroutine finish reading the global paths before cleanup
+		// restores them (avoids a data race); see the spawn subtest above.
 		require.Eventuallyf(t, func() bool {
 			coord.uninstallMu.Lock()
 			defer coord.uninstallMu.Unlock()
