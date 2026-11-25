@@ -5,6 +5,8 @@
 package common
 
 import (
+	"context"
+
 	"github.com/magefile/mage/mg"
 
 	devtools "github.com/elastic/elastic-agent/dev-tools/mage"
@@ -15,7 +17,7 @@ func Fmt() {
 	mg.Deps(devtools.Format)
 }
 
-// AddLicenseHeaders adds license headers
-func AddLicenseHeaders() {
-	mg.Deps(devtools.AddLicenseHeaders)
+// AddLicenseHeaders adds license headers.
+func AddLicenseHeaders(ctx context.Context) error {
+	return devtools.AddLicenseHeaders(devtools.SettingsFromContext(ctx))
 }

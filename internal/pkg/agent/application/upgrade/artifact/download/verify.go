@@ -23,7 +23,7 @@ import (
 
 	"golang.org/x/crypto/openpgp" //nolint:staticcheck // crypto/openpgp is only receiving security updates.
 
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/artifact"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -121,14 +121,14 @@ func AppendFallbackPGP(log *logger.Logger, fleetServerURI string, targetVersion 
 func VerifySHA512Hash(filename string) error {
 	hasher := sha512.New()
 	checksumFileName := AddHashExtension(filename)
-	return VerifyChecksum(hasher, filename, checksumFileName)
+	return VerifyChecksum(hasher, filename, checksumFileName, filepath.Base(filename))
 }
 
 // VerifyChecksum checks that the hash contained in checksumFileName correspond to the hash calculated for filename using
 // hasher.Sum()
-func VerifyChecksum(hasher hash.Hash, filename, checksumFileName string) error {
+func VerifyChecksum(hasher hash.Hash, filename, checksumFileName, checksumEntry string) error {
 	// Read expected checksum.
-	expectedHash, err := readChecksumFile(checksumFileName, filepath.Base(filename))
+	expectedHash, err := readChecksumFile(checksumFileName, checksumEntry)
 	if err != nil {
 		return fmt.Errorf("could not read checksum file: %w", err)
 	}
@@ -241,7 +241,7 @@ func VerifyPGPSignature(file string, asciiArmorSignature, publicKey []byte) erro
 	return nil
 }
 
-func FetchPGPKeys(log *logger.Logger, config *artifact.Config, defaultPGPKey []byte, skipDefaultPGP bool, pgpSources []string) ([][]byte, error) {
+func FetchPGPKeys(log *logger.Logger, config *artifact.Config, defaultPGPKey []byte, skipDefaultPGP bool, fleetServerURI string, fleetTransport httpcommon.HTTPTransportSettings, pgpSources []string) ([][]byte, error) {
 	var pgpKeys [][]byte
 	if len(defaultPGPKey) > 0 && !skipDefaultPGP {
 		pgpKeys = append(pgpKeys, defaultPGPKey)
@@ -266,7 +266,24 @@ func FetchPGPKeys(log *logger.Logger, config *artifact.Config, defaultPGPKey []b
 			continue
 		}
 
-		raw, err := PgpBytesFromSource(log, check, client)
+		c := client
+		if fleetServerURI != "" && strings.HasPrefix(check, PgpSourceURIPrefix+fleetServerURI) {
+			log.Debugf("Fetching PGP key from Fleet Server at %s", strings.TrimPrefix(check, PgpSourceURIPrefix))
+			c, err = fleetTransport.Client(
+				httpcommon.WithAPMHTTPInstrumentation(),
+				httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+					return WithHeaders(rt, Headers)
+				}),
+				httpcommon.WithModRoundtripper(func(rt http.RoundTripper) http.RoundTripper {
+					return WithBackoff(rt, log)
+				}),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create HTTP client for fetching PGP key from Fleet Server: %w", err)
+			}
+		}
+
+		raw, err := PgpBytesFromSource(log, check, c)
 		if err != nil {
 			return nil, err
 		}
@@ -389,8 +406,8 @@ func FetchPGPSignature(ctx context.Context, log *logger.Logger, config *artifact
 	return io.ReadAll(resp.Body)
 }
 
-func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, defaultPGP []byte, src, dst string, skipDefaultPgp bool, pgpBytes ...string) error {
-	if err := VerifySHA512Hash(dst); err != nil {
+func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, defaultPGP []byte, name, src, dst string, skipDefaultPgp bool, fleetServerURI string, fleetTransport httpcommon.HTTPTransportSettings, pgpBytes ...string) error {
+	if err := VerifyChecksum(sha512.New(), dst, AddHashExtension(name), filepath.Base(name)); err != nil {
 		return fmt.Errorf("failed to verify checksum: %w", err)
 	}
 
@@ -399,12 +416,12 @@ func Verify(ctx context.Context, log *logger.Logger, config *artifact.Config, de
 		return fmt.Errorf("could not get .asc file: %w", err)
 	}
 
-	keys, err := FetchPGPKeys(log, config, defaultPGP, skipDefaultPgp, pgpBytes)
+	keys, err := FetchPGPKeys(log, config, defaultPGP, skipDefaultPgp, fleetServerURI, fleetTransport, pgpBytes)
 	if err != nil {
 		return fmt.Errorf("could not get pgp keys: %w", err)
 	}
 	if len(keys) == 0 {
-		return fmt.Errorf("no PGP keys available to verify %q", dst)
+		return fmt.Errorf("no PGP keys available to verify %q", name)
 	}
 
 	if err := VerifyPGPSignatureWithKeys(log, dst, signature, keys); err != nil {

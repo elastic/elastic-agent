@@ -26,15 +26,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/logp"
-	monitoringLib "github.com/elastic/elastic-agent-libs/monitoring"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/logp"
+	monitoringLib "github.com/elastic/beats/v7/pkg/monitoring"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/enroll"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -167,7 +167,7 @@ all the above actions will be skipped, because the Elastic Agent has already bee
 occurs on every start of the container set FLEET_FORCE to 1.
 `,
 		Run: func(c *cobra.Command, args []string) {
-			if err := logContainerCmd(streams); err != nil {
+			if err := logContainerCmd(streams); err != nil && !errors.Is(err, context.Canceled) {
 				logError(streams, err)
 				os.Exit(1)
 			}
@@ -930,7 +930,67 @@ func containerCfgOverrides(cfg *config.Config) error {
 		}
 	}
 
+	hasServerTLS, err := cfg.Agent.Has("fleet.server.ssl", -1, ucfg.PathSep("."))
+	if err != nil {
+		return fmt.Errorf("failed to check Fleet Server TLS config for container override: %w", err)
+	}
+	if envBool("FLEET_SERVER_ENABLE") && hasServerTLS {
+		for cfgKey, envKey := range map[string]string{ //nolint:gosec // G101: env var names
+			"fleet.server.ssl.certificate":           "FLEET_SERVER_CERT",
+			"fleet.server.ssl.key":                   "FLEET_SERVER_CERT_KEY",
+			"fleet.server.ssl.key_passphrase_path":   "FLEET_SERVER_CERT_KEY_PASSPHRASE",
+			"fleet.server.ssl.client_authentication": "FLEET_SERVER_CLIENT_AUTH",
+		} {
+			if val, ok := os.LookupEnv(envKey); ok {
+				uCfg[cfgKey] = val
+			}
+		}
+
+		if caEnv, ok := os.LookupEnv("FLEET_CA"); ok {
+			if caChild, err := ucfg.NewFrom(cli.StringToSlice(caEnv)); err != nil {
+				return fmt.Errorf("failed to create Fleet Server CA config for container override: %w", err)
+			} else if err := cfg.Agent.SetChild("fleet.server.ssl.certificate_authorities", -1, caChild, ucfg.PathSep(".")); err != nil {
+				return fmt.Errorf("failed to write Fleet Server CA config for container override: %w", err)
+			}
+		}
+	}
+
+	if err := containerBrowserCAOverrides(cfg, uCfg); err != nil {
+		return err
+	}
+
 	return cfg.Merge(uCfg)
+}
+
+// containerBrowserCAOverrides sets the CAs browser monitors trust to the paths in
+// ELASTIC_AGENT_BROWSER_CA, files or directories, when it is defined, as FLEET_CA does
+// for Fleet. ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL sets how often they are checked
+// for changes; 0 disables it.
+func containerBrowserCAOverrides(cfg *config.Config, uCfg map[string]any) error {
+	// Override even with an empty value. ucfg Merge won't allow an empty array to
+	// overwrite, so we have to edit cfg instead of uCfg here.
+	if caEnv, ok := os.LookupEnv("ELASTIC_AGENT_BROWSER_CA"); ok {
+		if caChild, err := ucfg.NewFrom(cli.StringToSlice(caEnv)); err != nil {
+			return fmt.Errorf("failed to create browser CA config for container override: %w", err)
+		} else if err := cfg.Agent.SetChild("agent.synthetics.browser.certificate_authorities", -1, caChild, ucfg.PathSep(".")); err != nil {
+			return fmt.Errorf("failed to write browser CA config for container override: %w", err)
+		}
+	}
+
+	const reloadEnv = "ELASTIC_AGENT_BROWSER_CA_RELOAD_INTERVAL"
+	if v, ok := os.LookupEnv(reloadEnv); ok {
+		interval, err := time.ParseDuration(v)
+		switch {
+		case err != nil || interval < 0:
+			logp.Warn("cannot parse %s='%s' as a duration, using the default", reloadEnv, v)
+		case interval == 0:
+			uCfg["agent.synthetics.browser.certificate_reload.enabled"] = false
+		default:
+			uCfg["agent.synthetics.browser.certificate_reload.enabled"] = true
+			uCfg["agent.synthetics.browser.certificate_reload.reload_interval"] = interval.String()
+		}
+	}
+	return nil
 }
 
 func setPaths(statePath, configPath, logsPath, socketPath string, writePaths bool) error {
@@ -986,7 +1046,7 @@ func setPaths(statePath, configPath, logsPath, socketPath string, writePaths boo
 	}
 
 	// ensure that the internal logger directory exists
-	loggerPath := filepath.Join(paths.Home(), logger.DefaultLogDirectory)
+	loggerPath := paths.BuildLogs()
 	if err := os.MkdirAll(loggerPath, logsPathPerms); err != nil {
 		return fmt.Errorf("preparing internal log path(%s) failed: %w", loggerPath, err)
 	}
@@ -1425,18 +1485,25 @@ func ackFleet(ctx context.Context, client fleetclient.Sender, agentID string) er
 	ackRequest := &fleetapi.AckRequest{Events: nil}
 	ackCMD := fleetapi.NewAckCmd(&agentInfo{agentID}, client)
 	retries := 0
-	return backoff.Retry(func() error {
+	_, err := backoff.Retry(ctx, func() (struct{}, error) {
 		retries++
-		_, err := ackCMD.Execute(ctx, ackRequest)
+		_, execErr := ackCMD.Execute(ctx, ackRequest)
 		switch {
-		case err == nil:
-			return nil
-		case errors.Is(err, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
-			return backoff.Permanent(err)
+		case execErr == nil:
+			return struct{}{}, nil
+		case errors.Is(execErr, fleetclient.ErrInvalidAPIKey) || retries == maxRetries:
+			return struct{}{}, backoff.Permanent(execErr)
 		default:
-			return err
+			return struct{}{}, execErr
 		}
-	}, &backoff.ConstantBackOff{Interval: retryInterval})
+	}, backoff.WithBackOff(&backoff.ConstantBackOff{Interval: retryInterval}))
+	if err != nil {
+		if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+			return re.LastErr
+		}
+		return err
+	}
+	return nil
 }
 
 // kibanaFetchFleetServerPolicy is used to gather the fleet-server policy specified by ID from Kibana

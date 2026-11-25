@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/elastic/beats/v7/libbeat/otel/otelmap"
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/connector"
@@ -110,7 +110,7 @@ func (c *monitoringConnector) appendMonitoringEvent(scopeLogs plog.ScopeLogs, rm
 	}
 
 	if compID, ok := scopeAttrs.Get(internaltelemetry.ComponentIDAttr); ok {
-		template[monitoringFieldComponentID] = compID.Str()
+		_, _ = template.Put(monitoringFieldComponentID, compID.Str())
 	}
 
 	eventType := eventTypeVal.Str()

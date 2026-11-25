@@ -16,6 +16,7 @@ const (
 	wolfi              = "wolfi"
 	complete           = "complete"
 	completeWolfi      = "complete-wolfi"
+	ironbank           = "ironbank"
 	cloud              = "cloud"
 	service            = "service"
 	edotCollector      = "elastic-otel-collector"
@@ -35,6 +36,7 @@ const (
 	Wolfi
 	WolfiComplete
 	Complete
+	Ironbank
 	Cloud
 	Service
 	EdotCollector
@@ -58,6 +60,8 @@ func (typ DockerVariant) String() string {
 		return completeWolfi
 	case Complete:
 		return complete
+	case Ironbank:
+		return ironbank
 	case Cloud:
 		return cloud
 	case Service:
@@ -95,6 +99,8 @@ func (typ *DockerVariant) UnmarshalText(text []byte) error {
 		*typ = WolfiComplete
 	case complete:
 		*typ = Complete
+	case ironbank:
+		*typ = Ironbank
 	case cloud:
 		*typ = Cloud
 	case service:

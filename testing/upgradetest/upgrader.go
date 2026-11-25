@@ -9,17 +9,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+
 	"github.com/elastic/elastic-agent/testing/installtest"
 
 	"github.com/otiai10/copy"
 
 	"github.com/elastic/elastic-agent/internal/pkg/acl"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade"
 	v1client "github.com/elastic/elastic-agent/pkg/control/v1/client"
 	v2proto "github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -36,6 +40,7 @@ type CustomPGP struct {
 
 type UpgradeOpts struct {
 	sourceURI *string
+	BasePath  string
 
 	unprivileged     *bool
 	skipVerify       bool
@@ -77,6 +82,13 @@ func WithSourceURI(sourceURI string) UpgradeOpt {
 func WithUnprivileged(unprivileged bool) UpgradeOpt {
 	return func(opts *UpgradeOpts) {
 		opts.unprivileged = &unprivileged
+	}
+}
+
+// WithBasePath sets the custom base path for the installation checks.
+func WithBasePath(basePath string) UpgradeOpt {
+	return func(opts *UpgradeOpts) {
+		opts.BasePath = basePath
 	}
 }
 
@@ -278,6 +290,7 @@ func PerformUpgrade(
 	}
 
 	installOpts := atesting.InstallOpts{
+		BasePath:       upgradeOpts.BasePath,
 		NonInteractive: nonInteractiveFlag,
 		Force:          true,
 		Privileged:     !(*upgradeOpts.unprivileged),
@@ -313,7 +326,11 @@ func PerformUpgrade(
 
 		// validate installation is correct
 		if InstallChecksAllowed(!installOpts.Privileged, startVersion) {
-			err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
+			var topPath string
+			if installOpts.BasePath != "" {
+				topPath = paths.InstallPath(installOpts.BasePath)
+			}
+			err = installtest.CheckSuccess(ctx, startFixture, topPath, &installtest.CheckOpts{Privileged: installOpts.Privileged})
 			if err != nil {
 				return fmt.Errorf("pre-upgrade installation checks failed: %w", err)
 			}
@@ -325,6 +342,16 @@ func PerformUpgrade(
 			return fmt.Errorf("pre upgrade hook failed: %w", err)
 		}
 	}
+
+	reservationTopPath := installtest.DefaultTopPath()
+	if installOpts.BasePath != "" {
+		reservationTopPath = paths.InstallPath(installOpts.BasePath)
+	}
+	startInspect, err := startFixture.ExecInspect(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to inspect start agent: %w", err)
+	}
+	startDownloadsDir := filepath.Join(startInspect.Path.Home, "downloads")
 
 	logger.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\"", startParsedVersion, startVersionInfo.Binary.Commit, endVersionInfo.Binary.String(), endVersionInfo.Binary.Commit)
 
@@ -451,11 +478,42 @@ func PerformUpgrade(
 		return err
 	}
 
+	if err := CheckDiskSpaceReservationsRemoved(reservationTopPath, startDownloadsDir); err != nil {
+		return err
+	}
+
 	// validate again that the installation is correct, upgrade should not have changed installation validation
 	if InstallChecksAllowed(!installOpts.Privileged, startVersion, endVersion) {
-		err = installtest.CheckSuccess(ctx, startFixture, installOpts.BasePath, &installtest.CheckOpts{Privileged: installOpts.Privileged, TargetVersion: endVersionInfo.Binary.String(), StartVersion: startVersionInfo.Binary.String()})
+		var topPath string
+		if installOpts.BasePath != "" {
+			topPath = paths.InstallPath(installOpts.BasePath)
+		}
+		err = installtest.CheckSuccess(ctx, startFixture, topPath, &installtest.CheckOpts{Privileged: installOpts.Privileged, TargetVersion: endVersionInfo.Binary.String(), StartVersion: startVersionInfo.Binary.String()})
 		if err != nil {
 			return fmt.Errorf("post-upgrade installation checks failed: %w", err)
+		}
+	}
+
+	// the upgraded Agent logs to the log directory of its own build, outside of its installation
+	if WritesBuildLogs(endFixture) {
+		topPath := startFixture.WorkDir()
+		buildName := InstalledBuildLogsDirName(topPath, endFixture.Version(), endVersionInfo.Binary)
+		pattern := filepath.Join(topPath, "data", "logs", buildName, "elastic-agent-*.ndjson")
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			return fmt.Errorf("searching the build logs of the upgraded Agent matching %s: %w", pattern, err)
+		}
+		if len(files) == 0 {
+			return fmt.Errorf("no build logs of the upgraded Agent found matching %s", pattern)
+		}
+
+		// and nothing is written to the logs directories of its installation, by the Agent or by a component that
+		// does not use the logs path it is given
+		home := filepath.Join(topPath, "data", "elastic-agent-"+buildName)
+		for _, dir := range []string{filepath.Join(home, "logs"), filepath.Join(home, "components", "logs")} {
+			if err := CheckNoFilesIn(dir); err != nil {
+				return fmt.Errorf("the upgraded Agent wrote to its installation: %w", err)
+			}
 		}
 	}
 
@@ -466,6 +524,41 @@ func PerformUpgrade(
 	}
 
 	return nil
+}
+
+// CheckNoFilesIn returns an error if any file exists below dir. A directory that does not exist has none.
+func CheckNoFilesIn(dir string) error {
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			return fmt.Errorf("unexpected file %s, logs must be written to data/logs/<build>", p)
+		}
+		return nil
+	})
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+
+func CheckDiskSpaceReservationsRemoved(topPath, archiveDir string) error {
+	installReservation := filepath.Join(paths.DataFrom(topPath), upgrade.InstallReservationName)
+	archiveReservation := filepath.Join(archiveDir, upgrade.ArchiveReservationName)
+
+	var errs []error
+	if _, err := os.Lstat(installReservation); err == nil {
+		errs = append(errs, fmt.Errorf("disk space reservation file %s was not removed", installReservation))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("failed to check disk space reservation file %s: %w", installReservation, err))
+	}
+	if _, err := os.Lstat(archiveReservation); err == nil {
+		errs = append(errs, fmt.Errorf("disk space reservation file %s was not removed", archiveReservation))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		errs = append(errs, fmt.Errorf("failed to check disk space reservation file %s: %w", archiveReservation, err))
+	}
+	return errors.Join(errs...)
 }
 
 var ErrVerMismatch = errors.New("versions don't match")

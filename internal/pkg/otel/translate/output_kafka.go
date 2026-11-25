@@ -8,25 +8,23 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"net/url"
-	"reflect"
 	"strings"
-	"time"
 
 	otelcomponent "go.opentelemetry.io/collector/component"
-	"go.opentelemetry.io/collector/config/configopaque"
 
 	"github.com/go-viper/mapstructure/v2"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/bearertokenauthextension"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/oauth2clientauthextension"
 
 	"github.com/elastic/beats/v7/libbeat/common/fmtstr"
 	"github.com/elastic/beats/v7/libbeat/outputs/kafka"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 )
 
 const transformProcessorType = "transform"
 const oauth2ClientExtensionType = "oauth2client"
+const bearertokenAuthConfigKey = "bearertoken"
 
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
@@ -64,13 +62,16 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 		"client_id":        kConfig.ClientID,
 		"protocol_version": string(kConfig.Version),
 		"sending_queue": map[string]any{
+			"enabled": true,
 			"batch": map[string]any{
 				"max_size":      kConfig.BulkMaxSize,
 				"flush_timeout": getFlushTimeout(logger, config),
 				"min_size":      min(getFlushMinEvents(logger, config), kConfig.BulkMaxSize), // queue.mem.flush.min_events, capped at max_size
 				"sizer":         "items",
 			},
-			"queue_size": getQueueSize(logger, config),
+			"queue_size":        getQueueSize(logger, config),
+			"block_on_overflow": true,
+			"wait_for_result":   true,
 		},
 		"producer": map[string]any{
 			"compression":       kConfig.Compression,
@@ -102,28 +103,24 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 	// Set SASL and/or Kerberos authentication
 	auth := map[string]any{}
 	if strings.ToUpper(kConfig.Sasl.SaslMechanism) == "OAUTHBEARER" {
-		auth["sasl"] = map[string]any{
-			"mechanism":                "OAUTHBEARER",
-			"oauthbearer_token_source": getOauth2ClientExtensionID(outputName).String(),
-		}
-
-		oauthCfg, err := config.Child("auth", -1)
+		authCfg, err := config.Child("auth", -1)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
+			return nil, nil, nil, fmt.Errorf("auth config is required when sasl.mechanism is OAUTHBEARER: %w", err)
 		}
 
-		fields := oauthCfg.GetFields()
+		fields := authCfg.GetFields()
 		if len(fields) == 0 {
-			return nil, nil, nil, fmt.Errorf("oauth config is required when sasl.mechanism is OAUTHBEARER")
+			return nil, nil, nil, fmt.Errorf("auth config is required when sasl.mechanism is OAUTHBEARER")
 		}
 
 		if len(fields) != 1 {
-			return nil, nil, nil, fmt.Errorf("auth must specify a single oauth type, got %v", fields)
+			return nil, nil, nil, fmt.Errorf("auth must specify a single authentication type, got %v", fields)
 		}
 
+		var tokenSourceID otelcomponent.ID
 		switch fields[0] {
 		case oauth2ClientExtensionType:
-			oauth2ClientCfg, err := oauthCfg.Child(oauth2ClientExtensionType, -1)
+			oauth2ClientCfg, err := authCfg.Child(oauth2ClientExtensionType, -1)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("error translating oauth2client extension config: %w", err)
 			}
@@ -133,12 +130,30 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			}
 
 			maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
+			tokenSourceID = getOauth2ClientExtensionID(outputName)
+
+		case bearertokenAuthConfigKey:
+			bearertokenauthCfg, err := authCfg.Child(bearertokenAuthConfigKey, -1)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("error translating bearertokenauth extension config: %w", err)
+			}
+			bearertokenauthExtensionCfg, err := getBearertokenauthExtensionConfig(bearertokenauthCfg, outputName)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("error translating bearertokenauth extension config: %w", err)
+			}
+			maps.Copy(extensionCfg, bearertokenauthExtensionCfg)
+			tokenSourceID = getBearertokenauthExtensionID(outputName)
 
 		// In case we choose to support more oauth style extensions, we can add a case for each extension here.
 		// For example, azureauth extension https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension
 
 		default:
 			return nil, nil, nil, fmt.Errorf("unsupported oauth config: %v", fields[0])
+		}
+
+		auth["sasl"] = map[string]any{
+			"mechanism":                "OAUTHBEARER",
+			"oauthbearer_token_source": tokenSourceID.String(),
 		}
 
 	} else if kConfig.Username != "" {
@@ -162,6 +177,7 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 
 	setIfNotNil(kafkaExporter, "tls", tlsCfg)
 	setIfNotNil(kafkaExporter, "record_headers", headers)
+	setIfNotNil(kafkaExporter, "dial_timeout", kConfig.Timeout)
 
 	// Set partitioner extension config
 	partitionerExtensionCfg, err := getKafkaPartitionerExtensionConfig(kConfig.Partition, outputName)
@@ -305,6 +321,39 @@ func getKafkaPartitionerExtensionConfig(partition map[string]*config.C, _ string
 	return partitionerCfg, nil
 }
 
+func getBearertokenauthExtensionConfig(cfg *config.C, outputName string) (extensionCfg map[string]any, err error) {
+	// unpack the config into a map[string]any
+	var bearertokenauthMap map[string]any
+	err = cfg.Unpack(&bearertokenauthMap)
+	if err != nil {
+		return nil, fmt.Errorf("error unpacking bearertokenauth extension config: %w", err)
+	}
+
+	// Decode onto the upstream config only to validate it; the collector applies its own defaults.
+	var bearertokenauthCfg bearertokenauthextension.Config
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result:     &bearertokenauthCfg,
+		DecodeHook: mapstructure.StringToTimeDurationHookFunc(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed creating decoder: %w", err)
+	}
+
+	// Unpack the map[string]any onto the defaultConfig
+	if err = decoder.Decode(bearertokenauthMap); err != nil {
+		return nil, fmt.Errorf("error decoding bearertokenauth extension config: %w", err)
+	}
+
+	if err = bearertokenauthCfg.Validate(); err != nil {
+		return nil, fmt.Errorf("error validating bearertokenauth extension config: %w", err)
+	}
+
+	extensionID := getBearertokenauthExtensionID(outputName)
+	return map[string]any{
+		extensionID.String(): bearertokenauthMap,
+	}, nil
+}
+
 func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extensionCfg map[string]any, err error) {
 	var oauthMap map[string]any
 	err = cfg.Unpack(&oauthMap)
@@ -312,61 +361,41 @@ func getOauth2ClientExtensionConfig(cfg *config.C, outputName string) (extension
 		return nil, fmt.Errorf("error unpacking oauth2client extension config: %w", err)
 	}
 
-	// Default settings are taken from https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/cbc5a870545d7a25c8bbd62404a025978c907d57/extension/oauth2clientauthextension/factory.go#L28
-	defaultConfig := oauth2clientauthextension.Config{
-		ExpiryBuffer: 5 * time.Minute,
-	}
-
-	err = mapstructure.Decode(oauthMap, &defaultConfig)
+	// Decode onto the upstream config only to validate it; the collector applies its own defaults.
+	var oauth2ClientCfg oauth2clientauthextension.Config
+	decoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		Result: &oauth2ClientCfg,
+		DecodeHook: mapstructure.ComposeDecodeHookFunc(
+			mapstructure.StringToSliceHookFunc(","),
+			mapstructure.StringToTimeDurationHookFunc(),
+		),
+	})
 	if err != nil {
+		return nil, fmt.Errorf("failed creating decoder: %w", err)
+	}
+	if err = decoder.Decode(oauthMap); err != nil {
 		return nil, fmt.Errorf("error decoding oauth2client extension config: %w", err)
 	}
 
-	if err = defaultConfig.Validate(); err != nil {
+	if err = oauth2ClientCfg.Validate(); err != nil {
 		return nil, fmt.Errorf("error validating oauth2client extension config: %w", err)
-	}
-
-	// Convert config back to map[string]any
-	if err = mapstructure.Decode(defaultConfig, &oauthMap); err != nil {
-		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
-	}
-
-	var newMap map[string]any
-	encoder, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
-		Result:     &newMap,
-		DecodeHook: oauth2MapEncodeHook(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed creating encoder: %w", err)
-	}
-	if err = encoder.Decode(oauthMap); err != nil {
-		return nil, fmt.Errorf("error encoding oauth2client extension config: %w", err)
 	}
 
 	extensionID := getOauth2ClientExtensionID(outputName)
 	return map[string]any{
-		extensionID.String(): newMap,
+		extensionID.String(): oauthMap,
 	}, nil
 }
 
-func oauth2MapEncodeHook() mapstructure.DecodeHookFunc {
-	return func(_ reflect.Type, _ reflect.Type, data any) (any, error) {
-		switch v := data.(type) {
-		case time.Duration:
-			return v.String(), nil
-		case configopaque.String:
-			return string(v), nil
-		case url.URL:
-			return v.String(), nil
-		default:
-			return data, nil
-		}
-	}
+func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(oauth2ClientExtensionType), extensionName)
 }
 
-func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(oauth2ClientExtensionType), extensionName)
+func getBearertokenauthExtensionID(outputName string) otelcomponent.ID {
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
+	// The extension name is "bearertokenauth" in the OTel config, but "bearertoken" in the Elastic Agent config.
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(fmt.Sprint(bearertokenAuthConfigKey, "auth")), extensionName)
 }
 
 func extractField(field string) string {
@@ -398,14 +427,14 @@ func getLogBody(field string) string {
 
 // getTransformProcessorID returns the id for transform processor
 func getTransformProcessorID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(transformProcessorType), extensionName)
 }
 
 // getKafkaPartitionerExtensionID returns the id for kafkapartitioner extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getKafkaPartitionerExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType("kafkapartitioner"), extensionName)
 }
 
@@ -414,13 +443,11 @@ func checkUnsupportedKafkaConfig(cfg *config.C, logger *logp.Logger) error {
 
 	if cfg.HasField("keep_alive") {
 		return fmt.Errorf("keep_alive is currently not supported: %w", errors.ErrUnsupported)
-	} else if cfg.HasField("timeout") {
-		return fmt.Errorf("timeout is currently not supported: %w", errors.ErrUnsupported)
 	} else if value, err := cfg.Child("ssl", -1); err == nil {
 		if value.HasField("ca_trusted_fingerprint") {
 			return fmt.Errorf("ca_trusted_fingerprint is currently not supported: %w", errors.ErrUnsupported)
-		} else if value.HasField("ca_sha_256") {
-			return fmt.Errorf("ca_sha_256 is currently not supported: %w", errors.ErrUnsupported)
+		} else if value.HasField("ca_sha256") {
+			return fmt.Errorf("ca_sha256 is currently not supported: %w", errors.ErrUnsupported)
 		}
 	}
 

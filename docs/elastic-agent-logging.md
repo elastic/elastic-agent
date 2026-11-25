@@ -3,8 +3,10 @@ The Elastic-Agent process defines two log outputs:
  - The "internal" core that is used by monitoring components and
    collected in the diagnostics. It's configuration is **hardcoded**.
    This output always logs to files in
-   `data/elastic-agent-<hash>/logs` and uses the default configuration
-   defined in `elastic-agent-libs/logp`.
+   `data/logs/<build>`, where `<build>` is `<commit>` or
+   `<package-version>-<commit>` like the name of the build's home directory
+   without the `elastic-agent-` prefix, and uses the default configuration
+   defined in the Beats `pkg/logp` package.
  - The "default" logger that is the user-configurable logger, it logs
    to the Elastic-Agent's root folder, it can also be configured to
    log to `stderr`. When running in a container environment, it
@@ -65,15 +67,57 @@ and defaults to:
  - Rotated on startup
  - ECS/JSON are not explicitly set
 
-## Collecting logs for diagnostics
-The Elastic-Agent will only collect
-`data/elastic-agent-<hash>/logs`. The functions responsible for
-collecting logs during diagnostics are:
- - [`zipLogs`](https://github.com/elastic/elastic-agent/blob/574aa5db629231d56062ab40d27ccceb02cbbe4d/internal/pkg/diagnostics/diagnostics.go#L383-L415)
- - [`zipLogsWithPath`](https://github.com/elastic/elastic-agent/blob/574aa5db629231d56062ab40d27ccceb02cbbe4d/internal/pkg/diagnostics/diagnostics.go#L418-L476)
+## Retention across builds
+Each build of the Agent writes its internal logs to its own directory,
+`data/logs/<build>`. These directories live outside the installation
+directories, so they are not deleted together with an old installation. This
+keeps the logs of a failed upgrade available after the Agent rolled back to a
+build that has this layout. Builds from before this change keep their logs in
+their installation directory, so after a rollback to one of them the `diagnostics`
+command of that build does not collect the logs in `data/logs`, although the
+files are kept.
 
-`zipLogsWithPath` always appends the `/logs` to whatever path it
-receives.
+To keep disk use bounded, the Agent tidies up whenever it starts:
+ - it always keeps the logs of the build that is running,
+ - it keeps the logs of one other build, the one that was written to most
+   recently, which is normally the previous version,
+ - it deletes the logs of every other build.
+
+So at most two builds' logs are on disk: the current one and the previous one
+(builds whose name has no commit, such as development builds, are never deleted).
+Logs of an older build disappear the next time the Agent starts after a newer
+build has been running.
+
+A few things to know:
+ - The tidy-up runs for every Agent with a versioned home directory, including
+   DEB and RPM installations. In containers the logs stay in
+   `<home>/logs` and nothing is deleted.
+ - `data/logs` is managed by the Agent, do not put your own files in it. A
+   directory there whose name looks like a build's, such as `ff7609` or
+   `9.7.0-ff7609`, can be deleted, and diagnostics collects everything in it.
+
+## Collecting logs for diagnostics
+The diagnostics bundle collects the following logs:
+ - `data/logs/<build>`, into `logs/elastic-agent-<build>/`. It is outside the
+   installation directory, so it outlives it.
+ - `data/elastic-agent-<build>/logs`, into `logs/elastic-agent-<build>/`
+   (builds that wrote their logs inside the installation directory)
+ - `data/logs/<build>/components/logs` and `data/elastic-agent-<build>/components/logs`, into
+   `logs/elastic-agent-<build>/components/`
+ - the log directory of every service input that sets `service.log.path` in its
+   spec (for example Endpoint's), into `logs/services/`
+
+The functions responsible for collecting logs during diagnostics, all in
+[`internal/pkg/diagnostics/diagnostics.go`](../internal/pkg/diagnostics/diagnostics.go), are:
+ - `zipLogs`
+ - `zipLogsWithPath`
+ - `collectServiceComponentsLogs`
+
+`zipLogsWithPath` collects the logs of one build, from its installation
+directory (`<home>/logs` and `<home>/components/logs`) and from its build logs
+directory.
+
+The layout of the whole bundle is described in [diagnostics.md](./diagnostics.md).
 
 ## Total footprint
 Given the two log outputs and their default log rotation policies, the

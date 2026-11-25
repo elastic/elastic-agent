@@ -1,6 +1,8 @@
 ## 9.5.2 [elastic-agent-release-notes-9.5.2]
 
-
+::::{important} 
+The 9.5.2 release contains fixes for potential security vulnerabilities. For details, go to [security announcements](https://discuss.elastic.co/t/elastic-agent-8-19-21-9-4-6-9-5-2-security-update-esa-2026-150/390109).
+::::
 
 ### Features and enhancements [elastic-agent-9.5.2-features-enhancements]
 

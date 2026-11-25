@@ -22,10 +22,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-system-metrics/metric/system/process"
+	"github.com/elastic/beats/v7/pkg/systemmetrics/metric/system/process"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
 	otelMonitoring "github.com/elastic/elastic-agent/internal/pkg/otel/monitoring"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -126,6 +126,7 @@ func (runner *MetricsRunner) addMonitoringToOtelRuntimeOverwrite() {
 	if err != nil {
 		runner.T().Fatalf("could not execute request to Kibana/Fleet: %s", err)
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		// On error dump the whole request response so we can easily spot
 		// what went wrong.

@@ -264,7 +264,7 @@ func TestActionRestartMarshalMap(t *testing.T) {
 	action := ActionRestart{
 		ActionID:   "164a6819-5c58-40f7-a33c-821c98ab0a8c",
 		ActionType: "RESTART",
-		Signed: &Signed{
+		Signature: &Signed{
 			Data:      "eyJAdGltZXN0YW1wIjoiMjAy",
 			Signature: "MEQCIGxsrI742xKL6OSI",
 		},

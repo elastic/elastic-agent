@@ -9,9 +9,9 @@ import (
 	"reflect"
 	"time"
 
-	c "github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/transport/httpcommon"
+	c "github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/transport/httpcommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 )
 
@@ -45,6 +45,13 @@ type configWithoutHTTPTransportSettings struct {
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	// This key is, for some reason, problematic
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
+
+	ReserveDiskSpace ReserveDiskSpaceConfig `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+}
+
+// ReserveDiskSpaceConfig controls the upgrade disk space reservation.
+type ReserveDiskSpaceConfig struct {
+	Enabled bool `yaml:"enabled" config:"enabled"`
 }
 
 // Config is a configuration used for verifier and downloader
@@ -70,6 +77,8 @@ type Config struct {
 	// will increase for subsequent retry attempts in a randomized exponential backoff manner.
 	RetrySleepInitDuration time.Duration `yaml:"retry_sleep_init_duration" config:"retry_sleep_init_duration"`
 
+	ReserveDiskSpace ReserveDiskSpaceConfig `yaml:"reserve_diskspace" config:"reserve_diskspace"`
+
 	httpcommon.HTTPTransportSettings `config:",inline" yaml:",inline"` // Note: use anonymous struct for json inline
 }
 
@@ -89,6 +98,7 @@ func DefaultConfig() *Config {
 		TargetDirectory:        paths.Downloads(),
 		InstallPath:            paths.Install(),
 		RetrySleepInitDuration: 30 * time.Second,
+		ReserveDiskSpace:       ReserveDiskSpaceConfig{Enabled: true},
 		HTTPTransportSettings:  transport,
 	}
 }
@@ -142,8 +152,12 @@ func (c *Config) Unpack(cfg *c.C) error {
 	// the default so a misconfigured policy can't cause that.
 	if tmp.RetrySleepInitDuration <= 0 {
 		def := DefaultConfig().RetrySleepInitDuration
-		logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
-			tmp.RetrySleepInitDuration, def)
+		// Only warn when the field was explicitly set to a bad value. When it is
+		// absent the zero value is the default, which is not a user misconfiguration.
+		if cfg.HasField("retry_sleep_init_duration") {
+			logp.L().Warnf("agent.download.retry_sleep_init_duration must be > 0, got %s; using default %s",
+				tmp.RetrySleepInitDuration, def)
+		}
 		tmp.RetrySleepInitDuration = def
 	}
 

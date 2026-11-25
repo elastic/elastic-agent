@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/elastic/elastic-agent-libs/api/npipe"
+	"github.com/elastic/beats/v7/pkg/api/npipe"
 
 	"github.com/elastic/elastic-agent/internal/pkg/acl"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"

@@ -125,6 +125,7 @@ The chart built-in [kubernetes integration](https://docs.elastic.co/integrations
 | kubernetes.containers.state.vars | object | `{}` | containers state stream vars |
 | kubernetes.containers.logs.enabled | bool | `true` | enable containers logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/container-logs) |
 | kubernetes.containers.logs.rotated_logs | bool | `false` | BETA: enable rotated logs ingestion. WARNING: enabling it might cause date re-ingestion on existing deployments. [ref](https://www.elastic.co/docs/reference/integrations/kubernetes/container-logs#ingesting-rotated-container-logs) |
+| kubernetes.containers.logs.single_input | bool | `true` | use a single filestream input with a glob path for all container logs, enriched by `add_kubernetes_metadata`. Set to `false` to go back to one input per container. With `enabledDefaultProcessors`, the `elastic.co/dataset`, `elastic.co/namespace` and `elastic.co/preserve_original_event` pod annotations are added by `add_kubernetes_metadata`. Not supported with dynamic provider variables (`${kubernetes.*}`, `${docker.*}`) in `kubernetes.containers.logs.vars`, `kubernetes.namespace` or `kubernetes.onboardingID`: the chart fails to render, set it to `false` in that case. When `agent.presets.perNode.providers.kubernetes.namespace` is set, only that namespace's logs are collected. |
 | kubernetes.containers.logs.vars | object | `{}` | containers logs stream vars |
 | kubernetes.containers.audit_logs.enabled | bool | `false` | enable containers audit logs stream [ref](https://www.elastic.co/docs/current/integrations/kubernetes/audit-logs) |
 | kubernetes.pods.metrics.enabled | bool | `true` | enable pods metric stream (kubelet) [ref](https://www.elastic.co/docs/current/integrations/kubernetes/kubelet#pod) |
@@ -210,6 +211,7 @@ The [cloud-defend](https://www.elastic.co/docs/current/integrations/cloud_defend
 ### 6.1 - Elastic-Agent Managed Configuration
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| agent.browserCAs.secretName | string | `""` | name of an existing Secret with PEM CA certificates (`*.crt` or `*.pem` keys) that browser monitors trust. It is mounted at `/etc/elastic-agent/browser-cas`, which `ELASTIC_AGENT_BROWSER_CA` is set to. Only the `complete` image variants run browser monitors, so use one of them. Changes to the Secret are picked up without a restart. This does not change the trust store of the operating system. |
 | agent.fleet.enabled | bool | `false` | enable elastic-agent managed |
 | agent.fleet.url | string | `""` | Fleet server URL |
 | agent.fleet.token | string | `""` | Fleet enrollment token |

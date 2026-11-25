@@ -15,7 +15,7 @@ import (
 
 	"github.com/gofrs/uuid/v5"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
+	"github.com/elastic/beats/v7/pkg/kibana"
 )
 
 type EnrollParams struct {
@@ -66,8 +66,7 @@ func UpgradeAgent(ctx context.Context, client *kibana.Client, agentID, version s
 }
 
 // RollbackAgent requests a rollback for the given agent via the Fleet API.
-// TODO: Replace with a dedicated method once elastic-agent-libs supports
-// the rollback endpoint (https://github.com/elastic/elastic-agent-libs/pull/399).
+// TODO: Replace with kibana.Client.RollbackAgent.
 func RollbackAgent(ctx context.Context, client *kibana.Client, agentID string) error {
 	apiURL := fmt.Sprintf("/api/fleet/agents/%s/rollback", agentID)
 	resp, err := client.SendWithContext(ctx, http.MethodPost, apiURL, nil, nil, nil)
@@ -179,15 +178,16 @@ const (
 	OutputPresetScale      OutputPreset = "scale"
 )
 
-// UpdateESOutputPreset updates the Fleet Elasticsearch output with the given ID
-// to use the given preset. Use DefaultFleetOutputID to target the default output
-// and OutputPresetLatency to lower the flush interval from 10s to 1s, which
-// speeds up tests that poll Elasticsearch for ingested data.
-//
-// Call this before enrolling the agent so that the preset is in effect from the
-// agent's first check-in, avoiding an extra policy revision bump mid-test.
-func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, outputID string, preset OutputPreset) error {
-	updateBytes, err := json.Marshal(map[string]any{"preset": preset})
+// ElasticsearchOutputUpdate contains settings for a partial Fleet
+// Elasticsearch output update.
+type ElasticsearchOutputUpdate struct {
+	Preset     OutputPreset `json:"preset,omitempty"`
+	ConfigYAML string       `json:"config_yaml,omitempty"`
+}
+
+// UpdateESOutput updates the Fleet Elasticsearch output with the given ID.
+func UpdateESOutput(ctx context.Context, client *kibana.Client, outputID string, update ElasticsearchOutputUpdate) error {
+	updateBytes, err := json.Marshal(update)
 	if err != nil {
 		return fmt.Errorf("marshaling Fleet output update: %w", err)
 	}
@@ -205,4 +205,15 @@ func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, outputID s
 	}
 
 	return nil
+}
+
+// UpdateESOutputPreset updates the Fleet Elasticsearch output with the given ID
+// to use the given preset. Use DefaultFleetOutputID to target the default output
+// and OutputPresetLatency to lower the flush interval from 10s to 1s, which
+// speeds up tests that poll Elasticsearch for ingested data.
+//
+// Call this before enrolling the agent so that the preset is in effect from the
+// agent's first check-in, avoiding an extra policy revision bump mid-test.
+func UpdateESOutputPreset(ctx context.Context, client *kibana.Client, outputID string, preset OutputPreset) error {
+	return UpdateESOutput(ctx, client, outputID, ElasticsearchOutputUpdate{Preset: preset})
 }

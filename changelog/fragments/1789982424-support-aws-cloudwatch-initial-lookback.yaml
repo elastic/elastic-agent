@@ -1,3 +1,0 @@
-kind: enhancement
-summary: Support initial lookback for AWS CloudWatch logs in the EDOT Collector
-component: elastic-agent

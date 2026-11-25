@@ -20,12 +20,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/otiai10/copy"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/logp"
+	"github.com/elastic/beats/v7/pkg/logp"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
@@ -51,7 +51,6 @@ type Fixture struct {
 	logOutput       bool
 	allowErrs       bool
 	connectTimout   time.Duration
-	binaryName      string
 	runLength       time.Duration
 	additionalArgs  []string
 	fipsArtifact    bool
@@ -129,7 +128,7 @@ func WithLogOutput() FixtureOpt {
 }
 
 // WithCmdOutput configures a writer that receives a combined copy of stdout and
-// stderr from the spawned process started by Run/RunOtelWithClient/RunBeat.
+// stderr from the spawned process started by Run/RunOtelWithClient.
 // Writes from the stdout and stderr goroutines are serialized internally so the
 // supplied writer does not need to be safe for concurrent use.
 func WithCmdOutput(w io.Writer) FixtureOpt {
@@ -152,13 +151,6 @@ func WithAllowErrors() FixtureOpt {
 func WithConnectTimeout(timeout time.Duration) FixtureOpt {
 	return func(f *Fixture) {
 		f.connectTimout = timeout
-	}
-}
-
-// WithBinaryName sets the name of the binary under test, in cases where tests aren't being run against elastic-agent
-func WithBinaryName(name string) FixtureOpt {
-	return func(f *Fixture) {
-		f.binaryName = name
 	}
 }
 
@@ -221,8 +213,6 @@ func NewFixture(t *testing.T, version string, opts ...FixtureOpt) (*Fixture, err
 		architecture:    runtime.GOARCH,
 		packageFormat:   pkgFormat,
 		connectTimout:   15 * time.Second,
-		// default to elastic-agent, can be changed by a set FixtureOpt below
-		binaryName: "elastic-agent",
 	}
 	for _, o := range opts {
 		o(f)
@@ -254,6 +244,12 @@ func (f *Fixture) Version() string {
 // Hash returns the Elastic Agent build commit hash (populated only after the fixture has been prepared/extracted)
 func (f *Fixture) Hash() string {
 	return f.hash
+}
+
+// FetchedFromLocalBuild reports whether the fixture's Elastic Agent comes from a build of the code under test,
+// as opposed to a released or snapshot build from the artifacts repository.
+func (f *Fixture) FetchedFromLocalBuild() bool {
+	return f.fetcher.Name() == localFetcherName
 }
 
 // ShortHash returns the Elastic Agent build commit hash in short form (populated only after the fixture has been prepared/extracted)
@@ -457,86 +453,6 @@ func ExtractArtifact(l Logger, artifactFile, outputDir string) error {
 	return nil
 }
 
-// RunBeat runs the given given beat
-// the beat will run until an error, or the given timeout is reached
-func (f *Fixture) RunBeat(ctx context.Context) error {
-	if f.binaryName == "elastic-agent" {
-		return errors.New("RunBeat() can't be run against elastic-agent")
-	}
-
-	if _, deadlineSet := ctx.Deadline(); !deadlineSet {
-		f.t.Fatal("Context passed to Fixture.RunBeat() has no deadline set.")
-	}
-
-	var err error
-	err = f.EnsurePrepared(ctx)
-	if err != nil {
-		return fmt.Errorf("error preparing beat: %w", err)
-	}
-
-	var logProxy Logger
-	if f.logOutput {
-		logProxy = f.t
-	}
-	stdOut := newLogWatcher(logProxy)
-	stdErr := newLogWatcher(logProxy)
-	args := []string{"run", "-e", "-c", filepath.Join(f.workDir, fmt.Sprintf("%s.yml", f.binaryName))}
-
-	args = append(args, f.additionalArgs...)
-
-	proc, err := process.Start(
-		f.binaryPath(),
-		process.WithContext(ctx),
-		process.WithArgs(args),
-		process.WithCmdOptions(attachOutErr(stdOut, stdErr, f.cmdOutput)))
-	if err != nil {
-		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
-	}
-
-	procWaitCh := proc.Wait()
-	killProc := func() {
-		_ = proc.Kill()
-		<-procWaitCh
-	}
-
-	var doneChan <-chan time.Time
-	if f.runLength != 0 {
-		doneChan = time.After(f.runLength)
-	}
-
-	stopping := false
-	for {
-		select {
-		case <-ctx.Done():
-			killProc()
-			return ctx.Err()
-		case ps := <-procWaitCh:
-			if stopping {
-				return nil
-			}
-			return fmt.Errorf("elastic-agent exited unexpectedly with exit code: %d", ps.ExitCode())
-		case err := <-stdOut.Watch():
-			if !f.allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case err := <-stdErr.Watch():
-			if !f.allowErrs {
-				// no errors allowed
-				killProc()
-				return fmt.Errorf("elastic-agent logged an unexpected error: %w", err)
-			}
-		case <-doneChan:
-			if !stopping {
-				// trigger the stop
-				stopping = true
-				_ = proc.Stop()
-			}
-		}
-	}
-}
-
 // RunProcess runs the given given process
 // the process will run until an error, or the given timeout is reached
 func RunProcess(t *testing.T,
@@ -659,9 +575,6 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		f.t.Error("Context passed to Fixture.Run() has no deadline set.")
 	}
 
-	if f.binaryName != "elastic-agent" {
-		return errors.New("Run() can only be used with elastic-agent, use RunBeat()")
-	}
 	if f.installed {
 		return errors.New("fixture is installed; cannot be run")
 	}
@@ -722,7 +635,7 @@ func (f *Fixture) executeWithClient(ctx context.Context, command string, disable
 		process.WithCmdOptions(attachOutErr(stdOut, stdErr, f.cmdOutput)))
 	f.procMutex.Unlock()
 	if err != nil {
-		return fmt.Errorf("failed to spawn %s: %w", f.binaryName, err)
+		return fmt.Errorf("failed to spawn elastic-agent: %w", err)
 	}
 
 	if shouldWatchState {
@@ -1198,11 +1111,7 @@ func (f *Fixture) binaryPath() string {
 			workDir = f.installOpts.BasePath + workDir
 		}
 	}
-	defaultBin := "elastic-agent"
-	if f.binaryName != "" {
-		defaultBin = f.binaryName
-	}
-	binary := filepath.Join(workDir, defaultBin)
+	binary := filepath.Join(workDir, "elastic-agent")
 	if f.operatingSystem == "windows" {
 		binary += ".exe"
 	}
@@ -1525,9 +1434,9 @@ func findAgentDataVersionDir(dir, version string) (string, error) {
 	)
 	for _, fi := range agentVersions {
 		filename := fi.Name()
-		if strings.HasPrefix(filename, "elastic-agent-") && fi.IsDir() {
+		if strings.HasPrefix(filename, paths.VersionedHomePrefix) && fi.IsDir() {
 			// Below we exclude the hash suffix (7 characters) of the directory to check the version
-			if version != "" && filename[:len(filename)-7] != "elastic-agent-"+version {
+			if version != "" && filename[:len(filename)-7] != paths.VersionedHomePrefix+version {
 				// version specified but version mismatch. in case of upgrade we have multiple
 				// directories, we don't want first found
 				continue
@@ -1647,20 +1556,23 @@ func watchState(ctx context.Context, t *testing.T, c client.Client, timeout time
 		var sub client.ClientStateWatch
 		expBackoff := backoff.NewExponentialBackOff()
 		expBackoff.InitialInterval = 100 * time.Millisecond
-		expBackoff.MaxElapsedTime = timeout
 		expBackoff.MaxInterval = 2 * time.Second
-		err = backoff.RetryNotify(
-			func() error {
-				var err error
-				sub, err = c.StateWatch(ctx)
-				return err
+		_, err = backoff.Retry(ctx,
+			func() (struct{}, error) {
+				var watchErr error
+				sub, watchErr = c.StateWatch(ctx)
+				return struct{}{}, watchErr
 			},
-			backoff.WithContext(expBackoff, ctx),
-			func(err error, retryAfter time.Duration) {
+			backoff.WithBackOff(expBackoff),
+			backoff.WithMaxElapsedTime(timeout),
+			backoff.WithNotify(func(err error, retryAfter time.Duration) {
 				t.Logf("%s: StateWatch failed: %s retrying: %s", time.Now().UTC().Format(time.RFC3339Nano), err.Error(), retryAfter)
-			},
+			}),
 		)
 		if err != nil {
+			if re := backoff.AsRetryError(err); re != nil && re.LastErr != nil {
+				err = re.LastErr
+			}
 			errCh <- fmt.Errorf("StateWatch() failed: %w", err)
 			return
 		}

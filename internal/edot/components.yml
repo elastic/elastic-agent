@@ -35,6 +35,7 @@ core_components:
   - kafkareceiver
   - kubeletstatsreceiver
   - otlpreceiver
+  - prometheusscrapereceiver
 
 # Exporters
   - elasticsearchexporter
@@ -129,6 +130,9 @@ annotations:
       - Encoding options other than `otlp_proto` or `otlp_json`
       - Using the Sarama client (i.e. opting out of the `exporter.kafkaexporter.UseFranzGo` feature gate is not supported)
       - Partitioning configuration (i.e. `partition_*` options).
+  prometheusscrapereceiver:
+    comment: |
+      Keeps scraped data in the native Prometheus schema, so that it can be written to the {{es}} Prometheus remote write endpoint through the `prometheusremotewrite` exporter. The exporter requires the following settings: `translation_strategy: UnderscoreEscapingWithoutSuffixes`, `disable_scope_info: true`, `target_info.enabled: false` and `send_metadata: false`. Refer to the [receiver documentation](https://github.com/elastic/opentelemetry-collector-components/blob/main/receiver/prometheusscrapereceiver/README.md) for details.
   jmxreceiver:
     comment: |
       Deprecated in 9.3.1. JMX Scraper is recommended to run as a standalone Java program. Refer to [Migrate from deprecated components](/reference/edot-collector/components/migrate-components.md) for migration instructions.
@@ -218,6 +222,7 @@ since:
   profilingmetricsconnector: v9.2.0
   prometheusreceiver: v9.0.0
   prometheusremotewritereceiver: v9.3.0
+  prometheusscrapereceiver: v9.7.0
   rabbitmqreceiver: v9.4.0
   ratelimitprocessor: v9.4.0
   receivercreator: v9.0.0

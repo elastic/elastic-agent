@@ -69,7 +69,7 @@ func addEnrollFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("url", "", "", "URL to enroll Agent into Fleet")
 	cmd.Flags().StringP("enrollment-token", "t", "", "Enrollment token to use to enroll Agent into Fleet")
 	cmd.Flags().StringP("id", "", "", "Agent ID to use for enrollment into Fleet")
-	cmd.Flags().StringP("replace-token", "", "", "Replace token that that allows the Agent to be replace with the provided --id as long as this token matches")
+	cmd.Flags().StringP("replace-token", "", "", "Replace token that allows the Agent to be replaced with the provided --id as long as this token matches")
 	cmd.Flags().StringP("fleet-server-es", "", "", "Start and run a Fleet Server alongside this Elastic Agent connecting to the provided Elasticsearch")
 	cmd.Flags().StringP("fleet-server-es-ca", "", "", "Path to certificate authority for Fleet Server to use to communicate with Elasticsearch")
 	cmd.Flags().StringP("fleet-server-es-ca-trusted-fingerprint", "", "", "Elasticsearch certificate authority's SHA256 fingerprint for Fleet Server to use")

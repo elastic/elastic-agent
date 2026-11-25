@@ -14,12 +14,11 @@ import (
 	"io/fs"
 	"math/rand/v2"
 	"os"
-	"strings"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/transport/tlscommon"
+	"github.com/elastic/beats/v7/pkg/transport/tlscommon"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/filelock"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -30,6 +29,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/crypto"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi"
 	fleetclient "github.com/elastic/elastic-agent/internal/pkg/fleetapi/client"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/internal/pkg/remote"
 	"github.com/elastic/elastic-agent/pkg/backoff"
@@ -150,7 +150,7 @@ func enroll(
 ) error {
 	cmd := fleetapi.NewEnrollCmd(client)
 
-	metadata, err := info.Metadata(ctx, log)
+	metadata, err := info.Metadata(ctx, hostinfo.NewFetcher(log))
 	if err != nil {
 		return fmt.Errorf("acquiring metadata failed: %w", err)
 	}
@@ -169,7 +169,7 @@ func enroll(
 		Metadata: fleetapi.Metadata{
 			Local:        metadata,
 			UserProvided: options.UserProvidedMetadata,
-			Tags:         cleanTags(options.Tags),
+			Tags:         info.NormalizeTags(options.Tags),
 		},
 	}
 
@@ -543,20 +543,4 @@ func fleetHashToken(token string) (string, error) {
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(enrollmentHashBytes), nil
-}
-
-func cleanTags(tags []string) []string {
-	var r []string
-	// Create a map to store unique elements
-	seen := make(map[string]bool)
-	for _, str := range tags {
-		tag := strings.TrimSpace(str)
-		if tag != "" {
-			if _, ok := seen[tag]; !ok {
-				seen[tag] = true
-				r = append(r, tag)
-			}
-		}
-	}
-	return r
 }

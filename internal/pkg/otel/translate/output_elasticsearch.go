@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -19,9 +20,9 @@ import (
 	"github.com/elastic/beats/v7/libbeat/common"
 	"github.com/elastic/beats/v7/libbeat/outputs"
 	"github.com/elastic/beats/v7/libbeat/outputs/elasticsearch"
+	"github.com/elastic/beats/v7/pkg/config"
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
-	"github.com/elastic/elastic-agent-libs/config"
-	"github.com/elastic/elastic-agent-libs/logp"
 )
 
 type esToOTelOptions struct {
@@ -117,7 +118,7 @@ func defaultRetryOnStatus() []int {
 // order of gigabytes. This ceiling exists purely to put a roof on that.
 //
 // It is deliberately set well above any concurrency the presets reach on a single host
-// (the throughput preset asks for 25,600), so it does not interfere with normal sizing --
+// (the throughput preset asks for 16,000), so it does not interfere with normal sizing --
 // it only engages on large host lists, where it trades some connection utilisation for a
 // bounded footprint. Raising it costs memory roughly linearly; at typical event sizes this
 // value corresponds to on the order of a gigabyte of in-flight events.
@@ -204,8 +205,8 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 			logger.Infof("Applying performance preset '%v': %v", storedPreset, config.DebugString(storedPresetConfig, false))
 		}
 		// num_consumers has no beats equivalent (users never set it) so apply the
-		// same two-per-connection staging model regardless of preset.
-		numConsumers = 2 * maxConns
+		// same one-spare-consumer staging model regardless of preset.
+		numConsumers = maxConns + 1
 		// queue.mem.events is user-configurable in beats and must not be overridden.
 		queueSize = getQueueSize(logger, output)
 		if suggested := min(2*batchSize*numConsumers, maxQueueEvents); queueSize < suggested {
@@ -238,7 +239,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		return nil, nil, nil, err
 	}
 
-	hosts, err := getURL(escfg, output)
+	hosts, err := getURL(escfg.ElasticsearchConfig, output)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error creating hosts:%w", err)
 	}
@@ -268,7 +269,7 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 			"queue_size":        queueSize,
 			"block_on_overflow": true,
 			"wait_for_result":   true,
-			"num_consumers":     numConsumers, // two per connection
+			"num_consumers":     numConsumers, // one per connection plus one spare
 		},
 
 		"logs_dynamic_pipeline": map[string]any{
@@ -279,6 +280,12 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		"retry":                     getRetryConfig(escfg),
 		"suppress_conflict_errors":  true,
 		"bulk_response_filter_path": "errors,items.*.error,items.*.status,items.*.failure_store",
+
+		// Work around https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52437:
+		// the startup version probe does not send credentials and reuses retry_on_status, which
+		// includes 401/403 by default. Every probe then retries until its 5s timeout and delays
+		// receiver startup. Remove once the upstream fix is in the version we depend on.
+		"version_detection": map[string]any{"enabled": false},
 	}
 
 	// Compression
@@ -343,15 +350,15 @@ func calcNamedPresetSizing(maxConns, batchSize, floor int) (queueSize, numConsum
 		// divide-by-zero if config parsing somehow yields an empty value.
 		batchSize = 1
 	}
-	// Two consumers per connection: one sends while the other stages the next
-	// batch, keeping each connection continuously fed without stalling.
-	numConsumers = 2 * maxConns
+	// One consumer per connection plus one spare that stages the next batch
+	// while the others send, keeping every connection continuously fed.
+	numConsumers = maxConns + 1
 	// Two batches per consumer in the queue at any moment so no consumer ever
 	// stalls waiting for the queue to produce the next batch.
 	queueSize = 2 * batchSize * numConsumers
 	if queueSize > maxQueueEvents {
 		// Large host lists would otherwise demand unbounded in-flight events.
-		// Scale back proportionally: halving numConsumers also halves connections,
+		// Scale back proportionally: fewer numConsumers also means fewer connections,
 		// keeping the queue-to-batch ratio constant at the memory ceiling.
 		queueSize = maxQueueEvents
 		numConsumers = max(1, queueSize/(2*batchSize))
@@ -364,7 +371,7 @@ func calcNamedPresetSizing(maxConns, batchSize, floor int) (queueSize, numConsum
 		}
 	} else if floor > queueSize {
 		// The floor is above the formula result but below the memory ceiling.
-		// Only the queue size needs to grow; numConsumers stays at 2*maxConns
+		// Only the queue size needs to grow; numConsumers stays at maxConns+1
 		// because the cap path has not changed it from the connection-model value.
 		queueSize = floor
 	}
@@ -401,7 +408,7 @@ func getRetryConfig(escfg esToOTelOptions) map[string]any {
 	return retryCfg
 }
 
-func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
+func getURL(escfg elasticsearch.ElasticsearchConfig, output *config.C) ([]string, error) {
 	// Create url using host name, protocol and path
 	outputHosts, err := outputs.ReadHostList(output)
 	if err != nil {
@@ -414,23 +421,31 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("cannot generate ES URL from host %w", err)
 		}
+		hostURL, err := url.Parse(esURL)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse generated Elasticsearch URL: %w", err)
+		}
+		if hostURL.User != nil {
+			return nil, errors.New("credentials in Elasticsearch host URLs are unsupported; configure username and password separately")
+		}
 		if !slices.Contains(hosts, esURL) {
 			hosts = append(hosts, esURL)
 		}
 	}
 
 	if len(escfg.Params) != 0 {
-		// convert params to map[string][]string
-		params := make(map[string][]string, 0)
-		for key, value := range escfg.Params {
-			params[key] = []string{value}
-		}
-
-		decodedParam := url.Values(params)
-		// It is enough to add params as encoded query to any one host
-		// Elasticsearch exporter will make sure to add these for every outgoing request
+		// Each endpoint may be selected independently, so every URL needs the output parameters.
 		for i := range hosts {
-			hosts[i] = strings.Join([]string{hosts[0], decodedParam.Encode()}, "?")
+			hostURL, err := url.Parse(hosts[i])
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse generated Elasticsearch URL %q: %w", hosts[i], err)
+			}
+			query := hostURL.Query()
+			for key, value := range escfg.Params {
+				query.Set(key, value)
+			}
+			hostURL.RawQuery = query.Encode()
+			hosts[i] = hostURL.String()
 		}
 	}
 
@@ -440,12 +455,12 @@ func getURL(escfg esToOTelOptions, output *config.C) ([]string, error) {
 // getBeatsAuthExtensionID returns the id for beatsauth extension
 // outputName here is name of the output defined in elastic-agent.yml. For ex: default, monitoring
 func getBeatsAuthExtensionID(outputName string) otelcomponent.ID {
-	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, outputName)
+	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
 	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(BeatsAuthExtensionType), extensionName)
 }
 
-// getBeatsAuthExtensionConfig sets http transport settings on beatsauth
-// this is only required for elasticsearch output
+// getBeatsAuthExtensionConfig translates an Elasticsearch output into the
+// beatsauth configuration shared by the Elasticsearch exporter and Heartbeat.
 func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 	authSettings := beatsauthextension.BeatsAuthConfig{
 		Transport: elasticsearch.ESDefaultTransportSettings(),
@@ -484,6 +499,60 @@ func getBeatsAuthExtensionConfig(outputCfg *config.C) (map[string]any, error) {
 
 	// required to make the extension not cause the collector to fail and exit on startup
 	newMap["continue_on_error"] = true
+
+	esConfig := elasticsearch.DefaultConfig()
+	if err := outputCfg.Unpack(&esConfig); err != nil {
+		return nil, fmt.Errorf("failed unpacking Elasticsearch connection config: %w", err)
+	}
+	if err := esConfig.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid Elasticsearch connection config: %w", err)
+	}
+
+	if outputCfg.HasField("hosts") {
+		endpoints, err := getURL(esConfig, outputCfg)
+		if err != nil {
+			return nil, fmt.Errorf("error creating beatsauth endpoints: %w", err)
+		}
+		// Beatsauth consumers use endpoints as base URLs and do not support
+		// Elasticsearch output parameters. Keep query parameters on the exporter
+		// endpoints, but remove them from the shared authenticator endpoints.
+		for i, endpoint := range endpoints {
+			endpointURL, err := url.Parse(endpoint)
+			if err != nil {
+				return nil, fmt.Errorf("cannot parse beatsauth endpoint %q: %w", endpoint, err)
+			}
+			endpointURL.RawQuery = ""
+			endpointURL.ForceQuery = false
+			endpoints[i] = endpointURL.String()
+		}
+		newMap["endpoints"] = endpoints
+	}
+
+	auth := map[string]any{}
+	if esConfig.Username != "" || esConfig.Password != "" {
+		if esConfig.Username == "" || esConfig.Password == "" {
+			return nil, errors.New("username and password must be configured together for the beatsauth extension")
+		}
+		auth["username"] = esConfig.Username
+		auth["password"] = esConfig.Password
+	}
+	if esConfig.APIKey != "" {
+		auth["api_key"] = base64.StdEncoding.EncodeToString([]byte(esConfig.APIKey))
+	}
+	if len(esConfig.Headers) > 0 {
+		headerNames := slices.Sorted(maps.Keys(esConfig.Headers))
+		headers := make([]map[string]string, 0, len(headerNames))
+		for _, name := range headerNames {
+			headers = append(headers, map[string]string{
+				"key":   name,
+				"value": esConfig.Headers[name],
+			})
+		}
+		auth["headers"] = headers
+	}
+	if len(auth) > 0 {
+		newMap["auth"] = auth
+	}
 
 	return newMap, nil
 }

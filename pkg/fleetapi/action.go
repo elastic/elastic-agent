@@ -453,13 +453,22 @@ func (a *ActionUpgrade) MarshalMap() (map[string]interface{}, error) {
 // It reuses the upgrade restart machinery: the agent persists the action,
 // re-execs, and acknowledges the action on the next startup.
 type ActionRestart struct {
-	ActionID         string  `json:"id" yaml:"id" mapstructure:"id"`
-	ActionType       string  `json:"type" yaml:"type" mapstructure:"type"`
-	ActionStartTime  string  `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
-	ActionExpiration string  `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
-	Signed           *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
+	ActionID         string `json:"id" yaml:"id" mapstructure:"id"`
+	ActionType       string `json:"type" yaml:"type" mapstructure:"type"`
+	ActionStartTime  string `json:"start_time,omitempty" yaml:"start_time,omitempty" mapstructure:"-"`
+	ActionExpiration string `json:"expiration,omitempty" yaml:"expiration,omitempty" mapstructure:"-"`
+	// Signature is the action signature (JSON key "signed"). It is exposed via the
+	// Signed() method so the action satisfies the signed-action contract used by
+	// in-agent signature verification.
+	Signature *Signed `json:"signed,omitempty" yaml:"signed,omitempty" mapstructure:"signed,omitempty"`
 
 	Err error `json:"-" yaml:"-" mapstructure:"-"`
+}
+
+// Signed returns the action signature, allowing the RESTART action's signature
+// to be verified in-agent (see internal/pkg/agent/protection).
+func (a *ActionRestart) Signed() *Signed {
+	return a.Signature
 }
 
 func (a *ActionRestart) String() string {

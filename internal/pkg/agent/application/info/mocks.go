@@ -12,9 +12,6 @@ import (
 	"context"
 
 	mock "github.com/stretchr/testify/mock"
-
-	"github.com/elastic/elastic-agent/pkg/core/logger"
-	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 )
 
 // NewMockAgent creates a new instance of MockAgent. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -93,68 +90,6 @@ func (_c *MockAgent_AgentID_Call) Return(s string) *MockAgent_AgentID_Call {
 }
 
 func (_c *MockAgent_AgentID_Call) RunAndReturn(run func() string) *MockAgent_AgentID_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// ECSMetadata provides a mock function for the type MockAgent
-func (_mock *MockAgent) ECSMetadata(logger1 *logger.Logger) (*ecsmeta.ECSMeta, error) {
-	ret := _mock.Called(logger1)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ECSMetadata")
-	}
-
-	var r0 *ecsmeta.ECSMeta
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) (*ecsmeta.ECSMeta, error)); ok {
-		return returnFunc(logger1)
-	}
-	if returnFunc, ok := ret.Get(0).(func(*logger.Logger) *ecsmeta.ECSMeta); ok {
-		r0 = returnFunc(logger1)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*ecsmeta.ECSMeta)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(*logger.Logger) error); ok {
-		r1 = returnFunc(logger1)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockAgent_ECSMetadata_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ECSMetadata'
-type MockAgent_ECSMetadata_Call struct {
-	*mock.Call
-}
-
-// ECSMetadata is a helper method to define mock.On call
-//   - logger1 *logger.Logger
-func (_e *MockAgent_Expecter) ECSMetadata(logger1 any) *MockAgent_ECSMetadata_Call {
-	return &MockAgent_ECSMetadata_Call{Call: _e.mock.On("ECSMetadata", logger1)}
-}
-
-func (_c *MockAgent_ECSMetadata_Call) Run(run func(logger1 *logger.Logger)) *MockAgent_ECSMetadata_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *logger.Logger
-		if args[0] != nil {
-			arg0 = args[0].(*logger.Logger)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockAgent_ECSMetadata_Call) Return(eCSMeta *ecsmeta.ECSMeta, err error) *MockAgent_ECSMetadata_Call {
-	_c.Call.Return(eCSMeta, err)
-	return _c
-}
-
-func (_c *MockAgent_ECSMetadata_Call) RunAndReturn(run func(logger1 *logger.Logger) (*ecsmeta.ECSMeta, error)) *MockAgent_ECSMetadata_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -287,6 +222,52 @@ func (_c *MockAgent_GetLogLevelRuntime_Call) Return(s string) *MockAgent_GetLogL
 }
 
 func (_c *MockAgent_GetLogLevelRuntime_Call) RunAndReturn(run func() string) *MockAgent_GetLogLevelRuntime_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTags provides a mock function for the type MockAgent
+func (_mock *MockAgent) GetTags() []string {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTags")
+	}
+
+	var r0 []string
+	if returnFunc, ok := ret.Get(0).(func() []string); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	return r0
+}
+
+// MockAgent_GetTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTags'
+type MockAgent_GetTags_Call struct {
+	*mock.Call
+}
+
+// GetTags is a helper method to define mock.On call
+func (_e *MockAgent_Expecter) GetTags() *MockAgent_GetTags_Call {
+	return &MockAgent_GetTags_Call{Call: _e.mock.On("GetTags")}
+}
+
+func (_c *MockAgent_GetTags_Call) Run(run func()) *MockAgent_GetTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockAgent_GetTags_Call) Return(strings []string) *MockAgent_GetTags_Call {
+	_c.Call.Return(strings)
+	return _c
+}
+
+func (_c *MockAgent_GetTags_Call) RunAndReturn(run func() []string) *MockAgent_GetTags_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -525,6 +506,46 @@ func (_c *MockAgent_SetLogLevelPolicy_Call) Return() *MockAgent_SetLogLevelPolic
 }
 
 func (_c *MockAgent_SetLogLevelPolicy_Call) RunAndReturn(run func(level string)) *MockAgent_SetLogLevelPolicy_Call {
+	_c.Run(run)
+	return _c
+}
+
+// SetTags provides a mock function for the type MockAgent
+func (_mock *MockAgent) SetTags(tags []string) {
+	_mock.Called(tags)
+	return
+}
+
+// MockAgent_SetTags_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetTags'
+type MockAgent_SetTags_Call struct {
+	*mock.Call
+}
+
+// SetTags is a helper method to define mock.On call
+//   - tags []string
+func (_e *MockAgent_Expecter) SetTags(tags any) *MockAgent_SetTags_Call {
+	return &MockAgent_SetTags_Call{Call: _e.mock.On("SetTags", tags)}
+}
+
+func (_c *MockAgent_SetTags_Call) Run(run func(tags []string)) *MockAgent_SetTags_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 []string
+		if args[0] != nil {
+			arg0 = args[0].([]string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAgent_SetTags_Call) Return() *MockAgent_SetTags_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockAgent_SetTags_Call) RunAndReturn(run func(tags []string)) *MockAgent_SetTags_Call {
 	_c.Run(run)
 	return _c
 }

@@ -1,0 +1,76 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {},
+      "scopeMetrics": [
+        {
+          "scope": {
+            "name": "github.com/elastic/beats/v7/x-pack/otel/telemetry",
+            "attributes": [
+              {
+                "key": "otelcol.component.id",
+                "value": {"stringValue": "filebeatreceiver/_agent-component/filestream-monitoring/filestream-monitoring-agent"}
+              },
+              {
+                "key": "otelcol.component.kind",
+                "value": {"stringValue": "receiver"}
+              },
+              {
+                "key": "otelcol.signal",
+                "value": {"stringValue": "logs"}
+              }
+            ]
+          },
+          "metrics": [
+            {
+              "name": "libbeat.output.events.acked",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {"stringValue": "filebeatreceiver/_agent-component/filestream-monitoring/filestream-monitoring-agent"}
+                      }
+                    ],
+                    "startTimeUnixNano": "1000000000",
+                    "timeUnixNano": "2000000000",
+                    "asInt": "5"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "beat.input.log.files.open",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      {
+                        "key": "receiver",
+                        "value": {"stringValue": "filebeatreceiver/_agent-component/filestream-monitoring/filestream-monitoring-agent"}
+                      },
+                      {
+                        "key": "input_id",
+                        "value": {"stringValue": "filestream-monitoring-agent-input-0"}
+                      },
+                      {
+                        "key": "input_type",
+                        "value": {"stringValue": "log"}
+                      }
+                    ],
+                    "startTimeUnixNano": "1000000000",
+                    "timeUnixNano": "2000000000",
+                    "asInt": "3"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

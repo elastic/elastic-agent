@@ -22,9 +22,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/elastic/elastic-agent-libs/kibana"
-	"github.com/elastic/elastic-agent-libs/mapstr"
-	"github.com/elastic/elastic-agent-libs/testing/estools"
+	"github.com/elastic/beats/v7/pkg/kibana"
+	"github.com/elastic/beats/v7/pkg/mapstr"
+	"github.com/elastic/beats/v7/pkg/testing/estools"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
@@ -47,7 +47,7 @@ type NetworkTrafficRunner struct {
 
 func TestNetworkTraffic(t *testing.T) {
 	info := define.Require(t, define.Requirements{
-		Group: integration.Fleet,
+		Group: integration.FleetProxy,
 		Stack: &define.Stack{},
 		Local: false, // requires Agent installation
 		Sudo:  true,  // requires Agent installation
@@ -55,10 +55,6 @@ func TestNetworkTraffic(t *testing.T) {
 			{Type: define.Linux},
 			{Type: define.Windows},
 		},
-		// The network_traffic Fleet integration relies on packetbeat, which
-		// has no windows/arm64 build, so the agent component never reaches
-		// HEALTHY on this combination.
-		SkipOS: []define.OS{{Type: define.Windows, Arch: define.ARM64}},
 	})
 
 	suite.Run(t, &NetworkTrafficRunner{info: info})

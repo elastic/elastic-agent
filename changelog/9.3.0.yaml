@@ -54,7 +54,7 @@ entries:
         name: 1762782544-edot-add-awslogsencodingextension.yaml
         checksum: 4567bd63f0a8d715d18a21521fd80239bf24ea91
     - kind: feature
-      summary: Add opex to elastic-agent helm chart, This change will add the Opex-CCM support to the offical elastic-agent helm chart deployment.
+      summary: Add opex to elastic-agent helm chart, This change will add the Opex-CCM support to the official elastic-agent helm chart deployment.
       description: ""
       component: elastic-agent
       pr:

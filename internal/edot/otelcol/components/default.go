@@ -54,6 +54,7 @@ import (
 	snmpreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/snmpreceiver"
 	sqlserverreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/sqlserverreceiver"
 	statsdreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/statsdreceiver"
+	syslogreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/syslogreceiver"
 	vcenterreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/vcenterreceiver"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowseventlogreceiver"
 	windowsperfcountersreceiver "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/windowsperfcountersreceiver"
@@ -71,6 +72,7 @@ import (
 	mbreceiver "github.com/elastic/beats/v7/x-pack/metricbeat/mbreceiver"
 
 	// Processors:
+	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/adaptivetailsamplingprocessor"
 	attributesprocessor "github.com/open-telemetry/opentelemetry-collector-contrib/processor/attributesprocessor" // for modifying signal attributes
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/cumulativetodeltaprocessor"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/processor/filterprocessor"
@@ -95,6 +97,7 @@ import (
 	fileexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/fileexporter" // for e2e tests
 	kafkaexporter "github.com/open-telemetry/opentelemetry-collector-contrib/exporter/kafkaexporter"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/loadbalancingexporter"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/exporter/prometheusremotewriteexporter"
 	debugexporter "go.opentelemetry.io/collector/exporter/debugexporter" // for dev
 	nopexporter "go.opentelemetry.io/collector/exporter/nopexporter"
 	"go.opentelemetry.io/collector/exporter/otlpexporter"
@@ -117,11 +120,14 @@ import (
 	k8sobserver "github.com/open-telemetry/opentelemetry-collector-contrib/extension/observer/k8sobserver"
 	opampextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/opampextension"
 	pprofextension "github.com/open-telemetry/opentelemetry-collector-contrib/extension/pprofextension"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/extension/sigv4authextension"
 	filestorage "github.com/open-telemetry/opentelemetry-collector-contrib/extension/storage/filestorage"
 	"go.opentelemetry.io/collector/extension/memorylimiterextension" // for putting backpressure when approach a memory limit
 
 	elasticsearchstorage "github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchstorage"
 	kafkapartitionerextension "github.com/elastic/beats/v7/x-pack/otel/extension/kafkapartitionerextension"
+	"github.com/elastic/elastic-agent/internal/edot/extensions/awsidentityfederationextension"
+	"github.com/elastic/elastic-agent/internal/edot/extensions/meterlifecycle"
 	verifierreceiver "github.com/elastic/elastic-agent/internal/edot/receivers/verifierreceiver"
 	elasticdiagnostics "github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 
@@ -136,6 +142,7 @@ import (
 	forwardconnector "go.opentelemetry.io/collector/connector/forwardconnector"
 
 	"github.com/elastic/beats/v7/x-pack/otel/extension/beatsauthextension"
+	"github.com/elastic/beats/v7/x-pack/otel/extension/elasticsearchauth"
 	elasticmonitoringconnector "github.com/elastic/elastic-agent/internal/edot/connectors/elasticmonitoring"
 	elasticmonitoringprocessor "github.com/elastic/elastic-agent/internal/edot/processors/elasticmonitoring"
 	elasticapmconnector "github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector"
@@ -198,6 +205,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			kafkareceiver.NewFactory(),
 			sqlserverreceiver.NewFactory(),
 			statsdreceiver.NewFactory(),
+			syslogreceiver.NewFactory(),
 			vcenterreceiver.NewFactory(),
 			zookeeperreceiver.NewFactory(),
 			windowseventlogreceiver.NewFactory(),
@@ -238,6 +246,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			elastictraceprocessor.NewFactory(), // deprecated, will be removed in future
 			ratelimitprocessor.NewFactory(),
 			tailsamplingprocessor.NewFactory(),
+			adaptivetailsamplingprocessor.NewFactory(),
 			logdedupprocessor.NewFactory(),
 			beatprocessor.NewFactory(),
 			elasticmonitoringprocessor.NewFactory(),
@@ -254,6 +263,7 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			elasticsearchexporter.NewFactory(),
 			kafkaexporter.NewFactory(),
 			loadbalancingexporter.NewFactory(),
+			prometheusremotewriteexporter.NewFactory(),
 			otlphttpexporter.NewFactory(),
 			nopexporter.NewFactory(),
 			logstashexporter.NewFactory(),
@@ -289,19 +299,23 @@ func Default(extensionFactories ...extension.Factory) func() (otelcol.Factories,
 			healthcheckextension.NewFactory(),
 			bearertokenauthextension.NewFactory(),
 			oauth2clientauthextension.NewFactory(),
+			sigv4authextension.NewFactory(),
 			pprofextension.NewFactory(),
 			k8sobserver.NewFactory(),
 			apikeyauthextension.NewFactory(),
 			apmconfigextension.NewFactory(),
 			headersetterextension.NewFactory(),
 			beatsauthextension.NewFactory(),
+			elasticsearchauth.NewFactory(),
 			elasticdiagnostics.NewFactory(),
+			meterlifecycle.NewFactory(),
 			elasticsearchstorage.NewFactory(),
 			kafkapartitionerextension.NewFactory(),
 			awslogsencodingextension.NewFactory(),
 			azureencodingextension.NewFactory(),
 			opampextension.NewFactory(),
 			awscredentialsproviderextension.NewFactory(),
+			awsidentityfederationextension.NewFactory(),
 		}
 		extensions = append(extensions, extensionFactories...)
 		factories.Extensions, err = otelcol.MakeFactoryMap[extension.Factory](extensions...)

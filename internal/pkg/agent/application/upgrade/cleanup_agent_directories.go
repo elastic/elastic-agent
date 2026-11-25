@@ -298,7 +298,7 @@ func snapshotAgentDirs(topDir string) ([]string, error) {
 	}
 	var dirs []string
 	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), "elastic-agent-") {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), paths.VersionedHomePrefix) {
 			dirs = append(dirs, filepath.Join(paths.DataFrom(topDir), entry.Name()))
 		}
 	}

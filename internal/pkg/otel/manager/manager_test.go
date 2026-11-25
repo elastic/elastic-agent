@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -19,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/gofrs/uuid/v5"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/assert"
@@ -26,20 +29,24 @@ import (
 	otelComponent "go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/component/componentstatus"
 	"go.opentelemetry.io/collector/confmap"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 
-	"github.com/elastic/elastic-agent-libs/logp"
-	"github.com/elastic/elastic-agent-libs/logp/logptest"
-	"github.com/elastic/elastic-agent-libs/mapstr"
+	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/beats/v7/pkg/logp/logptest"
+	"github.com/elastic/beats/v7/pkg/mapstr"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
+	componentmonitoring "github.com/elastic/elastic-agent/internal/pkg/agent/application/monitoring/component"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
+	internalConfig "github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
+	"github.com/elastic/elastic-agent/pkg/features"
 	"github.com/elastic/elastic-agent/version"
 
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -869,7 +876,7 @@ func TestOTelManager_Run(t *testing.T) {
 			}
 			factory, testExec := testExecutionFactory(testBinary, innerFactory)
 
-			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
+			m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, testHostInfo, nil, waitTimeForStop, factory, true)
 			require.NoError(t, err, "could not create otel manager")
 			m.recoveryTimer = tc.restarter
 			if tc.makeExecFactory != nil {
@@ -930,13 +937,8 @@ func TestOTelManager_Logging(t *testing.T) {
 	const waitTimeForStop = 30 * time.Second
 
 	tmp := t.TempDir()
-	topPath, logsPath := paths.Top(), paths.Logs()
-	paths.SetTop(tmp)
-	paths.SetLogs(filepath.Join(tmp, "logs"))
-	t.Cleanup(func() {
-		paths.SetTop(topPath)
-		paths.SetLogs(logsPath)
-	})
+	pathstest.SetTop(t, tmp)
+	pathstest.SetLogs(t, filepath.Join(tmp, "logs"))
 
 	l, _ := loggertest.New("otel-manager")
 
@@ -947,7 +949,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	collectorLogger, err := logger.NewNamedLogger(CollectorLogFileName, logger.DefaultLoggingConfig(), logger.DefaultEventLoggingConfig())
 	require.NoError(t, err, "could not create collector logger")
 
-	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
+	m, err := NewOTelManager(l, logp.InfoLevel, collectorLogger, &info.AgentInfo{}, testHostInfo, nil, waitTimeForStop, factory, true)
 	require.NoError(t, err, "could not create otel manager")
 
 	var wg sync.WaitGroup
@@ -971,7 +973,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	m.Update(cfg, nil, logp.InfoLevel, nil)
 
 	// Normal collector logs must appear in the dedicated log file, not in the agent's own log.
-	logFileGlob := filepath.Join(paths.Home(), "logs", CollectorLogFileName+"-*.ndjson")
+	logFileGlob := filepath.Join(paths.BuildLogs(), CollectorLogFileName+"-*.ndjson")
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		matches, globErr := filepath.Glob(logFileGlob)
 		require.NoError(collect, globErr)
@@ -986,7 +988,7 @@ func TestOTelManager_Logging(t *testing.T) {
 	}, time.Second*10, time.Second)
 
 	// Event-tagged lines must be routed to the collector's own events log file.
-	eventLogFileGlob := filepath.Join(paths.Home(), "logs", "events", CollectorLogFileName+"-event-log-*.ndjson")
+	eventLogFileGlob := filepath.Join(paths.BuildLogs(), "events", CollectorLogFileName+"-event-log-*.ndjson")
 	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		matches, globErr := filepath.Glob(eventLogFileGlob)
 		require.NoError(collect, globErr)
@@ -1022,7 +1024,7 @@ func TestOTelManager_PartialReceiverReload(t *testing.T) {
 	l, _ := loggertest.New("otel-manager")
 
 	factory, _ := testExecutionFactory(testBinary, nil)
-	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, true)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, testHostInfo, nil, waitTimeForStop, factory, true)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
@@ -1130,7 +1132,7 @@ func TestOTelManager_FullReloadWhenPartialReloadDisabled(t *testing.T) {
 		return newSubprocessExecution(collectorPath, healthCheckExtID, healthCheckPort, false)
 	}
 	factory, _ := testExecutionFactory(testBinary, innerFactory)
-	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, nil, waitTimeForStop, factory, false)
+	m, err := NewOTelManager(l, logp.InfoLevel, base, &info.AgentInfo{}, testHostInfo, nil, waitTimeForStop, factory, false)
 	require.NoError(t, err, "could not create otel manager")
 
 	go func() {
@@ -1265,6 +1267,7 @@ func TestOTelManager_Ports(t *testing.T) {
 				logp.InfoLevel,
 				base,
 				&info.AgentInfo{},
+				testHostInfo,
 				&agentCollectorConfig,
 				waitTimeForStop,
 				factory,
@@ -1385,6 +1388,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 		logp.InfoLevel,
 		base,
 		&info.AgentInfo{},
+		testHostInfo,
 		nil,
 		waitTimeForStop,
 		factory,
@@ -1567,7 +1571,7 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 				healthCheckExtComponentID: "healthcheckv2/test-uuid",
 				collectorMetricsPort:      8888,
 			}
-			result, err := mgr.buildMergedConfig(cfgUpdate, commonAgentInfo, logptest.NewTestingLogger(t, ""))
+			result, err := mgr.buildMergedConfig(t.Context(), cfgUpdate, commonAgentInfo, logptest.NewTestingLogger(t, ""))
 
 			if tt.expectedErrorString != "" {
 				assert.Error(t, err)
@@ -1606,10 +1610,8 @@ func TestOTelManager_buildMergedConfig(t *testing.T) {
 func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	// Set a temp top path so injectDiagnosticsExtension can compute a valid
 	// socket path without side-effects on the real paths.
-	topPath := paths.Top()
 	tempTopPath := t.TempDir()
-	paths.SetTop(tempTopPath)
-	t.Cleanup(func() { paths.SetTop(topPath) })
+	pathstest.SetTop(t, tempTopPath)
 
 	m := &OTelManager{
 		healthCheckExtComponentID: "healthcheckv2/test",
@@ -1695,7 +1697,7 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 		components:   []component.Component{comp},
 	}
 
-	result, err := m.buildMergedConfig(cfgUpdate, agentInfo, logp.NewNopLogger())
+	result, err := m.buildMergedConfig(t.Context(), cfgUpdate, agentInfo, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -1710,16 +1712,19 @@ func TestBuildMergedConfigPreservesComponentExtensions(t *testing.T) {
 	// The user-supplied extension must also be present.
 	assert.Contains(t, list, "user_extension",
 		"user-supplied extension must be present in merged service::extensions")
+
+	assert.Contains(t, list, "headers_setter/_agent-component/",
+		"headers_setter extension must be injected when the config has beat receivers")
+	assert.True(t, result.IsSet("extensions::headers_setter/_agent-component/"),
+		"headers_setter extension config must be present when the config has beat receivers")
 }
 
 // TestBuildMergedConfigCollectorOnlyExtensions verifies that when there are no
 // components (and therefore no component-generated extensions), the collector
 // config extensions are still preserved in the merged output.
 func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
-	topPath := paths.Top()
 	tempTopPath := t.TempDir()
-	paths.SetTop(tempTopPath)
-	t.Cleanup(func() { paths.SetTop(topPath) })
+	pathstest.SetTop(t, tempTopPath)
 
 	m := &OTelManager{
 		healthCheckExtComponentID: "healthcheckv2/test",
@@ -1752,7 +1757,7 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 		// No components: componentOtelCfg will be nil.
 	}
 
-	result, err := m.buildMergedConfig(cfgUpdate, &info.AgentInfo{}, logp.NewNopLogger())
+	result, err := m.buildMergedConfig(t.Context(), cfgUpdate, &info.AgentInfo{}, logp.NewNopLogger())
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -1761,6 +1766,11 @@ func TestBuildMergedConfigCollectorOnlyExtensions(t *testing.T) {
 	require.NotNil(t, list)
 	assert.Contains(t, list, "user_extension",
 		"collector-config extension must be present in merged service::extensions")
+
+	assert.NotContains(t, list, "headers_setter/_agent-component/",
+		"headers_setter extension must not be injected without beat receivers")
+	assert.False(t, result.IsSet("extensions::headers_setter/_agent-component/"),
+		"headers_setter extension config must not be present without beat receivers")
 }
 
 func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
@@ -1785,10 +1795,10 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					"pipeline:logs/_agent-component/test-component": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						ComponentStatusMap: map[string]*status.AggregateStatus{
-							"receiver:filebeat/_agent-component/test-component/test-1": {
+							"receiver:filebeat/_agent-component/test-component/filestream-unit-test-1": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
-							"receiver:filebeat/_agent-component/test-component/test-2": {
+							"receiver:filebeat/_agent-component/test-component/filestream-unit-test-2": {
 								Event: componentstatus.NewEvent(componentstatus.StatusOK),
 							},
 							"exporter:elasticsearch/_agent-component/test-component": {
@@ -1828,6 +1838,14 @@ func TestOTelManager_handleOtelStatusUpdate(t *testing.T) {
 					// This represents a regular collector pipeline (should remain after cleaning)
 					"pipeline:logs": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+					},
+					"extensions": {
+						Event: componentstatus.NewEvent(componentstatus.StatusOK),
+						ComponentStatusMap: map[string]*status.AggregateStatus{
+							"extension:oauth2client/test": {
+								Event: componentstatus.NewEvent(componentstatus.StatusOK),
+							},
+						},
 					},
 				},
 			},
@@ -2044,6 +2062,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		logp.InfoLevel,
 		testLogger,
 		agentInfo,
+		testHostInfo,
 		nil,
 		time.Second,
 		mockFactory,
@@ -2089,6 +2108,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		}
 		expectedCfg := confmap.NewFromStringMap(collectorCfg.ToStringMap())
 		assert.NoError(t, injectDiagnosticsExtension(expectedCfg))
+		assert.NoError(t, injectMeterLifecycleExtension(expectedCfg))
 		assert.NoError(t, maybeInjectLogLevel(expectedCfg, logpLevel))
 		assert.NoError(t, injectHealthCheckV2Extension(expectedCfg, mgr.healthCheckExtComponentID, 0))
 		assert.NoError(t, addCollectorMetricsReader(expectedCfg, mgr.collectorMetricsPort))
@@ -2128,7 +2148,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.True(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/filestream-unit-test-1"))
 	})
 
 	t.Run("empty collector config leaves the component config running", func(t *testing.T) {
@@ -2144,7 +2164,7 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, receivers)
 		assert.False(t, receivers.IsSet("nop"))
-		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/test-1"))
+		assert.True(t, receivers.IsSet("filebeatreceiver/_agent-component/test/filestream-unit-test-1"))
 	})
 
 	t.Run("collector status with components is passed up to the component manager", func(t *testing.T) {
@@ -2155,10 +2175,10 @@ func TestOTelManagerEndToEnd(t *testing.T) {
 				"pipeline:logs/_agent-component/test": {
 					Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					ComponentStatusMap: map[string]*status.AggregateStatus{
-						"receiver:filebeatreceiver/_agent-component/test/test-1": {
+						"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-1": {
 							Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						},
-						"receiver:filebeatreceiver/_agent-component/test/test-2": {
+						"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-2": {
 							Event: componentstatus.NewEvent(componentstatus.StatusOK),
 						},
 						"exporter:elasticsearch/_agent-component/test": {
@@ -2248,7 +2268,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 	mockFactory := func(string, string, int) (collectorExecution, error) {
 		return execution, nil
 	}
-	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, nil, time.Second, mockFactory, true)
+	mgr, err := NewOTelManager(testLogger, logp.InfoLevel, testLogger, &info.AgentInfo{}, testHostInfo, nil, time.Second, mockFactory, true)
 	require.NoError(t, err)
 	mgr.recoveryTimer = newRestarterNoop()
 
@@ -2312,6 +2332,7 @@ func TestOTelManager_CollectorRunErrWithNilConfig(t *testing.T) {
 		logp.InfoLevel,
 		collectorLogger,
 		&info.AgentInfo{},
+		testHostInfo,
 		nil,
 		time.Second,
 		mockFactory,
@@ -2369,6 +2390,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		logp.InfoLevel,
 		testLogger,
 		&info.AgentInfo{},
+		testHostInfo,
 		nil,
 		time.Second,
 		mockFactory,
@@ -2395,10 +2417,10 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 			"pipeline:logs/_agent-component/test": {
 				Event: componentstatus.NewEvent(componentstatus.StatusOK),
 				ComponentStatusMap: map[string]*status.AggregateStatus{
-					"receiver:filebeatreceiver/_agent-component/test/test-1": {
+					"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-1": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
-					"receiver:filebeatreceiver/_agent-component/test/test-2": {
+					"receiver:filebeatreceiver/_agent-component/test/filestream-unit-test-2": {
 						Event: componentstatus.NewEvent(componentstatus.StatusOK),
 					},
 					"exporter:elasticsearch/_agent-component/test": {
@@ -2449,7 +2471,7 @@ func TestManagerAlwaysEmitsStoppedStatesForComponents(t *testing.T) {
 		require.Len(collect, componentStates, 1)
 		componentState := componentStates[0]
 		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
-	}, time.Millisecond, time.Second*5)
+	}, time.Second*5, time.Millisecond)
 }
 
 func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
@@ -2470,6 +2492,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		logp.InfoLevel,
 		testLogger,
 		agentInfo,
+		testHostInfo,
 		nil,
 		time.Second,
 		mockFactory,
@@ -2534,7 +2557,7 @@ func TestManagerEmitsStartingStatesWhenHealthcheckIsUnavailable(t *testing.T) {
 		require.Len(collect, componentStates, 1)
 		componentState := componentStates[0]
 		assert.Equal(collect, componentState.State.State, client.UnitStateStopped)
-	}, time.Millisecond, time.Second*5)
+	}, time.Second*5, time.Millisecond)
 }
 
 func getFromChannelOrErrorWithContext[T any](t *testing.T, ctx context.Context, ch <-chan T, errCh <-chan error) (T, error) {
@@ -2817,30 +2840,222 @@ func TestMonitoringReceiverProcessors(t *testing.T) {
 	// Processors are injected on the logs pipeline (connector → ES), which is only
 	// created when an OTel-based monitoring exporter is present.
 	logsPipelineName := "logs/" + translate.OtelNamePrefix + "internal-telemetry-monitoring"
-	baseConfig := map[string]any{
-		"exporters": map[string]any{
-			exporterName: nil,
-		},
-	}
-	cfg := confmap.NewFromStringMap(baseConfig)
-	monitoringConfig := &config.MonitoringConfig{}
-	agentInfo := &info.AgentInfo{}
-	components := []component.Component{}
-	err := injectMonitoringReceiver(cfg, monitoringConfig, agentInfo, components, logp.NewNopLogger())
-	require.NoError(t, err, "injectMonitoringReceiver should succeed")
-	result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-	expectedBeatsProcessors := translate.GetDefaultProcessors("")
-	actualBeatsProcessors := result["processors."+procName+".processors"]
-	assert.NotNil(t, actualBeatsProcessors, "monitoring receiver processors should not be nil")
-	if actualBeatsProcessors != nil {
-		assert.ElementsMatch(t, expectedBeatsProcessors, actualBeatsProcessors, "monitoring processors don't match expected value")
+	newCfg := func() *confmap.Conf {
+		return confmap.NewFromStringMap(map[string]any{
+			"exporters": map[string]any{exporterName: nil},
+		})
 	}
 
-	expectedPipelineProcessors := []string{procName}
-	actualPipelineProcessors := result["service.pipelines."+logsPipelineName+".processors"]
-	assert.NotNil(t, actualPipelineProcessors, "processors for monitoring logs pipeline should not be nil")
-	assert.ElementsMatch(t, expectedPipelineProcessors, actualPipelineProcessors, "monitoring logs pipeline processors should match default")
+	// monitoringOutputComp builds a component routed to the monitoring output,
+	// optionally merging extra fields into the output unit config.
+	monitoringOutputComp := func(outputExtra ...map[string]any) component.Component {
+		outputCfg := map[string]any{
+			"type":  "elasticsearch",
+			"hosts": []any{"localhost:9200"},
+		}
+		for _, extra := range outputExtra {
+			maps.Copy(outputCfg, extra)
+		}
+		return component.Component{
+			ID:         "filestream-monitoring",
+			OutputType: "elasticsearch",
+			OutputName: componentmonitoring.MonitoringOutput,
+			Units: []component.Unit{
+				{
+					ID:     "filestream-monitoring-output",
+					Type:   client.UnitTypeOutput,
+					Config: component.MustExpectedConfig(outputCfg),
+				},
+			},
+		}
+	}
+
+	// monitoringProcessorNames extracts the processor names from the monitoring
+	// beatprocessor config, returning nil if no beatprocessor was injected.
+	monitoringProcessorNames := func(t *testing.T, cfg *confmap.Conf) []string {
+		t.Helper()
+		m := cfg.ToStringMap()
+		procsAny, ok := m["processors"]
+		if !ok {
+			return nil
+		}
+		procs, ok := procsAny.(map[string]any)
+		if !ok {
+			return nil
+		}
+		beatProcAny, ok := procs[procName]
+		if !ok {
+			return nil
+		}
+		beatProc, ok := beatProcAny.(map[string]any)
+		if !ok {
+			return nil
+		}
+		listAny, ok := beatProc["processors"]
+		if !ok {
+			return nil
+		}
+		list, ok := listAny.([]map[string]any)
+		if !ok {
+			return nil
+		}
+		names := make([]string, 0, len(list))
+		for _, p := range list {
+			for k := range p {
+				names = append(names, k)
+			}
+		}
+		return names
+	}
+
+	// applyGlobalFlags applies default processor flags via features.Apply and
+	// registers a cleanup to restore the original state when the sub-test ends.
+	applyGlobalFlags := func(t *testing.T, f features.DefaultProcessors) {
+		t.Helper()
+		orig := features.GetDefaultProcessors()
+		t.Cleanup(func() {
+			_ = features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+				"agent.features.default_processors.add_host_metadata":       orig.AddHostMetadata,
+				"agent.features.default_processors.add_cloud_metadata":      orig.AddCloudMetadata,
+				"agent.features.default_processors.add_docker_metadata":     orig.AddDockerMetadata,
+				"agent.features.default_processors.add_kubernetes_metadata": orig.AddKubernetesMetadata,
+			}))
+		})
+		require.NoError(t, features.Apply(internalConfig.MustNewConfigFrom(map[string]any{
+			"agent.features.default_processors.add_host_metadata":       f.AddHostMetadata,
+			"agent.features.default_processors.add_cloud_metadata":      f.AddCloudMetadata,
+			"agent.features.default_processors.add_docker_metadata":     f.AddDockerMetadata,
+			"agent.features.default_processors.add_kubernetes_metadata": f.AddKubernetesMetadata,
+		})))
+	}
+
+	t.Run("default processors applied", func(t *testing.T) {
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		assert.ElementsMatch(t,
+			[]string{"add_host_metadata", "add_cloud_metadata", "add_docker_metadata", "add_kubernetes_metadata"},
+			names,
+			"all four default processors should be present",
+		)
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.ElementsMatch(t, []string{procName}, result["service.pipelines."+logsPipelineName+".processors"])
+	})
+
+	t.Run("globally disabled processor omitted from monitoring pipeline", func(t *testing.T) {
+		applyGlobalFlags(t, features.DefaultProcessors{
+			AddHostMetadata: true, AddCloudMetadata: false,
+			AddDockerMetadata: true, AddKubernetesMetadata: true,
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		require.NotNil(t, names)
+		assert.NotContains(t, names, "add_cloud_metadata")
+		assert.Contains(t, names, "add_host_metadata")
+		assert.Contains(t, names, "add_docker_metadata")
+		assert.Contains(t, names, "add_kubernetes_metadata")
+	})
+
+	t.Run("all processors disabled globally leaves no beatprocessor", func(t *testing.T) {
+		applyGlobalFlags(t, features.DefaultProcessors{
+			AddHostMetadata: false, AddCloudMetadata: false,
+			AddDockerMetadata: false, AddKubernetesMetadata: false,
+		})
+
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		assert.Nil(t, monitoringProcessorNames(t, cfg), "no beatprocessor should be injected when all processors disabled")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.Nil(t, result["service.pipelines."+logsPipelineName+".processors"], "logs pipeline should have no processors")
+	})
+
+	t.Run("per-output monitoring config disables a processor", func(t *testing.T) {
+		comp := monitoringOutputComp(map[string]any{
+			"default_processors": map[string]any{"add_host_metadata": false},
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{comp}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		names := monitoringProcessorNames(t, cfg)
+		require.NotNil(t, names)
+		assert.NotContains(t, names, "add_host_metadata")
+		assert.Contains(t, names, "add_cloud_metadata")
+		assert.Contains(t, names, "add_docker_metadata")
+		assert.Contains(t, names, "add_kubernetes_metadata")
+	})
+
+	t.Run("per-output monitoring enabled:false leaves no beatprocessor", func(t *testing.T) {
+		comp := monitoringOutputComp(map[string]any{
+			"default_processors": map[string]any{"enabled": false},
+		})
+		cfg := newCfg()
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{comp}, logp.NewNopLogger())
+		require.NoError(t, err)
+
+		assert.Nil(t, monitoringProcessorNames(t, cfg), "no beatprocessor should be injected when all processors disabled per-output")
+		result := mapstr.M(cfg.ToStringMap()).Flatten()
+		assert.Nil(t, result["service.pipelines."+logsPipelineName+".processors"], "logs pipeline should have no processors")
+	})
+}
+
+// testHostInfo provides fixed host information, so the tests don't gather it from the test host.
+var testHostInfo = hostinfo.FetchFunc(func(context.Context) (hostinfo.Info, error) {
+	return hostinfo.Info{Hostname: "Test-Host"}, nil
+})
+
+func TestMonitoringHostname(t *testing.T) {
+	osHostname, err := os.Hostname()
+	require.NoError(t, err)
+	log, _ := loggertest.New(t.Name())
+
+	t.Run("from shared host information", func(t *testing.T) {
+		fetches := 0
+		m := &OTelManager{
+			managerLogger: log,
+			hostInfo: hostinfo.NewWatcherWithFetcher(log, time.Minute, func(context.Context) (hostinfo.Info, error) {
+				fetches++
+				return hostinfo.Info{Hostname: "Test-Host.Example.com"}, nil
+			}),
+		}
+		assert.Equal(t, "Test-Host.Example.com", m.monitoringHostname(t.Context()))
+		assert.Equal(t, "Test-Host.Example.com", m.monitoringHostname(t.Context()))
+		assert.Equal(t, 1, fetches, "the host information is fetched once and then taken from the watcher")
+	})
+
+	t.Run("host information unavailable", func(t *testing.T) {
+		m := &OTelManager{
+			managerLogger: log,
+			hostInfo: hostinfo.NewWatcherWithFetcher(log, time.Minute, func(context.Context) (hostinfo.Info, error) {
+				return hostinfo.Info{}, errors.New("fetch failed")
+			}),
+		}
+		assert.Equal(t, osHostname, m.monitoringHostname(t.Context()))
+	})
+}
+
+func TestMonitoringEventTemplateHostname(t *testing.T) {
+	tmpl := mapstr.M(monitoringEventTemplate(&config.MonitoringConfig{}, &info.AgentInfo{}, "Test-Host"))
+	name, err := tmpl.GetValue("agent.name")
+	require.NoError(t, err)
+	assert.Equal(t, "Test-Host", name)
+	hostname, err := tmpl.GetValue("host.hostname")
+	require.NoError(t, err)
+	assert.Equal(t, "Test-Host", hostname)
+
+	tmpl = mapstr.M(monitoringEventTemplate(&config.MonitoringConfig{}, &info.AgentInfo{}, ""))
+	_, err = tmpl.GetValue("agent.name")
+	assert.Error(t, err, "agent.name isn't set without a hostname")
+	_, err = tmpl.GetValue("host")
+	assert.Error(t, err, "host isn't set without a hostname")
 }
 
 func TestMonitoringReceiverFileExporter(t *testing.T) {
@@ -2863,7 +3078,7 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 			},
 		}
 		cfg := confmap.NewFromStringMap(baseConfig)
-		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
@@ -2892,7 +3107,7 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 		// internal telemetry is captured in the diagnostics file. No connector or
 		// logs pipeline is added since there is no ES output to send logs to.
 		cfg := confmap.NewFromStringMap(map[string]any{})
-		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed without monitoring exporter")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
@@ -2913,15 +3128,15 @@ func TestMonitoringReceiverFileExporter(t *testing.T) {
 
 	t.Run("file exporter config", func(t *testing.T) {
 		cfg := confmap.NewFromStringMap(map[string]any{})
-		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, []component.Component{}, logp.NewNopLogger())
+		err := injectMonitoringReceiver(cfg, &config.MonitoringConfig{}, &info.AgentInfo{}, "", []component.Component{}, logp.NewNopLogger())
 		require.NoError(t, err, "injectMonitoringReceiver should succeed")
 		result := mapstr.M(cfg.ToStringMap()).Flatten()
 
-		// The file exporter path must be in paths.Home()/logs/ — the same directory
+		// The file exporter path must be in paths.BuildLogs() — the same directory
 		// that MakeInternalFileOutput writes to and that the diagnostics collector walks.
-		expectedPath := filepath.Join(paths.Home(), "logs", internalTelemetryDiagnosticsFileName)
+		expectedPath := filepath.Join(paths.BuildLogs(), internalTelemetryDiagnosticsFileName)
 		assert.Equal(t, expectedPath, result["exporters."+fileExporterName+".path"],
-			"file exporter path should be in paths.Home()/logs/")
+			"file exporter path should be in paths.BuildLogs()")
 
 		// Records are written as OTLP JSON metrics — format: json uses the same metrics
 		// marshaler as the otlp_encoding extension, without needing a separate extension component.

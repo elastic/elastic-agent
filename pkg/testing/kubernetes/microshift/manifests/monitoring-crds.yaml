@@ -1,0 +1,287 @@
+# Source: https://github.com/openshift/cluster-monitoring-operator/tree/release-4.22/manifests
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: alertmanagerconfigs.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: AlertmanagerConfig
+    listKind: AlertmanagerConfigList
+    plural: alertmanagerconfigs
+    shortNames:
+    - amcfg
+    singular: alertmanagerconfig
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
+  - name: v1beta1
+    served: true
+    storage: false
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: alertmanagers.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: Alertmanager
+    listKind: AlertmanagerList
+    plural: alertmanagers
+    shortNames:
+    - am
+    singular: alertmanager
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: podmonitors.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: PodMonitor
+    listKind: PodMonitorList
+    plural: podmonitors
+    shortNames:
+    - pmon
+    singular: podmonitor
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: probes.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: Probe
+    listKind: ProbeList
+    plural: probes
+    shortNames:
+    - prb
+    singular: probe
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: prometheuses.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: Prometheus
+    listKind: PrometheusList
+    plural: prometheuses
+    shortNames:
+    - prom
+    singular: prometheus
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      scale:
+        labelSelectorPath: .status.selector
+        specReplicasPath: .spec.shards
+        statusReplicasPath: .status.shards
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: prometheusrules.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: PrometheusRule
+    listKind: PrometheusRuleList
+    plural: prometheusrules
+    shortNames:
+    - promrule
+    singular: prometheusrule
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: servicemonitors.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: ServiceMonitor
+    listKind: ServiceMonitorList
+    plural: servicemonitors
+    shortNames:
+    - smon
+    singular: servicemonitor
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: thanosrulers.monitoring.coreos.com
+spec:
+  group: monitoring.coreos.com
+  names:
+    categories:
+    - prometheus-operator
+    kind: ThanosRuler
+    listKind: ThanosRulerList
+    plural: thanosrulers
+    shortNames:
+    - ruler
+    singular: thanosruler
+  scope: Namespaced
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+    subresources:
+      status: {}

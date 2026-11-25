@@ -41,8 +41,6 @@ exporters:
     api_key: ${ELASTIC_API_KEY} # Will be populated from environment variable
     # tls:
     #   insecure_skip_verify: true
-    mapping:
-      mode: otel
 
 service:
   pipelines:

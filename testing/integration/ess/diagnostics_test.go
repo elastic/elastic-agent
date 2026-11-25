@@ -29,7 +29,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 
-	"github.com/elastic/elastic-agent-libs/redact"
+	"github.com/elastic/beats/v7/pkg/redact"
 	"github.com/elastic/elastic-agent/pkg/control/v2/client"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
@@ -363,6 +363,49 @@ func TestRedactFleetSecretPathsDiagnostics(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsAgentTags(t *testing.T) {
+	define.Require(t, define.Requirements{
+		Group: integration.Default,
+		Local: true,
+	})
+
+	f, err := define.NewFixtureFromLocalBuild(t, define.Version())
+	require.NoError(t, err)
+
+	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
+	defer cancel()
+	err = f.Prepare(ctx, fakeComponent)
+	require.NoError(t, err)
+
+	err = f.Run(ctx, integrationtest.State{
+		Configure:  simpleConfigWithTags,
+		AgentState: integrationtest.NewClientState(client.Healthy),
+		Components: componentSetup,
+		After: func(ctx context.Context) error {
+			diagZip, err := f.ExecDiagnostics(ctx, "diagnostics", "collect")
+			require.NoError(t, err)
+
+			extractionDir := t.TempDir()
+			extractZipArchive(t, diagZip, extractionDir)
+
+			agentInfoPath := filepath.Join(extractionDir, "agent-info.yaml")
+			agentInfoFile, err := os.Open(agentInfoPath)
+			require.NoErrorf(t, err, "open file %q failed", agentInfoPath)
+			defer agentInfoFile.Close()
+
+			var agentInfo map[string]any
+			err = yaml.NewDecoder(agentInfoFile).Decode(&agentInfo)
+			require.NoErrorf(t, err, "decode file %q failed", agentInfoPath)
+
+			assert.Equal(t, []any{"tag1", "tag2"}, agentInfo["tags"],
+				"agent-info.yaml should report the tags set with agent.tags")
+
+			return nil
+		},
+	})
+	assert.NoError(t, err)
+}
+
 func TestBeatDiagnostics(t *testing.T) {
 	define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -398,10 +441,8 @@ agent.monitoring.enabled: {{ .MonitoringEnabled }}
 agent.internal.runtime.filebeat.filestream: {{ .Runtime }}
 `
 
-	// httpjsonTracerConfigTemplate runs httpjson as a normal filebeat subprocess (process
-	// mode). In that mode filebeat sets the global paths.Paths.Logs, so the httpjson tracer
-	// path validation works and writes trace files to {versionedHome}/components/logs/httpjson/
-	// — the directory the diagnostic bundle fix now collects.
+	// httpjsonTracerConfigTemplate runs httpjson with the request tracer in the given runtime. Trace files
+	// are written to {buildLogs}/components/httpjson/, which the diagnostic bundle collects.
 	httpjsonTracerConfigTemplate := `
 inputs:
   - type: httpjson
@@ -420,13 +461,9 @@ outputs:
     type: elasticsearch
     hosts: [{{ .ESHost }}]
     api_key: placeholder
-agent.monitoring.enabled: false
-# Force process (subprocess) mode for httpjson. The default runtime for all filebeat inputs
-# is otel (see DefaultRuntimeConfig), but in otel mode the fbreceiver stores paths in
-# b.Info.Paths rather than the global paths.Paths, so the httpjson tracer path validation
-# reads an uninitialised paths.Paths.Logs and rejects the tracer filename. In process mode
-# filebeat runs as a subprocess and initialises the global paths normally.
-agent.internal.runtime.filebeat.httpjson: process
+agent.monitoring.enabled: {{ .MonitoringEnabled }}
+{{ if .MonitoringEnabled }}agent.monitoring.metrics_period: 2s{{ end }}
+agent.internal.runtime.filebeat.httpjson: {{ .Runtime }}
 `
 
 	fileStreamAgentCompState := map[string]integrationtest.ComponentState{
@@ -509,11 +546,8 @@ agent.internal.runtime.filebeat.httpjson: process
 			configTemplate: fileStreamConfigTemplate,
 		},
 		{
-			// Verifies that beat receiver trace logs written to {versionedHome}/components/logs/
-			// are included in the diagnostic bundle under logs/<commit>/httpjson/.
-			// Uses httpjson in process mode: the filebeat subprocess sets the global
-			// paths.Paths.Logs so the tracer path validation succeeds, and trace files land in
-			// {versionedHome}/components/logs/httpjson/ — the path the fix now collects.
+			// Verifies that trace logs written by a filebeat subprocess to {buildLogs}/components/
+			// are included in the diagnostic bundle under logs/<group>/components/httpjson/.
 			name:    "httpjson trace logs in bundle",
 			runtime: "process",
 			expectedCompDiagnosticsFiles: append(compDiagnosticsFiles,
@@ -523,6 +557,24 @@ agent.internal.runtime.filebeat.httpjson: process
 				"beat-rendered-config.yml",
 				"global_processors.txt",
 			),
+			agentCompState: httpjsonAgentCompState,
+			diagCompSetup: map[string]integrationtest.ComponentState{
+				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},
+			},
+			configTemplate:             httpjsonTracerConfigTemplate,
+			checkBeatReceiverTraceLogs: true,
+		},
+		{
+			// Same as above for httpjson running as a beat receiver in the collector: the receiver
+			// writes its trace files to {buildLogs}/components/ too.
+			name:              "httpjson trace logs in bundle, otel runtime",
+			runtime:           "otel",
+			monitoringEnabled: true,
+			expectedCompDiagnosticsFiles: []string{
+				"*/registry.tar.gz",
+				"*/beat_metrics.json",
+				"*/input_metrics.json",
+			},
 			agentCompState: httpjsonAgentCompState,
 			diagCompSetup: map[string]integrationtest.ComponentState{
 				"httpjson-default": {State: integrationtest.NewClientState(client.Healthy)},
@@ -663,15 +715,7 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		require.Containsf(collect, output.String(), "Diagnostics extension started", "expected log: %s", output.String())
 	}, 30*time.Second, 1*time.Second)
 
-	diagZip, err := f.ExecDiagnostics(ctx)
-	extractionDir := t.TempDir()
-
-	stat, err := os.Stat(diagZip)
-	require.NoErrorf(t, err, "stat file %q failed", diagZip)
-	require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", diagZip)
-
-	extractZipArchive(t, diagZip, extractionDir)
-
+	const registryArchivePattern = "components/filestream-default/*/registry.tar.gz"
 	// Beat receivers register diagnostic hooks per input stream via the OTel receiver
 	// instance ID ("<receiverType>/_agent-component/<comp.ID>/<streamID>"). Results are grouped
 	// at the component level and land under the component directory, same as for process-runtime beats.
@@ -686,7 +730,7 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		"edot/heap.profile.gz",
 		"edot/mutex.profile.gz",
 		"edot/threadcreate.profile.gz",
-		"components/filestream-default/*/registry.tar.gz",
+		registryArchivePattern,
 		"components/filestream-default/*/beat_metrics.json",
 		"components/filestream-default/*/input_metrics.json",
 		"components/system-metrics-default/*/beat_metrics.json",
@@ -695,18 +739,18 @@ agent.internal.runtime.metricbeat.system/metrics: otel
 		"logs/elastic-agent-*/elastic-otel-collector-*.ndjson",
 	}
 
-	for _, f := range expectedFiles {
-		matches, err := filepath.Glob(filepath.Join(extractionDir, f))
-		require.NoErrorf(t, err, "glob %q failed", f)
-		require.NotEmptyf(t, matches, "no file matching %q", f)
-		stat, err := os.Stat(matches[0])
-		require.NoErrorf(t, err, "stat file %q failed", matches[0])
-		require.Greaterf(t, stat.Size(), int64(0), "file %s has incorrect size", matches[0])
-	}
-	registryMatches, err := filepath.Glob(filepath.Join(extractionDir, "components/filestream-default/*/registry.tar.gz"))
-	require.NoError(t, err)
-	require.NotEmpty(t, registryMatches)
-	verifyFilebeatRegistry(t, registryMatches[0])
+	var diagZip string
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		diagZip, err = f.ExecDiagnostics(ctx)
+		if err != nil {
+			collect.Errorf("running diagnostics failed: %v", err)
+			return
+		}
+
+		if err := validateEDOTDiagnosticsArchive(diagZip, expectedFiles, registryArchivePattern); err != nil {
+			collect.Errorf("%v", err)
+		}
+	}, 30*time.Second, time.Second)
 }
 
 // TestContainerDiagnostics verifies that `elastic-agent diagnostics` collects
@@ -1065,22 +1109,88 @@ type filePattern struct {
 	optional bool
 }
 
-func verifyFilebeatRegistry(t *testing.T, path string) {
-	data, err := os.ReadFile(path)
-	require.NoError(t, err)
+func validateEDOTDiagnosticsArchive(archivePath string, expectedFiles []string, registryPattern string) error {
+	stat, err := os.Stat(archivePath)
+	if err != nil {
+		return fmt.Errorf("stat diagnostics archive %q: %w", archivePath, err)
+	}
+	if stat.Size() == 0 {
+		return fmt.Errorf("diagnostics archive %q is empty", archivePath)
+	}
+
+	archive, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return fmt.Errorf("open diagnostics archive %q: %w", archivePath, err)
+	}
+	defer archive.Close()
+
+	for _, pattern := range expectedFiles {
+		var registryData []byte
+		matched := false
+		for _, file := range archive.File {
+			match, err := path.Match(pattern, file.Name)
+			if err != nil {
+				return fmt.Errorf("match diagnostics file %q against %q: %w", file.Name, pattern, err)
+			}
+			if !match {
+				continue
+			}
+
+			matched = true
+			if file.UncompressedSize64 == 0 {
+				return fmt.Errorf("diagnostics file %q is empty", file.Name)
+			}
+			if pattern == registryPattern {
+				reader, err := file.Open()
+				if err != nil {
+					return fmt.Errorf("open registry diagnostics file %q: %w", file.Name, err)
+				}
+				registryData, err = io.ReadAll(reader)
+				closeErr := reader.Close()
+				if err != nil {
+					return fmt.Errorf("read registry diagnostics file %q: %w", file.Name, err)
+				}
+				if closeErr != nil {
+					return fmt.Errorf("close registry diagnostics file %q: %w", file.Name, closeErr)
+				}
+			}
+		}
+		if !matched {
+			return fmt.Errorf("no diagnostics file matching %q", pattern)
+		}
+		if pattern == registryPattern {
+			if err := validateFilebeatRegistry(registryData); err != nil {
+				return fmt.Errorf("validate registry diagnostics file: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateFilebeatRegistry(data []byte) error {
 	gzReader, err := gzip.NewReader(bytes.NewReader(data))
-	require.NoError(t, err)
+	if err != nil {
+		return fmt.Errorf("open gzip stream: %w", err)
+	}
+	defer gzReader.Close()
+
 	tarReader := tar.NewReader(gzReader)
-	hdr, err := tarReader.Next()
-	require.NoError(t, err)
-	assert.Equal(t, "registry", hdr.Name)
-	hdr, err = tarReader.Next()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join("registry", "filebeat"), hdr.Name)
-	hdr, err = tarReader.Next()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join("registry", "filebeat", "log.json"), hdr.Name)
-	hdr, err = tarReader.Next()
-	require.NoError(t, err)
-	assert.Equal(t, filepath.Join("registry", "filebeat", "meta.json"), hdr.Name)
+	expectedEntries := []string{
+		"registry",
+		filepath.Join("registry", "filebeat"),
+		filepath.Join("registry", "filebeat", "log.json"),
+		filepath.Join("registry", "filebeat", "meta.json"),
+	}
+	for _, expectedEntry := range expectedEntries {
+		hdr, err := tarReader.Next()
+		if err != nil {
+			return fmt.Errorf("read registry entry %q: %w", expectedEntry, err)
+		}
+		if hdr.Name != expectedEntry {
+			return fmt.Errorf("registry entry %q: got %q", expectedEntry, hdr.Name)
+		}
+	}
+
+	return nil
 }

@@ -218,7 +218,7 @@ RUN echo \
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
 ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
-ENV NODE_VERSION=22.23.2
+ENV NODE_VERSION=24.22.3
 ENV PATH="$NODE_PATH/node/bin:$PATH"
 # Install the latest version of @elastic/synthetics forcefully ignoring the previously
 # cached node_modules, heartbeat then calls the global executable to run test suites
@@ -243,16 +243,18 @@ RUN cd {{$beatHome}}/.node \
   && curl ${NODE_DOWNLOAD_URL} | tar -xJ --strip 1 -C node \
   && chmod ugo+rwX -R $NODE_PATH \
 # Install synthetics as a regular user, installing npm deps as root odesn't work
-   # fix .node .npm and .synthetics
-   && chown -R {{ .user }}:{{ .user }} $NODE_PATH
-# TODO: Remove this step when Node.js is bumped to a version that bundles npm >= 12.0.2
-# Bootstrap npm 12.0.2 from a downloaded copy to avoid npm 10.x self-replacement failures
-RUN curl -fsSL https://registry.npmjs.org/npm/-/npm-12.0.2.tgz | tar xz -C /tmp \
-    && node /tmp/package/bin/npm-cli.js install -g npm@12.0.2 \
-    && rm -rf /tmp/package \
-    && rm -rf /tmp/node-compile-cache \
-    && npm cache clean --force \
-    && chown -R {{ .user }}:{{ .user }} $NODE_PATH
+# fix .node .npm and .synthetics
+  && chown -R {{ .user }}:{{ .user }} $NODE_PATH \
+# TODO: Remove this step when Node.js is bumped to a version that bundles npm >= 12.2.2
+# Bootstrap npm 12.2.2 from a downloaded copy to avoid npm 10.x self-replacement failures
+  && curl -fsSL -o /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-12.2.2.tgz \
+  && echo "2a09606d9c9a71fee31fe147b8d46a56e0b3422f15848d9aec9f3b231e3716c3d3b99a065a62175c6759b4150e03bf6fc0bf8825112a511573ba903b3ec41370  /tmp/npm.tgz" | sha512sum -c - \
+  && tar xz -C /tmp -f /tmp/npm.tgz \
+  && node /tmp/package/bin/npm-cli.js install -g npm@12.2.2 \
+  && rm -rf /tmp/package /tmp/npm.tgz \
+  && rm -rf /tmp/node-compile-cache \
+  && npm cache clean --force \
+  && chown -R {{ .user }}:{{ .user }} $NODE_PATH
 USER {{ .user }}
 # If this fails dump the NPM logs
 RUN (npm i -g --loglevel verbose --production --engine-strict @elastic/synthetics@stack_release || sh -c 'tail -n +1 /root/.npm/_logs/* && exit 1') && \
@@ -271,7 +273,7 @@ USER root
 RUN for iter in {1..10}; do \
         microdnf -y update --nodocs && \
         microdnf -y --nodocs --setopt install_weak_deps=0 install fontconfig freetype cairo glib2 gtk3 pango xorg-x11-fonts-misc xorg-x11-fonts-Type1 \
-        at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss libX11 \
+        at-spi2-atk atk at-spi2-core alsa-lib cups-libs dbus-libs libdrm mesa-libEGL mesa-libgbm nspr nss nss-tools libX11 \
         libX11-xcb libxcb libXcomposite libXdamage libXext libXfixes libXrandr libxkbcommon libxshmfence glib2 \
         libicu mesa-libGL unzip && \
         mkdir -p /usr/share/fonts/google-noto && \
@@ -295,15 +297,16 @@ USER root
 # Install required dependencies from wolfi repository
 RUN for iter in {1..10}; do \
         apk fix && \
-        apk add --no-interactive --no-progress --no-cache nodejs-22=22.23.2-r0 npm=12.0.2-r0 glib libatk-1.0 \
+        apk add --no-interactive --no-progress --no-cache nodejs-24=24.22.3-r2 glib libatk-1.0 \
         libatk-bridge-2.0 cups-libs libxcomposite libxdamage libxfixes libxrandr libxkbcommon pango alsa-lib \
-        font-opensans fontconfig gtk icu-data-full libnss mesa font-noto-cjk font-noto-emoji && \
+        font-opensans fontconfig gtk icu-data-full libnss libnss-tools mesa font-noto-cjk font-noto-emoji && \
         exit_code=0 && break || exit_code=$? && echo "apk error: retry $iter in 10s" && sleep 10; \
     done; \
     (exit $exit_code)
 
 # Setup synthetics env vars
 ENV ELASTIC_SYNTHETICS_CAPABLE=true
+ENV ELASTIC_AGENT_COMPLETE=true
 ENV TZ=UTC
 ENV NPM_CONFIG_PREFIX={{ $beatHome }}/.npm
 ENV PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
@@ -317,6 +320,16 @@ RUN echo \
     | xargs -IDIR sh -c 'mkdir -m 0770 -p DIR && chown -R {{ .user }} DIR'
 
 USER {{ .user }}
+# nodejs-24 ships no npm, and Wolfi's npm package bundles an undici version
+# with known vulnerabilities. Bootstrap npm from the registry instead.
+# Pinned sha512 (hex) of npm-12.2.2.tgz, i.e. `npm view npm@12.2.2 dist.integrity` decoded from base64.
+# Update it together with the version.
+RUN curl -fsSL -o /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-12.2.2.tgz \
+    && echo "2a09606d9c9a71fee31fe147b8d46a56e0b3422f15848d9aec9f3b231e3716c3d3b99a065a62175c6759b4150e03bf6fc0bf8825112a511573ba903b3ec41370  /tmp/npm.tgz" | sha512sum -c - \
+    && tar xz -C /tmp -f /tmp/npm.tgz \
+    && node /tmp/package/bin/npm-cli.js install -g npm@12.2.2 \
+    && rm -rf /tmp/package /tmp/npm.tgz /tmp/node-compile-cache \
+    && npm cache clean --force
 
 RUN (npm i -g --loglevel verbose --production --engine-strict  @elastic/synthetics@stack_release || sh -c 'tail -n +1 ${NPM_CONFIG_PREFIX}/_logs/* && exit 1') && \
     npm cache clean --force

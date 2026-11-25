@@ -17,9 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
-	"github.com/elastic/elastic-agent-libs/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/transpiler"
 	"github.com/elastic/elastic-agent/internal/pkg/eql"
 	"github.com/elastic/go-ucfg"
@@ -27,7 +27,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"google.golang.org/protobuf/types/known/structpb"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -4554,6 +4554,42 @@ func TestToComponentsWithRuntimeConfig(t *testing.T) {
 			if tt.validate != nil {
 				tt.validate(t, result)
 			}
+		})
+	}
+}
+
+func TestToComponentsWithAgentInfo(t *testing.T) {
+	platform := PlatformDetail{Platform: Platform{OS: Linux, Arch: AMD64, GOOS: Linux}}
+	specs, err := LoadRuntimeSpecs(filepath.Join("..", "..", "specs"), platform, SkipBinaryCheck())
+	require.NoError(t, err)
+
+	tests := []struct {
+		name         string
+		inputType    string
+		isolateUnits bool
+	}{
+		{name: "input with shared units", inputType: "filestream", isolateUnits: false},
+		{name: "input with isolated units", inputType: "cloudbeat/cis_k8s", isolateUnits: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := map[string]any{
+				"outputs": map[string]any{
+					"default": map[string]any{"type": "elasticsearch", "enabled": true},
+				},
+				"inputs": []any{
+					map[string]any{"id": "input", "type": tt.inputType, "use_output": "default", "enabled": true},
+				},
+			}
+			agentInfo := &proto.AgentInfo{Id: "agent-1", Tags: []string{"production"}}
+
+			got, err := specs.ToComponents(
+				policy, DefaultRuntimeConfig(), nil, nil, logp.InfoLevel, nil,
+				map[string]uint64{}, map[string]bool{}, WithAgentInfo(agentInfo))
+			require.NoError(t, err)
+			require.Len(t, got, 1)
+			require.Equal(t, tt.isolateUnits, got[0].InputSpec.Spec.IsolateUnits)
+			require.Same(t, agentInfo, got[0].AgentInfo)
 		})
 	}
 }
