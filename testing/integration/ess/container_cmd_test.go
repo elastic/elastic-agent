@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"text/template"
@@ -1261,7 +1262,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
 	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -1354,14 +1355,36 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		return resp.StatusCode, nil
 	}
 	var agentID string
+	var (
+		statusMu      sync.Mutex
+		lastStatus    string
+		lastStatusErr error
+	)
 	agentReady := func() bool {
-		var status atesting.AgentStatusOutput
-		status, err = agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
-		if err != nil || status.FleetState != int(cproto.State_HEALTHY) {
+		status, statusErr := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
+		statusJSON, _ := json.Marshal(status)
+		statusMu.Lock()
+		lastStatus, lastStatusErr = string(statusJSON), statusErr
+		statusMu.Unlock()
+		if statusErr != nil || status.FleetState != int(cproto.State_HEALTHY) {
 			return false
 		}
 		agentID = status.Info.ID
 		return true
+	}
+	// waitAgentReady waits for the agent to report a healthy Fleet connection.
+	// On failure it reports the last `status` result, because the error of the
+	// failed attempt is the only thing that explains why the agent is not ready.
+	// After a restart Fleet Server needs time to come up before the agent can
+	// check in again, so the timeout must leave room for that.
+	waitAgentReady := func(timeout time.Duration, description string, output *strings.Builder) {
+		if assert.Eventually(t, agentReady, timeout, time.Second) {
+			return
+		}
+		statusMu.Lock()
+		defer statusMu.Unlock()
+		t.Fatalf("Agent did not connect to Fleet %s within %s. Last status error: %v, last status: %s, Agent logs\n%s",
+			description, timeout, lastStatusErr, lastStatus, output)
 	}
 
 	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPathA + "," + caPathB}, env...))
@@ -1370,11 +1393,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, agentReady,
-		2*time.Minute, time.Second,
-		"Agent did not connect to Fleet after first enrollment. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentReady(2*time.Minute, "after first enrollment", agentOutput)
 	require.NotEmpty(t, agentID, "enrolled agent ID must not be empty")
 	enrolledAgentID := agentID
 
@@ -1395,11 +1414,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, agentReady,
-		2*time.Minute, time.Second,
-		"Agent did not connect to Fleet after restart with CA B replaced by CA C in FLEET_CA. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentReady(5*time.Minute, "after restart with CA B replaced by CA C in FLEET_CA", agentOutput)
 	require.Equal(t, enrolledAgentID, agentID, "agent re-enrolled after restart with CA B replaced by CA C in FLEET_CA")
 
 	_, err = fleetServerStatus(&clientB)
@@ -1419,11 +1434,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, agentReady,
-		2*time.Minute, time.Second,
-		"Agent did not connect to Fleet after restart with CA B and CA C removed from FLEET_CA. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentReady(5*time.Minute, "after restart with CA B and CA C removed from FLEET_CA", agentOutput)
 	require.Equal(t, enrolledAgentID, agentID, "agent re-enrolled after restart with CA B and CA C removed from FLEET_CA")
 
 	code, err = fleetServerStatus(clientA)
