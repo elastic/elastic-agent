@@ -30,6 +30,7 @@ require (
 	go.opentelemetry.io/collector/component/componentstatus v0.119.0
 	go.opentelemetry.io/collector/confmap/provider/envprovider v1.25.0
 	go.opentelemetry.io/collector/exporter/debugexporter v0.119.0
+	go.opentelemetry.io/collector/extension/extensioncapabilities v0.119.0
 	go.opentelemetry.io/collector/extension/memorylimiterextension v0.119.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.119.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.119.0
