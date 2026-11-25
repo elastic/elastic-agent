@@ -989,17 +989,25 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 	// it hangs), stop waiting and clear the state so the agent recovers and a
 	// redelivery can retry.
 	go func() {
-		waited := make(chan struct{})
+		waitErr := make(chan error, 1)
 		go func() {
-			_ = cmd.Wait()
-			close(waited)
+			waitErr <- cmd.Wait()
 		}()
 
 		select {
-		case <-waited:
+		case exitErr := <-waitErr:
+			// RunningInstalled only checks the install marker, so it is a coarse
+			// signal: it stays true for an uninstall that failed before removing
+			// anything and for a partial failure that left the marker behind. In
+			// all those cases the uninstall did not complete. The failure itself is
+			// communicated to Fleet by the detached uninstaller (it acks the action
+			// with the error before the point of no return) and its step-by-step
+			// logs are in the collectable uninstall.log; log the child's exit status
+			// here too so the agent's own logs record the abnormal exit.
 			if paths.RunningInstalled() {
-				c.logger.Warnw("Uninstall process exited but the agent is still installed; clearing Stopping state",
-					"uninstall.process.pid", cmd.Process.Pid)
+				c.logger.Warnw("Uninstall process exited but the agent is still installed; the uninstall did not complete, clearing Stopping state",
+					"uninstall.process.pid", cmd.Process.Pid,
+					"uninstall.process.error", exitErr)
 				c.ClearOverrideState()
 				// The uninstall failed before the point of no return and the agent
 				// remains installed; clear the in-flight marker so a redelivery of
