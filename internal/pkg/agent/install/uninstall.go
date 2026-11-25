@@ -14,9 +14,12 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kardianos/service"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
@@ -64,6 +67,50 @@ func (a *agentInfo) AgentID() string {
 // the API key). If the uninstall fails before that point the action is
 // acknowledged with the error set, so Fleet learns the uninstall did not
 // complete and the agent remains installed.
+// uninstallLogName is the fixed name of the file the detached uninstaller
+// streams its logs to, in the agent's collectable log directory.
+const uninstallLogName = "uninstall.log"
+
+// enableUninstallFileLog returns a logger that tees log's output to a file in
+// paths.BuildLogs() (the directory `elastic-agent diagnostics` collects), so a
+// failed or stuck Fleet-triggered uninstall leaves a trace on the machine, and a
+// close function that flushes and closes that file. The close function is
+// idempotent and must be called before the install tree is removed, since
+// Windows cannot delete an open file. A fixed file name is used; the
+// coordinator's single-flight guard ensures only one uninstaller runs at a time.
+func enableUninstallFileLog(log *logp.Logger) (*logp.Logger, func(), error) {
+	dir := paths.BuildLogs()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return log, func() {}, fmt.Errorf("failed to create log directory %q: %w", dir, err)
+	}
+	logPath := filepath.Join(dir, uninstallLogName)
+	// #nosec G304 -- logPath is derived from agent-controlled paths, not user input.
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return log, func() {}, fmt.Errorf("failed to open uninstall log file %q: %w", logPath, err)
+	}
+
+	encoderCfg := logp.ConsoleEncoderConfig()
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	fileCore := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderCfg),
+		zapcore.AddSync(f),
+		zap.NewAtomicLevelAt(zapcore.DebugLevel),
+	)
+	teed := log.WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+		return zapcore.NewTee(c, fileCore)
+	}))
+
+	var once sync.Once
+	closeLog := func() {
+		once.Do(func() {
+			_ = f.Sync()
+			_ = f.Close()
+		})
+	}
+	return teed, closeLog, nil
+}
+
 func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log *logp.Logger, pt ProgressDescriber, skipFleetAudit bool, fleetAckActionID string) (err error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -72,6 +119,29 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	if runtime.GOOS == "windows" && paths.HasPrefix(cwd, topPath) {
 		return fmt.Errorf("uninstall must be run from outside the installed path '%s'", topPath)
+	}
+
+	// A Fleet-triggered uninstall runs detached with no console, so its logs
+	// would be lost. Stream them to a file in the agent's collectable log
+	// directory (paths.BuildLogs(), which `elastic-agent diagnostics` collects)
+	// so a failed or stuck remote uninstall leaves a trace. The file must be
+	// closed before the install tree is removed (RemovePath) because Windows
+	// cannot delete an open file; a deferred close covers the failure paths.
+	closeUninstallLog := func() {}
+	if fleetAckActionID != "" {
+		teed, closeLog, lerr := enableUninstallFileLog(log)
+		if lerr != nil {
+			log.Warnf("failed to enable collectable uninstall log: %v", lerr)
+		} else {
+			origLog := log
+			log = teed
+			closeUninstallLog = func() {
+				closeLog()
+				log = origLog
+			}
+			defer closeUninstallLog()
+			log.Infof("writing uninstall logs to %s", filepath.Join(paths.BuildLogs(), uninstallLogName))
+		}
 	}
 
 	// check if the agent was installed using --unprivileged by checking the file vault for the agent secret (needed on darwin to correctly load the vault)
@@ -256,6 +326,10 @@ func Uninstall(ctx context.Context, cfgFile, topPath, uninstallToken string, log
 
 	// remove existing directory
 	pt.Describe("Removing install directory")
+	// Close the collectable uninstall log before removing the tree it lives in:
+	// Windows cannot delete a file that is still open. The deferred close above
+	// then no-ops. After this, logging reverts to the original sinks.
+	closeUninstallLog()
 	err = RemovePath(log, topPath)
 	if err != nil {
 		pt.Describe("Failed to remove install directory")

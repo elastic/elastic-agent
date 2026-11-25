@@ -23,6 +23,7 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
@@ -34,6 +35,26 @@ import (
 type noopProgressDescriber struct{}
 
 func (n *noopProgressDescriber) Describe(string) {}
+
+func TestEnableUninstallFileLog(t *testing.T) {
+	pathstest.SetTop(t, t.TempDir())
+
+	teed, closeLog, err := enableUninstallFileLog(logp.NewLogger("uninstall"))
+	require.NoError(t, err)
+	require.NotNil(t, teed)
+
+	teed.Info("streamed-uninstall-line")
+	// The file must be readable (closed) before the install tree is removed, and
+	// closing must be idempotent (called explicitly and via defer).
+	closeLog()
+	closeLog()
+
+	logPath := filepath.Join(paths.BuildLogs(), uninstallLogName)
+	data, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "streamed-uninstall-line",
+		"the uninstaller log line must be streamed to the collectable log file")
+}
 
 func Test_checkForUnprivilegedVault(t *testing.T) {
 	type postVaultInit func(t *testing.T, vaultPath string)
