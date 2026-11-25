@@ -3302,6 +3302,9 @@ func TestSystemMetricsWithKafkaOutput(t *testing.T) {
 	)
 	tokenServer := newOAuth2TokenMockServer(t, oauthClientID, oauthClientSecret)
 
+	bearerTokenFile := filepath.Join(t.TempDir(), "kafka-token")
+	require.NoError(t, os.WriteFile(bearerTokenFile, []byte(unsecuredJWT("beats", time.Hour)), 0o600))
+
 	_, currentFile, _, ok := runtime.Caller(0)
 	require.True(t, ok, "failed to get current file path")
 	kafkaPath := filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "beats", "testing", "environments", "docker", "kafka")
@@ -3331,11 +3334,13 @@ services:
 		runtimeExperimental string
 		namespace           string
 		saslMechanism       string
+		authType            string
 	}{
 		{name: "agent", runtimeExperimental: "process", namespace: "process", saslMechanism: "SCRAM-SHA-256"},
 		{name: "otel", runtimeExperimental: "otel", namespace: "otel", saslMechanism: "SCRAM-SHA-256"},
-		// Beats process runtime cannot fetch OAuth2 tokens yet, so OAUTHBEARER is otel-only.
-		{name: "otel-oauth2", runtimeExperimental: "otel", namespace: "otel-oauth2", saslMechanism: "OAUTHBEARER"},
+		// Beats process runtime does not support OAUTHBEARER yet, so these are otel-only.
+		{name: "otel-oauth2", runtimeExperimental: "otel", namespace: "otel-oauth2", saslMechanism: "OAUTHBEARER", authType: "oauth2client"},
+		{name: "otel-bearertokenauth", runtimeExperimental: "otel", namespace: "otel-bearertokenauth", saslMechanism: "OAUTHBEARER", authType: "bearertoken"},
 	}
 
 	for _, tt := range tableTests {
@@ -3345,9 +3350,11 @@ services:
 			Broker              string
 			CaCert              string
 			SaslMechanism       string
+			AuthType            string
 			TokenURL            string
 			ClientID            string
 			ClientSecret        string
+			TokenFile           string
 		}
 
 		fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
@@ -3386,10 +3393,15 @@ outputs:
 {{- if eq .SaslMechanism "OAUTHBEARER"}}
     sasl.mechanism: OAUTHBEARER
     auth:
+{{- if eq .AuthType "bearertoken"}}
+      bearertoken:
+        filename: "{{.TokenFile}}"
+{{- else}}
       oauth2client:
         client_id: {{.ClientID}}
         client_secret: {{.ClientSecret}}
         token_url: "{{.TokenURL}}"
+{{- end}}
 {{- else}}
     username: beats
     password: KafkaTest
@@ -3414,9 +3426,11 @@ agent.monitoring:
 					Broker:              "localhost:9093",
 					CaCert:              filepath.Join(kafkaPath, "certs", "ca-cert"),
 					SaslMechanism:       tt.saslMechanism,
+					AuthType:            tt.authType,
 					TokenURL:            tokenServer.URL,
 					ClientID:            oauthClientID,
 					ClientSecret:        oauthClientSecret,
+					TokenFile:           bearerTokenFile,
 				}))
 
 		ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
@@ -3481,7 +3495,7 @@ agent.monitoring:
 			}, 2*time.Minute, 5*time.Second,
 			"Expected at least 1 document")
 
-		if tt.saslMechanism == "OAUTHBEARER" {
+		if tt.authType == "oauth2client" {
 			require.Greater(t, tokenServer.RequestCount(), int64(0), "oauth2client should have fetched a token from the mock token endpoint")
 		}
 
