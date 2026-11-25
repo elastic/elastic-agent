@@ -3005,8 +3005,10 @@ agent.grpc:
 }
 
 // TestOtelElasticsearchStorageWithElasticsearchAuth verifies that the
-// elasticsearch_storage extension persists the cel input state in
-// Elasticsearch when authenticating through the elasticsearchauth extension.
+// elasticsearch_storage extension persists the cel input state through the
+// elasticsearchauth extension rather than the output's beatsauth extension.
+// The output points at mock-es and only elasticsearchauth points at the real
+// Elasticsearch, so the state can only reach it through elasticsearchauth.
 func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -3051,8 +3053,13 @@ func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
+	// The storage extension takes its endpoints from its authenticator, so if it used
+	// the output's beatsauth the state would be sent to mock-es instead.
+	mockESURL := integration.StartMockES(t, 0, 0, 0, 0).String()
+
 	type configOptions struct {
 		ESEndpoint       string
+		OutputEndpoint   string
 		ESApiKey         string
 		ESAuthEncodedKey string
 		InputID          string
@@ -3090,7 +3097,7 @@ inputs:
 outputs:
   default:
     type: elasticsearch
-    hosts: [{{.ESEndpoint}}]
+    hosts: [{{.OutputEndpoint}}]
     api_key: "{{.ESApiKey}}"
     preset: latency
 extensions:
@@ -3109,6 +3116,7 @@ extensions:
 		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
 			configOptions{
 				ESEndpoint:       esEndpoint,
+				OutputEndpoint:   mockESURL,
 				ESApiKey:         decodedApiKey,
 				ESAuthEncodedKey: esApiKey.Encoded,
 				InputID:          inputID,
@@ -3144,19 +3152,8 @@ extensions:
 		return true
 	}, 1*time.Minute, 1*time.Second, "agent did not become healthy")
 
-	// The policy doesn't list elasticsearchauth/state in service::extensions. The agent adds it
-	// when it makes it the authenticator of the storage extension, so it running confirms that.
-	require.EventuallyWithT(t, func(ct *assert.CollectT) {
-		status, err := fixture.ExecStatus(ctx)
-		require.NoError(ct, err)
-		require.NotNil(ct, status.Collector, "expected collector status")
-		extensions := status.Collector.ComponentStatusMap["extensions"]
-		require.NotNil(ct, extensions, "expected extension statuses in the collector status")
-		require.Contains(ct, extensions.ComponentStatusMap, "extension:elasticsearchauth/state")
-	}, 1*time.Minute, 1*time.Second, "expected elasticsearchauth/state to run in the collector")
-
-	// Wait for the CEL input's incremented cursor to be persisted in
-	// Elasticsearch through the elasticsearchauth authenticator.
+	// Only elasticsearchauth/state points at this Elasticsearch, so finding the
+	// incremented cursor here proves the storage extension authenticated through it.
 	require.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)
