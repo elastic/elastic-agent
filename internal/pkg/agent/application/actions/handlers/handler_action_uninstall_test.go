@@ -57,7 +57,10 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
 	})
 
-	t.Run("expired action acks error and does not uninstall", func(t *testing.T) {
+	t.Run("expired action still uninstalls once the handler is invoked", func(t *testing.T) {
+		// Reaching the handler is the point of no return: expiry is enforced by the
+		// dispatcher on receipt, so an action that only expired while awaiting its
+		// grace period (e.g. the host hibernated) must still uninstall here.
 		exp := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
 		action := &fleetapi.ActionUninstall{
 			ActionID:         "u-expired",
@@ -66,38 +69,15 @@ func TestActionUninstallHandler(t *testing.T) {
 		}
 
 		coord := &fakeUninstallCoordinator{}
+		coord.On("Uninstall", mock.Anything, action).Return(nil)
 
 		ack := &fakeAcker{}
-		ack.On("Ack", mock.Anything, action).Return(nil)
-		ack.On("Commit", mock.Anything).Return(nil)
 
 		h := NewUninstall(log, &info.AgentInfo{}, coord)
 
 		require.NoError(t, h.Handle(t.Context(), action, ack))
-		require.Error(t, action.Err, "expired action should carry an error for the ack")
-		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
-		ack.AssertCalled(t, "Ack", mock.Anything, action)
-	})
-
-	t.Run("invalid expiration acks error and does not uninstall", func(t *testing.T) {
-		action := &fleetapi.ActionUninstall{
-			ActionID:         "u-bad-exp",
-			ActionType:       fleetapi.ActionTypeUninstall,
-			ActionExpiration: "not-a-timestamp",
-		}
-
-		coord := &fakeUninstallCoordinator{}
-
-		ack := &fakeAcker{}
-		ack.On("Ack", mock.Anything, action).Return(nil)
-		ack.On("Commit", mock.Anything).Return(nil)
-
-		h := NewUninstall(log, &info.AgentInfo{}, coord)
-
-		require.NoError(t, h.Handle(t.Context(), action, ack))
-		require.Error(t, action.Err, "malformed expiration should carry an error for the ack")
-		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
-		ack.AssertCalled(t, "Ack", mock.Anything, action)
+		coord.AssertCalled(t, "Uninstall", mock.Anything, action)
+		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
 	})
 
 	t.Run("uninstall error acks failure", func(t *testing.T) {
@@ -155,40 +135,16 @@ func TestActionUninstallHandler(t *testing.T) {
 		ack.AssertNotCalled(t, "Ack", mock.Anything, mock.Anything)
 	})
 
-	// The expiry check must trust the signed expiration, not the mutable outer
-	// one. (&info.AgentInfo{}).AgentID() is "", so the signed payload lists "" as
-	// its agent.
-	t.Run("expired signed expiration rejects even when the outer expiration is in the future", func(t *testing.T) {
+	// (&info.AgentInfo{}).AgentID() is "", so the signed payload lists "" as its
+	// agent.
+	t.Run("valid signature proceeds to uninstall", func(t *testing.T) {
 		priv, pubDER := genSignKey(t)
 		action := &fleetapi.ActionUninstall{
-			ActionID:         "u-sig-expired",
-			ActionType:       fleetapi.ActionTypeUninstall,
-			ActionExpiration: time.Now().Add(time.Hour).UTC().Format(time.RFC3339), // outer: not expired
+			ActionID:   "u-signed",
+			ActionType: fleetapi.ActionTypeUninstall,
 		}
 		action.Signature = signUninstallAction(t, action.ActionID, "",
-			time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), priv) // signed: expired
-
-		coord := &fakeUninstallCoordinator{protectionConfig: protection.Config{SignatureValidationKey: pubDER}}
-		ack := &fakeAcker{}
-		ack.On("Ack", mock.Anything, action).Return(nil)
-		ack.On("Commit", mock.Anything).Return(nil)
-
-		h := NewUninstall(log, &info.AgentInfo{}, coord)
-		require.NoError(t, h.Handle(t.Context(), action, ack))
-		require.Error(t, action.Err, "the signed (expired) expiration must cause rejection despite a future outer expiration")
-		coord.AssertNotCalled(t, "Uninstall", mock.Anything, mock.Anything)
-		ack.AssertCalled(t, "Ack", mock.Anything, action)
-	})
-
-	t.Run("valid signed expiration proceeds even when the outer expiration is in the past", func(t *testing.T) {
-		priv, pubDER := genSignKey(t)
-		action := &fleetapi.ActionUninstall{
-			ActionID:         "u-sig-valid",
-			ActionType:       fleetapi.ActionTypeUninstall,
-			ActionExpiration: time.Now().Add(-time.Hour).UTC().Format(time.RFC3339), // outer: expired (untrusted)
-		}
-		action.Signature = signUninstallAction(t, action.ActionID, "",
-			time.Now().Add(time.Hour).UTC().Format(time.RFC3339), priv) // signed: not expired
+			time.Now().Add(time.Hour).UTC().Format(time.RFC3339), priv)
 
 		coord := &fakeUninstallCoordinator{protectionConfig: protection.Config{SignatureValidationKey: pubDER}}
 		coord.On("Uninstall", mock.Anything, action).Return(nil)

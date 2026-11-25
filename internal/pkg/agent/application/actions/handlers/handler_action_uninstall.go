@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/protection"
@@ -28,9 +27,10 @@ type uninstallCoordinator interface {
 	Protection() protection.Config
 }
 
-// Uninstall is a handler for the UNINSTALL action. It performs the checks that
-// can still be recovered from (signature, expiry) and, when they pass, hands off
-// to the coordinator which spawns a detached uninstaller.
+// Uninstall is a handler for the UNINSTALL action. It verifies the action
+// signature and, when it passes, hands off to the coordinator which spawns a
+// detached uninstaller. Expiry and grace-period are enforced by the dispatcher
+// on receipt, not here: reaching the handler is the point of no return.
 //
 // The success path is NOT acknowledged here: the uninstall is terminal, so the
 // detached uninstaller acknowledges the action to Fleet at the point of no
@@ -41,8 +41,6 @@ type Uninstall struct {
 	log       *logger.Logger
 	agentInfo info.Agent
 	coord     uninstallCoordinator
-
-	nowFn func() time.Time
 }
 
 // NewUninstall creates a new Uninstall handler.
@@ -51,7 +49,6 @@ func NewUninstall(log *logger.Logger, agentInfo info.Agent, coord uninstallCoord
 		log:       log,
 		agentInfo: agentInfo,
 		coord:     coord,
-		nowFn:     time.Now,
 	}
 }
 
@@ -71,20 +68,15 @@ func (h *Uninstall) Handle(ctx context.Context, a fleetapi.Action, ack acker.Ack
 	// time, also covering actions restored from the persisted queue on restart.
 	// The error is returned (not acked) so a potentially tampered action is not
 	// acknowledged, mirroring the MIGRATE handler.
-	verified, err := protection.VerifyActionSignature(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID())
-	if err != nil {
+	// Verify the action signature (tamper protection). Only the signature is
+	// re-checked here; the grace-period window and expiry are enforced by the
+	// dispatcher on receipt (an expired or out-of-window action is rejected before
+	// it is ever scheduled). Reaching the handler is the point of no return: the
+	// host may have hibernated and the action expired while it waited out its
+	// grace period, but re-rejecting it here would needlessly leave the agent
+	// installed, so once invoked we commit to the uninstall.
+	if _, err := protection.VerifyActionSignature(action, h.coord.Protection().SignatureValidationKey, h.agentInfo.AgentID()); err != nil {
 		return fmt.Errorf("uninstall action %s rejected: signature verification failed: %w", action.ActionID, err)
-	}
-	// The expiration is only trustworthy when it comes from the verified signed
-	// envelope: the signature covers the signed payload, not the action's outer
-	// JSON. Trusting the outer expiration would let an attacker strip or extend it
-	// on an otherwise valid, signed action (making an expired action run) or
-	// shorten it (making a valid action fail). Overwrite the outer value with the
-	// verified one so the expiry check below operates on signed data. When the
-	// action is unsigned (no key configured) verified is nil and the outer
-	// expiration is used as-is. Mirrors the RESTART handler.
-	if verified != nil {
-		action.ActionExpiration = verified.Expiration
 	}
 
 	// The dispatcher may have rejected the action on receipt (e.g. its start_time
@@ -93,26 +85,6 @@ func (h *Uninstall) Handle(ctx context.Context, a fleetapi.Action, ack acker.Ack
 	// scheduling. Ack that failure now.
 	if action.Err != nil {
 		h.log.Warnf("handlerUninstall: action '%s' rejected before scheduling: %v", action.ActionID, action.Err)
-		return h.ackNow(ctx, ack, action)
-	}
-
-	// Do not uninstall if the action is expired or carries an invalid
-	// expiration. In both cases we ack the error so Fleet learns about the
-	// failure instead of silently uninstalling.
-	exp, err := action.Expiration()
-	switch {
-	case err == nil:
-		if h.nowFn().After(exp) {
-			h.log.Warnf("handlerUninstall: action '%s' expired at %s, skipping uninstall", action.ActionID, exp)
-			action.Err = fmt.Errorf("uninstall action expired at %s", exp)
-			return h.ackNow(ctx, ack, action)
-		}
-	case errors.Is(err, fleetapi.ErrNoExpiration):
-		// No expiration set; the action never expires, proceed with the uninstall.
-	default:
-		// Malformed expiration timestamp; treat the action as invalid.
-		h.log.Warnf("handlerUninstall: action '%s' has an invalid expiration, skipping uninstall: %v", action.ActionID, err)
-		action.Err = fmt.Errorf("uninstall action has an invalid expiration: %w", err)
 		return h.ackNow(ctx, ack, action)
 	}
 
