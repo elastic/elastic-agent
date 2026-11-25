@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	otelcomponent "go.opentelemetry.io/collector/component"
 	"go.uber.org/zap/zapcore"
 
@@ -588,10 +590,6 @@ func TestPerformComponentDiagnosticsUnexpectedError(t *testing.T) {
 }
 
 func setTemporaryAgentPath(t *testing.T) {
-	topPath := paths.Top()
 	tempTopPath := t.TempDir()
-	paths.SetTop(tempTopPath)
-	t.Cleanup(func() {
-		paths.SetTop(topPath)
-	})
+	pathstest.SetTop(t, tempTopPath)
 }

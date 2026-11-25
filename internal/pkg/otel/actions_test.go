@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/extension/elasticdiagnostics"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
 	"github.com/elastic/elastic-agent/pkg/ipc"
@@ -48,9 +49,7 @@ func startMockActionsServer(t *testing.T, handle func(elasticdiagnostics.ActionR
 
 func TestPerformActionExt(t *testing.T) {
 	tempDir := t.TempDir()
-	prevSocket := paths.DiagnosticsExtensionSocket()
-	paths.SetDiagnosticsExtensionSocket(paths.SocketFromPath(runtime.GOOS, tempDir, "test-actions.sock"))
-	t.Cleanup(func() { paths.SetDiagnosticsExtensionSocket(prevSocket) })
+	pathstest.SetDiagnosticsExtensionSocket(t, paths.SocketFromPath(runtime.GOOS, tempDir, "test-actions.sock"))
 
 	t.Run("successful action round-trips result", func(t *testing.T) {
 		startMockActionsServer(t, func(req elasticdiagnostics.ActionRequest) (int, elasticdiagnostics.ActionResponse) {
@@ -87,7 +86,7 @@ func TestPerformActionExt(t *testing.T) {
 
 	t.Run("collector not running", func(t *testing.T) {
 		shrinkActionDialRetryMaxTime(t, 100*time.Millisecond)
-		paths.SetDiagnosticsExtensionSocket(paths.SocketFromPath(runtime.GOOS, t.TempDir(), "does-not-exist.sock"))
+		pathstest.SetDiagnosticsExtensionSocket(t, paths.SocketFromPath(runtime.GOOS, t.TempDir(), "does-not-exist.sock"))
 		_, err := PerformActionExt(context.Background(), "osquery-default", "osquery", nil)
 		require.Error(t, err)
 	})
@@ -96,7 +95,7 @@ func TestPerformActionExt(t *testing.T) {
 		shrinkActionDialRetryMaxTime(t, 2*time.Second)
 		shrinkActionDialRetryInterval(t, time.Millisecond, 5*time.Millisecond)
 		socketDir := t.TempDir()
-		paths.SetDiagnosticsExtensionSocket(paths.SocketFromPath(runtime.GOOS, socketDir, "test-actions-restart.sock"))
+		pathstest.SetDiagnosticsExtensionSocket(t, paths.SocketFromPath(runtime.GOOS, socketDir, "test-actions-restart.sock"))
 
 		// Simulate the collector being mid-restart: nothing is listening on the
 		// socket when PerformActionExt is first called.

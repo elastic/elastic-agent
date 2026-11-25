@@ -11,7 +11,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2 v2.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions/v2 v2.0.0
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261120163632-b4b0aa4e506a
+	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123204423-67f7497b6db0
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.81.0
@@ -129,6 +129,7 @@ require (
 	github.com/elastic/proxy-connect-dialer-go v0.1.1 // indirect
 	github.com/elastic/tk-btf v0.3.0 // indirect
 	github.com/elastic/toutoumomoma v0.0.0-20261115195231-8e972b20fa5e // indirect
+	github.com/elazarl/goproxy v1.9.4 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/fsnotify/fsevents v0.2.0 // indirect
 	github.com/go-openapi/swag/cmdutils v0.29.2 // indirect
@@ -143,7 +144,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.29.2 // indirect
 	github.com/go-openapi/swag/yamlutils v0.29.2 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20261111200114-fac431ef4d26 // indirect
+	github.com/google/pprof v0.0.0-20261118010117-084b33a85f63 // indirect
 	github.com/gorhill/cronexpr v0.0.0-20180427100037-88b0669f7d75 // indirect
 	github.com/gosnmp/gosnmp v1.47.0 // indirect
 	github.com/grobie/gomemcache v0.0.0-20230213081705-239240bbc445 // indirect
@@ -449,7 +450,7 @@ require (
 	github.com/elastic/gokrb5/v8 v8.0.0-20251105095404-23cc45e6a102 // indirect
 	github.com/elastic/gosigar v0.14.4 // indirect
 	github.com/elastic/lunes v0.2.2 // indirect
-	github.com/elastic/mito v1.28.2 // indirect
+	github.com/elastic/mito v1.29.0 // indirect
 	github.com/elastic/opentelemetry-collector-components/processor/lsmintervalprocessor v0.81.0 // indirect
 	github.com/elastic/opentelemetry-lib v0.51.0 // indirect
 	github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be // indirect

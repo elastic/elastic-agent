@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/status"
 	"github.com/stretchr/testify/require"
 	otelcomponent "go.opentelemetry.io/collector/component"
@@ -5480,8 +5482,7 @@ func TestGetReceiversConfigHostnameOverride(t *testing.T) {
 // unversioned: a home and a data path, no logs path. Files receivers write directly therefore resolve to the
 // default logs path. Versioned homes are covered by TestGetReceiversConfigForComponent.
 func TestGetReceiversConfigPathsContract(t *testing.T) {
-	paths.SetVersionHome(false)
-	t.Cleanup(func() { paths.SetVersionHome(true) })
+	pathstest.SetVersionHome(t, false)
 
 	comp := &component.Component{
 		ID:        "filestream-paths-contract-test",
