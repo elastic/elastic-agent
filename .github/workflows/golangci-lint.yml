@@ -54,7 +54,14 @@ jobs:
           # which can lead to some frustration from developers who would like to
           # fix a single line in an existing codebase and the linter would force them
           # into fixing all linting issues in the whole file instead.
+<<<<<<< HEAD
           args: --timeout=60m --whole-files
+=======
+          #
+          # TODO: macOS gets 90m because the job times out on a cold Go cache, see
+          # https://github.com/elastic/observability-robots/issues/5374. Drop the bump once that is fixed.
+          args: --timeout=${{ matrix.os == 'macos-latest' && '90m' || '60m' }} --whole-files --build-tags=${{ matrix.tagset.tags }}
+>>>>>>> ddb110c (ci: raise macOS golangci-lint timeout to 90m (#18195))
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           only-new-issues: true
