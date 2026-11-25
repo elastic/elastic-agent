@@ -22,7 +22,7 @@ Pushes to `main`, `8.19`, or `9.*` and pull requests run only when Go files, mod
 
 | Job or step | Runs when | Depends on | What it does |
 | --- | --- | --- | --- |
-| `golangci` | Each OS/tag-set matrix entry | None | Checks out submodules, installs Go, and runs the pinned golangci-lint action with whole-file linting and a 60-minute timeout. |
+| `golangci` | Each OS/tag-set matrix entry | None | Checks out submodules, installs Go, and runs the pinned golangci-lint action with whole-file linting and a 60-minute timeout (90 minutes on macOS). |
 
 ## Inputs, outputs, and access
 
