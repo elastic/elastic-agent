@@ -14,6 +14,8 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.elastic.co/ecszap"
@@ -539,7 +541,6 @@ func TestCreateLogWriterJSONEncoder(t *testing.T) {
 }
 
 func TestPathArgs(t *testing.T) {
-	t.Cleanup(func() { paths.SetVersionHome(true) })
 	workDir := filepath.Join("run", "comp")
 
 	// setting returns the value of the -E setting with the given key, and whether it is set
@@ -553,7 +554,7 @@ func TestPathArgs(t *testing.T) {
 	}
 
 	t.Run("a beat in a versioned home logs next to the build logs", func(t *testing.T) {
-		paths.SetVersionHome(true)
+		pathstest.SetVersionHome(t, true)
 
 		args := pathArgs(workDir, "filebeat")
 
@@ -570,7 +571,7 @@ func TestPathArgs(t *testing.T) {
 	})
 
 	t.Run("a component that is not a beat keeps the default logs path", func(t *testing.T) {
-		paths.SetVersionHome(true)
+		pathstest.SetVersionHome(t, true)
 
 		args := pathArgs(workDir, "")
 
@@ -581,7 +582,7 @@ func TestPathArgs(t *testing.T) {
 	})
 
 	t.Run("unversioned home keeps the default logs path", func(t *testing.T) {
-		paths.SetVersionHome(false)
+		pathstest.SetVersionHome(t, false)
 
 		args := pathArgs(workDir, "filebeat")
 
@@ -594,7 +595,7 @@ func TestPathArgs(t *testing.T) {
 	// only beats get the logs path: the other components, such as fleet-server and the profiling collectors,
 	// are not known to accept it
 	t.Run("only the beats of the specs get the logs path", func(t *testing.T) {
-		paths.SetVersionHome(true)
+		pathstest.SetVersionHome(t, true)
 
 		withoutLogsPath := map[string]struct{}{}
 		for _, platform := range component.GlobalPlatforms {

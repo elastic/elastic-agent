@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -171,7 +173,7 @@ func TestDiagnosticHandlerHappyPathWithLogs(t *testing.T) {
 
 func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
@@ -212,7 +214,7 @@ func TestDiagnosticHandlerUploaderErrorWithLogs(t *testing.T) {
 
 func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	// 'data' is a file, not a directory, so the zip process always returns an error.
 	// A missing directory is not enough: paths.TempDir() creates it on its first call in the process.
 	require.NoError(t, os.WriteFile(path.Join(tempAgentRoot, "data"), nil, 0600))
@@ -249,7 +251,7 @@ func TestDiagnosticHandlerZipArchiveErrorWithLogs(t *testing.T) {
 
 func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
@@ -288,7 +290,7 @@ func TestDiagnosticHandlerAckErrorWithLogs(t *testing.T) {
 
 func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
@@ -328,7 +330,7 @@ func TestDiagnosticHandlerCommitErrorWithLogs(t *testing.T) {
 
 func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
@@ -365,7 +367,7 @@ func TestDiagnosticHandlerContexteExpiredErrorWithLogs(t *testing.T) {
 
 func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 
@@ -416,7 +418,7 @@ func TestDiagnosticHandlerWithCPUProfile(t *testing.T) {
 
 func TestDiagnosticsHandlerWithEDOT(t *testing.T) {
 	tempAgentRoot := t.TempDir()
-	paths.SetTop(tempAgentRoot)
+	pathstest.SetTop(t, tempAgentRoot)
 	err := os.MkdirAll(path.Join(tempAgentRoot, "data"), 0755)
 	require.NoError(t, err)
 	called := false
