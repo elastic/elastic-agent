@@ -821,6 +821,14 @@ var uninstallCmd = func(executable string, args ...string) *exec.Cmd {
 // override it; it defaults to utils.HasRoot.
 var uninstallHasRoot = utils.HasRoot
 
+// uninstallReapTimeout bounds how long the reaping goroutine waits for the
+// detached uninstaller to finish. On a successful uninstall the agent's service
+// is removed and this process is terminated before the timeout; the bound only
+// matters if the child neither finishes nor removes the service (e.g. it hangs),
+// in which case the agent must not report Stopping forever. It is a var so tests
+// can shorten it.
+var uninstallReapTimeout = 10 * time.Minute
+
 // Uninstall fulfils an UNINSTALL action by spawning a detached process that runs
 // the uninstall sub-command. The uninstall cannot run in-process: it stops (and
 // removes) the agent service, which would kill this process mid-operation, so
@@ -976,16 +984,37 @@ func (c *Coordinator) Uninstall(_ context.Context, action *fleetapi.ActionUninst
 	// process; this goroutine then dies with it. If the uninstaller instead exits
 	// while the agent is still installed (an uninstall failure before the service
 	// is stopped), reap it to avoid a zombie and clear the Stopping override so
-	// the agent does not report Stopping indefinitely after it recovers.
+	// the agent does not report Stopping indefinitely after it recovers. If it
+	// neither finishes nor removes the service within uninstallReapTimeout (e.g.
+	// it hangs), stop waiting and clear the state so the agent recovers and a
+	// redelivery can retry.
 	go func() {
-		_ = cmd.Wait()
-		if paths.RunningInstalled() {
-			c.logger.Warnw("Uninstall process exited but the agent is still installed; clearing Stopping state",
-				"uninstall.process.pid", cmd.Process.Pid)
+		waited := make(chan struct{})
+		go func() {
+			_ = cmd.Wait()
+			close(waited)
+		}()
+
+		select {
+		case <-waited:
+			if paths.RunningInstalled() {
+				c.logger.Warnw("Uninstall process exited but the agent is still installed; clearing Stopping state",
+					"uninstall.process.pid", cmd.Process.Pid)
+				c.ClearOverrideState()
+				// The uninstall failed before the point of no return and the agent
+				// remains installed; clear the in-flight marker so a redelivery of
+				// the same action can spawn a new uninstaller.
+				clearInFlight()
+			}
+		case <-time.After(uninstallReapTimeout):
+			// The detached uninstaller has not finished and the agent is still
+			// running after the timeout. Stop waiting so the agent does not report
+			// Stopping forever and a redelivery can trigger a new attempt; the
+			// possibly stuck child is left for the OS to reap.
+			c.logger.Warnw("Uninstall process did not finish within the timeout; clearing Stopping state",
+				"uninstall.process.pid", cmd.Process.Pid,
+				"timeout", uninstallReapTimeout)
 			c.ClearOverrideState()
-			// The uninstall failed before the point of no return and the agent
-			// remains installed; clear the in-flight marker so a redelivery of the
-			// same action can spawn a new uninstaller.
 			clearInFlight()
 		}
 	}()

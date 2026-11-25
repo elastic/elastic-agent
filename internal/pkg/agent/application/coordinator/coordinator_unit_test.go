@@ -3487,6 +3487,44 @@ func TestCoordinator_Uninstall(t *testing.T) {
 		assert.False(t, spawned, "a different concurrent uninstall must not spawn a second uninstaller")
 	})
 
+	t.Run("reaping goroutine stops waiting after the timeout and clears state", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+		// Shorten the reap timeout so the hanging child trips it quickly.
+		defer overrideUninstallReapTimeout(50 * time.Millisecond)()
+
+		// A child that neither exits nor removes the service; cancelled at the end
+		// of the subtest so it does not leak.
+		cmdCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			return hangingUninstallCmd(cmdCtx)
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		require.NoError(t, coord.Uninstall(ctx, action))
+
+		// The child never finishes, so only the timeout path can clear the
+		// in-flight marker; its clearing proves the reaping goroutine stopped
+		// waiting instead of blocking on the stuck process.
+		require.Eventuallyf(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 10*time.Second, 10*time.Millisecond,
+			"reaping goroutine did not clear the in-flight flag after the timeout")
+	})
+
 }
 
 // overrideUninstallCmd swaps the package-level uninstallCmd for tests and returns
@@ -3512,4 +3550,33 @@ func overrideUninstallHasRoot(fn func() (bool, error)) func() {
 func noopUninstallCmd() *exec.Cmd {
 	// #nosec G204 G702 -- test-only; arguments are constant and reference the test binary.
 	return exec.CommandContext(context.Background(), os.Args[0], "-test.run", "^$")
+}
+
+// overrideUninstallReapTimeout swaps the package-level uninstallReapTimeout for
+// tests and returns a function that restores the original.
+func overrideUninstallReapTimeout(d time.Duration) func() {
+	orig := uninstallReapTimeout
+	uninstallReapTimeout = d
+	return func() { uninstallReapTimeout = orig }
+}
+
+// hangingUninstallCmd returns a command that does not exit on its own, standing
+// in for a stuck detached uninstaller. It re-invokes the test binary into the
+// sleeping helper below (cross-platform) and is killed when ctx is cancelled so
+// it does not leak past the test.
+func hangingUninstallCmd(ctx context.Context) *exec.Cmd {
+	// #nosec G204 -- test-only; re-invokes the test binary into a sleeping helper.
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run", "^TestUninstallSleepHelper$")
+	cmd.Env = append(os.Environ(), "GO_UNINSTALL_SLEEP_HELPER=1")
+	return cmd
+}
+
+// TestUninstallSleepHelper is not a real test: it is the process body spawned by
+// hangingUninstallCmd. It only sleeps when its env marker is set, so it is a
+// no-op during a normal test run.
+func TestUninstallSleepHelper(t *testing.T) {
+	if os.Getenv("GO_UNINSTALL_SLEEP_HELPER") == "" {
+		return
+	}
+	time.Sleep(30 * time.Second)
 }
