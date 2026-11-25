@@ -319,7 +319,7 @@ func TestKafkaBearerTokenAuthTranslation(t *testing.T) {
 		{
 			name: "token file with retry",
 			auth: `
-  bearertokenauth:
+  bearertoken:
     filename: /var/run/secrets/tokens/kafka-token
     retry_on_failure:
       enabled: true
@@ -338,7 +338,7 @@ func TestKafkaBearerTokenAuthTranslation(t *testing.T) {
 		{
 			name: "multiple tokens",
 			auth: `
-  bearertokenauth:
+  bearertoken:
     tokens: [first, second]
 `,
 			expectedExt: map[string]any{
@@ -348,7 +348,7 @@ func TestKafkaBearerTokenAuthTranslation(t *testing.T) {
 		{
 			name: "no token configured",
 			auth: `
-  bearertokenauth:
+  bearertoken:
     scheme: Bearer
 `,
 			expectedErr: "no bearer token provided",

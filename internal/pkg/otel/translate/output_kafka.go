@@ -24,7 +24,7 @@ import (
 
 const transformProcessorType = "transform"
 const oauth2ClientExtensionType = "oauth2client"
-const bearertokenauthExtensionType = "bearertokenauth"
+const bearertokenAuthConfigKey = "bearertoken"
 
 // KafkaToOTelConfig translates kafka output to OTel config
 // It returns kafka exporter, transform processor (if required), extension config (if required) and error
@@ -132,8 +132,8 @@ func KafkaToOTelConfig(config *config.C, outputName string, logger *logp.Logger)
 			maps.Copy(extensionCfg, oauth2ClientExtensionCfg)
 			tokenSourceID = getOauth2ClientExtensionID(outputName)
 
-		case bearertokenauthExtensionType:
-			bearertokenauthCfg, err := authCfg.Child(bearertokenauthExtensionType, -1)
+		case bearertokenAuthConfigKey:
+			bearertokenauthCfg, err := authCfg.Child(bearertokenAuthConfigKey, -1)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("error translating bearertokenauth extension config: %w", err)
 			}
@@ -394,7 +394,8 @@ func getOauth2ClientExtensionID(outputName string) otelcomponent.ID {
 
 func getBearertokenauthExtensionID(outputName string) otelcomponent.ID {
 	extensionName := fmt.Sprintf("%s%s", OtelNamePrefix, EncodeNameSegment(outputName))
-	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(bearertokenauthExtensionType), extensionName)
+	// The extension name is "bearertokenauth" in the OTel config, but "bearertoken" in the Elastic Agent config.
+	return otelcomponent.NewIDWithName(otelcomponent.MustNewType(fmt.Sprint(bearertokenAuthConfigKey, "auth")), extensionName)
 }
 
 func extractField(field string) string {

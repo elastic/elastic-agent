@@ -3340,7 +3340,7 @@ services:
 		{name: "otel", runtimeExperimental: "otel", namespace: "otel", saslMechanism: "SCRAM-SHA-256"},
 		// Beats process runtime does not support OAUTHBEARER yet, so these are otel-only.
 		{name: "otel-oauth2", runtimeExperimental: "otel", namespace: "otel-oauth2", saslMechanism: "OAUTHBEARER", authType: "oauth2client"},
-		{name: "otel-bearertokenauth", runtimeExperimental: "otel", namespace: "otel-bearertokenauth", saslMechanism: "OAUTHBEARER", authType: "bearertokenauth"},
+		{name: "otel-bearertokenauth", runtimeExperimental: "otel", namespace: "otel-bearertokenauth", saslMechanism: "OAUTHBEARER", authType: "bearertoken"},
 	}
 
 	for _, tt := range tableTests {
@@ -3393,8 +3393,8 @@ outputs:
 {{- if eq .SaslMechanism "OAUTHBEARER"}}
     sasl.mechanism: OAUTHBEARER
     auth:
-{{- if eq .AuthType "bearertokenauth"}}
-      bearertokenauth:
+{{- if eq .AuthType "bearertoken"}}
+      bearertoken:
         filename: "{{.TokenFile}}"
 {{- else}}
       oauth2client:

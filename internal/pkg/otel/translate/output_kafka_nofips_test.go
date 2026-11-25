@@ -122,7 +122,7 @@ hosts: ["kafka1:9092"]
 topic: static-topic
 sasl.mechanism: OAUTHBEARER
 `,
-			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
+			wantErr: "auth config is required when sasl.mechanism is OAUTHBEARER",
 		},
 		{
 			name: "empty auth",
@@ -132,7 +132,7 @@ topic: static-topic
 sasl.mechanism: OAUTHBEARER
 auth: {}
 `,
-			wantErr: "oauth config is required when sasl.mechanism is OAUTHBEARER",
+			wantErr: "auth config is required when sasl.mechanism is OAUTHBEARER",
 		},
 		{
 			name: "unsupported auth type",
@@ -160,7 +160,7 @@ auth:
   unknown:
     client_id: other
 `,
-			wantErr: "auth must specify a single oauth type",
+			wantErr: "auth must specify a single authentication type",
 		},
 	}
 

@@ -13,13 +13,13 @@ kind: feature
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Support reading the Kafka OAUTHBEARER token from a file in the OTel runtime
+summary: Support reading the bearer token from a file in the OTel runtime for Kafka output
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change
 # this field accommodate a description without length limits.
 description: |
-  The Kafka output now accepts `auth.bearertokenauth` when `sasl.mechanism` is `OAUTHBEARER`.
+  The Kafka output now accepts `auth.bearertoken` when `sasl.mechanism` is `OAUTHBEARER`.
   The token is read from the configured `filename` (or `token`/`tokens`) and is picked up again when the file changes,
   for example a Kubernetes projected service account token.
 
