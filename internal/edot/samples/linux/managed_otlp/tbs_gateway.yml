@@ -8,7 +8,11 @@ receivers:
         endpoint: 0.0.0.0:4318 # Listen on all interfaces
 
 connectors:
-  elasticapm: {} # Generates APM metrics from spans enriched by the processor
+  elasticapm: # Generates APM metrics from spans enriched by the processor
+    # Aggregation state is stored in memory by default. For high-throughput
+    # production workloads, uncomment and set a dedicated writable directory.
+    # aggregation:
+    #   directory: ${env:ELASTIC_APM_AGGREGATION_DIR}
   forward: # Forward connector necessary for tail-based sampling
 
 processors:
