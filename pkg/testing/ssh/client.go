@@ -7,6 +7,7 @@ package ssh
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -237,14 +238,12 @@ func (s *sshClient) Copy(filePath string, dest string) error {
 	_, err = fmt.Fprintf(w, "C%#o %d %s\n", fs.Mode().Perm(), fs.Size(), dest)
 	if err != nil {
 		_ = w.Close()
-		<-errCh
-		return err
+		return errors.Join(err, <-errCh)
 	}
 	_, err = io.Copy(w, f)
 	if err != nil {
 		_ = w.Close()
-		<-errCh
-		return err
+		return errors.Join(err, <-errCh)
 	}
 	_, _ = fmt.Fprint(w, "\x00")
 	_ = w.Close()

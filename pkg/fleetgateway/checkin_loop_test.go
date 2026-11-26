@@ -150,7 +150,9 @@ func TestCheckinLoop_401EscalationAfterMaxCount(t *testing.T) {
 	for i := 0; i < 7; i++ {
 		sched.Next()
 	}
-	<-done
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run returned %v, want context.Canceled", err)
+	}
 
 	if len(sched.durations) == 0 {
 		t.Fatal("SetDuration never called after 7 consecutive 401s")
@@ -175,7 +177,9 @@ func TestCheckinLoop_NextIntervalApplied(t *testing.T) {
 	})
 
 	sched.Next()
-	<-done
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run returned %v, want context.Canceled", err)
+	}
 
 	if len(sched.durations) == 0 {
 		t.Fatal("SetDuration never called")
