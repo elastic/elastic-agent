@@ -13,8 +13,9 @@
 #
 # The merged manifest is a JSON object with a top-level "projects" map,
 # where each key is a product name and the value contains the product's
-# external_artifacts_manifest_url (pointing to its own DRA manifest).
-# This is the format elastic-agent's packaging code (manifest.go) expects.
+# packages inlined. The packaging code (manifest.go DownloadComponents)
+# only downloads a single manifest and looks up packages inline — it does
+# NOT follow external_artifacts_manifest_url.
 set -euo pipefail
 
 WORKFLOW="${1:?workflow argument required (snapshot|staging)}"

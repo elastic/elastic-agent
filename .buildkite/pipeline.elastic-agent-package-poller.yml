@@ -28,7 +28,7 @@ steps:
           lifetime: 3600
           project-id: "elastic-observability-ci"
           project-number: "911195782929"
-      - elastic/vault-secrets#v0.1.0:
+      - elastic/vault-secrets#v0.1.1:
           path: "kv/ci-shared/platform-ingest/buildkite_token"
           field: "value"
           env_var: "BUILDKITE_API_TOKEN"

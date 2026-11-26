@@ -103,7 +103,7 @@ RUNNING=$(curl -sf --retry 3 \
 
 if [[ "${RUNNING}" -gt 0 ]]; then
   echo "An elastic-agent-package build is already running on branch ${BRANCH} — skipping trigger."
-  echo "The in-flight build will pick up the latest dependency versions."
+  echo "Will retry on the next poll tick."
   exit 0
 fi
 
