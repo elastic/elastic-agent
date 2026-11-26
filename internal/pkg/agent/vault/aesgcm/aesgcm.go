@@ -73,7 +73,11 @@ func Encrypt(key, data []byte) ([]byte, error) {
 	}
 
 	// The first parameter is nonce in order to get the ciphertext as concatenation of nonce and encrypted data
+<<<<<<< HEAD
 	ciphertext := aesGCM.Seal(nonce, nonce, data, nil)
+=======
+	ciphertext := aesGCM.Seal(nil, nil, data, nil) //nolint:gosec // G407: false positive, NewGCMWithRandomNonce generates the nonce and requires a nil one here
+>>>>>>> 25e5e5a (chore: update golangci-lint to v2.15.0 to support Go 1.27 (#18263))
 
 	return ciphertext, nil
 }
