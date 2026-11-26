@@ -1,0 +1,45 @@
+# REQUIRED
+# Kind can be one of:
+# - breaking-change: a change to previously-documented behavior
+# - deprecation: functionality that is being removed in a later release
+# - bug-fix: fixes a problem in a previous version
+# - enhancement: extends functionality but does not break or fix existing behavior
+# - feature: new functionality
+# - known-issue: problems that we are aware of in a given version
+# - security: impacts on the security of a product or a user’s deployment.
+# - upgrade: important information for someone upgrading from a prior version
+# - other: does not fit into any of the other categories
+kind: feature
+
+# REQUIRED for all kinds
+# Change summary; a 80ish characters long description of the change.
+summary: Add agent.limits.cpu to limit the CPU use of Elastic Agent and its components on Linux with systemd
+
+# REQUIRED for breaking-change, deprecation, known-issue
+# Long description; in case the summary is not enough to describe the change
+# this field accommodate a description without length limits.
+description: "The new optional setting agent.limits.cpu is a whole number from 1 to 100. It is the share of the CPU capacity of the host that Elastic Agent and the components that it starts as child processes may use together. No value means that no limit is set. The value 0 is not valid. On Linux hosts with systemd and cgroup v2, a root service sets a runtime CPUQuota on its own unit over D-Bus. When the setting is removed, the Agent removes its own quota right away if it is sure that the quota is its own, and it always tries to remove its own quota when it stops. A quota left by a crash is not removed. To lift such a limit, set the value to 100 first and remove the setting after that. Components are held back until the limit is verified. The status of the limit is shown in elastic-agent status, in the diagnostics and in Fleet. It also shows the effective limit, which includes the CPU quotas of the parent cgroups of the service. Other platforms, containers without systemd, and Agents that do not run as a root systemd service report that the limit is not supported. A container that runs systemd with the Agent as its own root service is supported, and the effective limit then includes the CPU limit of the container. An invalid value rejects the policy or configuration, as an invalid agent.limits.go_max_procs does."
+
+# REQUIRED for breaking-change, deprecation, known-issue
+# impact:
+
+# REQUIRED for breaking-change, deprecation, known-issue
+# action:
+
+# REQUIRED for all kinds
+# Affected component; usually one of "elastic-agent", "fleet-server", "filebeat", "metricbeat", "auditbeat", "all", etc
+component: elastic-agent
+
+# AUTOMATED
+# OPTIONAL to manually add other PR URLs
+# PR URL: A link the PR that added the changeset.
+# If not present is automatically filled by the tooling finding the PR where this changelog fragment has been added.
+# NOTE: the tooling supports backports, so it's able to fill the original PR number instead of the backport PR number.
+# Please provide it if you are adding a fragment for a different PR.
+# pr: https://github.com/owner/repo/1234
+
+# AUTOMATED
+# OPTIONAL to manually add other issue URLs
+# Issue URL; optional; the tooling will not link the PR to this issue
+# If not present is automatically filled by the tooling with the issue linked to the PR number.
+# issue: https://github.com/owner/repo/1234
