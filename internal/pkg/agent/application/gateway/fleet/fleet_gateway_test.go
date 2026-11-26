@@ -720,7 +720,7 @@ func runFleetGateway(ctx context.Context, g coordinator.FleetGateway) <-chan err
 			select {
 			case <-done:
 				return
-			case <-g.Errors():
+			case _ = <-g.Errors():
 				// ignore errors here
 			}
 		}

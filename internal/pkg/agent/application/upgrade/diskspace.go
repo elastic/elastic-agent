@@ -86,7 +86,7 @@ func ReserveDiskSpace(ctx context.Context, archiveDir string, archiveSize, decom
 	var errs []error
 	var spaceReqs []string
 
-	err := reserveDiskSpace(ctx, installPath, int64(installSize)) //nolint:gosec // G115: installSize is clamped to MaxInt64
+	err := reserveDiskSpace(ctx, installPath, int64(installSize))
 	if upgradeErrors.IsDiskSpaceLowError(err) {
 		if onSameVolume {
 			// Report both requirements so the user doesn't free up just the install
@@ -102,7 +102,7 @@ func ReserveDiskSpace(ctx context.Context, archiveDir string, archiveSize, decom
 		errs = append(errs, err)
 	}
 
-	err = reserveDiskSpace(ctx, archivePath, int64(artifactsSize)) //nolint:gosec // G115: artifactsSize is clamped to MaxInt64
+	err = reserveDiskSpace(ctx, archivePath, int64(artifactsSize))
 	if upgradeErrors.IsDiskSpaceLowError(err) {
 		if onSameVolume {
 			// Report both requirements here even though the install reservation

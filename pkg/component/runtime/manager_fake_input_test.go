@@ -1262,8 +1262,8 @@ LOOP:
 				// Update goroutine is terminating, test is over
 				break LOOP
 			}
-		case <-managerResultChan:
-			require.Fail(t, "Runtime manager terminated before test was over")
+		case err := <-managerResultChan:
+			require.Failf(t, "Runtime manager terminated before test was over", "Run returned: %v", err)
 		case <-updateTimeout.C:
 			require.Fail(t, "Timed out waiting for Manager.Update result")
 		}

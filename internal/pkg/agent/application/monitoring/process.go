@@ -150,7 +150,7 @@ func GetProcessMetrics(ctx context.Context, endpoint, path string) ([]byte, int,
 	client := http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
-			Dial: dialer.Dial,
+			DialContext: dialer.DialContext,
 		},
 	}
 
