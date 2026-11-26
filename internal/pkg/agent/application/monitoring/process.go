@@ -132,7 +132,7 @@ func redirectToPath(w http.ResponseWriter, r *http.Request, id, path string) err
 		w.WriteHeader(statusCode)
 	}
 
-	fmt.Fprint(w, string(metricsBytes))
+	fmt.Fprint(w, string(metricsBytes)) //nolint:gosec // G705: relays the component's own metrics response from its local monitoring socket
 	return nil
 }
 
@@ -154,7 +154,10 @@ func GetProcessMetrics(ctx context.Context, endpoint, path string) ([]byte, int,
 		},
 	}
 
-	req, err := http.NewRequest(http.MethodGet, hostData.uri, nil)
+	cctx, cancelFn := context.WithCancel(ctx)
+	defer cancelFn()
+
+	req, err := http.NewRequestWithContext(cctx, http.MethodGet, hostData.uri, nil)
 	if err != nil {
 		return nil, 0, errorWithStatus(
 			http.StatusInternalServerError,
@@ -163,10 +166,7 @@ func GetProcessMetrics(ctx context.Context, endpoint, path string) ([]byte, int,
 	}
 
 	req.Close = true
-	cctx, cancelFn := context.WithCancel(ctx)
-	defer cancelFn()
-
-	resp, err := client.Do(req.WithContext(cctx))
+	resp, err := client.Do(req)
 	if err != nil {
 		statusCode := http.StatusInternalServerError
 		if errors.Is(err, syscall.ENOENT) {

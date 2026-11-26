@@ -30,7 +30,7 @@ func reportErr(ctx context.Context, errCh chan error, err error) {
 	case <-ctx.Done():
 		// context is already done
 		return
-	case _ = <-errCh:
+	case <-errCh: //nolint:errcheck // stale errors are dropped on purpose, only the latest is kept
 	// drain the error channel first
 	default:
 	}
