@@ -144,7 +144,7 @@ AGENT_PKG_BRANCH="${BRANCH}"
 # for staging it does not (e.g. 9.6.0-rc1). Pass it as-is so the pipeline does
 # not need to append or strip the qualifier.
 FIRST_DEP="${DEPS[0]}"
-FIRST_DEP_LATEST=$(curl -sf --retry 3 "${ARTIFACT_HOST}/${FIRST_DEP}/latest/${BRANCH}.json")
+FIRST_DEP_LATEST=$(curl -sf --retry 3 "${ARTIFACT_HOST}/${FIRST_DEP}/latest/${DEP_BRANCH}.json")
 STACK_VERSION=$(echo "${FIRST_DEP_LATEST}" | jq -r '.version')
 
 echo "--- :pipeline: Triggering elastic-agent-package build"
