@@ -43,8 +43,10 @@ func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtes
 }
 
 // FleetAgentStatus returns a niladic function that returns true if the agent
-// has reached expectedStatus; false otherwise. The returned function is intended
-// for use with assert.Eventually or require.Eventually.
+// has reached expectedStatus; false otherwise. An error while reading the status
+// is logged and the function returns false, so a short Fleet error does not fail
+// the test. The returned function is intended for use with assert.Eventually or
+// require.Eventually.
 func FleetAgentStatus(ctx context.Context,
 	t *testing.T,
 	client *kibana.Client,
@@ -53,7 +55,7 @@ func FleetAgentStatus(ctx context.Context,
 	return func() bool {
 		currentStatus, err := fleettools.GetAgentStatus(ctx, client, agentID)
 		if err != nil {
-			t.Errorf("unable to determine agent status: %s", err.Error())
+			t.Logf("unable to determine agent status: %s", err.Error())
 			return false
 		}
 
