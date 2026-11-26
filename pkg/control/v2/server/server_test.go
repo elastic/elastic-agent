@@ -6,6 +6,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net"
 	"testing"
 	"time"
@@ -21,11 +22,13 @@ import (
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/control"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/limits"
 	"github.com/elastic/elastic-agent/pkg/upgrade/details"
 )
 
@@ -291,6 +294,132 @@ func TestStateMapping(t *testing.T) {
 				assert.Equal(t, tc.upgradeDetails.ActionID, stateResponse.UpgradeDetails.ActionId)
 				assert.Equal(t, expectedMetadata, stateResponse.UpgradeDetails.Metadata)
 			}
+		})
+	}
+}
+
+func TestCPULimitToProto(t *testing.T) {
+	var fifty limits.CPULimit
+	require.NoError(t, fifty.Unpack(int64(50)))
+	var hundred limits.CPULimit
+	require.NoError(t, hundred.Unpack(int64(100)))
+
+	testcases := []struct {
+		name     string
+		snapshot *cpulimit.Snapshot
+		expected *cproto.CPULimit
+	}{
+		{
+			name: "quota set with a lower effective quota",
+			snapshot: &cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     fifty,
+				TargetCPUs:     4,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 2.5},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 1.5},
+			},
+			expected: &cproto.CPULimit{
+				State:              "applied",
+				ConfiguredPercent:  50,
+				TargetCpus:         4,
+				ActiveQuota:        "set",
+				ActiveQuotaCpus:    2.5,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCpus: 1.5,
+			},
+		},
+		{
+			name: "no quota with error",
+			snapshot: &cpulimit.Snapshot{
+				State:          cpulimit.StateDegraded,
+				Configured:     fifty,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaNone, CPUs: 3},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaNone, CPUs: 3},
+				Err:            errors.New("set failed"),
+			},
+			expected: &cproto.CPULimit{
+				State:             "degraded",
+				ConfiguredPercent: 50,
+				ActiveQuota:       "none",
+				EffectiveQuota:    "none",
+				Error:             "set failed",
+			},
+		},
+		{
+			name: "unknown quota with reason",
+			snapshot: &cpulimit.Snapshot{
+				State:      cpulimit.StateUnsupported,
+				Configured: fifty,
+				Reason:     "not supported here",
+			},
+			expected: &cproto.CPULimit{
+				State:             "unsupported",
+				ConfiguredPercent: 50,
+				ActiveQuota:       "unknown",
+				EffectiveQuota:    "unknown",
+				Reason:            "not supported here",
+			},
+		},
+		{
+			name: "cap of 100 is a normal cap",
+			snapshot: &cpulimit.Snapshot{
+				State:          cpulimit.StateApplied,
+				Configured:     hundred,
+				TargetCPUs:     4,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaSet, CPUs: 4},
+			},
+			expected: &cproto.CPULimit{
+				State:              "applied",
+				ConfiguredPercent:  100,
+				TargetCpus:         4,
+				ActiveQuota:        "set",
+				ActiveQuotaCpus:    4,
+				EffectiveQuota:     "set",
+				EffectiveQuotaCpus: 4,
+			},
+		},
+		{
+			name: "unknown state and quota kind are passed through",
+			snapshot: &cpulimit.Snapshot{
+				State:          cpulimit.State("throttled"),
+				Configured:     fifty,
+				ActiveQuota:    cpulimit.Quota{Kind: cpulimit.QuotaKind("partial"), CPUs: 1},
+				EffectiveQuota: cpulimit.Quota{Kind: cpulimit.QuotaKind("partial"), CPUs: 1},
+			},
+			expected: &cproto.CPULimit{
+				State:             "throttled",
+				ConfiguredPercent: 50,
+				ActiveQuota:       "partial",
+				EffectiveQuota:    "partial",
+			},
+		},
+		{
+			name:     "cap off",
+			snapshot: &cpulimit.Snapshot{State: cpulimit.StateDisabled},
+			expected: &cproto.CPULimit{
+				State:          "disabled",
+				ActiveQuota:    "unknown",
+				EffectiveQuota: "unknown",
+			},
+		},
+		{
+			name:     "zero snapshot",
+			snapshot: &cpulimit.Snapshot{},
+			expected: nil,
+		},
+		{
+			name:     "no controller",
+			snapshot: nil,
+			expected: nil,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			stateResponse, err := stateToProto(&coordinator.State{CPULimit: tc.snapshot}, new(info.AgentInfo))
+			require.NoError(t, err)
+			assert.Equal(t, tc.expected, stateResponse.CpuLimit)
 		})
 	}
 }
