@@ -10,6 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestQuotaKindName(t *testing.T) {
+	cases := map[QuotaKind]string{QuotaUnknown: "unknown", QuotaNone: "none", QuotaSet: "set"}
+	for kind, want := range cases {
+		require.Equal(t, want, kind.Name())
+	}
+}
+
 func TestDeriveState(t *testing.T) {
 	cases := []struct {
 		name string
