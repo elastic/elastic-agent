@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	stderrors "errors"
+	"math"
 	"sync"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 
 	eaclient "github.com/elastic/elastic-agent-client/v7/pkg/client"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/cpulimit"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/info"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/errors"
@@ -30,6 +32,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/backoff"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
+	"github.com/elastic/elastic-agent/pkg/ecsmeta"
 	fleetapi "github.com/elastic/elastic-agent/pkg/fleetapi"
 	"github.com/elastic/elastic-agent/pkg/scheduler"
 )
@@ -416,6 +419,11 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	f.log.Debugf("correcting agent loglevel from %s to %s using coordinator state", ecsMeta.Elastic.Agent.LogLevel, state.LogLevel.String())
 	// Fix loglevel with the current log level used by coordinator
 	ecsMeta.Elastic.Agent.LogLevel = state.LogLevel.String()
+	// The CPU limit is nil only when there is no CPU limit controller. The disabled state is sent too, so it replaces an
+	// object that Fleet Server stored while a cap was on.
+	if state.CPULimit != nil {
+		ecsMeta.Elastic.Agent.Limits = &ecsmeta.LimitsECSMeta{CPU: cpuLimitMetadata(*state.CPULimit)}
+	}
 
 	var (
 		agentPolicyID     string
@@ -497,6 +505,38 @@ func (f *FleetGateway) execute(ctx context.Context) (*fleetapi.CheckinResponse, 
 	}
 
 	return resp, took, nil
+}
+
+// cpuLimitMetadata returns the CPU limit metadata for s. The error text is not sent, because it can change between
+// checks and would make Fleet Server rewrite the metadata.
+// active_quota_cpus and effective_quota_cpus are always sent. Each is 0 unless its quota is set, so a value stored by
+// Fleet Server from an earlier check-in is reset. The diagnostics hook in the coordinator also takes the quota CPUs only
+// when a quota is set; keep both the same.
+func cpuLimitMetadata(s cpulimit.Snapshot) ecsmeta.CPULimitECSMeta {
+	m := ecsmeta.CPULimitECSMeta{
+		State:             string(s.State),
+		ConfiguredPercent: s.Configured.Percent(),
+		TargetCPUs:        finiteOrZero(s.TargetCPUs),
+		ActiveQuota:       s.ActiveQuota.Kind.Name(),
+		EffectiveQuota:    s.EffectiveQuota.Kind.Name(),
+		Reason:            s.Reason,
+	}
+	if s.ActiveQuota.Kind == cpulimit.QuotaSet {
+		m.ActiveQuotaCPUs = finiteOrZero(s.ActiveQuota.CPUs)
+	}
+	if s.EffectiveQuota.Kind == cpulimit.QuotaSet {
+		m.EffectiveQuotaCPUs = finiteOrZero(s.EffectiveQuota.CPUs)
+	}
+	return m
+}
+
+// finiteOrZero returns v, or 0 when v is NaN or infinite, because JSON cannot encode those values and the whole
+// check-in request would fail to encode.
+func finiteOrZero(v float64) float64 {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0
+	}
+	return v
 }
 
 // shouldUseLongSched checks if the max number of trying an invalid key is reached
