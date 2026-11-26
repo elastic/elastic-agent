@@ -439,8 +439,8 @@ func TestActionDispatcher(t *testing.T) {
 
 		// Second, assert that the Dispatch method completes without putting anything else on the error channel.
 		select {
-		case <-d.Errors():
-			t.Fatal(err)
+		case err := <-d.Errors():
+			t.Fatalf("unexpected error on the error channel: %v", err)
 		case <-dispatchCompleted:
 			// Expecting the dispatch to complete.
 		}
