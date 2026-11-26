@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -3189,4 +3190,412 @@ func TestCoordinator_Restart(t *testing.T) {
 		require.ErrorIs(t, err, ErrContainerNotSupported)
 		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
 	})
+}
+
+func TestCoordinator_Uninstall(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	action := &fleetapi.ActionUninstall{ActionID: "u1", ActionType: fleetapi.ActionTypeUninstall}
+
+	// linuxSpecs is a non-container platform so isContainerizedEnvironment is false.
+	linuxSpecs, err := pkgcomponent.NewRuntimeSpecs(
+		pkgcomponent.PlatformDetail{Platform: pkgcomponent.Platform{OS: "linux"}}, nil)
+	require.NoError(t, err)
+
+	t.Run("containerized returns ErrContainerNotSupported and does not spawn", func(t *testing.T) {
+		containerSpecs, err := pkgcomponent.NewRuntimeSpecs(
+			pkgcomponent.PlatformDetail{Platform: pkgcomponent.Platform{OS: pkgcomponent.Container}}, nil)
+		require.NoError(t, err)
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             containerSpecs,
+			logger:            logp.NewLogger("testing"),
+		}
+		err = coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrContainerNotSupported)
+		assert.False(t, spawned, "should not spawn uninstaller in a container")
+	})
+
+	t.Run("not installed returns ErrNotUninstallable and does not spawn", func(t *testing.T) {
+		pathstest.SetTop(t, t.TempDir()) // empty dir, no install marker
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		err := coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrNotUninstallable)
+		assert.False(t, spawned, "should not spawn uninstaller when not installed")
+	})
+
+	t.Run("installed but not root returns ErrUninstallRequiresRoot and does not spawn", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return false, nil })()
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		err := coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrUninstallRequiresRoot)
+		assert.False(t, spawned, "should not spawn uninstaller without root")
+	})
+
+	t.Run("installed but not supervised (interactive) returns ErrNotUninstallable and does not spawn", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			// Installed and root, but not running under the service supervisor
+			// (e.g. started interactively in the foreground): uninstalling would
+			// remove the installation while this foreground process keeps running.
+			canRestart: func() bool { return false },
+		}
+		err := coord.Uninstall(ctx, action)
+		require.ErrorIs(t, err, ErrNotUninstallable)
+		assert.False(t, spawned, "should not spawn uninstaller when not running under the supervisor")
+	})
+
+	t.Run("installed spawns uninstaller and sets stopping override state", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		// Create the install marker so RunningInstalled() reports installed.
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		// Unit tests may run as a non-root user; force the root check to pass so
+		// the spawn path is exercised deterministically.
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		var gotArgs []string
+		restore := overrideUninstallCmd(func(_ string, args ...string) *exec.Cmd {
+			gotArgs = args
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		err := coord.Uninstall(ctx, action)
+		require.NoError(t, err)
+
+		assert.Contains(t, gotArgs, "uninstall")
+		assert.Contains(t, gotArgs, "--force")
+		assert.Contains(t, gotArgs, "--"+UninstallFleetAckActionIDFlag)
+		assert.Contains(t, gotArgs, action.ActionID)
+		// The agent's paths and config must be forwarded to the detached child, as
+		// absolute paths (it runs from a different working directory).
+		assert.Contains(t, gotArgs, "--path.home")
+		assert.Contains(t, gotArgs, "--path.config")
+		assert.Contains(t, gotArgs, "--config")
+		// In the default namespace nothing extra is forwarded.
+		assert.NotContains(t, gotArgs, "--namespace")
+		for i, a := range gotArgs {
+			switch a {
+			case "--path.home", "--path.config", "--config":
+				require.Less(t, i+1, len(gotArgs), "%s must have a value", a)
+				assert.Truef(t, filepath.IsAbs(gotArgs[i+1]),
+					"%s must be forwarded as an absolute path, got %q", a, gotArgs[i+1])
+			}
+		}
+
+		select {
+		case override := <-coord.overrideStateChan:
+			require.NotNil(t, override, "uninstall should set an override state")
+			assert.Equal(t, agentclient.Stopping, override.state)
+		default:
+			t.Fatal("expected an override state to be set")
+		}
+
+		// Uninstall spawns a reaping goroutine that, once the (noop) process exits
+		// while the agent is still installed, reads paths.RunningInstalled() and
+		// clears the in-flight flag. Wait for the flag to clear so that goroutine's
+		// read of the global paths finishes before this subtest returns and the
+		// pathstest cleanup (and the next subtest) restores the global paths —
+		// avoiding a data race.
+		require.Eventuallyf(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 10*time.Second, 10*time.Millisecond,
+			"reaping goroutine did not clear the in-flight flag")
+	})
+
+	t.Run("forwards the installation namespace to the detached uninstaller", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+		// The agent is installed into a non-default namespace; the detached
+		// uninstaller must target that agent's service and paths, not the primary
+		// agent's, so the namespace is forwarded explicitly.
+		pathstest.SetInstallNamespace(t, paths.DevelopmentNamespace)
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		var gotArgs []string
+		restore := overrideUninstallCmd(func(_ string, args ...string) *exec.Cmd {
+			gotArgs = args
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		require.NoError(t, coord.Uninstall(ctx, action))
+
+		var nsValue string
+		for i, a := range gotArgs {
+			if a == "--namespace" {
+				require.Less(t, i+1, len(gotArgs), "--namespace must have a value")
+				nsValue = gotArgs[i+1]
+			}
+		}
+		assert.Equal(t, paths.DevelopmentNamespace, nsValue,
+			"the installation namespace must be forwarded to the detached uninstaller")
+
+		// Let the reaping goroutine finish reading the global paths before cleanup
+		// restores them (avoids a data race); see the spawn subtest above.
+		require.Eventuallyf(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 10*time.Second, 10*time.Millisecond,
+			"reaping goroutine did not clear the in-flight flag")
+	})
+
+	t.Run("duplicate action already in-flight does not spawn a second uninstaller", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		// Pre-seed the SAME action as already in-flight: a detached uninstaller was
+		// already spawned and has not finished. The success ack is delayed until
+		// the point of no return, so Fleet can redeliver the action before the
+		// ack is observed; that redelivery must be dropped rather than spawning a
+		// second, concurrent uninstaller.
+		coord.uninstalling = true
+		coord.uninstallingActionID = action.ActionID
+
+		// A redelivery of an already-in-flight action is a no-op: it returns nil
+		// (so the handler does not fail-ack it) and does not spawn a second
+		// uninstaller.
+		require.NoError(t, coord.Uninstall(ctx, action))
+		assert.False(t, spawned, "a duplicate in-flight uninstall action must not spawn a second uninstaller")
+	})
+
+	t.Run("different action while one is in-flight is rejected so its failure is acked", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+
+		spawned := false
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawned = true
+			return noopUninstallCmd()
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 2),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		// A different uninstall action is already in flight.
+		coord.uninstalling = true
+		coord.uninstallingActionID = "u2"
+
+		// A different concurrent action must be rejected with an error (not dropped)
+		// so its handler acknowledges the failure instead of leaving it silently
+		// pending after the agent is removed, and it must not spawn a second
+		// uninstaller.
+		err := coord.Uninstall(ctx, action)
+		require.Error(t, err, "a different concurrent uninstall action must be rejected")
+		assert.False(t, spawned, "a different concurrent uninstall must not spawn a second uninstaller")
+	})
+
+	t.Run("timeout keeps the in-flight guard until the child exits so redelivery cannot start a second uninstaller", func(t *testing.T) {
+		tmpTop := t.TempDir()
+		pathstest.SetTop(t, tmpTop)
+		require.NoError(t, os.WriteFile(
+			filepath.Join(tmpTop, paths.MarkerFileName), []byte("{}"), 0o600))
+
+		defer overrideUninstallHasRoot(func() (bool, error) { return true, nil })()
+		// Shorten the reap timeout so the hanging child trips it quickly.
+		defer overrideUninstallReapTimeout(50 * time.Millisecond)()
+
+		// A child that neither exits nor removes the service; cancelled later to
+		// simulate it finally exiting (and to avoid leaking it).
+		cmdCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		// overrideUninstallCmd's callback runs synchronously inside Uninstall, so a
+		// plain counter is safe here.
+		spawns := 0
+		restore := overrideUninstallCmd(func(string, ...string) *exec.Cmd {
+			spawns++
+			return hangingUninstallCmd(cmdCtx)
+		})
+		defer restore()
+
+		coord := &Coordinator{
+			overrideStateChan: make(chan *coordinatorOverrideState, 4),
+			specs:             linuxSpecs,
+			logger:            logp.NewLogger("testing"),
+			canRestart:        func() bool { return true },
+		}
+		require.NoError(t, coord.Uninstall(ctx, action))
+
+		// After the reap timeout (50ms) the reaping goroutine stops reporting
+		// Stopping but must RETAIN the in-flight guard, because the child is still
+		// alive. Wait past the timeout and assert the guard is still held.
+		require.Never(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 300*time.Millisecond, 25*time.Millisecond,
+			"the in-flight guard must be retained while the child is still alive")
+
+		// A redelivery while the child is still alive must be dropped (returns nil)
+		// and must not start a second, concurrent uninstaller.
+		require.NoError(t, coord.Uninstall(ctx, action))
+		assert.Equal(t, 1, spawns, "a redelivery must not start a second uninstaller")
+
+		// Once the child exits, the reaping goroutine releases the guard so a
+		// future uninstall can run.
+		cancel()
+		require.Eventuallyf(t, func() bool {
+			coord.uninstallMu.Lock()
+			defer coord.uninstallMu.Unlock()
+			return !coord.uninstalling
+		}, 10*time.Second, 10*time.Millisecond,
+			"the in-flight guard must be released after the child exits")
+	})
+
+}
+
+// overrideUninstallCmd swaps the package-level uninstallCmd for tests and returns
+// a function that restores the original.
+func overrideUninstallCmd(fn func(string, ...string) *exec.Cmd) func() {
+	orig := uninstallCmd
+	uninstallCmd = fn
+	return func() { uninstallCmd = orig }
+}
+
+// overrideUninstallHasRoot swaps the package-level uninstallHasRoot for tests and
+// returns a function that restores the original.
+func overrideUninstallHasRoot(fn func() (bool, error)) func() {
+	orig := uninstallHasRoot
+	uninstallHasRoot = fn
+	return func() { uninstallHasRoot = orig }
+}
+
+// noopUninstallCmd returns a harmless, fast-exiting command used in tests to
+// stand in for the real detached uninstaller: it re-invokes the test binary with
+// a run filter that matches no tests, so Start() succeeds on any OS without side
+// effects.
+func noopUninstallCmd() *exec.Cmd {
+	// #nosec G204 G702 -- test-only; arguments are constant and reference the test binary.
+	return exec.CommandContext(context.Background(), os.Args[0], "-test.run", "^$")
+}
+
+// overrideUninstallReapTimeout swaps the package-level uninstallReapTimeout for
+// tests and returns a function that restores the original.
+func overrideUninstallReapTimeout(d time.Duration) func() {
+	orig := uninstallReapTimeout
+	uninstallReapTimeout = d
+	return func() { uninstallReapTimeout = orig }
+}
+
+// hangingUninstallCmd returns a command that does not exit on its own, standing
+// in for a stuck detached uninstaller. It re-invokes the test binary into the
+// sleeping helper below (cross-platform) and is killed when ctx is cancelled so
+// it does not leak past the test.
+func hangingUninstallCmd(ctx context.Context) *exec.Cmd {
+	// #nosec G204 G702 -- test-only; arguments are constant and reference the test binary.
+	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run", "^TestUninstallSleepHelper$")
+	cmd.Env = append(os.Environ(), "GO_UNINSTALL_SLEEP_HELPER=1")
+	return cmd
+}
+
+// TestUninstallSleepHelper is not a real test: it is the process body spawned by
+// hangingUninstallCmd. It only sleeps when its env marker is set, so it is a
+// no-op during a normal test run.
+func TestUninstallSleepHelper(t *testing.T) {
+	if os.Getenv("GO_UNINSTALL_SLEEP_HELPER") == "" {
+		return
+	}
+	time.Sleep(30 * time.Second)
 }

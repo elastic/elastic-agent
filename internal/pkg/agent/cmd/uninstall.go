@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/elastic/beats/v7/pkg/logp"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/coordinator"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/install"
 	"github.com/elastic/elastic-agent/internal/pkg/cli"
@@ -39,11 +40,31 @@ Unless -f is used this command will ask confirmation before performing removal.
 	cmd.Flags().String("uninstall-token", "", "Uninstall token required for protected agent uninstall")
 	cmd.Flags().Bool("skip-fleet-audit", false, "Skip fleet audit/unenroll")
 
+	// Hidden: set by the agent when an uninstall is triggered by a Fleet
+	// UNINSTALL action. The action is acknowledged to Fleet at the point of no
+	// return by this (detached) uninstall process.
+	cmd.Flags().String(coordinator.UninstallFleetAckActionIDFlag, "", "Fleet UNINSTALL action ID to acknowledge after uninstalling")
+	_ = cmd.Flags().MarkHidden(coordinator.UninstallFleetAckActionIDFlag)
+
+	// Hidden: forwarded by the agent when a Fleet UNINSTALL action targets an
+	// agent installed into a non-default namespace (--develop or --namespace), so
+	// the detached uninstaller removes that agent's service and paths rather than
+	// the primary agent's.
+	cmd.Flags().String(flagInstallNamespace, "", "Uninstall the Elastic Agent installed in this namespace")
+	_ = cmd.Flags().MarkHidden(flagInstallNamespace)
+
 	return cmd
 }
 
 func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	var err error
+
+	// Resolve the namespace before touching any namespace-dependent path (service
+	// name, display name, Top()) so we operate on the intended installation when
+	// it lives in a non-default namespace.
+	if namespace, _ := cmd.Flags().GetString(flagInstallNamespace); namespace != "" {
+		paths.SetInstallNamespace(namespace)
+	}
 
 	isAdmin, err := utils.HasRoot()
 	if err != nil {
@@ -63,6 +84,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 	force, _ := cmd.Flags().GetBool("force")
 	uninstallToken, _ := cmd.Flags().GetString("uninstall-token")
 	skipFleetAudit, _ := cmd.Flags().GetBool("skip-fleet-audit")
+	fleetAckActionID, _ := cmd.Flags().GetString(coordinator.UninstallFleetAckActionIDFlag)
 	if status == install.Broken {
 		if !force {
 			fmt.Fprintf(streams.Out, "%s is installed but currently broken: %s\n", paths.ServiceDisplayName(), reason)
@@ -97,7 +119,7 @@ func uninstallCmd(streams *cli.IOStreams, cmd *cobra.Command) error {
 		fmt.Fprint(os.Stderr, logBuff.String())
 	}()
 
-	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar, skipFleetAudit)
+	err = install.Uninstall(cmd.Context(), paths.ConfigFile(), paths.Top(), uninstallToken, log, progBar, skipFleetAudit, fleetAckActionID)
 	if err != nil {
 		progBar.Describe("Failed to uninstall agent")
 		return fmt.Errorf("error uninstalling agent: %w", err)

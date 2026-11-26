@@ -20,7 +20,7 @@ require (
 	github.com/elastic/cloud-on-k8s/v3 v3.5.0
 	github.com/elastic/elastic-agent-client/v7 v7.20.0
 	github.com/elastic/elastic-transport-go/v8 v8.11.0
-	github.com/elastic/fleet-server/pkg/api v0.0.0-20260515154942-99dc973fd52e
+	github.com/elastic/fleet-server/pkg/api v0.0.0-20261020073204-8d70d3eb77f3
 	github.com/elastic/go-elasticsearch/v9 v9.5.3
 	github.com/elastic/go-sysinfo v1.15.5
 	github.com/elastic/go-ucfg v0.9.2

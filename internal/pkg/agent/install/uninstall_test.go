@@ -6,7 +6,9 @@ package install
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,6 +23,7 @@ import (
 
 	"github.com/elastic/beats/v7/pkg/logp"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/secret"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/configuration"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/vault"
@@ -32,6 +35,31 @@ import (
 type noopProgressDescriber struct{}
 
 func (n *noopProgressDescriber) Describe(string) {}
+
+func TestEnableUninstallFileLog(t *testing.T) {
+	pathstest.SetTop(t, t.TempDir())
+
+	teed, closeLog, err := enableUninstallFileLog(logp.NewLogger("uninstall"))
+	require.NoError(t, err)
+	require.NotNil(t, teed)
+
+	teed.Info("streamed-uninstall-line")
+	// The reason a uninstall fails is logged at error level (see Uninstall's
+	// deferred error log); make sure that level reaches the file too.
+	teed.Errorf("uninstall failed: %v", errors.New("boom"))
+	// The file must be readable (closed) before the install tree is removed, and
+	// closing must be idempotent (called explicitly and via defer).
+	closeLog()
+	closeLog()
+
+	logPath := filepath.Join(paths.BuildLogs(), uninstallLogName)
+	data, err := os.ReadFile(logPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "streamed-uninstall-line",
+		"the uninstaller log line must be streamed to the collectable log file")
+	assert.Contains(t, string(data), "uninstall failed: boom",
+		"the uninstall failure reason must be streamed to the collectable log file")
+}
 
 func Test_checkForUnprivilegedVault(t *testing.T) {
 	type postVaultInit func(t *testing.T, vaultPath string)
@@ -227,6 +255,95 @@ func TestNotifyFleetAuditUnenroll(t *testing.T) {
 		err := notifyFleetAuditUninstall(context.Background(), log, pt, cfg, &agentID)
 		assert.EqualError(t, err, "notify Fleet: failed")
 
+	})
+}
+
+func TestAckFleetUninstallAction(t *testing.T) {
+	const actionID = "uninstall-action-id"
+	log, _ := logp.NewInMemoryLocal("test", zap.NewDevelopmentEncoderConfig())
+	pt := &noopProgressDescriber{}
+	var agentID agentInfo = "testID"
+
+	newCfg := func(host string) *configuration.Configuration {
+		return &configuration.Configuration{
+			Fleet: &configuration.FleetAgentConfig{
+				AccessAPIKey: "example-key",
+				Client: remote.Config{
+					Protocol: remote.ProtocolHTTP,
+					Host:     host,
+				},
+			},
+		}
+	}
+
+	t.Run("acks the action successfully", func(t *testing.T) {
+		var gotPath string
+		var gotBody string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			gotPath = r.URL.Path
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"action":"acks"}`))
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID, nil)
+		require.NoError(t, err)
+		assert.Equal(t, fmt.Sprintf("/api/fleet/agents/%s/acks", agentID), gotPath,
+			"ack must be sent to the agent's acks endpoint")
+		assert.Contains(t, gotBody, actionID, "ack request must carry the action id")
+	})
+
+	t.Run("a failure ack carries the error", func(t *testing.T) {
+		var gotBody string
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			gotBody = string(b)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"action":"acks"}`))
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID,
+			errors.New("uninstall failed before point of no return"))
+		require.NoError(t, err)
+		assert.Contains(t, gotBody, "uninstall failed before point of no return",
+			"a failure ack must include the action error so Fleet learns the uninstall did not complete")
+	})
+
+	t.Run("returns an error when Fleet rejects the ack", func(t *testing.T) {
+		fleetAuditAttempts = 1
+		t.Cleanup(func() { fleetAuditAttempts = 10 })
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID, nil)
+		require.Error(t, err)
+	})
+
+	t.Run("returns an error when Fleet returns HTTP 200 with a failed item", func(t *testing.T) {
+		fleetAuditAttempts = 1
+		t.Cleanup(func() { fleetAuditAttempts = 10 })
+		// Fleet Server can reject an acknowledgement at the item level while still
+		// returning HTTP 200 (errors: true). This must be treated as a failure (and
+		// retried) rather than success; otherwise the uninstaller removes its
+		// credentials and can never acknowledge the terminal action again.
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"action":"acks","errors":true,"items":[{"status":409}]}`))
+		}))
+		defer server.Close()
+
+		err := ackFleetUninstallAction(context.Background(), log, pt, newCfg(server.URL), &agentID, actionID, nil)
+		require.Error(t, err, "an HTTP-200 ack with errors:true must be reported as a failure")
+	})
+
+	t.Run("returns an error when no fleet configuration is available", func(t *testing.T) {
+		err := ackFleetUninstallAction(context.Background(), log, pt, &configuration.Configuration{}, &agentID, actionID, nil)
+		require.Error(t, err)
 	})
 }
 

@@ -23,6 +23,14 @@ func SetTop(t testing.TB, path string) {
 	paths.SetTop(path)
 }
 
+// SetInstallNamespace sets the installation namespace until the end of the test.
+func SetInstallNamespace(t testing.TB, namespace string) {
+	t.Helper()
+	orig := paths.InstallNamespace()
+	t.Cleanup(func() { paths.SetInstallNamespace(orig) })
+	paths.SetInstallNamespace(namespace)
+}
+
 // SetConfig sets the config path until the end of the test.
 func SetConfig(t testing.TB, path string) {
 	t.Helper()
