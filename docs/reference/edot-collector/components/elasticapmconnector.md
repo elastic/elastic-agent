@@ -113,7 +113,7 @@ Follow these recommendations when using the Elastic {{product.apm}} connector:
 
 * **Create a separate metrics pipeline for connector output**: Set up a dedicated metrics pipeline with the connector as the receiver. This isolates metric handling and makes it easier to apply metric-specific processing if needed.
 
-* **Use only for direct {{es}} ingestion or for tail-based sampling in a Gateway**: If you're using the {{motlp}}, you don't need the Elastic {{product.apm}} connector, because the endpoint handles metric aggregation automatically. Using both can cause conflicts or duplicate metrics. The exception is a self-managed Gateway that runs tail-based sampling before it sends data to the {{motlp}}. Refer to [](../config/configure-tracing-collection.md#tail-sampling-gateway).
+* **Skip it with the {{motlp}}, unless you sample at the edge**: The {{motlp}} handles metric aggregation automatically, so you don't normally need the Elastic {{product.apm}} connector. The exception is a self-managed gateway that performs [tail-based sampling and APM aggregation before sending the processed telemetry to the {{motlp}}](../config/configure-tracing-collection.md#tail-sampling-gateway), using the `x-elastic-apm-aggregation-processed` header.
 
 * **Keep the connector updated**: The Elastic {{product.apm}} connector evolves with new Elastic {{product.apm}} features. Keep your {{agent}} version current to benefit from the latest enhancements and compatibility improvements.
 
