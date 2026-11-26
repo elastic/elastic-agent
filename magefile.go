@@ -2838,6 +2838,10 @@ func generateEnvFile(stack tcommon.Stack) error {
 		return err
 	}
 
+	if runtime.GOOS != "windows" {
+		return nil
+	}
+
 	return writeEnvFile("./env.ps1", func(w io.Writer) error {
 		if _, err := fmt.Fprintf(w, "$env:ELASTICSEARCH_HOST=\"%s\"\n", stack.Elasticsearch); err != nil {
 			return fmt.Errorf("write ELASTICSEARCH_HOST: %w", err)
@@ -2945,7 +2949,7 @@ func (Integration) Stacks() error {
 	return nil
 }
 
-// GenerateEnvFile generates 'env.sh' containing envvars to connect to a cloud stack
+// GenerateEnvFile generates 'env.sh' (and 'env.ps1' on Windows) containing envvars to connect to a cloud stack
 func (Integration) GenerateEnvFile() error {
 	stack, err := askForStack()
 	if err != nil {
@@ -2954,6 +2958,10 @@ func (Integration) GenerateEnvFile() error {
 
 	if err := generateEnvFile(stack); err != nil {
 		return fmt.Errorf("cannot generate env file: %w", err)
+	}
+	if runtime.GOOS == "windows" {
+		fmt.Println("run '. .\\env.ps1' to load the environment variables to your shell")
+		return nil
 	}
 	fmt.Println("run 'source ./env.sh' to load the environment variables to your shell")
 
