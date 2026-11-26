@@ -19,39 +19,46 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
-// IsPolicyRevision returns a niladic function that returns true if the
-// given agent's policy revision matches the given policy revision exactly;
-// false otherwise. The returned function is intended
-// for use with assert.Eventually or require.Eventually.
-func IsPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
-	return func() bool {
-		getAgentReq := kibana.GetAgentRequest{ID: agentID}
-		updatedPolicyAgent, err := client.GetAgent(ctx, getAgentReq)
-		if err != nil {
-			t.Logf("failed to get agent document to check policy revision: %v", err)
-			return false
-		}
-
-		return updatedPolicyAgent.PolicyRevision == policyRevision
-	}
-}
-
 // IsMinPolicyRevision returns a niladic function that returns true if the
 // given agent's policy revision is at least the given policy revision; false
-// otherwise. Use this instead of IsPolicyRevision when intermediate revisions
-// may occur between computing the expected value and the agent applying it.
+// otherwise. Tests share one Fleet, and a change to a shared object (for
+// example the default output) creates a new policy revision at any time. So
+// wait for "at least" the revision returned by UpdatePolicy, never for an exact
+// number.
 // The returned function is intended for use with assert.Eventually or require.Eventually.
 func IsMinPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
 	return func() bool {
-		getAgentReq := kibana.GetAgentRequest{ID: agentID}
-		updatedPolicyAgent, err := client.GetAgent(ctx, getAgentReq)
+		revision, ok := agentPolicyRevision(ctx, t, client, agentID)
+		return ok && revision >= policyRevision
+	}
+}
+
+// IsAgentOnLatestPolicyRevision returns a niladic function that returns true if
+// the agent has the latest revision of its policy; false otherwise. Use it
+// before a test reads the agent's policy revision as a baseline, so the agent
+// has no older revision left to apply.
+// The returned function is intended for use with assert.Eventually or require.Eventually.
+func IsAgentOnLatestPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, policyID string, agentID string) func() bool {
+	return func() bool {
+		policy, err := client.GetPolicy(ctx, policyID)
 		if err != nil {
-			t.Logf("failed to get agent document to check policy revision: %v", err)
+			t.Logf("failed to get policy to check its revision: %v", err)
 			return false
 		}
-
-		return updatedPolicyAgent.PolicyRevision >= policyRevision
+		revision, ok := agentPolicyRevision(ctx, t, client, agentID)
+		return ok && revision >= policy.Revision
 	}
+}
+
+// agentPolicyRevision returns the policy revision of the agent. The boolean is
+// false if the agent document could not be read.
+func agentPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string) (int, bool) {
+	revision, err := fleettools.GetAgentPolicyRevision(ctx, client, agentID)
+	if err != nil {
+		t.Logf("failed to get agent document to check policy revision: %v", err)
+		return 0, false
+	}
+	return revision, true
 }
 
 func GetUninstallToken(ctx context.Context, kibClient *kibana.Client, policyId string) (string, error) {

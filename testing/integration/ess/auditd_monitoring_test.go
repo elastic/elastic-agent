@@ -198,7 +198,7 @@ func (runner *AuditDRunner) TestBeatsMetrics() {
 		policyRevision := switchAuditbeatToProcessRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
 		// Wait for the agent to apply the new policy revision.
-		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
+		require.Eventually(t, tools.IsMinPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
 			5*time.Minute, time.Second)
 
 		// Verify that the audit/auditd component has switched to process mode.

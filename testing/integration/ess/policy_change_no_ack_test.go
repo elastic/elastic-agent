@@ -86,10 +86,13 @@ func TestPolicyChangePersistsWithoutAck(t *testing.T) {
 
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
-	initialAgent, err := info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
-	require.NoError(t, err)
-	initialRevision := initialAgent.PolicyRevision
-	t.Logf("agent reported initial policy revision %d", initialRevision)
+	// Other tests share Fleet and can create new policy revisions at any time.
+	// Wait for the agent to have the latest one, so the update below is the
+	// only change left to apply.
+	require.Eventually(t,
+		tools.IsAgentOnLatestPolicyRevision(ctx, t, info.KibanaClient, policy.ID, agentID),
+		6*time.Minute, 5*time.Second,
+		"agent did not reach the latest revision of its policy")
 
 	// Update the policy to bump its revision. Description is the only field
 	// that changes; the disable_policy_change_acks feature flag must remain
@@ -102,10 +105,10 @@ func TestPolicyChangePersistsWithoutAck(t *testing.T) {
 		MonitoringEnabled: createPolicyReq.MonitoringEnabled,
 		AgentFeatures:     policyFeatures,
 	}
-	_, err = info.KibanaClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
+	updatedPolicy, err := info.KibanaClient.UpdatePolicy(ctx, policy.ID, updatePolicyReq)
 	require.NoError(t, err)
 
-	expectedRevision := initialRevision + 1
+	expectedRevision := updatedPolicy.Revision
 	t.Logf("waiting for agent to report policy revision %d", expectedRevision)
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {

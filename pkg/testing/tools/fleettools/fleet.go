@@ -40,6 +40,15 @@ func GetAgentVersion(ctx context.Context, client *kibana.Client, agentID string)
 	return agent.Agent.Version, nil
 }
 
+// GetAgentPolicyRevision returns the policy revision that Fleet shows for the agent.
+func GetAgentPolicyRevision(ctx context.Context, client *kibana.Client, agentID string) (int, error) {
+	agent, err := client.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+	if err != nil {
+		return 0, err
+	}
+	return agent.PolicyRevision, nil
+}
+
 func UnEnrollAgent(ctx context.Context, client *kibana.Client, agentID string) error {
 	unEnrollAgentReq := kibana.UnEnrollAgentRequest{
 		ID:     agentID,

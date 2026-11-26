@@ -990,7 +990,7 @@ func TestFleetDownloadProxyURL(t *testing.T) {
 		agentResp, err := kibClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 		require.NoError(c, err)
 		require.Equal(c, "online", agentResp.Status)
-		require.Equal(c, updatedPolicy.Revision, agentResp.PolicyRevision)
+		require.GreaterOrEqual(c, agentResp.PolicyRevision, updatedPolicy.Revision)
 	}, time.Minute, time.Second, "Expected agent to be online and policy has updated")
 
 	t.Logf("Upgrading from version \"%s-%s\" to version \"%s-%s\", with proxy...",

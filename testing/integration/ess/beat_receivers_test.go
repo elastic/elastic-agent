@@ -2089,7 +2089,7 @@ func TestMonitoringNoDuplicates(t *testing.T) {
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			inspectOutput, err := fut.ExecInspect(ctx)
 			require.NoError(collect, err)
-			assert.Equal(collect, expectedRevision, inspectOutput.Revision)
+			assert.GreaterOrEqual(collect, inspectOutput.Revision, expectedRevision)
 		}, 3*time.Minute, 1*time.Second)
 	}
 	policyCheck(otelMonResp.Revision)
