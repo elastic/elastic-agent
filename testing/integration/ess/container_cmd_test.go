@@ -32,6 +32,7 @@ import (
 	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/beats/v7/pkg/testing/certutil"
 	"github.com/elastic/beats/v7/pkg/testing/estools"
+	"github.com/elastic/elastic-agent/internal/pkg/cli"
 	monitoringCfg "github.com/elastic/elastic-agent/internal/pkg/core/monitoring/config"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
@@ -119,7 +120,7 @@ func prepareAgentCMD(
 	agentFixture *atesting.Fixture,
 	args []string,
 	env []string,
-) (*exec.Cmd, *strings.Builder) {
+) (*exec.Cmd, *cli.SyncBuffer) {
 	cmd, err := agentFixture.PrepareAgentCommand(ctx, args)
 	if err != nil {
 		t.Fatalf("could not prepare agent command: %s", err)
@@ -148,11 +149,13 @@ func prepareAgentCMD(
 		t.Log(">> cleaning up: no process to kill")
 	})
 
-	agentOutput := strings.Builder{}
-	cmd.Stderr = &agentOutput
-	cmd.Stdout = &agentOutput
+	// The output is written by the exec goroutine while tests read it, so the
+	// buffer must be safe for concurrent use.
+	agentOutput := &cli.SyncBuffer{}
+	cmd.Stderr = agentOutput
+	cmd.Stdout = agentOutput
 	cmd.Env = append(os.Environ(), env...)
-	return cmd, &agentOutput
+	return cmd, agentOutput
 }
 
 func TestContainerCMD(t *testing.T) {
@@ -1377,7 +1380,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 	// failed attempt is the only thing that explains why the agent is not ready.
 	// After a restart Fleet Server needs time to come up before the agent can
 	// check in again, so the timeout must leave room for that.
-	waitAgentReady := func(timeout time.Duration, description string, output *strings.Builder) {
+	waitAgentReady := func(timeout time.Duration, description string, output *cli.SyncBuffer) {
 		if assert.Eventually(t, agentReady, timeout, time.Second) {
 			return
 		}
