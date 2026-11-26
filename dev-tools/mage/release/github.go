@@ -250,11 +250,7 @@ var mergeLabelDefs = map[string]struct {
 	},
 	mergeLabelAfterRelease: {
 		Color:       "0E8A16",
-		Description: "Merge 4th: after release day",
-	},
-	mergeLabelBeforeBuild: {
-		Color:       "B60205",
-		Description: "Merge before the final patch release build",
+		Description: "Merge after release: post-release version bump",
 	},
 }
 

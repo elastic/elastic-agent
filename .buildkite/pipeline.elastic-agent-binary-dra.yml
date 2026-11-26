@@ -9,8 +9,8 @@ env:
 
   # The following images are defined here and their values will be updated by updatecli
   # Please do not change them manually.
-  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1793494863"
-  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1793494863"
+  IMAGE_UBUNTU_2404_X86_64: "platform-ingest-elastic-agent-ubuntu-2404-1794704524"
+  IMAGE_UBUNTU_2404_ARM_64: "platform-ingest-elastic-agent-ubuntu-2404-aarch64-1794704524"
 
 # This section is used to define the plugins that will be used in the pipeline.
 # See https://buildkite.com/docs/pipelines/integrations/plugins/using#using-yaml-anchors-with-plugins
@@ -112,7 +112,7 @@ steps:
         DRA_WORKFLOW: "snapshot"
       plugins:
         - *google_oidc_plugin
-        - elastic/dra-prep#v0.1.7:
+        - elastic/dra-prep#v0.1.8:
             product_id: "elastic-agent-core"
             stack_version: "${BEAT_VERSION}-SNAPSHOT"
             workflow: "snapshot"
@@ -229,6 +229,22 @@ steps:
         memory: "1Gi"
       plugins:
         - *google_oidc_plugin
+
+  - wait: ~
+
+  - label: ":wastebasket: Delete build artifacts"
+    key: "delete_build_artifacts"
+    if: build.env("RUN_STAGING") == "true" || build.env("RUN_SNAPSHOT") == "true" || (build.pull_request.id == null && (build.branch == "main" || build.branch =~ /^[0-9]+\.[0-9x]+\$/))
+    command: "true"
+    plugins:
+      - elastic/vault-secrets#v0.1.1:
+          path: "kv/ci-shared/manage-buildkite-artifacts/delete"
+          field: "token"
+          env_var: "BUILDKITE_API_TOKEN"
+      - elastic/delete-build-artifacts#v0.1.0:
+          continue-on-error: true
+    agents:
+      provider: k8s
 
 notify:
   - slack: "#ingest-notifications"
