@@ -12,13 +12,6 @@ connectors:
   forward: # Forward connector necessary for tail-based sampling
 
 processors:
-  batch:
-    send_batch_size: 1000
-    timeout: 1s
-    send_batch_max_size: 1500
-  batch/metrics:
-    send_batch_max_size: 0 # Explicitly set to 0 to avoid splitting metrics requests
-    timeout: 1s
   elasticapm: {} # Enriches spans before the connector generates APM metrics
   tail_sampling:
     decision_wait: 10s
@@ -57,17 +50,17 @@ service:
     # aggregation and Managed OTLP as their original signals.
     metrics:
       receivers: [ otlp ]
-      processors: [ batch/metrics, elasticapm ]
+      processors: [ elasticapm ]
       exporters: [ debug, elasticapm, otlp_grpc/managed_otlp_aggregated ]
     logs:
       receivers: [ otlp ]
-      processors: [ batch, elasticapm ]
+      processors: [ elasticapm ]
       exporters: [ debug, elasticapm, otlp_grpc/managed_otlp_aggregated ]
     # Enrich all spans and aggregate APM metrics before sampling. The forward
     # connector passes the same traces to the post-processing pipeline.
     traces/1-process-elastic:
       receivers: [ otlp ]
-      processors: [ batch, elasticapm ]
+      processors: [ elasticapm ]
       exporters: [ debug, elasticapm, forward ]
     # Make the tail-sampling decision and export only retained traces.
     traces/2-process-tbs:
