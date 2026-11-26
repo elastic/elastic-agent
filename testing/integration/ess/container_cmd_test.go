@@ -40,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -1270,7 +1271,9 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx := t.Context()
+	// Longer than the sum of the waits below (2 + 6 + 6 minutes).
+	ctx, cancel := testcontext.WithTimeout(t, t.Context(), 20*time.Minute)
+	defer cancel()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
