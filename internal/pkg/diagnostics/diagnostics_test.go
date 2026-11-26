@@ -808,13 +808,13 @@ func TestSaveLogs(t *testing.T) {
 
 	t.Run("broken zip writer is fatal", func(t *testing.T) {
 		// zip.NewWriter wraps the underlying writer in a bufio.Writer (4 KB buffer),
-		// so small writes never reach the broken writer — they sit in the bufio.
-		// The deflate compressor emits a compressed block every ~32 768 tokens; for
-		// truly incompressible data (LCG bytes, no back-references) each token is one
-		// literal byte, so a 40 KB incompressible file forces the compressor to emit a
-		// ~32 KB block during io.Copy, overflowing the bufio and surfacing the error
-		// inside saveLogs before it returns.
-		const dataSize = 40 * 1024
+		// and the deflate compressor buffers its input before emitting a block, so
+		// small writes never reach the broken writer. How much input it takes before
+		// the first write depends on the compress/flate implementation: about 18 KB
+		// of incompressible data with Go 1.26 and 64 KB with Go 1.27. 1 MB of
+		// incompressible data (LCG bytes, no back-references) is far above that, so
+		// the error surfaces during io.Copy inside saveLogs before it returns.
+		const dataSize = 1024 * 1024
 		data := make([]byte, dataSize)
 		v := uint32(0xdeadbeef)
 		for i := range data {
