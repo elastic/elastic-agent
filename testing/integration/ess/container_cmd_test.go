@@ -148,8 +148,8 @@ func prepareAgentCMD(
 		t.Log(">> cleaning up: no process to kill")
 	})
 
-	// The output is written by the exec goroutine while tests read it, so the
-	// buffer must be safe for concurrent use.
+	// Tests read the output while the agent is still running, so the buffer
+	// must be safe for concurrent use.
 	agentOutput := &cli.SyncBuffer{}
 	cmd.Stderr = agentOutput
 	cmd.Stdout = agentOutput
@@ -157,8 +157,8 @@ func prepareAgentCMD(
 	return cmd, agentOutput
 }
 
-// waitAgentHealthy waits for the agent to report healthy. On timeout it fails
-// the test with the last health check error and the agent output.
+// waitAgentHealthy waits until the agent is healthy. If it does not become
+// healthy in time, the test fails with the last error and the agent output.
 func waitAgentHealthy(
 	t *testing.T,
 	ctx context.Context,
@@ -174,11 +174,10 @@ func waitAgentHealthy(
 	}, timeout, time.Second, "Elastic-Agent did not report healthy %s, Agent logs\n%s", description, output)
 }
 
-// waitAgentFleetHealthy waits for the agent to report a healthy Fleet
-// connection and returns the agent ID. Unlike waitAgentHealthy it also checks
-// the Fleet state, so it only succeeds after a successful Fleet checkin.
-// A Fleet checkin is a 5 minute long-poll, so after a restart the timeout must
-// be longer than that.
+// waitAgentFleetHealthy waits until the agent is connected to Fleet and returns
+// the agent ID. Unlike waitAgentHealthy, it also checks the connection to Fleet.
+// After a restart the agent can need several minutes to connect again, so use a
+// timeout of 6 minutes or more.
 func waitAgentFleetHealthy(
 	t *testing.T,
 	ctx context.Context,
