@@ -28,37 +28,15 @@ import (
 // The returned function is intended for use with assert.Eventually or require.Eventually.
 func IsMinPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string, policyRevision int) func() bool {
 	return func() bool {
-		revision, ok := agentPolicyRevision(ctx, t, client, agentID)
-		return ok && revision >= policyRevision
-	}
-}
-
-// IsAgentOnLatestPolicyRevision returns a niladic function that returns true if
-// the agent has the latest revision of its policy; false otherwise. Use it
-// before a test reads the agent's policy revision as a baseline, so the agent
-// has no older revision left to apply.
-// The returned function is intended for use with assert.Eventually or require.Eventually.
-func IsAgentOnLatestPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, policyID string, agentID string) func() bool {
-	return func() bool {
-		policy, err := client.GetPolicy(ctx, policyID)
+		getAgentReq := kibana.GetAgentRequest{ID: agentID}
+		updatedPolicyAgent, err := client.GetAgent(ctx, getAgentReq)
 		if err != nil {
-			t.Logf("failed to get policy to check its revision: %v", err)
+			t.Logf("failed to get agent document to check policy revision: %v", err)
 			return false
 		}
-		revision, ok := agentPolicyRevision(ctx, t, client, agentID)
-		return ok && revision >= policy.Revision
-	}
-}
 
-// agentPolicyRevision returns the policy revision of the agent. The boolean is
-// false if the agent document could not be read.
-func agentPolicyRevision(ctx context.Context, t *testing.T, client *kibana.Client, agentID string) (int, bool) {
-	revision, err := fleettools.GetAgentPolicyRevision(ctx, client, agentID)
-	if err != nil {
-		t.Logf("failed to get agent document to check policy revision: %v", err)
-		return 0, false
+		return updatedPolicyAgent.PolicyRevision >= policyRevision
 	}
-	return revision, true
 }
 
 func GetUninstallToken(ctx context.Context, kibClient *kibana.Client, policyId string) (string, error) {

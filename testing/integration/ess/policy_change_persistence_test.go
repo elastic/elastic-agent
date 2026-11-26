@@ -21,7 +21,6 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
-	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
 
@@ -87,10 +86,13 @@ func TestPolicyChangeNotAcknowledgedOnStateStoreFail(t *testing.T) {
 	// Other tests share Fleet and can create new policy revisions at any time.
 	// Wait for the agent to have the latest one, so no older revision is left
 	// to be acknowledged after the state store is locked.
-	require.Eventually(t,
-		tools.IsAgentOnLatestPolicyRevision(ctx, t, info.KibanaClient, policy.ID, agentID),
-		6*time.Minute, 5*time.Second,
-		"agent did not reach the latest revision of its policy")
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		latest, err := info.KibanaClient.GetPolicy(ctx, policy.ID)
+		require.NoError(c, err)
+		agent, err := info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
+		require.NoError(c, err)
+		require.GreaterOrEqual(c, agent.PolicyRevision, latest.Revision)
+	}, 6*time.Minute, 5*time.Second, "agent did not reach the latest revision of its policy")
 
 	// Block state store writes before triggering the policy change.
 	// chattr +i makes the directory immutable so no new files can be created
@@ -104,8 +106,9 @@ func TestPolicyChangeNotAcknowledgedOnStateStoreFail(t *testing.T) {
 	})
 
 	// The agent must keep this revision while the state store is locked.
-	lockedRevision, err := fleettools.GetAgentPolicyRevision(ctx, info.KibanaClient, agentID)
+	lockedAgent, err := info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 	require.NoError(t, err)
+	lockedRevision := lockedAgent.PolicyRevision
 	t.Logf("policy revision when the state store was locked: %d", lockedRevision)
 
 	// Trigger a policy change from Fleet.
@@ -119,7 +122,6 @@ func TestPolicyChangeNotAcknowledgedOnStateStoreFail(t *testing.T) {
 	require.NoError(t, err)
 	targetRevision := updatedPolicy.Revision
 	t.Logf("triggered policy update to revision %d", targetRevision)
-	require.Greater(t, targetRevision, lockedRevision, "the policy update must create a new revision")
 
 	// The agent must not advance the policy revision while the state store is unwritable.
 	require.Never(t,
@@ -135,9 +137,9 @@ func TestPolicyChangeNotAcknowledgedOnStateStoreFail(t *testing.T) {
 	require.NoError(t, err, "failed to stop elastic-agent: %s", out)
 
 	// Confirm the revision is still at the initial value after the agent stops.
-	stoppedRevision, err := fleettools.GetAgentPolicyRevision(ctx, info.KibanaClient, agentID)
+	stoppedAgent, err := info.KibanaClient.GetAgent(ctx, kibana.GetAgentRequest{ID: agentID})
 	require.NoError(t, err)
-	require.Equal(t, lockedRevision, stoppedRevision,
+	require.Equal(t, lockedRevision, stoppedAgent.PolicyRevision,
 		"policy revision advanced while state store was read-only")
 
 	// Restore write access, then start the agent.

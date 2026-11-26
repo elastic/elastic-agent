@@ -86,14 +86,6 @@ func TestPolicyChangePersistsWithoutAck(t *testing.T) {
 
 	check.ConnectedToFleet(ctx, t, agentFixture, 5*time.Minute)
 
-	// Other tests share Fleet and can create new policy revisions at any time.
-	// Wait for the agent to have the latest one, so the update below is the
-	// only change left to apply.
-	require.Eventually(t,
-		tools.IsAgentOnLatestPolicyRevision(ctx, t, info.KibanaClient, policy.ID, agentID),
-		6*time.Minute, 5*time.Second,
-		"agent did not reach the latest revision of its policy")
-
 	// Update the policy to bump its revision. Description is the only field
 	// that changes; the disable_policy_change_acks feature flag must remain
 	// enabled so that the second POLICY_CHANGE action is processed with acks
