@@ -19,7 +19,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"syscall"
 	"testing"
 	"text/template"
@@ -156,6 +155,48 @@ func prepareAgentCMD(
 	cmd.Stdout = agentOutput
 	cmd.Env = append(os.Environ(), env...)
 	return cmd, agentOutput
+}
+
+// waitAgentHealthy waits for the agent to report healthy. On timeout it fails
+// the test with the last health check error and the agent output.
+func waitAgentHealthy(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	env []string,
+	timeout time.Duration,
+	description string,
+	output *cli.SyncBuffer,
+) {
+	t.Helper()
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		require.NoError(c, agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env))))
+	}, timeout, time.Second, "Elastic-Agent did not report healthy %s, Agent logs\n%s", description, output)
+}
+
+// waitAgentFleetHealthy waits for the agent to report a healthy Fleet
+// connection and returns the agent ID. Unlike waitAgentHealthy it also checks
+// the Fleet state, so it only succeeds after a successful Fleet checkin.
+// A Fleet checkin is a 5 minute long-poll, so after a restart the timeout must
+// be longer than that.
+func waitAgentFleetHealthy(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	env []string,
+	timeout time.Duration,
+	description string,
+	output *cli.SyncBuffer,
+) string {
+	t.Helper()
+	var agentID string
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
+		require.NoError(c, err, "elastic-agent status failed")
+		require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "Fleet state is not healthy, status: %+v", status)
+		agentID = status.Info.ID
+	}, timeout, time.Second, "Agent did not connect to Fleet %s, Agent logs\n%s", description, output)
+	return agentID
 }
 
 func TestContainerCMD(t *testing.T) {
@@ -1098,14 +1139,7 @@ func TestContainerCMDTLSCertOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(envWithCerts)))
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy after first enrollment. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentHealthy(t, ctx, agentFixture, envWithCerts, 2*time.Minute, "after first enrollment", agentOutput)
 
 	require.FileExists(t, filepath.Join(statePath, "fleet.enc"),
 		"fleet.enc must exist for regression test")
@@ -1123,14 +1157,7 @@ func TestContainerCMDTLSCertOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env)))
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy after restart without certs. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentHealthy(t, ctx, agentFixture, env, 2*time.Minute, "after restart without certs", agentOutput)
 }
 
 // Regression test for #15408: FLEET_CA/KIBANA_CA/ELASTICSEARCH_CA overrides fleet.enc CA
@@ -1189,14 +1216,7 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy after first enrollment. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentHealthy(t, ctx, agentFixture, []string{"STATE_PATH=" + statePath}, 2*time.Minute, "after first enrollment", agentOutput)
 
 	require.FileExists(t, filepath.Join(statePath, "fleet.enc"),
 		"fleet.enc must exist for regression test")
@@ -1222,14 +1242,7 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy after restart with FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentHealthy(t, ctx, agentFixture, []string{"STATE_PATH=" + statePath}, 2*time.Minute, "after restart with FLEET_CA overriding the stale stored path", agentOutput)
 
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
@@ -1243,14 +1256,7 @@ func TestContainerCMDFleetCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	require.Eventuallyf(t, func() bool {
-		err = agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
-		return err == nil
-	},
-		2*time.Minute, time.Second,
-		"Elastic-Agent did not report healthy after restart with an explicitly empty FLEET_CA overriding the stale stored path. Agent status error: \"%v\", Agent logs\n%s",
-		err, agentOutput,
-	)
+	waitAgentHealthy(t, ctx, agentFixture, []string{"STATE_PATH=" + statePath}, 2*time.Minute, "after restart with an explicitly empty FLEET_CA overriding the stale stored path", agentOutput)
 }
 
 // Regression test for #17357: FLEET_CA overrides fleet.enc Fleet Server client CAs
@@ -1265,8 +1271,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		Group: "container",
 	})
 
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Minute)
-	defer cancel()
+	ctx := t.Context()
 
 	agentFixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
@@ -1357,38 +1362,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		resp.Body.Close()
 		return resp.StatusCode, nil
 	}
-	var agentID string
-	var (
-		statusMu      sync.Mutex
-		lastStatus    string
-		lastStatusErr error
-	)
-	agentReady := func() bool {
-		status, statusErr := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv([]string{"STATE_PATH=" + statePath})))
-		statusJSON, _ := json.Marshal(status)
-		statusMu.Lock()
-		lastStatus, lastStatusErr = string(statusJSON), statusErr
-		statusMu.Unlock()
-		if statusErr != nil || status.FleetState != int(cproto.State_HEALTHY) {
-			return false
-		}
-		agentID = status.Info.ID
-		return true
-	}
-	// waitAgentReady waits for the agent to report a healthy Fleet connection.
-	// On failure it reports the last `status` result, because the error of the
-	// failed attempt is the only thing that explains why the agent is not ready.
-	// After a restart Fleet Server needs time to come up before the agent can
-	// check in again, so the timeout must leave room for that.
-	waitAgentReady := func(timeout time.Duration, description string, output *cli.SyncBuffer) {
-		if assert.Eventually(t, agentReady, timeout, time.Second) {
-			return
-		}
-		statusMu.Lock()
-		defer statusMu.Unlock()
-		t.Fatalf("Agent did not connect to Fleet %s within %s. Last status error: %v, last status: %s, Agent logs\n%s",
-			description, timeout, lastStatusErr, lastStatus, output)
-	}
+	agentEnv := []string{"STATE_PATH=" + statePath}
 
 	cmd, agentOutput := prepareAgentCMD(t, ctx, agentFixture, []string{"container"}, append([]string{"FLEET_CA=" + caPathA + "," + caPathB}, env...))
 	t.Logf(">> running binary with: %v", cmd.Args)
@@ -1396,9 +1370,8 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	waitAgentReady(2*time.Minute, "after first enrollment", agentOutput)
-	require.NotEmpty(t, agentID, "enrolled agent ID must not be empty")
-	enrolledAgentID := agentID
+	enrolledAgentID := waitAgentFleetHealthy(t, ctx, agentFixture, agentEnv, 2*time.Minute, "after first enrollment", agentOutput)
+	require.NotEmpty(t, enrolledAgentID, "enrolled agent ID must not be empty")
 
 	code, err := fleetServerStatus(&clientB)
 	require.NoError(t, err, "client B should be accepted")
@@ -1417,7 +1390,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	waitAgentReady(5*time.Minute, "after restart with CA B replaced by CA C in FLEET_CA", agentOutput)
+	agentID := waitAgentFleetHealthy(t, ctx, agentFixture, agentEnv, 6*time.Minute, "after restart with CA B replaced by CA C in FLEET_CA", agentOutput)
 	require.Equal(t, enrolledAgentID, agentID, "agent re-enrolled after restart with CA B replaced by CA C in FLEET_CA")
 
 	_, err = fleetServerStatus(&clientB)
@@ -1437,7 +1410,7 @@ func TestContainerCMDFleetServerCAOverride(t *testing.T) {
 		t.Fatalf("error running container cmd: %s", err)
 	}
 
-	waitAgentReady(5*time.Minute, "after restart with CA B and CA C removed from FLEET_CA", agentOutput)
+	agentID = waitAgentFleetHealthy(t, ctx, agentFixture, agentEnv, 6*time.Minute, "after restart with CA B and CA C removed from FLEET_CA", agentOutput)
 	require.Equal(t, enrolledAgentID, agentID, "agent re-enrolled after restart with CA B and CA C removed from FLEET_CA")
 
 	code, err = fleetServerStatus(clientA)
