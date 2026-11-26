@@ -39,6 +39,7 @@ import (
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
 	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/testcontext"
 	"github.com/elastic/elastic-agent/testing/integration"
@@ -189,14 +190,12 @@ func waitAgentFleetHealthy(
 	output *cli.SyncBuffer,
 ) string {
 	t.Helper()
-	var agentID string
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
-		require.NoError(c, err, "elastic-agent status failed")
-		require.Equal(c, int(cproto.State_HEALTHY), status.FleetState, "Fleet state is not healthy, status: %+v", status)
-		agentID = status.Info.ID
-	}, timeout, time.Second, "Agent did not connect to Fleet %s, Agent logs\n%s", description, output)
-	return agentID
+	require.True(t, check.ConnectedToFleet(ctx, t, agentFixture, timeout, withEnv(env)),
+		"Agent did not connect to Fleet %s, Agent logs\n%s", description, output)
+
+	status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
+	require.NoError(t, err, "elastic-agent status failed")
+	return status.Info.ID
 }
 
 func TestContainerCMD(t *testing.T) {
