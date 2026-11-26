@@ -94,15 +94,17 @@ fi
 
 # --- Step 3: Check if a build is already running ----------------------------
 
-echo "--- :buildkite: Checking for in-flight elastic-agent-package builds on branch ${BRANCH}"
+echo "--- :buildkite: Checking for in-flight elastic-agent-package builds on branch ${BRANCH} workflow ${WORKFLOW}"
 
+# Filter by both branch and DRA_WORKFLOW so a running snapshot build does not
+# block the staging poller (and vice versa) on the same branch.
 RUNNING=$(curl -sf --retry 3 \
   -H "Authorization: Bearer ${BUILDKITE_API_TOKEN}" \
-  "https://api.buildkite.com/v2/organizations/${BK_ORG}/pipelines/${BK_PIPELINE}/builds?branch=${BRANCH}&state[]=running&state[]=scheduled&per_page=1" \
-  | jq 'length')
+  "https://api.buildkite.com/v2/organizations/${BK_ORG}/pipelines/${BK_PIPELINE}/builds?branch=${BRANCH}&state[]=running&state[]=scheduled&per_page=50" \
+  | jq --arg wf "${WORKFLOW}" '[.[] | select(.env.DRA_WORKFLOW == $wf)] | length')
 
 if [[ "${RUNNING}" -gt 0 ]]; then
-  echo "An elastic-agent-package build is already running on branch ${BRANCH} — skipping trigger."
+  echo "An elastic-agent-package ${WORKFLOW} build is already running on branch ${BRANCH} — skipping trigger."
   echo "Will retry on the next poll tick."
   exit 0
 fi
