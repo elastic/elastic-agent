@@ -481,9 +481,9 @@ func TestGetOtelConfig(t *testing.T) {
 				"wait_for_result":   true,
 				"batch": map[string]any{
 					"flush_timeout": "10s",
-					"max_size":      1600,
-					"min_size":      1600,
-					"sizer":         "items",
+					"max_size":      batchMaxSizeBytes,
+					"min_size":      batchMinSizeBytes,
+					"sizer":         "bytes",
 				},
 			},
 			"logs_dynamic_id": map[string]any{

@@ -124,6 +124,31 @@ func defaultRetryOnStatus() []int {
 // value corresponds to on the order of a gigabyte of in-flight events.
 const maxQueueEvents = 64000
 
+// Exporter batches are sized in bytes rather than events, so that a bulk request cannot
+// exceed Elasticsearch's http.max_content_length (100 MiB by default) no matter how large
+// the individual events are. Elasticsearch rejects an oversized request with a 413, which
+// the exporter cannot split and has to drop.
+//
+// The byte sizer measures the OTLP encoding of a batch, not the NDJSON bulk body that is
+// sent. The exporter covers that gap itself: with a bytes batch sizer it flushes as soon as
+// the uncompressed bulk body reaches batch::max_size, so a request is at most max_size plus
+// one document.
+const (
+	// batchMaxSizeBytes is half of the default Elasticsearch request limit. The batcher drops
+	// any single record larger than max_size, so the largest request is max_size plus one
+	// document of at most max_size, which still fits in the limit.
+	batchMaxSizeBytes = 50 * 1024 * 1024
+
+	// batchMinSizeBytes is the size at which a batch is flushed without waiting for
+	// flush_timeout. It is close to the previous default of 1600 events at typical event
+	// sizes.
+	batchMinSizeBytes = 1024 * 1024
+
+	// batchMinSizeBytesLatency is the flush size for the latency preset, which trades
+	// throughput for smaller, more frequent requests.
+	batchMinSizeBytesLatency = 512 * 1024
+)
+
 var defaultOptions = esToOTelOptions{
 	ElasticsearchConfig: elasticsearch.DefaultConfig(),
 
@@ -179,8 +204,15 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		}
 	}
 
+	if !isNamedPreset {
+		warnBatchSettingsNotApplied(logger, output)
+	}
+
 	// maxConns and batchSize are computed once here, after ApplyPreset has written
 	// the preset's worker count and queue parameters into output.
+	//
+	// batchSize is in events and only drives the queue sizing below. The exporter's
+	// batches are sized in bytes, see batchMaxSizeBytes.
 	maxConns := getTotalNumConnections(output)
 	batchSize := min(getFlushMinEvents(logger, output), getBulkMaxSize(output))
 
@@ -261,9 +293,9 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 		"sending_queue": map[string]any{
 			"batch": map[string]any{
 				"flush_timeout": getFlushTimeout(logger, output),
-				"max_size":      escfg.BulkMaxSize, // bulk_max_size
-				"min_size":      batchSize,         // queue.mem.flush.min_events, capped at max_size
-				"sizer":         "items",
+				"max_size":      batchMaxSizeBytes,
+				"min_size":      getBatchMinSizeBytes(storedPreset),
+				"sizer":         "bytes",
 			},
 			"enabled":           true,
 			"queue_size":        queueSize,
@@ -335,6 +367,33 @@ func ESToOTelConfig(output *config.C, outputName string, logger *logp.Logger) (e
 	}
 
 	return otelYAMLCfg, nil, extensionCfg, nil
+}
+
+// getBatchMinSizeBytes returns the exporter's batch::min_size for the given preset.
+func getBatchMinSizeBytes(preset string) int {
+	if preset == "latency" {
+		return batchMinSizeBytesLatency
+	}
+	return batchMinSizeBytes
+}
+
+// warnBatchSettingsNotApplied logs a warning if the user set bulk_max_size or
+// queue.mem.flush.min_events. Both count events, and the exporter's batches are sized in
+// bytes, so neither sets the size of a bulk request. It must only be called when no named
+// preset is in use: a named preset overrides these settings and warns about that itself.
+func warnBatchSettingsNotApplied(logger *logp.Logger, output *config.C) {
+	var set []string
+	for _, field := range []string{"bulk_max_size", "queue.mem.flush.min_events"} {
+		if ok, err := output.Has(field, -1); err == nil && ok {
+			set = append(set, field)
+		}
+	}
+	if len(set) == 0 {
+		return
+	}
+	logger.Warnf("%s does not set the size of bulk requests: batches are flushed at %d bytes and are at most %d bytes. "+
+		"Use otel.exporter.sending_queue.batch on the output to change this.",
+		strings.Join(set, ","), batchMinSizeBytes, batchMaxSizeBytes)
 }
 
 // calcNamedPresetSizing computes the OTel queue size and consumer count for a

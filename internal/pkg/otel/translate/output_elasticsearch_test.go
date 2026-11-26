@@ -98,9 +98,9 @@ __REQUEST_RETRY_STATUSES__
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 61
@@ -168,9 +168,9 @@ __REQUEST_RETRY_STATUSES__
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -237,9 +237,9 @@ __REQUEST_RETRY_STATUSES__
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -340,9 +340,9 @@ __REQUEST_RETRY_STATUSES__
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -436,9 +436,9 @@ max_conns_per_host: 1
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -455,9 +455,9 @@ max_conns_per_host: 4
 sending_queue:
   batch:
     flush_timeout: 5s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 5
@@ -503,9 +503,9 @@ max_conns_per_host: 1
 sending_queue:
   batch:
     flush_timeout: 20s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -531,9 +531,9 @@ max_conns_per_host: 1
 sending_queue:
   batch:
     flush_timeout: 1s
-    max_size: 50
-    min_size: 50
-    sizer: items
+    max_size: 52428800
+    min_size: 524288
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -550,9 +550,9 @@ max_conns_per_host: 1
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 2
@@ -626,9 +626,9 @@ __REQUEST_RETRY_STATUSES__
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 61
@@ -692,9 +692,9 @@ retry:
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 61
@@ -773,9 +773,9 @@ user: elastic
 sending_queue:
   batch:
     flush_timeout: 10s
-    max_size: 1600
-    min_size: 1600
-    sizer: items
+    max_size: 52428800
+    min_size: 1048576
+    sizer: bytes
   block_on_overflow: true
   enabled: true
   num_consumers: 3
