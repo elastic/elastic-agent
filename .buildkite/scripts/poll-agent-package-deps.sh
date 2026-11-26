@@ -71,8 +71,8 @@ for dep in "${DEPS[@]}"; do
   latest_json=$(curl -sf --retry 3 --retry-delay 5 "${latest_url}" 2>/dev/null || true)
 
   if [[ -z "${latest_json}" ]]; then
-    echo "WARNING: no latest pointer for ${dep} on branch ${DEP_BRANCH}, skipping"
-    continue
+    echo "ERROR: no latest pointer for ${dep} on branch ${DEP_BRANCH}" >&2
+    exit 1
   fi
 
   current_build_id=$(echo "${latest_json}" | jq -r '.build_id')
