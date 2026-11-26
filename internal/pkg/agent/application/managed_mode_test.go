@@ -202,7 +202,7 @@ func newTestManagedConfigManager(t *testing.T, agentInfo *info.MockAgent, ss *st
 		return hostinfo.Info{Hostname: "Test-Host"}, nil
 	}), setter)
 	require.NoError(t, err)
-	m.coord = coordinator.New(log, cfg, logger.DefaultLogLevel, agentInfo, component.RuntimeSpecs{}, nil, upgradeMgr, nil, nil, nil, nil, nil, true, nil, nil, nil, nil)
+	m.coord = coordinator.New(log, cfg, logger.DefaultLogLevel, agentInfo, component.RuntimeSpecs{}, nil, upgradeMgr, nil, nil, nil, nil, nil, true, nil, nil, nil, nil, nil)
 	return m, setter, upgradeMgr
 }
 
