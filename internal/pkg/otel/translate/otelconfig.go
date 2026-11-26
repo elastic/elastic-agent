@@ -30,12 +30,8 @@ import (
 	"github.com/elastic/beats/v7/pkg/config"
 	"github.com/elastic/beats/v7/x-pack/libbeat/management"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths"
-<<<<<<< HEAD
-	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
-=======
 	"github.com/elastic/elastic-agent/internal/pkg/diagnostics"
-	"github.com/elastic/elastic-agent/internal/pkg/util"
->>>>>>> a210ef3 ([beatreceiver][bug] Remove secret marker from otel config (#17994))
+	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/features"
 )
