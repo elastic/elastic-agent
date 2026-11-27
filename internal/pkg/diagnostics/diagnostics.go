@@ -39,6 +39,10 @@ const (
 	agentName             = "elastic-agent"
 	redactionMarkerPrefix = "__mark_redact_"
 	redactionRouteKey     = "routekey"
+	// redactionSecretPathsKey is the policy field that lists the paths of the
+	// secrets in the policy. It contains paths, not secret values, so it is kept
+	// even though its name contains "secret".
+	redactionSecretPathsKey = "secret_paths"
 )
 
 var redactionHeaderValueKeys = []string{
@@ -355,8 +359,13 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 func RedactOpts(w io.Writer) []redact.RedactOption {
 	return []redact.RedactOption{
 		redact.WithErrorOutput(w),
+<<<<<<< HEAD
 		redact.WithMarkerPrefix(redactionMarkerPrefix),
 		redact.WithIgnoreKeys(redactionRouteKey),
+=======
+		redact.WithMarkerPrefix(RedactionMarkerPrefix),
+		redact.WithIgnoreKeys(redactionRouteKey, redactionSecretPathsKey),
+>>>>>>> 3cad52f (fix(diagnostics): don't redact the secret_paths list (#18277))
 		redact.WithHeaderValueKeys(redactionHeaderValueKeys...),
 	}
 }
