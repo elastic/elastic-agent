@@ -700,6 +700,18 @@ top of `bk.integration.pipeline.yml`), it should generally be added to the tier 
 list first. Promote it to tier 2 or tier 1 only when it needs to run more frequently (e.g. it's
 becoming the new default, or it validates something that changes often).
 
+#### Docker variants built on pull requests
+
+The `:package: amd64: Containers` and `:package: arm64: Containers` steps gate every Kubernetes
+test job. On pull requests they build only the Docker variants the PR pipeline consumes
+(`wolfi`, `complete`, `elastic-otel-collector` and `cloud`), unless the PR changes files that
+can affect the images or the pipeline (`.buildkite/**`, `dev-tools/**`, `deploy/**`, `specs/**`,
+`_meta/**`, `version/**`, `magefile.go`, `go.mod`, `go.sum`, `.package-version`, `.go-version`,
+`NOTICE*.txt`, `LICENSE.txt`), in which case every variant is built as on branch builds. The
+selection lives in `.buildkite/scripts/steps/docker-variants-for-pr.sh`; a step that sets
+`DOCKER_VARIANTS` explicitly is never changed. If a new PR consumer of another variant is added,
+extend that list, and make sure the paths that enable it are covered by the build-affecting paths.
+
 Image versions are timestamped VM image names (for example
 `platform-ingest-elastic-agent-ubuntu-2604-1789378451`) that are bumped automatically across all
 `.buildkite/*.yml` files by the `updatecli-bump-vm-images.yml` Updatecli pipeline
