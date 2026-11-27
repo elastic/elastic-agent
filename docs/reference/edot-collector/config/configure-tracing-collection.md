@@ -153,7 +153,7 @@ Send unrelated host metrics, platform logs, and other telemetry through a separa
 
 Before you deploy this configuration to production, review [Scale tail-based sampling](#scale-tail-based-sampling).
 
-The following configuration is a full working example:
+The following configuration is a full working example. Before you run it, set the `ELASTIC_OTLP_ENDPOINT` and `ELASTIC_API_KEY` environment variables to your [{{motlp}} URL](docs-content://reference/managed-inputs/managed-otlp-endpoint.md#find-your-motlp) and [API key](docs-content://reference/managed-inputs/authentication-delivery-and-failure-handling.md#authentication):
 
 ```yaml
 receivers:
