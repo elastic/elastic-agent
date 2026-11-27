@@ -1128,7 +1128,7 @@ func TestOTelManager_PortConflict(t *testing.T) {
 	go func() {
 		for {
 			select {
-			case <-m.Errors():
+			case <-m.Errors(): //nolint:errcheck // errors are ignored in this test
 			case <-m.WatchComponents(): // ensure we receive component updates
 			case <-ctx.Done():
 				return
@@ -1993,7 +1993,7 @@ func TestOTelManager_RestartOnLogLevelChange(t *testing.T) {
 			select {
 			case <-mgr.WatchCollector():
 			case <-mgr.WatchComponents():
-			case <-mgr.Errors():
+			case <-mgr.Errors(): //nolint:errcheck // errors are ignored in this test
 			case <-ctx.Done():
 				return
 			}
