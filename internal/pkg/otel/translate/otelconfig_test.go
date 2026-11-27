@@ -3996,7 +3996,7 @@ func TestRemoveRedactionMarkers(t *testing.T) {
 	}, cfg)
 }
 
-func TestGetInputsForUnitRemovesRedactionMarkers(t *testing.T) {
+func TestGetInputsForUnitKeepsRedactionMarkers(t *testing.T) {
 	unit := component.Unit{
 		ID:   "httpjson-unit",
 		Type: client.UnitTypeInput,
@@ -4030,7 +4030,11 @@ func TestGetInputsForUnitRemovesRedactionMarkers(t *testing.T) {
 	require.True(t, ok)
 	set, ok := transforms[0].(map[string]any)["set"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, map[string]any{"target": "header.Authorization", "value": "stream-secret"}, set)
+	assert.Equal(t, map[string]any{
+		"target":              "header.Authorization",
+		"value":               "stream-secret",
+		"__mark_redact_value": true,
+	}, set)
 }
 
 // TestKeepScheduledMonitors verifies the schedule-based filtering used to drop
@@ -5430,7 +5434,7 @@ func TestInjectOsqueryConfig(t *testing.T) {
 		})
 	}
 
-	t.Run("redaction markers are removed from the injected osquery config", func(t *testing.T) {
+	t.Run("redaction markers are kept in the injected osquery config", func(t *testing.T) {
 		unitWithSecret := component.Unit{
 			Config: component.MustExpectedConfig(map[string]any{
 				"osquery": map[string]any{
@@ -5441,7 +5445,10 @@ func TestInjectOsqueryConfig(t *testing.T) {
 		}
 		got := injectOsqueryConfig([]receiverInput{makeStream("result", true)}, unitWithSecret)
 		require.Len(t, got, 1)
-		assert.Equal(t, map[string]any{"options": map[string]any{"tls_password": "secret"}}, got[0].config["osquery"])
+		assert.Equal(t, map[string]any{
+			"options":               map[string]any{"tls_password": "secret"},
+			"__mark_redact_options": true,
+		}, got[0].config["osquery"])
 	})
 }
 

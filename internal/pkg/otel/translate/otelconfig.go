@@ -850,6 +850,7 @@ func unitToExporterConfig(unit component.Unit, outputName string, exporterType o
 
 // removeRedactionMarkers deletes the keys the coordinator adds next to secrets for diagnostics
 // redaction. Collector components reject unknown keys, so these must not reach their configs.
+// Beat receiver inputs keep them: the Beats ignore them and diagnostics need them to redact.
 func removeRedactionMarkers(v any) {
 	switch t := v.(type) {
 	case map[string]any:
@@ -911,7 +912,6 @@ func getInputsForUnit(unit component.Unit, defaultDataStreamType string, comp *c
 	inputTypePrefix, inputTypeSuffix, inputTypeHasSlash := strings.Cut(comp.InputType, "/")
 	result := make([]receiverInput, len(inputs))
 	for i, input := range inputs {
-		removeRedactionMarkers(input)
 		switch {
 		case inputTypeHasSlash && inputTypeSuffix == "metrics":
 			// metricbeat: "system/metrics" → "module: system" per https://www.elastic.co/docs/reference/beats/metricbeat/configuration-metricbeat
@@ -1116,7 +1116,6 @@ func injectOsqueryConfig(result []receiverInput, unit component.Unit) []receiver
 	// inputs[0] — osquerybeat wires its client to inputs[0] and live-query result rows must
 	// land in the result stream, not action.responses.
 	osqMap, _ := unit.Config.GetSource().AsMap()["osquery"].(map[string]any)
-	removeRedactionMarkers(osqMap)
 	for i, ri := range result {
 		// "osquery_manager.result" is the dataset of the stream that carries osquery
 		// scheduled query results and must receive the input-level osquery configuration.
