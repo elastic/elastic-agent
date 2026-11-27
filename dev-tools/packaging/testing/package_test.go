@@ -863,6 +863,14 @@ func checkDockerUser(t *testing.T, p *packageFile, info *dockerInfo, expectRoot 
 	})
 }
 
+// nonGoFIPSComponents lists the components of the FIPS packages that are not Go
+// binaries, so carry no Go build info to check. Their FIPS mode comes from their
+// own build (Elastic Defend uses the OpenSSL FIPS provider), not from GOFIPS140.
+// They are still checked to be present and executable.
+var nonGoFIPSComponents = map[string]bool{
+	"endpoint-security": true,
+}
+
 func checkFIPS(t *testing.T, agentPackageRootDir string) {
 	extractedPackageDir := getExtractedPackageDir(agentPackageRootDir, t)
 	t.Logf("Checking agent binary in %q for FIPS compliance", extractedPackageDir)
@@ -896,6 +904,10 @@ func checkFIPS(t *testing.T, agentPackageRootDir string) {
 			fileInfo, err := os.Stat(binary)
 			require.NoErrorf(t, err, "error collecting info on component %s", binary)
 			require.Truef(t, fileInfo.Mode().IsRegular() && (fileInfo.Mode().Perm()&0111 > 0), "component %s exists and has a spec file but it's not an executable regular file", binary)
+
+			if nonGoFIPSComponents[filepath.Base(binary)] {
+				t.Skipf("%s is not a Go binary; its FIPS mode comes from its own build", filepath.Base(binary))
+			}
 
 			info, err := buildinfo.ReadFile(binary)
 			require.NoError(t, err)
