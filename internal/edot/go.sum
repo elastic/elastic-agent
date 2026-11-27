@@ -453,8 +453,8 @@ github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumpti
 github.com/elastic/azure-sdk-for-go/sdk/resourcemanager/consumption/armconsumption v1.1.0-elastic/go.mod h1:0vCBR1wgGwZeGmloJ+eCWIZF2S47grTXRzj2mftg2Nk=
 github.com/elastic/bayeux v1.0.5 h1:UceFq01ipmT3S8DzFK+uVAkbCdiPR0Bqei8qIGmUeY0=
 github.com/elastic/bayeux v1.0.5/go.mod h1:CSI4iP7qeo5MMlkznGvYKftp8M7qqP/3nzmVZoXHY68=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123151532-85a0ed9cce81 h1:hi1LJYf1S5dVPCGtoQrDixq3Nzx4PAcH/eONE0mJy1c=
-github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261123151532-85a0ed9cce81/go.mod h1:HyvZqHMRmhhe4KCw8T27I85P4zVHpUk+w10/9FnCar0=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261126112631-c74d0a232b22 h1:825NdmF6JLtNXD6RWBdZX2/USKLgbHF8fF8BTyi8u6A=
+github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261126112631-c74d0a232b22/go.mod h1:8c1GW3GWlJ9bJwjWHQtqtbeYDcXbU6IyKvttdo5iP+M=
 github.com/elastic/elastic-agent-client/v7 v7.20.0 h1:3aMCdZx+3ZqFT4YghogqWxTxtyGafxWjWQnJQJ10Rg8=
 github.com/elastic/elastic-agent-client/v7 v7.20.0/go.mod h1:dRGR6EAk5QnFvI5U1SDjwhKO1uva9BEqdDyJbput9Hk=
 github.com/elastic/elastic-agent-libs v0.47.0 h1:fltOh0mETIlW3LYExX62iacL63sHXSTfDB/8Qi+wXso=
@@ -531,8 +531,8 @@ github.com/elastic/opentelemetry-lib v0.51.0 h1:ab9BhwqFxlq2cwfXZhKPIGfoEVeC+tmY
 github.com/elastic/opentelemetry-lib v0.51.0/go.mod h1:lmeNoCUx+A93fUSNAxMVmEcVCFEA5xRPpANoh/T1CdE=
 github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be h1:AbN9OyZ+o9tNmbY5cEDRrXq4pdCY6thW02NF9CiUJpk=
 github.com/elastic/sarama v1.19.1-0.20261105163725-10d0ecc585be/go.mod h1:J0lqNUlLxjFJpAGJDmFT8+vOlAnOMbQCoBQmUJ79zT4=
-github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1 h1:g7YUigN4dW2+zpdusdTTghZ+5Py3BaUMAStvL8Nk+FY=
-github.com/elazarl/goproxy v0.0.0-20240909085733-6741dbfc16a1/go.mod h1:thX175TtLTzLj3p7N/Q9IiKZ7NF+p72cvL91emV0hzo=
+github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=
+github.com/elazarl/goproxy v1.7.2/go.mod h1:82vkLNir0ALaW14Rc399OTTjyNREgmdL2cVoIbS6XaE=
 github.com/elazarl/goproxy/ext v0.0.0-20240909085733-6741dbfc16a1 h1:XgXwWTQglBILwCpfm8I9xUjPXKOi1EzRzuYzyczU5Z0=
 github.com/elazarl/goproxy/ext v0.0.0-20240909085733-6741dbfc16a1/go.mod h1:gNh8nYJoAm43RfaxurUnxr+N1PwuFV3ZMl/efxlIlY8=
 github.com/emicklei/go-restful/v3 v3.13.0 h1:C4Bl2xDndpU6nJ4bc1jXd+uTmYPVUwkD6bFY/oTyCes=
