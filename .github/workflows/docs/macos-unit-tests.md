@@ -36,6 +36,13 @@ It runs for any pull request, a push to `main`, `8.19`, or `9.*`, or `workflow_d
 
 The checkout comment identifies full Git history as necessary for `TestGetReleaseBranches`.
 
+The Go build and module caches are managed with `actions/cache` rather than `setup-go`'s built-in cache:
+
+- The cache key includes the runner OS and architecture, the Mage target, the Go version, and the hashes of `go.sum` and `internal/edot/go.sum`, so each matrix job has its own cache.
+- When `go.sum` changes, `restore-keys` falls back to the most recent cache for the same runner, target, and Go version.
+- Only `push` runs save the cache. Pull requests restore from their base branch's cache and never save.
+- The save step runs even if the tests fail or hit the test step's timeout, which is shorter than the job's timeout so there is time left to save.
+
 ## Sources
 
 - Workflow: [`macos-unit-tests.yml`](../macos-unit-tests.yml)
