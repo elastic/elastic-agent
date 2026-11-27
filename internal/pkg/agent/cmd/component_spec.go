@@ -19,7 +19,7 @@ func newComponentSpecCommandWithArgs(_ []string, streams *cli.IOStreams) *cobra.
 	cmd := &cobra.Command{
 		Use:   "spec [file]",
 		Short: "Validates a component specification",
-		Long:  "Validates a component specification that instructs the Elastic Agent how it should be ran.",
+		Long:  "Validates a component specification that instructs the Elastic Agent how it should be run.",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			data, err := os.ReadFile(args[0])

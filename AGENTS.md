@@ -69,7 +69,7 @@ High-level areas:
 | `specs/` | Component `.spec.yml` files defining supported inputs/outputs |
 | `deploy/helm/` | Helm charts (for example elastic-agent and EDOT collector stacks) |
 | `dev-tools/` | Developer tooling for build, packaging, notice generation, mage targets |
-| `testing/` | Testing utiliteis including integration test definitions |
+| `testing/` | Testing utilities including integration test definitions |
 | `docs/` | Architecture and developer guides |
 | `changelog/` | Changelog fragments for releases |
 | `build/` | Produced build and testing artifacts |
@@ -150,7 +150,7 @@ CI and local checks enforce the following (details in [.golangci.yml](./.golangc
 - **Generated / spec artifacts:** After changing protos, specs, or generated configs, run **`mage update`** (and related targets as described in magefile doc strings). Do not hand-edit generated outputs without regenerating from source.
 - **Docs structure:** **`mage check:all`** includes validation that files expected by docs generation exist (`Check.DocsFiles` in magefile).
 - **Go toolchain:** Version pinned in [.go-version](./.go-version).
-- **FIPS:** The codebase supports FIPS-oriented builds and tests (for example **`mage test:fIPSOnlyUnit`**, `requirefips` build tag). Crypto-related changes should remain compatible with FIPS expectations where applicable.
+- **FIPS:** The codebase supports FIPS-oriented builds and tests (for example **`mage test:FIPSOnlyUnit`**, `requirefips` build tag). Crypto-related changes should remain compatible with FIPS expectations where applicable.
 
 ## Documentation
 

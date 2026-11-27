@@ -10,10 +10,17 @@
 
 ## Official Documentation
 
-See https://www.elastic.co/guide/en/fleet/current/index.html.
+See https://www.elastic.co/docs/reference/fleet.
 
-The source files for the official Elastic Agent documentation are currently stored
-in the [ingest-docs](https://github.com/elastic/ingest-docs/tree/main/docs/en/ingest-management) repository.
+Those source files are not in this repository. Since Elastic Stack 9.0 they live in
+[docs-content](https://github.com/elastic/docs-content/tree/main/reference/fleet); the 8.x and
+earlier content stays in [ingest-docs](https://github.com/elastic/ingest-docs) on its version
+branches.
+
+What this repository does publish is the EDOT Collector reference under
+`docs/reference/edot-collector/` and the release notes under `docs/release-notes/`. Read
+[docs/contributing-docs.md](docs/contributing-docs.md) before changing either; it covers the
+docset layout, the style rules and the branch to target.
 
 ## Contributing
 
@@ -22,6 +29,24 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 ## Developing
 
 The following are exclusively focused on getting developers started building code for Elastic Agent.
+
+### Repository prerequisites
+
+After cloning, initialize the `beats` git submodule:
+
+```sh
+git submodule update --init
+```
+
+`go.mod` replaces `github.com/elastic/beats/v7` with the local `./beats` directory, so until
+the submodule is populated any command that resolves dependencies (`go build`, `go vet`,
+`go test`) fails before it reaches your changes:
+
+```text
+internal/pkg/composable/providers/docker/docker.go:11:2: github.com/elastic/beats/v7 (replaced by ./beats): reading beats/go.mod: open beats/go.mod: no such file or directory
+```
+
+`git submodule status` should then list `beats` without a leading `-`.
 
 ### Development Installations
 
@@ -57,7 +82,7 @@ sudo -u elastic-agent-user elastic-development-agent status
 ```
 
 The primary restriction of `--develop` installations is that they cannot run Elastic Defend. Defend requires the agent to be
-in the default path, the same restrictions applies for the `--base-path` option. All other integrations should be usable provided
+in the default path, the same restrictions apply to the `--base-path` option. All other integrations should be usable provided
 conflicting configurations are changed ahead of time. For example two agents cannot bind to the same `agent.monitoring.http.port`
 to expose their monitoring servers.
 
@@ -138,7 +163,7 @@ exec /crossbuild: exec format error
 
 If that happens, enable
 [`multiarch/qemu-user-static`](https://github.com/multiarch/qemu-user-static)
-is to enable an execution of different multi-architecture containers
+to allow execution of multi-architecture containers
 by QEMU and binfmt_misc:
 
 ```
@@ -161,7 +186,7 @@ elastic-package stack up --version=7.13.0-SNAPSHOT -v
 ```
 
 Please note that the docker container is built in standard, 'service', 'cloud' and 'complete' variants. The variants technical specificities can be found [here](https://github.com/elastic/elastic-agent/blob/main/dev-tools/packaging/templates/docker/Dockerfile.elastic-agent.tmpl).
-- The 'service' variant contains python libs and connectors that allows it to collect data using [search_connectors](https://www.elastic.co/guide/en/enterprise-search/current/connectors.html).
+- The 'service' variant contains python libs and connectors that allow it to collect data using [search_connectors](https://www.elastic.co/guide/en/enterprise-search/current/connectors.html).
 - The 'cloud' variant is the one used for ESS deployment.
 - The 'complete' variant contains extra files, like the chromium browser, that are too large
 for the standard variant which allows this docker image to run Synthetics.
@@ -203,7 +228,7 @@ docker build -t custom-agent-image .
 kind load docker-image custom-agent-image:latest
 ```
 4. Deploy agent with that image:
-- download all-in-ome manifest for elastic-agent in standalone or managed mode, change version if needed
+- download all-in-one manifest for elastic-agent in standalone or managed mode, change version if needed
 ```
 ELASTIC_AGENT_VERSION="8.0"
 ELASTIC_AGENT_MODE="standalone"     # ELASTIC_AGENT_MODE="managed"
@@ -238,7 +263,7 @@ Elastic employees can create an Elastic Cloud deployment with a locally
 built Elastic Agent, by pushing images to an internal Docker repository. The images will be
 based on the SNAPSHOT images with the version defined in `version/version.go`.
 
-Prerequisite to running following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
+A prerequisite to running the following commands is having `terraform` installed and running `terraform init` from within `testing/environments/cloud`.
 
 Running a shorthand `make deploy_local` in `testing/environments/cloud` will build Agent, tag the docker image correctly, push it to the repository and deploy to Elastic Cloud.
 
