@@ -1246,6 +1246,35 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	assert.Equal(t, redact.REDACTED, sliceSSL["key"])
 }
 
+func TestRedactKeepsSecretPaths(t *testing.T) {
+	// secret_paths lists where the secrets are in the policy, not the secrets
+	// themselves, so it must survive redaction even though its name contains
+	// "secret". The secrets it points to must still be redacted.
+	policy := map[string]any{
+		"secret_paths": []any{"inputs.0.custom_attr"},
+		"inputs": []any{
+			map[string]any{
+				"custom_attr":                         "secretValue",
+				RedactionMarkerPrefix + "custom_attr": true,
+				"api_key":                             "secretKey",
+			},
+		},
+	}
+
+	var errOut bytes.Buffer
+	redact.Redact(policy, RedactOpts(&errOut)...)
+	assert.Emptyf(t, errOut.String(), "Unexpected errors written when redacting secrets")
+
+	assert.Equal(t, []any{"inputs.0.custom_attr"}, policy["secret_paths"])
+	inputs, ok := policy["inputs"].([]any)
+	require.Truef(t, ok, "expected inputs to be slice, detected: %T", policy["inputs"])
+	require.Len(t, inputs, 1)
+	input, ok := inputs[0].(map[string]any)
+	require.Truef(t, ok, "expected input to be object, detected: %T", inputs[0])
+	assert.Equal(t, redact.REDACTED, input["custom_attr"])
+	assert.Equal(t, redact.REDACTED, input["api_key"])
+}
+
 func TestRedactNameValuePair(t *testing.T) {
 	tests := map[string]struct {
 		input  map[string]any
