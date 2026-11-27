@@ -609,7 +609,8 @@ func TestGetOtelConfig(t *testing.T) {
 		cfg["heartbeat"] = map[string]any{
 			"monitors": []map[string]any{
 				{
-					"id": "test-1",
+					// No origin: monitor.id is the input id, as in classic heartbeat.
+					"id": "test",
 					"data_stream": map[string]any{
 						"dataset": "generic-1",
 					},
@@ -4051,6 +4052,80 @@ func TestKeepScheduledMonitors(t *testing.T) {
 		got := keepScheduledMonitors(in)
 		assert.Equal(t, in, got)
 	})
+}
+
+// TestUseInputIDForMonitorsWithoutOrigin verifies that Fleet-integration monitors (no
+// origin) get the input id as monitor id, mirroring classic heartbeat.
+func TestUseInputIDForMonitorsWithoutOrigin(t *testing.T) {
+	cfg := component.MustExpectedConfig(map[string]any{"id": "input-id", "type": "synthetics/http"})
+	noID := component.MustExpectedConfig(map[string]any{"type": "synthetics/http"})
+	stream := func(origin string) receiverInput {
+		c := map[string]any{"id": "stream-id"}
+		if origin != "" {
+			c["origin"] = origin
+		}
+		return receiverInput{streamID: "stream-id", config: c}
+	}
+
+	tests := []struct {
+		name   string
+		inputs []receiverInput
+		cfg    *proto.UnitExpectedConfig
+		wantID []string
+	}{
+		{"no origin uses input id", []receiverInput{stream("")}, cfg, []string{"input-id"}},
+		{"origin ui keeps stream id", []receiverInput{stream("ui")}, cfg, []string{"stream-id"}},
+		{"origin project keeps stream id", []receiverInput{stream("project")}, cfg, []string{"stream-id"}},
+		{"empty input id keeps stream id", []receiverInput{stream("")}, noID, []string{"stream-id"}},
+		{"multiple inputs unchanged", []receiverInput{stream(""), stream("")}, cfg, []string{"stream-id", "stream-id"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := useInputIDForMonitorsWithoutOrigin(tt.inputs, tt.cfg)
+			require.Len(t, got, len(tt.wantID), "number of inputs must not change")
+			for i, want := range tt.wantID {
+				assert.Equal(t, want, got[i].config["id"], "monitor id of input %d", i)
+				assert.Equal(t, "stream-id", got[i].streamID, "receiver stream id must not change")
+			}
+		})
+	}
+}
+
+// TestGetInputsForUnitSyntheticsHTTPInputID verifies the input id override end to end
+// through getInputsForUnit.
+func TestGetInputsForUnitSyntheticsHTTPInputID(t *testing.T) {
+	newUnit := func(origin string) component.Unit {
+		s := map[string]any{
+			"id":          "stream-no-origin",
+			"data_stream": map[string]any{"dataset": "http"},
+			"schedule":    "@every 5s",
+		}
+		if origin != "" {
+			s["origin"] = origin
+		}
+		return component.Unit{
+			ID:   "heartbeat-http-unit",
+			Type: client.UnitTypeInput,
+			Config: component.MustExpectedConfig(map[string]any{
+				"id":         "input-no-origin",
+				"use_output": "default",
+				"type":       "synthetics/http",
+				"streams":    []any{s},
+			}),
+		}
+	}
+	comp := &component.Component{InputType: "synthetics/http"}
+
+	inputs, err := getInputsForUnit(newUnit(""), "synthetics", comp, nil)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+	assert.Equal(t, "input-no-origin", inputs[0].config["id"], "no origin must use the input id")
+	assert.Equal(t, "stream-no-origin", inputs[0].streamID, "receiver name must keep the stream id")
+
+	inputs, err = getInputsForUnit(newUnit("ui"), "synthetics", comp, nil)
+	require.NoError(t, err)
+	require.Len(t, inputs, 1)
+	assert.Equal(t, "stream-no-origin", inputs[0].config["id"], "origin must keep the stream id")
 }
 
 // TestGetReceiversConfigForComponentFeatures verifies that all agent feature flags
