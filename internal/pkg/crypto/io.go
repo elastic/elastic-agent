@@ -168,7 +168,7 @@ func (w *Writer) Write(b []byte) (int, error) {
 //
 // This differs from the automatic handling that NewGCMWithRandomNonce does which is: IV | ENCRYPTED-BYTES
 func (w *Writer) writeBlock(b []byte) error {
-	encodedBytes := w.gcm.Seal(nil, nil, b, nil)
+	encodedBytes := w.gcm.Seal(nil, nil, b, nil) //nolint:gosec // G407: false positive, w.gcm is from NewGCMWithRandomNonce, which generates the nonce and requires a nil one here
 	iv := encodedBytes[:nonceLen]
 	// Seal prepends a random nonce to the produced bytes, The encrypted text are all bytes after the nonce.
 	// However the agent crypto handlers were initially implemented with a different header structure that includes the length of each encrypted text block.
