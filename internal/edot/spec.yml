@@ -532,8 +532,18 @@ inputs:
     platforms: *platforms
     outputs: *outputs
     command: *metricbeat_command
+  - name: opcua/metrics
+    description: "OPC UA metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command: *metricbeat_command
   - name: panw/metrics
     description: "Palo Alto Networks metrics"
+    platforms: *platforms
+    outputs: *outputs
+    command: *metricbeat_command
+  - name: plc4x/metrics
+    description: "PLC4X metrics"
     platforms: *platforms
     outputs: *outputs
     command: *metricbeat_command
