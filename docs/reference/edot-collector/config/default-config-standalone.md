@@ -1,6 +1,6 @@
 ---
 navigation_title: Default config (Standalone)
-description: Default configuration of the {{agent}} in standalone mode.
+description: Default standalone configuration of Elastic Agent configured as an OTel Collector, for edge collector and gateway deployments.
 applies_to:
   stack:
   serverless:
@@ -17,14 +17,14 @@ products:
 
 The default configuration of the {{agent}} includes pipelines for the collection of logs, host metrics, and data from OpenTelemetry SDKs.
 
-The {{agent}} can run in [Agent](https://opentelemetry.io/docs/collector/deployment/agent/) or [Gateway](https://opentelemetry.io/docs/collector/deployment/gateway/) mode:
+You can deploy the {{agent}} as an edge collector or as a gateway. These correspond to the OpenTelemetry [agent](https://opentelemetry.io/docs/collector/deploy/agent/) and [gateway](https://opentelemetry.io/docs/collector/deploy/gateway/) deployment patterns:
 
-- Agent mode: The {{agent}} ingests data from infrastructure and SDKs and forwards it to Elastic or to another collector running in Gateway mode.
-- Gateway mode: The {{agent}} ingests data from other collectors running in Agent mode and forwards it to Elastic.
+- Edge collector: The {{agent}} ingests data from infrastructure and SDKs and forwards it to Elastic or to a gateway.
+- Gateway: The {{agent}} ingests data from edge collectors and forwards it to Elastic.
 
-## Agent mode
+## Edge collector [agent-mode]
 
-The following sample config files for Agent mode are available:
+The following sample config files for edge collectors are available:
 
 ::::{tab-set}
 
@@ -121,7 +121,7 @@ The `elasticinframetrics` processor is deprecated in {{agent}} 9.2 but is retain
 When ingesting OTel data through the [{{motlp}}](opentelemetry://reference/motlp.md), all the enrichment that is required for an optimal experience in the Elastic solutions happens at the endpoint level and is transparent to users.
 
 :::{note}
-The {{motlp}} isn't available for [self-managed](docs-content://deploy-manage/deploy/self-managed.md), [{{ece}}](docs-content://deploy-manage/deploy/cloud-enterprise.md), or [{{eck}}](docs-content://deploy-manage/deploy/cloud-on-k8s.md) deployments. For those deployment types, forward data to {{agent}} in Gateway mode instead, as described in [Forwarding to a self-managed Gateway](#forwarding-to-a-self-managed-gateway).
+The {{motlp}} isn't available for [self-managed](docs-content://deploy-manage/deploy/self-managed.md), [{{ece}}](docs-content://deploy-manage/deploy/cloud-enterprise.md), or [{{eck}}](docs-content://deploy-manage/deploy/cloud-on-k8s.md) deployments. For those deployment types, forward data to {{agent}} deployed as a gateway instead, as described in [Forwarding to a self-managed Gateway](#forwarding-to-a-self-managed-gateway).
 :::
 
 The Collector configuration for all use cases that involve the {{motlp}} is only concerned with local data collection and context enrichment.
@@ -136,9 +136,9 @@ With the {{motlp}}, there is no need to configure any Elastic-specific component
 
 {applies_to}`edot_collector: ga 9.3+`
 
-When the {{motlp}} isn't an option, {{agent}} in Agent mode can forward all signals over OTLP to {{agent}} in Gateway mode instead.
+When the {{motlp}} isn't an option, {{agent}} deployed as an edge collector can forward all signals over OTLP to {{agent}} deployed as a gateway instead.
 
-Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic: no Elastic-specific components are required in Agent mode. Data enrichment and the authenticated export to {{es}} happen centrally in Gateway mode. For guidance on when to use Gateway mode, and the components it requires in self-managed environments, refer to [Deployment modes](/reference/edot-collector/modes.md#edot-collector-as-gateway).
+Like the {{motlp}} path, this approach keeps the edge configuration vendor-agnostic: no Elastic-specific components are required on the edge collector. Data enrichment and the authenticated export to {{es}} happen centrally on the gateway. For guidance on when to use a gateway, and the components it requires in self-managed environments, refer to [Deployment patterns](/reference/edot-collector/modes.md#edot-collector-as-gateway).
 
 The receivers and processors are the same as in the {{motlp}} configuration. Only the export destination changes, from the {{motlp}} to the OTLP endpoint of your own Gateway:
 
@@ -192,17 +192,17 @@ Data from OTel SDKs stays in separate `fromsdk` pipelines without processors, so
 The component names in this example apply to recent {{agent}} versions. Earlier versions might not include a component, or might use a different name for it. To check which {{agent}} version added each embedded component, refer to [Components included in {{agent}}](/reference/edot-collector/components.md).
 :::
 
-The Agent mode configuration needs no [`elasticsearch`] exporter and none of the `elasticapm` or [`elasticinframetrics`] components, because enrichment and the authenticated export to Elastic happen in Gateway mode. To configure the receiving side, refer to [Gateway mode](#gateway-mode).
+The edge collector configuration needs no [`elasticsearch`] exporter and none of the `elasticapm` or [`elasticinframetrics`] components, because enrichment and the authenticated export to Elastic happen on the gateway. To configure the receiving side, refer to [Gateway](#gateway-mode).
 
 :::{note}
-With a self-managed Gateway, you own authentication, scaling, and availability. Authentication to {{es}} is configured in Gateway mode, not in Agent mode, so the `otlp_grpc/gateway` exporter needs no Elastic API key. To secure the connection between the two, use TLS or mutual TLS as described in [Secure connection](#secure-connection), or the `apikeyauth` extension.
+With a self-managed gateway, you own authentication, scaling, and availability. Authentication to {{es}} is configured on the gateway, not on the edge collector, so the `otlp_grpc/gateway` exporter needs no Elastic API key. To secure the connection between the two, use TLS or mutual TLS as described in [Secure connection](#secure-connection), or the `apikeyauth` extension.
 :::
 
-To send data from an upstream OpenTelemetry Collector to {{agent}} in Gateway mode, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
+To send data from an upstream OpenTelemetry Collector to {{agent}} deployed as a gateway, refer to [Send data from an upstream OpenTelemetry Collector](docs-content://solutions/observability/get-started/opentelemetry/use-cases/upstream-collector/index.md).
 
 ### Batching configuration for contrib OpenTelemetry Collector
 
-When using contrib or upstream OpenTelemetry collectors, the following batching configuration is recommended when sending data to the {{motlp}} or to {{agent}} in Gateway mode:
+When using contrib or upstream OpenTelemetry collectors, the following batching configuration is recommended when sending data to the {{motlp}} or to {{agent}} deployed as a gateway:
 
 ```yaml
 otlp_grpc/ingest:
@@ -226,13 +226,13 @@ The previous configuration leverages an in-memory queue and optimized batching d
 The previous configuration is already included in the {{edot}} Collector.
 :::
 
-## Gateway mode
+## Gateway [gateway-mode]
 
-In Gateway mode, the Collector ingests data from other Collectors running in Agent mode and forwards it to Elastic.
+As a gateway, the Collector ingests data from edge collectors and forwards it to Elastic.
 
 ### Example configuration
 
-The following example configuration files are available for the Gateway mode:
+The following example configuration files are available for a gateway:
 
 :::::{tab-set}
 
@@ -240,12 +240,12 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-9x-table
 | Version | Configuration  |
 |---------|----------------|
-| 9.5     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.5.6/internal/edot/samples/linux/gateway.yml) |
-| 9.4     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.9/internal/edot/samples/linux/gateway.yml) |
-| 9.3     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.8/internal/edot/samples/linux/gateway.yml) |
-| 9.2     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.8/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.1     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.10/internal/pkg/otel/samples/linux/gateway.yml) |
-| 9.0     | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.5     | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.5.6/internal/edot/samples/linux/gateway.yml) |
+| 9.4     | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.4.9/internal/edot/samples/linux/gateway.yml) |
+| 9.3     | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.3.8/internal/edot/samples/linux/gateway.yml) |
+| 9.2     | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.2.8/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.1     | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.1.10/internal/pkg/otel/samples/linux/gateway.yml) |
+| 9.0     | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.0.8/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-9x-table
 ::::
 
@@ -253,18 +253,18 @@ The following example configuration files are available for the Gateway mode:
 % start:edot-gateway-8x-table
 | Version | Configuration  |
 |---------|----------------|
-| 8.19    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.25/internal/pkg/otel/samples/linux/gateway.yml) |
-| 8.18    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
-| 8.17    | [Gateway mode](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.19    | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.19.25/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.18    | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.18.8/internal/pkg/otel/samples/linux/gateway.yml) |
+| 8.17    | [Gateway configuration](https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v8.17.10/internal/pkg/otel/samples/linux/gateway.yml) |
 % end:edot-gateway-8x-table
 ::::
 :::::
 
-Use the previous example configurations as a reference when configuring or customizing {{agent}} in Gateway mode.
+Use the previous example configurations as a reference when configuring or customizing {{agent}} as a gateway.
 
 ### Data collection
 
-The {{agent}} in Gateway mode collects data from other Collectors using the OTLP protocol. 
+The gateway collects data from other Collectors using the OTLP protocol. 
 
 By default, the sample Gateway configuration listens on port `4317` for gRPC and port `4318` for HTTP.
 
@@ -481,7 +481,7 @@ Enable TLS in the OTLP receiver:
 
 ```yaml
 receivers:
-      # Receives data from other Collectors in Agent mode
+      # Receives data from edge collectors
       otlp:
         protocols:
           grpc:
@@ -561,7 +561,7 @@ If you're upgrading {{agent}} to 9.x but keeping your {{stack}} on 8.18 or 8.19:
 - Continue using deprecated components (such as `elasticinframetrics` and `elastictrace` processors) that are included in the configuration for your Stack version.
 - These deprecated components are retained in {{agent}} 9.x specifically to maintain backwards compatibility during the official deprecation window.
 
-For Gateway mode configurations by Stack version, refer to the [Gateway mode section](#gateway-mode).
+For gateway configurations by Stack version, refer to the [Gateway section](#gateway-mode).
 ::::
 
 [`attributes`]: https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/attributesprocessor
@@ -589,4 +589,3 @@ For Gateway mode configurations by Stack version, refer to the [Gateway mode sec
 [Logs &#124; Metrics &#124; App - OTLP (Windows)]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/tags/v9.5.6/internal/edot/samples/windows/managed_otlp/logs_metrics_traces.yml
 
 % end:edot-samples-links
-[Gateway mode]: https://raw.githubusercontent.com/elastic/elastic-agent/refs/heads/main/internal/edot/samples/linux/gateway.yml

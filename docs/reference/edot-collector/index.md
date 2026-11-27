@@ -26,9 +26,9 @@ In previous versions, the **EDOT Collector** was a standalone product. From this
 
 To install {{agent}} with basic settings in your environment, follow the [quickstart guides](docs-content://solutions/observability/get-started/opentelemetry/quickstart/index.md).
 
-## Deployment modes
+## Deployment patterns
 
-You can deploy {{agent}} in different modes to meet your architectural needs. The two primary modes are Agent and Gateway. Depending on your Elastic deployment type, various {{agent}} instances might be required in each mode to support the target architecture. Refer to [Deployment modes](/reference/edot-collector/modes.md) for more details.
+You can deploy {{agent}} in different patterns to meet your architectural needs. The two primary patterns are edge collector and gateway. Depending on your Elastic deployment type, you might need several {{agent}} instances, each deployed in one of these patterns, to support the target architecture. Refer to [Deployment patterns](/reference/edot-collector/modes.md) for more details.
 
 ## Configure
 

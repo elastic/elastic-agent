@@ -23,11 +23,11 @@ The `elasticapmprocessor` is included by default in {{agent}} deployments that i
 
 ### Standalone deployments
 
-In standalone deployments, the Elastic APM processor is used in both agent and gateway modes:
+In standalone deployments, the Elastic APM processor is used in both edge collectors and gateways:
 
-**Agent mode**: The processor is part of the default [application and traces collection pipeline](../config/default-config-standalone.md#application-and-traces-collection-pipeline). It processes trace data received from OpenTelemetry SDKs before exporting to {{es}}.
+**Edge collector**: The processor is part of the default [application and traces collection pipeline](../config/default-config-standalone.md#application-and-traces-collection-pipeline). It processes trace data received from OpenTelemetry SDKs before exporting to {{es}}.
 
-**Gateway mode**: The processor is part of the [Gateway mode pipeline](../config/default-config-standalone.md#gateway-mode), where it enriches traces received from other collectors running in agent mode before ingesting them into {{es}}.
+**Gateway**: The processor is part of the [gateway pipeline](../config/default-config-standalone.md#gateway-mode), where it enriches traces received from edge collectors before ingesting them into {{es}}.
 
 :::{note}
 The `elasticapm` processor replaces the deprecated `elastictrace` processor. If you're upgrading from an older version, update your configuration to use `elasticapm` instead of `elastictrace`.

@@ -31,7 +31,7 @@ service:
 This configuration serves metrics on port 8888 and makes them available to scrape from any network interface.
 
 :::{note}
-The exact configuration might vary based on deployment mode and whether metrics are scraped directly or forwarded by another collector or {{agent}}.
+The exact configuration might vary based on the deployment pattern and whether metrics are scraped directly or forwarded by another collector or {{agent}}.
 :::
 
 ## Collect internal metrics

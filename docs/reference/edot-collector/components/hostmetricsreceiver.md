@@ -21,7 +21,7 @@ The receiver uses a set of specialized scrapers to gather metrics from different
 
 The `hostmetricsreceiver` is included by default in {{agent}} for both standalone and Kubernetes deployments.
 
-### Standalone agent mode
+### Standalone deployments
 
 In standalone deployments, the host metrics receiver is part of the default [host metrics collection pipeline](../config/default-config-standalone.md#host-metrics-collection-pipeline). It collects system metrics at 60-second intervals and can be configured to export either:
 
@@ -36,7 +36,7 @@ For more details about the Kubernetes configuration, refer to [Default configura
 
 ### Common configuration
 
-Across all deployment modes, the default configuration collects CPU, memory, disk, filesystem, network, and load metrics. Process-level metrics are turned off by default to avoid generating excessive timeseries data.
+In both standalone and Kubernetes deployments, the default configuration collects CPU, memory, disk, filesystem, network, and load metrics. Process-level metrics are turned off by default to avoid generating excessive timeseries data.
 
 For more details on configuring metrics collection, refer to [Configure metrics collection guide](../config/configure-metrics-collection.md#host-metrics).
 

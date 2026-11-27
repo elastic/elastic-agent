@@ -70,7 +70,7 @@ If you need local processing before ingest, such as deriving metrics from events
 
 The {{motlp}} is not available for self-managed, {{ece}}, or {{eck}} deployments. With these deployment methods, set up {{agent}} as a gateway. The gateway handles processing required for some use cases, like deriving metrics from events in {{product.apm}}, and writes data directly to {{es}}.
 
-Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) and [Gateway mode](/reference/edot-collector/modes.md#edot-collector-as-gateway).
+Point your contrib Collector OTLP exporter to the {{agent}} gateway. Refer to [Gateway configuration](/reference/edot-collector/config/default-config-standalone.md#gateway-mode) and [Gateway deployment pattern](/reference/edot-collector/modes.md#edot-collector-as-gateway).
 
 You also need to:
 
