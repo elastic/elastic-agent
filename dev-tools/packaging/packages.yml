@@ -759,6 +759,12 @@ shared:
       'data/{{.BeatName}}-{{ core_commit_short }}/components/connectors.spec.yml':
         source: '{{ elastic_beats_dir }}/specs/connectors.spec.yml'
         mode: 0644
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/crawler':
+        source: '{{ elastic_beats_dir }}/dev-tools/packaging/files/linux/crawler.sh'
+        mode: 0755
+      'data/{{.BeatName}}-{{ core_commit_short }}/components/crawler.spec.yml':
+        source: '{{ elastic_beats_dir }}/specs/crawler.spec.yml'
+        mode: 0644
 
   - &agent_docker_edot_spec
     <<: *agent_binary_spec_no_component_files
