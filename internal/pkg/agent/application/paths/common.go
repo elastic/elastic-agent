@@ -181,6 +181,10 @@ func SetConfig(path string) {
 	configPath = path
 }
 
+func SetConfigFile(name string) {
+	configFilePath = name
+}
+
 // ConfigFile returns the path to the configuration file.
 func ConfigFile() string {
 	return configFileWithDefaultOverride(DefaultConfigName)
