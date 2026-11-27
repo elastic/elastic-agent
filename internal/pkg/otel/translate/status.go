@@ -19,6 +19,7 @@ import (
 	serializablestatus "github.com/elastic/elastic-agent/internal/pkg/otel/status"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
 	"github.com/elastic/elastic-agent/version"
@@ -321,6 +322,8 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 
 	// Build a map from input ID to receiver status.
 	receiverByInputID := make(map[string]*receiverStatus)
+	// singleReceiver is the receiver of a single_receiver component.
+	var singleReceiver *receiverStatus
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver {
 		// single_receiver: true means all streams share one receiver named after the
 		// component ID with a placeholder stream suffix. Map every stream's resolved ID to it.
@@ -330,6 +333,7 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 				continue
 			}
 			rs := newReceiverStatus(aggStatus)
+			singleReceiver = rs
 			for _, u := range comp.Units {
 				if u.Type != client.UnitTypeInput || u.Config == nil {
 					continue
@@ -372,6 +376,10 @@ func getComponentState(pipelineStatus *status.AggregateStatus, comp component.Co
 				compState.Units[unitKey] = runtime.ComponentUnitState{
 					State:   client.UnitStateDegraded,
 					Message: noEnabledStreamsMessage,
+				}
+			} else if comp.UsesControlProtocolUnits() {
+				if singleReceiver != nil {
+					compState.Units[unitKey] = getControlProtocolUnitState(singleReceiver, unit)
 				}
 			} else if len(receiverByInputID) > 0 {
 				compState.Units[unitKey] = getComponentUnitState(nil, receiversForUnit(receiverByInputID, unit, &comp), unit, &comp)
@@ -670,6 +678,95 @@ func getComponentUnitState(outputUnitStatus *status.AggregateStatus, receiverByI
 	return runtime.ComponentUnitState{
 		Payload: payload,
 	}
+}
+
+// controlProtocolUnitNotReportedMessage is the message of an input unit whose
+// receiver hasn't reported on it, for example because it hasn't received the
+// unit yet.
+const controlProtocolUnitNotReportedMessage = "Waiting for the receiver to run this input"
+
+// getControlProtocolUnitState returns the state of an input unit that its
+// receiver gets over the control protocol. The receiver runs each such unit as
+// one input, and reports its status in the "inputs" attribute under one of the
+// unit's stream IDs, or under the unit ID. Heartbeat, for example, names a
+// monitor after its unit unless the monitor comes from the Synthetics app, and
+// a browser monitor's network and screenshot streams are not monitors of their
+// own, so they have no status.
+//
+// Unlike for other receivers, a unit the receiver doesn't report on doesn't
+// get the receiver's top-level status: the receiver aggregates that from all
+// its inputs, so it would show the errors of other units. The unit is
+// starting until the receiver reports on it.
+func getControlProtocolUnitState(rs *receiverStatus, unit component.Unit) runtime.ComponentUnitState {
+	if unit.Config == nil {
+		return runtime.ComponentUnitState{
+			State:   client.UnitStateDegraded,
+			Message: "unit configuration is nil",
+		}
+	}
+
+	ids := make([]string, 0, len(unit.Config.Streams)+1)
+	for _, stream := range unit.Config.Streams {
+		if stream.Id != "" {
+			ids = append(ids, stream.Id)
+		}
+	}
+	ids = append(ids, unit.Config.Id)
+
+	reported := make(map[string]*serializablestatus.SerializableEvent)
+	streamStatuses := make(map[string]map[string]string)
+	for _, id := range ids {
+		streamStatus := rs.streams[id]
+		if id == "" || streamStatus == nil {
+			continue
+		}
+		reported[id] = streamStatus
+		streamStatusEvent := streamStatusToStatusEvent(streamStatus)
+		streamState, streamMsg := StateWithMessage(streamStatusEvent)
+		if streamStatusEvent.Err() == nil {
+			streamMsg = ""
+		}
+		streamStatuses[payloadStreamID(unit.Config, id)] = map[string]string{
+			"error":  streamMsg,
+			"status": streamState.String(),
+		}
+	}
+	if len(reported) > 0 {
+		unitState, unitMessage := unitStateFromStreamStatuses(reported)
+		return runtime.ComponentUnitState{
+			State:   unitState,
+			Message: unitMessage,
+			Payload: map[string]any{"streams": streamStatuses},
+		}
+	}
+
+	// Without the "inputs" attribute, a problem in the receiver's top-level
+	// status is the receiver's own, so it applies to every unit.
+	if rs.streams == nil {
+		if state, message := StateWithMessage(rs); state != client.UnitStateHealthy && state != client.UnitStateStarting {
+			return runtime.ComponentUnitState{State: state, Message: message}
+		}
+	}
+	return runtime.ComponentUnitState{
+		State:   client.UnitStateStarting,
+		Message: controlProtocolUnitNotReportedMessage,
+	}
+}
+
+// payloadStreamID returns the stream that a status the receiver reports under
+// id belongs to. A status reported under the unit ID belongs to the stream
+// with the input's own config, the one with a type, as the others only
+// configure the data streams for it.
+func payloadStreamID(unitConfig *proto.UnitExpectedConfig, id string) string {
+	if id != unitConfig.Id {
+		return id
+	}
+	for _, stream := range unitConfig.Streams {
+		if stream.Id != "" && stream.GetSource().AsMap()["type"] != nil {
+			return stream.Id
+		}
+	}
+	return id
 }
 
 // unitStateFromStreamStatuses computes the unit state based on the stream statuses.

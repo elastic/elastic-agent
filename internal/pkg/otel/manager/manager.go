@@ -7,12 +7,14 @@ package manager
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -38,6 +40,7 @@ import (
 	"github.com/elastic/elastic-agent/internal/pkg/hostinfo"
 	"github.com/elastic/elastic-agent/internal/pkg/otel"
 	"github.com/elastic/elastic-agent/internal/pkg/otel/translate"
+	"github.com/elastic/elastic-agent/internal/pkg/otel/unitserver"
 	"github.com/elastic/elastic-agent/internal/pkg/release"
 	"github.com/elastic/elastic-agent/pkg/component"
 	"github.com/elastic/elastic-agent/pkg/component/runtime"
@@ -45,6 +48,8 @@ import (
 )
 
 const (
+	// unitServerMaxMessageSize matches the default control protocol message size.
+	unitServerMaxMessageSize = 100 * 1024 * 1024
 	// CollectorStopTimeout is the duration to wait for the collector to stop. Note: this needs to be shorter
 	// than 5 * time.Second (coordinator.managerShutdownTimeout) otherwise we might end up with a defunct process.
 	CollectorStopTimeout = 3 * time.Second
@@ -146,6 +151,23 @@ type OTelManager struct {
 
 	// collectorLogLevel is the log level the collector subprocess runs at.
 	collectorLogLevel logp.Level
+
+	// unitServer delivers units to receivers of components with control protocol
+	// units. It starts with the first such component.
+	unitServer        *unitserver.Server
+	unitServerStarted bool
+	// unitServerErr is the error from the last attempt to start the unit server.
+	unitServerErr error
+	// checkinPeriod is how often the receivers that get units from the unit
+	// server must check in.
+	checkinPeriod time.Duration
+	// missedCheckins holds the check-ins missed by receivers that get units from
+	// the unit server, by component ID. Components whose receivers missed none
+	// are left out.
+	missedCheckins map[string]int
+	// collectorComponentStates are the component states from the last collector
+	// status, by component ID, before missed check-ins are applied.
+	collectorComponentStates map[string]runtime.ComponentComponentState
 }
 
 // NewOTelManager returns a OTelManager.
@@ -195,6 +217,11 @@ func NewOTelManager(
 	}
 	healthCheckExtComponentID := otelcomponent.NewIDWithName(componentType, hcUUIDStr).String()
 
+	unitServer, err := unitserver.New(managerLogger.Named("unit_server"), paths.OtelUnitsSocket(), agentInfo, unitServerMaxMessageSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create unit server: %w", err)
+	}
+
 	executable := filepath.Join(paths.Components(), collectorBinaryName)
 	recoveryTimer = newRecoveryBackoff(100*time.Nanosecond, 10*time.Second, time.Minute)
 	if execFactory == nil {
@@ -226,6 +253,8 @@ func NewOTelManager(
 		collectorRunErr:   make(chan error, 1),
 		stopTimeout:       stopTimeout,
 		collectorLogLevel: collectorLogLevel,
+		unitServer:        unitServer,
+		checkinPeriod:     receiverCheckinPeriod,
 	}, nil
 }
 
@@ -239,6 +268,8 @@ func (m *OTelManager) Run(ctx context.Context) error {
 	// waiting for the collector to exit
 	collectorStatusCh := make(chan *status.AggregateStatus, 1)
 	forceFetchStatusCh := make(chan struct{}, 1)
+	checkinTicker := time.NewTicker(m.receiverCheckinPeriod())
+	defer checkinTicker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -317,6 +348,10 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			// and reset the retry count
 			m.recoveryTimer.Stop()
 			m.recoveryRetries.Store(0)
+			// Deliver the units before the collector config, so a new receiver
+			// finds them when it connects.
+			m.updateUnitServer(ctx, cfgUpdate.components)
+
 			mergedCfg, err := m.buildMergedConfig(ctx, cfgUpdate, m.agentInfo, m.managerLogger)
 			if err != nil {
 				// critical error, merging the configuration should always work
@@ -366,6 +401,14 @@ func (m *OTelManager) Run(ctx context.Context) error {
 				forceFetchStatusCh <- struct{}{}
 			}
 
+		case <-checkinTicker.C:
+			// As the runtime manager does for beat processes, retry starting
+			// the server and check the check-ins periodically.
+			if !m.unitServerStarted {
+				m.updateUnitServer(ctx, m.components)
+			}
+			m.reportMissedCheckins(ctx)
+
 		case otelStatus := <-collectorStatusCh:
 			err = m.reportOtelStatusUpdate(ctx, otelStatus)
 			if err != nil {
@@ -378,6 +421,64 @@ func (m *OTelManager) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// updateUnitServer sends the units of components with control protocol units to the
+// unit server, starting it for the first such component. The server is listening
+// once this returns, so the receivers started by the following collector config
+// can connect right away. If it fails to start, the next update or check-in
+// period tries again.
+func (m *OTelManager) updateUnitServer(ctx context.Context, components []component.Component) {
+	if m.unitServer == nil {
+		return
+	}
+	if !m.unitServerStarted && slices.ContainsFunc(components, func(c component.Component) bool { return c.UsesControlProtocolUnits() }) {
+		if err := m.unitServer.Start(ctx); err != nil {
+			m.managerLogger.Errorf("failed to start the unit server, will retry: %v", err)
+			m.unitServerErr = err
+		} else {
+			m.unitServerStarted = true
+			m.unitServerErr = nil
+		}
+	}
+	// The units are kept even if the server isn't running, as the receiver
+	// config needs the connection info for them.
+	m.unitServer.Update(components)
+}
+
+// injectControlProtocolConnections gives the receivers of components with control
+// protocol units the connection info for the unit server. The info is stable for
+// the life of the component, so it doesn't change the receiver config on updates.
+func (m *OTelManager) injectControlProtocolConnections(config *confmap.Conf, components []component.Component) error {
+	if m.unitServer == nil {
+		return nil
+	}
+	receivers := map[string]any{}
+	for _, comp := range components {
+		if !comp.UsesControlProtocolUnits() {
+			continue
+		}
+		receiverID, err := translate.GetControlProtocolReceiverID(&comp)
+		if err != nil {
+			return err
+		}
+		info, err := m.unitServer.ConnectionInfo(comp.ID)
+		if err != nil {
+			return err
+		}
+		receivers[receiverID.String()] = map[string]any{
+			"management": map[string]any{
+				"agent": map[string]any{
+					// The name makes diagnostics redact it: it holds a private key and token.
+					"connection_secret": base64.StdEncoding.EncodeToString(info),
+				},
+			},
+		}
+	}
+	if len(receivers) == 0 {
+		return nil
+	}
+	return config.Merge(confmap.NewFromStringMap(map[string]any{"receivers": receivers}))
 }
 
 // Errors returns channel that can send an error that affects the state of the running agent.
@@ -493,6 +594,10 @@ func (m *OTelManager) buildMergedConfig(
 
 		if err := injectHeaderSetterExtension(overlay, agentInfo); err != nil {
 			return nil, fmt.Errorf("failed to inject header setter extension: %w", err)
+		}
+
+		if err := m.injectControlProtocolConnections(overlay, cfgUpdate.components); err != nil {
+			return nil, fmt.Errorf("failed to inject control protocol connections: %w", err)
 		}
 
 		if mCfg := cfgUpdate.monitoringCfg; mCfg != nil {
@@ -1023,6 +1128,14 @@ func (m *OTelManager) handleOtelStatusUpdate(otelStatus *status.AggregateStatus)
 
 	// Update the current collector status to the cleaned status (after dropping component states)
 	m.currentCollectorStatus = finalStatus
+
+	// Apply the check-ins missed by receivers that get units from the unit server
+	m.collectorComponentStates = make(map[string]runtime.ComponentComponentState, len(componentStates))
+	m.updateMissedCheckins()
+	for i, componentState := range componentStates {
+		m.collectorComponentStates[componentState.Component.ID] = componentState
+		componentStates[i] = m.withMissedCheckins(componentState)
+	}
 
 	// Handle component state updates
 	return m.processComponentStates(componentStates), nil
