@@ -214,9 +214,11 @@ outputs:
         include_source_on_error: false # Override the generated value of include_source_on_error.
 ```
 
-Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. By default, batching uses an items sizer that limits only the number of events per batch. In rare cases, very large events may cause batches to become unbalanced, allowing the total request size to exceed Elasticsearch limits and resulting in 413 (Request Entity Too Large) errors.
+Overrides can also be used to adjust batching behavior in the Elasticsearch exporter. Batches are sized in bytes, not in events, so that a bulk request cannot exceed the Elasticsearch request size limit (`http.max_content_length`, 100 MiB by default) however large the events are. A request over the limit is rejected with a 413 (Request Entity Too Large) error and its events are dropped.
 
-To avoid this, the batching strategy can be configured to use a bytes sizer so that batches are constrained by their total size:
+By default a batch is sent when it reaches 1 MiB (512 KiB with the `latency` preset) or when `queue.mem.flush.timeout` expires, and it is never larger than 50 MiB. The `bulk_max_size` and `queue.mem.flush.min_events` output settings count events and do not set the size of a request.
+
+A single event larger than `max_size` cannot be sent and is dropped. Raise `max_size` if you need to send larger events, and lower it if a proxy in front of Elasticsearch has a smaller limit than Elasticsearch itself:
 
 ```yaml
 outputs:
@@ -228,9 +230,8 @@ outputs:
       exporter:
         sending_queue:
           batch:
-            min_size: 1e+6 # 1MB
-            max_size: 5e+6 # 5MB
-            sizer: bytes
+            min_size: 1048576 # 1 MiB
+            max_size: 5242880 # 5 MiB
 ```
 
 ## Hybrid Agent
@@ -353,10 +354,10 @@ exporters:
             num_consumers: 1
             queue_size: 3200
             batch:
-                max_size: 1600
-                min_size: 0
+                max_size: 52428800
+                min_size: 1048576
                 flush_timeout: 10s
-                sizer: items
+                sizer: bytes
 service:
     pipelines:
         logs:
