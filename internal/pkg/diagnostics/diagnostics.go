@@ -359,13 +359,8 @@ func writeErrorResult(zw *zip.Writer, path string, errBody string) error {
 func RedactOpts(w io.Writer) []redact.RedactOption {
 	return []redact.RedactOption{
 		redact.WithErrorOutput(w),
-<<<<<<< HEAD
 		redact.WithMarkerPrefix(redactionMarkerPrefix),
-		redact.WithIgnoreKeys(redactionRouteKey),
-=======
-		redact.WithMarkerPrefix(RedactionMarkerPrefix),
 		redact.WithIgnoreKeys(redactionRouteKey, redactionSecretPathsKey),
->>>>>>> 3cad52f (fix(diagnostics): don't redact the secret_paths list (#18277))
 		redact.WithHeaderValueKeys(redactionHeaderValueKeys...),
 	}
 }
