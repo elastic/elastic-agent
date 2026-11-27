@@ -37,13 +37,20 @@ func TestSamples(t *testing.T) {
 		assert.NoError(t, featuregate.GlobalRegistry().Set("service.profilesSupport", false))
 	}()
 
-	err := filepath.WalkDir(filepath.Join(".", "samples", runtime.GOOS), func(path string, d os.DirEntry, err error) error {
+	samplesDir := filepath.Join(".", "samples", runtime.GOOS)
+	err := filepath.WalkDir(samplesDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if !d.IsDir() && (filepath.Ext(d.Name()) == ".yaml" || filepath.Ext(d.Name()) == ".yml") {
-			t.Run(d.Name(), func(t *testing.T) {
-				testSample(t, filepath.Join(".", "samples", runtime.GOOS, d.Name()))
+			// Use the walked path (not just the file name) so samples in subdirectories
+			// are tested themselves, and subtests have unique names.
+			name, relErr := filepath.Rel(samplesDir, path)
+			if relErr != nil {
+				name = d.Name()
+			}
+			t.Run(filepath.ToSlash(name), func(t *testing.T) {
+				testSample(t, path)
 			})
 		}
 		return nil
