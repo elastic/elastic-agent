@@ -3,7 +3,7 @@ param (
     [string]$TEST_SUDO
 )
 
-$ErrorActionPreference = "Stop"
+. "$PWD\.buildkite\scripts\steps\ess.ps1"
 
 if (-not $GROUP_NAME) {
     Write-Error "Error: Specify the group name: integration_tests_tf_fips.ps1 <group_name> <true|false>"
@@ -36,26 +36,13 @@ if ($enabled -ne 1) {
     exit 1
 }
 
-Write-Output "~~~ Receiving ESS stack metadata"
-$metadataPrefix = "fips."
-$envMap = @{
-    "ELASTICSEARCH_HOST"      = "${metadataPrefix}es.host"
-    "ELASTICSEARCH_USERNAME"  = "${metadataPrefix}es.username"
-    "ELASTICSEARCH_PASSWORD"  = "${metadataPrefix}es.pwd"
-    "KIBANA_HOST"             = "${metadataPrefix}kibana.host"
-    "KIBANA_USERNAME"         = "${metadataPrefix}kibana.username"
-    "KIBANA_PASSWORD"         = "${metadataPrefix}kibana.pwd"
-    "ELASTIC_APM_SERVER_URL"  = "${metadataPrefix}integrations_server.host"
+# Stack version, same as integration_tests_tf.ps1. FRS only offers plain
+# versions, so the build id is not used for FIPS.
+$packageVersionContent = Get-Content .package-version -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+if ($packageVersionContent -and $packageVersionContent.stack_version) {
+    $STACK_VERSION = $packageVersionContent.stack_version
+    $STACK_BUILD_ID = $packageVersionContent.stack_build_id
 }
-foreach ($name in $envMap.Keys) {
-    $value = & buildkite-agent meta-data get $envMap[$name]
-    if ($LASTEXITCODE -ne 0 -or -not $value) {
-        Write-Error "Failed to read meta-data key $($envMap[$name])"
-        exit 1
-    }
-    [System.Environment]::SetEnvironmentVariable($name, $value)
-}
-Write-Output "Elasticsearch Host: $env:ELASTICSEARCH_HOST"
 
 Write-Output "~~~ Building integration test binaries"
 & mage build:integrationTestBinaries
@@ -64,5 +51,25 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-& "$PWD\.buildkite\scripts\buildkite-integration-tests.ps1" $GROUP_NAME $TEST_SUDO
-exit $LASTEXITCODE
+$TestsExitCode = 0
+try {
+    Write-Output "~~~ Running integration tests"
+    # Get-Ess-Stack only starts a new stack if this is a manual BK retry.
+    # Otherwise the shared FRS stack from the start step is used.
+    Get-Ess-Stack -StackVersion $STACK_VERSION -StackBuildId $STACK_BUILD_ID
+
+    $result = ess_load_secrets
+    if ($result -ne 0) {
+        Write-Error "Failed to load secrets"
+        exit 1
+    }
+    & "$PWD\.buildkite\scripts\buildkite-integration-tests.ps1" $GROUP_NAME $TEST_SUDO
+    $TestsExitCode = $LASTEXITCODE
+} finally {
+    # ess_down only destroys the stack if this step created it (manual retry).
+    if ($Env:BUILDKITE_RETRY_COUNT -gt 0 -and $Env:BUILDKITE_RETRY_TYPE -ne "automatic") {
+        ess_down
+    }
+}
+
+exit $TestsExitCode

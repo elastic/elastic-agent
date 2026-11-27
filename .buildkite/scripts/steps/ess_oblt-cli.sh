@@ -27,9 +27,25 @@ function ess_up() {
     --parameter "ExpireInHours=4"
   )
 
-  # Snapshot stacks need explicit image tags. Released stacks can be created
-  # from StackVersion alone until the next snapshot build is available.
-  if [ -n "${STACK_BUILD_ID}" ]; then
+  if [[ "${FIPS:-false}" == "true" ]]; then
+    # FIPS runs on FedRAMP Staging (frs). Only the generic `ess` template is
+    # supported there, and FRS only offers plain stack versions, so the
+    # StackBuildId pinning of ess-ea-it-build-id isn't available. Creating a
+    # cluster on FRS takes about 20 minutes, hence the longer --wait.
+    # See https://github.com/elastic/observability-test-environments/blob/main/docs/kb/create-ech-cluster-on-frs.md
+    oblt_cmd=(
+      oblt-cli cluster create custom
+      --template ess
+      --cluster-name-prefix frs
+      --output-file="${PWD}/cluster-info.json"
+      --wait 40
+      --parameter "Target=frs"
+      --parameter "StackVersion=$STACK_VERSION"
+      --parameter "ExpireInHours=4"
+    )
+  elif [ -n "${STACK_BUILD_ID}" ]; then
+    # Snapshot stacks need explicit image tags. Released stacks can be created
+    # from StackVersion alone until the next snapshot build is available.
     oblt_cmd+=(--parameter "StackBuildId=${STACK_BUILD_ID}")
   fi
 
