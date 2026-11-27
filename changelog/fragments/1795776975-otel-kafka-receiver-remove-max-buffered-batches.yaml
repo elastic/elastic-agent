@@ -1,0 +1,16 @@
+kind: breaking-change
+
+summary: The Kafka receiver in the EDOT Collector no longer accepts partition_processing.max_buffered_batches
+
+description: |
+  In OTel Collector Contrib v0.166.0, the deprecated `partition_processing.max_buffered_batches` option
+  of the `kafka` receiver is removed.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52922
+
+impact: |
+  The Collector fails to start if the configuration sets `partition_processing.max_buffered_batches`.
+
+action: |
+  Use `partition_processing.max_prefetch.batches` instead.
+
+component: elastic-agent

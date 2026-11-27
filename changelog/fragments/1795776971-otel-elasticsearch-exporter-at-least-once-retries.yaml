@@ -1,0 +1,24 @@
+kind: breaking-change
+
+summary: The Elasticsearch exporter in the EDOT Collector now retries with at-least-once delivery by default
+
+description: |
+  In OTel Collector Contrib v0.166.0, the `elasticsearch` exporter changed its retry defaults.
+  It now retries requests that fail with a transport error or an HTTP client timeout,
+  `retry::retry_on_status` defaults to `[400, 401, 403, 404, 409, 429, 500, 502, 503, 504]`
+  (previously `[429]`), and `retry::retry_on_document_status` defaults to `[429, 500, 502, 503, 504]`
+  instead of following `retry::retry_on_status`. HTTP client timeouts are always retried.
+  Elasticsearch outputs that Elastic Agent translates for the OTel runtime are not affected,
+  because Elastic Agent sets both lists explicitly.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52551
+
+impact: |
+  EDOT Collector configurations that rely on the exporter's default retry settings retry more failures,
+  which can produce duplicate documents.
+
+action: |
+  To keep the previous behavior, set both `retry::retry_on_status` and `retry::retry_on_document_status` to `[429]`.
+  If you set `retry::retry_on_status` without `retry::retry_on_document_status`, also set
+  `retry::retry_on_document_status` to the same list.
+
+component: elastic-agent
