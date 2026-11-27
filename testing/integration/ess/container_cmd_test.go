@@ -33,6 +33,11 @@ import (
 	"github.com/elastic/elastic-agent/pkg/core/process"
 	atesting "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/define"
+<<<<<<< HEAD
+=======
+	"github.com/elastic/elastic-agent/pkg/testing/tools"
+	"github.com/elastic/elastic-agent/pkg/testing/tools/check"
+>>>>>>> da5216c (Report the last error from check.ConnectedToFleet (#18257))
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 	"github.com/elastic/elastic-agent/testing/integration"
 )
@@ -146,7 +151,50 @@ func prepareAgentCMD(
 	cmd.Stderr = &agentOutput
 	cmd.Stdout = &agentOutput
 	cmd.Env = append(os.Environ(), env...)
+<<<<<<< HEAD
 	return cmd, &agentOutput
+=======
+	return cmd, agentOutput
+}
+
+// waitAgentHealthy waits until the agent is healthy. If it does not become
+// healthy in time, the test fails with the last error and the agent output.
+func waitAgentHealthy(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	env []string,
+	timeout time.Duration,
+	description string,
+	output *cli.SyncBuffer,
+) {
+	t.Helper()
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		require.NoError(c, agentFixture.IsHealthy(ctx, atesting.WithCmdOptions(withEnv(env))))
+	}, timeout, time.Second, "Elastic-Agent did not report healthy %s, Agent logs\n%s", description, output)
+}
+
+// waitAgentFleetHealthy waits until the agent is connected to Fleet and returns
+// the agent ID. Unlike waitAgentHealthy, it also checks the connection to Fleet.
+// After a restart the agent can need several minutes to connect again, so use a
+// timeout of 6 minutes or more.
+func waitAgentFleetHealthy(
+	t *testing.T,
+	ctx context.Context,
+	agentFixture *atesting.Fixture,
+	env []string,
+	timeout time.Duration,
+	description string,
+	output *cli.SyncBuffer,
+) string {
+	t.Helper()
+	require.True(t, check.ConnectedToFleet(ctx, t, agentFixture, timeout, withEnv(env)),
+		"Agent did not connect to Fleet %s, Agent logs\n%s", description, output)
+
+	status, err := agentFixture.ExecStatus(ctx, atesting.WithCmdOptions(withEnv(env)))
+	require.NoError(t, err, "elastic-agent status failed")
+	return status.Info.ID
+>>>>>>> da5216c (Report the last error from check.ConnectedToFleet (#18257))
 }
 
 func TestContainerCMD(t *testing.T) {
