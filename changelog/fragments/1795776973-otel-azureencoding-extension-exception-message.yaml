@@ -1,0 +1,19 @@
+kind: breaking-change
+
+summary: The Azure encoding extension in the EDOT Collector no longer emits the error.message attribute
+
+description: |
+  In OTel Collector Contrib v0.166.0, the `extension.azureencoding.EmitV1LogConventions` and
+  `extension.azureencoding.DontEmitV0LogConventions` feature gates of the `azure_encoding` extension
+  are stable and can no longer be disabled. The extension always emits `exception.message` and
+  no longer emits the deprecated `error.message` attribute.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52858
+
+impact: |
+  Dashboards, alerts, queries, ingest pipelines or processors that use `error.message` from Azure logs
+  decoded by the extension no longer find it.
+
+action: |
+  Use `exception.message` instead of `error.message`.
+
+component: elastic-agent

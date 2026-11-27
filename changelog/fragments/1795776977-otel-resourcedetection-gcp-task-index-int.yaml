@@ -1,0 +1,17 @@
+kind: breaking-change
+
+summary: The resource detection processor in the EDOT Collector reports gcp.cloud_run.job.task_index as an integer
+
+description: |
+  In OTel Collector Contrib v0.166.0, the `gcp` detector of the `resource_detection` processor emits
+  `gcp.cloud_run.job.task_index` as an integer instead of a string.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52807
+
+impact: |
+  Mappings, queries or processors that expect `gcp.cloud_run.job.task_index` to be a string can fail
+  or stop matching.
+
+action: |
+  Treat `gcp.cloud_run.job.task_index` as an integer.
+
+component: elastic-agent

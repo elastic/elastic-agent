@@ -1,0 +1,19 @@
+kind: breaking-change
+
+summary: The Prometheus remote write receiver in the EDOT Collector rejects requests that don't follow the protocol
+
+description: |
+  In OTel Collector Contrib v0.166.0, the `prometheus_remote_write` receiver enforces the HTTP POST method,
+  `snappy` block-format `Content-Encoding`, `Content-Type` parsing with `mode` validation and `Accept`
+  headers on `415` responses. `compression_algorithms` now defaults to `["snappy"]`, and the `snappy`
+  decoder rejects framed Snappy streams with `400 Bad Request`.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/53273
+
+impact: |
+  Senders that use another encoding or framed Snappy streams have their requests rejected.
+
+action: |
+  Configure `compression_algorithms` explicitly for encodings other than `snappy`,
+  or enable `x-snappy-framed` for framed Snappy streams.
+
+component: elastic-agent

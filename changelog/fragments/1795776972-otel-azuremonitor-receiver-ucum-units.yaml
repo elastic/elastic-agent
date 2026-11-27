@@ -1,0 +1,16 @@
+kind: breaking-change
+
+summary: The Azure Monitor receiver in the EDOT Collector now reports metric units in UCUM
+
+description: |
+  In OTel Collector Contrib v0.166.0, the `azure_monitor` receiver converts Azure Monitor metric units
+  to UCUM, for example `Bytes` to `By`.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/52325
+
+impact: |
+  Dashboards, alerts, queries or processors that match on the previous unit strings no longer match.
+
+action: |
+  Update anything that matches on Azure Monitor metric units to use the UCUM units.
+
+component: elastic-agent

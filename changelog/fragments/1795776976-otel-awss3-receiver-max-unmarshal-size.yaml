@@ -1,0 +1,17 @@
+kind: breaking-change
+
+summary: The AWS S3 receiver in the EDOT Collector limits decompressed objects to 256 MiB by default
+
+description: |
+  In OTel Collector Contrib v0.166.0, the `aws_s3` receiver limits the decompressed objects that
+  non-streaming decoders buffer with `s3downloader.max_unmarshal_size`, which defaults to 256 MiB.
+  Streaming decoders are not subject to this limit.
+  See https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/53137
+
+impact: |
+  Objects larger than the limit that use a non-streaming decoder are no longer processed.
+
+action: |
+  Increase `s3downloader.max_unmarshal_size` for larger objects.
+
+component: elastic-agent
