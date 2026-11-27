@@ -10,36 +10,28 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/elastic/beats/v7/pkg/kibana"
 	"github.com/elastic/elastic-agent/pkg/control/v2/cproto"
+	"github.com/elastic/elastic-agent/pkg/core/process"
 	integrationtest "github.com/elastic/elastic-agent/pkg/testing"
 	"github.com/elastic/elastic-agent/pkg/testing/tools/fleettools"
 )
 
-// ConnectedToFleet checks if the agent defined in the fixture is connected to
-// Fleet Server. It uses assert.Eventually and if it fails the last error will
-// be printed. It returns if the agent is connected to Fleet Server or not.
-func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, timeout time.Duration) bool {
+// ConnectedToFleet waits until the agent in the fixture is connected to Fleet
+// Server. If it is not connected in time, the errors from the last attempt are
+// printed. cmdOptions change how the status command runs, for example its
+// environment. It returns true if the agent is connected.
+func ConnectedToFleet(ctx context.Context, t *testing.T, fixture *integrationtest.Fixture, timeout time.Duration, cmdOptions ...process.CmdOption) bool {
 	t.Helper()
 
-	var err error
-	var agentStatus integrationtest.AgentStatusOutput
-	assertFn := func() bool {
-		agentStatus, err = fixture.ExecStatus(ctx)
-		return agentStatus.FleetState == int(cproto.State_HEALTHY)
-	}
-
-	connected := assert.Eventually(t, assertFn, timeout, 5*time.Second,
-		"want fleet state %s, got %s. agent status: %v",
-		cproto.State_HEALTHY, cproto.State(agentStatus.FleetState), agentStatus) //nolint:gosec // G115 always under 32-bit
-
-	if !connected && err != nil {
-		t.Logf("agent isn't connected to fleet-server: last error from agent status command: %v",
-			err)
-	}
-
-	return connected
+	return assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		agentStatus, err := fixture.ExecStatus(ctx, integrationtest.WithCmdOptions(cmdOptions...))
+		require.NoError(c, err, "elastic-agent status failed")
+		require.Equal(c, int(cproto.State_HEALTHY), agentStatus.FleetState,
+			"agent isn't connected to fleet-server, agent status: %+v", agentStatus)
+	}, timeout, 5*time.Second)
 }
 
 // FleetAgentStatus returns a niladic function that returns true if the agent

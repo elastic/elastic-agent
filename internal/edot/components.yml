@@ -43,6 +43,7 @@ core_components:
   - kafkaexporter
   - otlpexporter
   - otlphttpexporter
+  - prometheusremotewriteexporter
 
 # Processors
   - attributesprocessor
@@ -222,6 +223,7 @@ since:
   profiling: v9.2.0
   profilingmetricsconnector: v9.2.0
   prometheusreceiver: v9.0.0
+  prometheusremotewriteexporter: v9.6.0
   prometheusremotewritereceiver: v9.3.0
   prometheusremotewritev1receiver: v9.6.0
   prometheusscrapereceiver: v9.7.0
