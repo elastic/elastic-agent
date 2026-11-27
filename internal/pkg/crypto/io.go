@@ -161,24 +161,12 @@ func (w *Writer) Write(b []byte) (int, error) {
 }
 
 func (w *Writer) writeBlock(b []byte) error {
-<<<<<<< HEAD
 	// randomly generate the salt and the initialization vector, this information will be saved
 	// on disk in the file as part of the header
 	iv, err := w.generator(w.option.IVLength)
 	if err != nil {
 		w.err = fmt.Errorf("fail to generate random IV: %w", err)
 		return w.err
-=======
-	encodedBytes := w.gcm.Seal(nil, nil, b, nil) //nolint:gosec // G407: false positive, w.gcm is from NewGCMWithRandomNonce, which generates the nonce and requires a nil one here
-	iv := encodedBytes[:nonceLen]
-	// Seal prepends a random nonce to the produced bytes, The encrypted text are all bytes after the nonce.
-	// However the agent crypto handlers were initially implemented with a different header structure that includes the length of each encrypted text block.
-	payload := encodedBytes[nonceLen:]
-	size := len(payload)
-
-	if size > math.MaxUint32 {
-		return fmt.Errorf("encrypted block size %d exceeds uint32 max", size)
->>>>>>> 25e5e5a (chore: update golangci-lint to v2.15.0 to support Go 1.27 (#18263))
 	}
 
 	//nolint:errcheck // Ignore the error at this point.
