@@ -1255,7 +1255,7 @@ func TestRedactKeepsSecretPaths(t *testing.T) {
 		"inputs": []any{
 			map[string]any{
 				"custom_attr":                         "secretValue",
-				RedactionMarkerPrefix + "custom_attr": true,
+				redactionMarkerPrefix + "custom_attr": true,
 				"api_key":                             "secretKey",
 			},
 		},
