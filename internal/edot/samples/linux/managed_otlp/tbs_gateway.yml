@@ -19,8 +19,8 @@ processors:
   elasticapm: {} # Enriches spans before the connector generates APM metrics
   tail_sampling:
     decision_wait: 10s
-    num_traces: 100
-    expected_new_traces_per_sec: 10
+    num_traces: 200 # Example capacity with headroom; size for your peak traffic
+    expected_new_traces_per_sec: 10 # Allocation hint; doesn't limit throughput
     policies:
       - name: errors
         type: status_code

@@ -176,8 +176,8 @@ processors:
   elasticapm: {} # Enriches spans before the connector generates APM metrics
   tail_sampling:
     decision_wait: 10s
-    num_traces: 100
-    expected_new_traces_per_sec: 10
+    num_traces: 200 # Example capacity with headroom; size for your peak traffic
+    expected_new_traces_per_sec: 10 # Allocation hint; doesn't limit throughput
     policies:
       - name: errors
         type: status_code
@@ -232,6 +232,7 @@ The [tail-sampling processor](https://github.com/open-telemetry/opentelemetry-co
 
 * `decision_wait`: How long the processor waits after it receives the first span of a trace. A longer wait catches late spans, but the processor keeps each trace in memory for longer.
 * `num_traces`: The maximum number of traces the processor keeps in memory. When the processor reaches this limit, it can evict traces before it makes a sampling decision.
+* `expected_new_traces_per_sec`: The expected rate of new traces. The processor uses this value to preallocate internal data structures; it doesn't limit throughput.
 
 Set `num_traces` higher than the peak number of new traces you expect during `decision_wait`, and leave headroom for traffic bursts and late spans. Before you deploy to production, test under representative load and check memory usage and early evictions.
 
