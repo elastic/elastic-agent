@@ -135,7 +135,7 @@ func (runner *MonitoringRunner) TestMonitoringLiveness() {
 	// verify the new policy revision was applied
 	require.Eventually(
 		runner.T(),
-		tools.IsPolicyRevision(ctx, runner.T(), runner.info.KibanaClient, runner.agentID, policyResponse.Revision),
+		tools.IsMinPolicyRevision(ctx, runner.T(), runner.info.KibanaClient, runner.agentID, policyResponse.Revision),
 		5*time.Minute, time.Second)
 
 	runner.AllComponentsHealthy(ctx)

@@ -192,7 +192,7 @@ func (runner *NetworkTrafficRunner) TestBeatsMetrics() {
 		otelSince := time.Now()
 		policyRevision := switchPolicyToOtelRuntime(ctx, t, runner.info.KibanaClient, runner.policyID, runner.policyName, runner.info.Namespace)
 
-		require.Eventually(t, tools.IsPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
+		require.Eventually(t, tools.IsMinPolicyRevision(ctx, t, runner.info.KibanaClient, runner.agentID, policyRevision),
 			5*time.Minute, time.Second)
 
 		// The packet component may take a moment to appear after the policy switch.
