@@ -48,4 +48,4 @@ jobs:
         run: make mage
 
       - name: mage ${{ matrix.mage_target }}
-        run: RACE_DETECTOR=true TEST_COVERAGE=true mage ${{ matrix.mage_target }}
+        run: RACE_DETECTOR=true mage ${{ matrix.mage_target }}
