@@ -387,7 +387,7 @@ func (p *provisioner) createInfrastructureObject(ctx context.Context, client kli
 
 	infrastructure.Status = configv1.InfrastructureStatus{
 		InfrastructureName: clusterName,
-		Platform:           configv1.NonePlatformType,
+		Platform:           configv1.NonePlatformType, //nolint:staticcheck // SA1019: kept alongside PlatformStatus for consumers that still read the deprecated field
 		PlatformStatus:     &configv1.PlatformStatus{Type: configv1.NonePlatformType},
 	}
 	if err := r.UpdateStatus(ctx, infrastructure); err != nil {
