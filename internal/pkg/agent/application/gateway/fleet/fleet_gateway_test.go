@@ -663,7 +663,7 @@ func runFleetGateway(ctx context.Context, g coordinator.FleetGateway) <-chan err
 			select {
 			case <-done:
 				return
-			case <-g.Errors():
+			case <-g.Errors(): //nolint:errcheck // errors are ignored in this test
 				// ignore errors here
 			}
 		}
