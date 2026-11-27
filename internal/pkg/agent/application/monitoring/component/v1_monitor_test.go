@@ -975,9 +975,9 @@ func TestMonitoringConfigOtelOutputSupport(t *testing.T) {
 		{
 			name: "elasticsearch with unsupported config - should NOT have prometheus monitoring",
 			outputConfig: map[string]any{
-				"type":    "elasticsearch",
-				"hosts":   []string{"localhost:9200"},
-				"indices": []any{},
+				"type":        "elasticsearch",
+				"hosts":       []string{"localhost:9200"},
+				"loadbalance": false,
 			},
 			expectPrometheusMonitoring: false,
 			monitoringRuntimeManager:   monitoringcfg.ProcessRuntimeManager,

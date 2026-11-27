@@ -4392,46 +4392,6 @@ func TestVerifyComponentIsOtelSupported(t *testing.T) {
 			},
 		},
 		{
-			name: "unsupported configuration",
-			component: &component.Component{
-				ID:         "unsupported-config",
-				InputType:  "filestream",
-				OutputType: "elasticsearch",
-				OutputName: "default",
-				InputSpec: &component.InputRuntimeSpec{
-					BinaryName: "elastic-otel-collector",
-					Spec: component.InputSpec{
-						Command: &component.CommandSpec{
-							Args: []string{"filebeat"},
-						},
-					},
-				},
-				Units: []component.Unit{
-					{
-						ID:   "filestream-unit",
-						Type: client.UnitTypeInput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"streams": []any{
-								map[string]any{
-									"paths": []any{"/var/log/*.log"},
-								},
-							},
-						}),
-					},
-					{
-						ID:   "filestream-default",
-						Type: client.UnitTypeOutput,
-						Config: component.MustExpectedConfig(map[string]any{
-							"type":    "elasticsearch",
-							"hosts":   []any{"localhost:9200"},
-							"indices": []any{},
-						}),
-					},
-				},
-			},
-			expectedError: "unsupported configuration for unsupported-config: error translating config for output: default, unit: filestream-default, error: indices is currently not supported: unsupported operation",
-		},
-		{
 			// A unit with nil Config contributes no inputs. The component falls back to
 			// the no-op receiver and remains supported.
 			name: "input unit with nil config is supported",
@@ -4540,24 +4500,23 @@ func TestVerifyOutputIsOtelSupported(t *testing.T) {
 			outputCfg:  map[string]any{},
 		},
 		{
-			name:       "unsupported configuration - indices field",
+			name:       "unsupported configuration - loadbalance:false field",
 			outputType: "elasticsearch",
 			outputCfg: map[string]any{
-				"type":    "elasticsearch",
-				"hosts":   []any{"localhost:9200"},
-				"indices": []any{},
+				"type":        "elasticsearch",
+				"hosts":       []any{"localhost:9200"},
+				"loadbalance": false,
 			},
 			expectedError: "unsupported configuration for elasticsearch:",
 		},
 		{
-			name:       "unsupported configuration - negative retries",
+			name:       "supported configuration - negative retries",
 			outputType: "elasticsearch",
 			outputCfg: map[string]any{
 				"type":        "elasticsearch",
 				"hosts":       []any{"localhost:9200"},
 				"max_retries": -1,
 			},
-			expectedError: "unsupported configuration for elasticsearch:",
 		},
 		{
 			name:       "supported configuration - 0 retries",

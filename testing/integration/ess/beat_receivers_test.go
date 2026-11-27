@@ -971,7 +971,7 @@ outputs:
     preset: latency
     hosts: [%s]
     api_key: placeholder
-    indices: [] # not supported by the elasticsearch exporter
+    loadbalance: false # not supported by the elasticsearch exporter
   supported:
     type: elasticsearch
     preset: latency
