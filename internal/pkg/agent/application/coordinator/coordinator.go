@@ -180,6 +180,12 @@ type HostInfoWatcher interface {
 
 	// Get returns the latest host information.
 	Get(ctx context.Context) (hostinfo.Info, error)
+
+	// Changed returns a channel that is closed when the host information changes.
+	Changed() <-chan struct{}
+
+	// Synced returns a channel that is closed once the host information has been fetched.
+	Synced() <-chan struct{}
 }
 
 // OTelManager provides an interface to run components and plain otel configurations in an otel collector.
@@ -257,6 +263,9 @@ type VarsManager interface {
 
 // minManagerShutdownTimeout is the minimum timeout used when no components are running.
 const minManagerShutdownTimeout = 5 * time.Second
+
+// initialHostInfoTimeout is how long the Coordinator waits for the host information when it starts.
+const initialHostInfoTimeout = 5 * time.Second
 
 // managerShutdownTimeoutForComponents computes the manager shutdown timeout based on passed components.
 // It returns the maximum stop timeout across all command components plus a buffer,
@@ -350,6 +359,12 @@ type Coordinator struct {
 
 	// hostInfo is the agent's shared host information. The Coordinator runs it.
 	hostInfo HostInfoWatcher
+	// hostInfoChanged is closed when the host information changes.
+	hostInfoChanged <-chan struct{}
+	// hostname is the last hostname from hostInfo, if hostnameKnown. It's used in the OTel configuration, which is
+	// updated when it changes.
+	hostname      string
+	hostnameKnown bool
 
 	initialCfg *configuration.Configuration
 	currentCfg *configuration.Configuration
@@ -1671,12 +1686,14 @@ func (c *Coordinator) runner(ctx context.Context) error {
 
 	hostInfoDone := make(chan struct{})
 	if c.hostInfo != nil {
+		c.hostInfoChanged = c.hostInfo.Changed()
 		go func() {
 			defer close(hostInfoDone)
 			if err := c.hostInfo.Run(ctx); err != nil && ctx.Err() == nil {
 				c.logger.Errorf("Failed watching host information: %v", err)
 			}
 		}()
+		c.initHostname(ctx, initialHostInfoTimeout)
 	} else {
 		close(hostInfoDone)
 	}
@@ -1757,6 +1774,9 @@ func (c *Coordinator) runLoopIteration(ctx context.Context) {
 		c.setUpgradeDetails(upgradeDetails)
 
 	case c.heartbeatChan <- struct{}{}:
+
+	case <-c.hostInfoChanged:
+		c.processHostInfoChange(ctx)
 
 	case <-c.componentPIDTicker.C:
 		// if we hit the ticker and we've got a new PID,
@@ -2301,6 +2321,49 @@ func componentIDs(components []component.Component) []string {
 		ids[i] = comp.ID
 	}
 	return ids
+}
+
+// initHostname waits for the host information for up to timeout, and keeps its hostname, so the first fetch of the
+// host information isn't treated as a hostname change. If the host information takes longer, the first change is
+// treated as a hostname change.
+func (c *Coordinator) initHostname(ctx context.Context, timeout time.Duration) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-c.hostInfo.Synced():
+	case <-timer.C:
+		c.logger.Warnf("The host information wasn't available within %s", timeout)
+		return
+	case <-ctx.Done():
+		return
+	}
+	// Watch for changes before reading the hostname, so a change in between isn't missed.
+	c.hostInfoChanged = c.hostInfo.Changed()
+	// The host information has been fetched, so this doesn't fetch it again.
+	host, err := c.hostInfo.Get(ctx)
+	if err != nil {
+		c.logger.Warnf("Failed to get the host information: %v", err)
+		return
+	}
+	c.hostname, c.hostnameKnown = host.Hostname, true
+}
+
+// processHostInfoChange refreshes the component model when the hostname changes, so the OTel collector
+// configuration uses the new hostname immediately.
+func (c *Coordinator) processHostInfoChange(ctx context.Context) {
+	c.hostInfoChanged = c.hostInfo.Changed()
+	host, err := c.hostInfo.Get(ctx)
+	if err != nil {
+		c.logger.Warnf("Failed to get the host information: %v", err)
+		return
+	}
+	if c.hostnameKnown && host.Hostname == c.hostname {
+		return
+	}
+	c.hostname, c.hostnameKnown = host.Hostname, true
+	if err := c.refreshComponentModel(ctx); err != nil {
+		c.logger.Errorf("Error refreshing component model for hostname change: %v", err)
+	}
 }
 
 // applyOTelUpdate sends an update to the OTel manager.

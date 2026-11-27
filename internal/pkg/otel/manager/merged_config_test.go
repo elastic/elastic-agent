@@ -238,3 +238,45 @@ func BenchmarkBuildMergedConfig(b *testing.B) {
 		}
 	})
 }
+
+// TestBuildMergedConfigAgentMetadataProcessor verifies that the agent metadata processor is added to logs pipelines
+// from the collector config, but not to the pipelines of beat receivers, which set the agent metadata themselves.
+func TestBuildMergedConfigAgentMetadataProcessor(t *testing.T) {
+	pathstest.SetTop(t, t.TempDir())
+
+	m := &OTelManager{
+		healthCheckExtComponentID: "healthcheckv2/test",
+		hostInfo:                  testHostInfo,
+	}
+	cfgUpdate := configUpdate{
+		collectorCfg: confmap.NewFromStringMap(map[string]any{
+			"receivers": map[string]any{"nop": map[string]any{}},
+			"exporters": map[string]any{"nop": map[string]any{}},
+			"service": map[string]any{
+				"pipelines": map[string]any{
+					"logs/user": map[string]any{
+						"receivers": []any{"nop"},
+						"exporters": []any{"nop"},
+					},
+				},
+			},
+		}),
+		components: []component.Component{testComponent("test-component")},
+	}
+
+	result, err := m.buildMergedConfig(t.Context(), cfgUpdate, &info.AgentInfo{}, logp.NewNopLogger())
+	require.NoError(t, err)
+
+	pipelines, ok := result.Get("service::pipelines").(map[string]any)
+	require.True(t, ok)
+	require.Greater(t, len(pipelines), 1, "expected component pipelines in the merged config")
+	for id := range pipelines {
+		processors := fmt.Sprint(result.Get("service::pipelines::" + id + "::processors"))
+		if id == "logs/user" {
+			assert.Equal(t, fmt.Sprint([]any{agentMetadataProcessorID}), processors)
+		} else {
+			assert.NotContains(t, processors, agentMetadataProcessorID, "pipeline %s", id)
+		}
+	}
+	assert.True(t, result.IsSet("processors::"+agentMetadataProcessorID))
+}
