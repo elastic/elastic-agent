@@ -137,7 +137,7 @@ service:
       exporters: [debug, elasticsearch/otel]
 ```
 
-### Send data to Managed OTLP through a tail-sampling Gateway [tail-sampling-gateway]
+### Send tail-sampled data to Managed OTLP through a Gateway Collector [send-tail-sampled-data]
 
 Use this configuration to run tail-based sampling in your own environment and send the results to the [{{motlp}}](docs-content://reference/managed-inputs/managed-otlp-endpoint.md). Run it on a self-managed {{agent}} in [Gateway mode](../modes.md#edot-collector-as-gateway). OpenTelemetry SDKs and upstream Collectors send telemetry to the Gateway, which generates {{product.apm}} metrics, applies tail-based sampling, and exports the results to the {{motlp}}.
 
