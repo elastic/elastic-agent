@@ -19,7 +19,9 @@ if [ -z "$TEST_SUDO" ]; then
   exit 1
 fi
 
-if [ "$TEST_SUDO" == "true" ]; then
+# On macOS (Orka) the toolchain is installed for the build user and sudo keeps HOME/PATH, so there is
+# nothing to re-initialize and no /opt/buildkite-agent layout.
+if [ "$TEST_SUDO" == "true" ] && [ "$(uname -s)" != "Darwin" ]; then
   echo "Re-initializing ASDF. The user is changed to root..."
   export ASDF_DATA_DIR="/opt/buildkite-agent/.asdf"
   export PATH="$ASDF_DATA_DIR/bin:$ASDF_DATA_DIR/shims:$PATH"
@@ -28,7 +30,9 @@ if [ "$TEST_SUDO" == "true" ]; then
 fi
 
 # Make sure that all tools are installed
-retry 3 asdf install
+if [ "$(uname -s)" != "Darwin" ]; then
+  retry 3 asdf install
+fi
 
 echo "~~~ Running integration tests as $USER"
 
@@ -67,6 +71,10 @@ echo "~~~ Integration tests: ${GROUP_NAME}"
 GOTEST_OPTS="-test.shuffle on -test.timeout 2h0m0s"
 if [[ "${BUILDKITE_PULL_REQUEST:="false"}" != "false" ]]; then
   GOTEST_OPTS="${GOTEST_OPTS} -test.short"
+fi
+# Optional regexp of tests to skip (go test -skip), e.g. known failures of a platform
+if [[ -n "${GOTEST_SKIP:-}" ]]; then
+  GOTEST_OPTS="${GOTEST_OPTS} -test.skip ${GOTEST_SKIP}"
 fi
 GOTEST_ARGS=(-tags integration ${GOTEST_OPTS} "${TEST_PACKAGE}" -v -args "-integration.groups=${GROUP_NAME}" "-integration.sudo=${TEST_SUDO}" "-integration.fips=${FIPS:-false}")
 set +e
