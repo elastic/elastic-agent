@@ -71,7 +71,11 @@ The Gateway collectors pipelines differ between the two different deployment use
 
 ### Direct ingestion into {{es}} [direct-ingestion-into-elasticsearch]
 
-In self-managed {{stack}}, {{ece}}, and {{eck}} deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is being ingested directly into {{es}} using the [`elasticsearch`] exporter.
+In self-managed {{stack}}, {{ece}}, and {{eck}} deployment use cases, the main purpose of the Gateway Collector is the central enrichment of data before the OpenTelemetry data is ingested directly into {{es}}.
+
+{applies_to}`edot_collector: ga 9.6+` Metrics, including the pre-aggregated {{product.apm}} metrics that the `elasticapm` connector produces, go to the [{{es}} OTLP/HTTP endpoint](docs-content://manage-data/ingest/otlp-endpoint.md) on the `/_otlp` path through the `OTLP/HTTP` exporter. Logs and traces go through the [`elasticsearch`] exporter. For the exporter configuration and the API key privileges, refer to [Data export](/reference/edot-collector/config/default-config-standalone.md#data-export) in the standalone configuration.
+
+{applies_to}`edot_collector: ga 9.0-9.5` All signals go through the [`elasticsearch`] exporter.
 
 The Gateway Collector configuration comprises the pipelines for data enrichment of [application telemetry](/reference/edot-collector/config/default-config-standalone.md#application-and-traces-collection-pipeline) and [host metrics](/reference/edot-collector/config/default-config-standalone.md#host-metrics-collection-pipeline). For more details, refer to the linked descriptions of the corresponding standalone use cases.
 
