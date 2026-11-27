@@ -60,6 +60,19 @@ proxied_actions:
   - MIGRATE
 ```
 
+### `ack_action_data.fields` (list of strings)
+
+By default, when the agent acknowledges an `INPUT_ACTION` for this input it copies the action's `data` into the action result stored by Fleet. Inputs whose action data carries credentials (for example request headers) can restrict the copy to the listed top-level fields; every other field is dropped. An empty list drops all action data. The restriction applies to every ack for this input type, including acks for actions that fail before reaching the component.
+
+Example for the workflow runner spec:
+```
+ack_action_data:
+  fields:
+    - space_id
+    - execution_id
+    - step_id
+```
+
 ### `runtime.preventions`
 
 The `runtime.preventions` field contains a list of [EQL conditions](https://www.elastic.co/guide/en/elasticsearch/reference/current/eql-syntax.html#eql-syntax-conditions) which should prevent the use of this input if any are true. Each prevention should include a `condition` in EQL syntax and a `message` that will be displayed if the condition prevents the use of a component.

@@ -28,6 +28,15 @@ type InputSpec struct {
 	// (e.g. osqueryd) cannot tolerate multiple independently-launched receiver instances sharing
 	// the same working directory.
 	SingleReceiver bool `config:"single_receiver,omitempty" yaml:"single_receiver,omitempty"`
+	// AckActionData limits the INPUT_ACTION data the agent echoes back in action acks.
+	// When unset, the full action data is echoed.
+	AckActionData *AckActionDataSpec `config:"ack_action_data,omitempty" yaml:"ack_action_data,omitempty"`
+}
+
+// AckActionDataSpec lists the top-level action data fields that are safe to
+// store in Fleet action results. All other fields are dropped from the ack.
+type AckActionDataSpec struct {
+	Fields []string `config:"fields" yaml:"fields"`
 }
 
 // Validate ensures correctness of input specification.
