@@ -28,7 +28,7 @@ Follow these steps to migrate your existing {{agent}} configuration.
 :::::{stepper}
 
 ::::{step} Download the latest default configuration
-Download the configuration sample that matches your use case from the [default configuration samples](/reference/edot-collector/config/default-config-standalone.md#agent-mode). For Gateway mode, refer to the [Gateway mode section](/reference/edot-collector/config/default-config-standalone.md#gateway-mode).
+Download the configuration sample that matches your use case from the [default configuration samples](/reference/edot-collector/config/default-config-standalone.md#agent-mode). For a gateway, refer to the [Gateway section](/reference/edot-collector/config/default-config-standalone.md#gateway-mode).
 
 The latest configurations for {{stack}} 9.x use the latest components instead of the deprecated ones.
 ::::

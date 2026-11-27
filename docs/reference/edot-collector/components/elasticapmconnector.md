@@ -23,11 +23,11 @@ The `elasticapm` connector is included by default in {{agent}} deployments that 
 
 ### Standalone deployments
 
-In standalone deployments, the Elastic {{product.apm}} connector is used in both agent and gateway modes:
+In standalone deployments, the Elastic {{product.apm}} connector is used in both edge collectors and gateways:
 
-* **Agent mode**: The connector is part of the default [application and traces collection pipeline](../config/default-config-standalone.md#application-and-traces-collection-pipeline). It receives trace data from the pipeline, generates metrics, and forwards them to {{es}}.
+* **Edge collector**: The connector is part of the default [application and traces collection pipeline](../config/default-config-standalone.md#application-and-traces-collection-pipeline). It receives trace data from the pipeline, generates metrics, and forwards them to {{es}}.
 
-* **Gateway mode**: The connector is part of the [Gateway mode pipeline](../config/default-config-standalone.md#gateway-mode), where it generates metrics from traces received from other collectors running in agent mode before ingesting them into {{es}}.
+* **Gateway**: The connector is part of the [gateway pipeline](../config/default-config-standalone.md#gateway-mode), where it generates metrics from traces received from edge collectors before ingesting them into {{es}}.
 
 
 ### Kubernetes deployment
