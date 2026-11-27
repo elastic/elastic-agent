@@ -4417,7 +4417,7 @@ func getAgentBuildTargets(cfg *devtools.Settings) []interface{} {
 	return buildTargets
 }
 
-// loadReleaseConfig loads mage Settings and requires CURRENT_RELEASE for workflows.
+// loadReleaseConfig loads mage Settings and requires NEXT_RELEASE for workflows.
 func loadReleaseConfig() (*release.ReleaseConfig, error) {
 	settings, err := devtools.LoadSettings()
 	if err != nil {
@@ -4471,7 +4471,7 @@ func (Release) RunPatch() error {
 }
 
 // EnsureIssueTracker creates or updates the Elastic Agent release checklist issue for
-// CURRENT_RELEASE, linking related Elastic Agent PRs labeled "release".
+// NEXT_RELEASE, linking related Elastic Agent PRs labeled "release".
 func (Release) EnsureIssueTracker() error {
 	cfg, err := loadReleaseConfig()
 	if err != nil {
