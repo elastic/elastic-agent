@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/elastic/elastic-agent/internal/pkg/config"
 	"github.com/elastic/elastic-agent/pkg/core/logger"
@@ -31,6 +32,13 @@ type DynamicProviderComm interface {
 type DynamicProvider interface {
 	// Run runs the inventory provider.
 	Run(DynamicProviderComm) error
+}
+
+// RetryIntervalSetter receives agent.providers.restart_interval.
+// A provider implements it when it retries inside Run instead of returning
+// and letting the controller restart it.
+type RetryIntervalSetter interface {
+	SetRetryInterval(time.Duration)
 }
 
 // DynamicProviderBuilder creates a new dynamic provider based on the given config and returns it.

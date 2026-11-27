@@ -543,6 +543,10 @@ func (c *controller) startDynamicProvider(ctx context.Context, wg *sync.WaitGrou
 				}
 				continue
 			}
+			// Providers that retry inside Run keep the configured restart interval.
+			if setter, ok := provider.(RetryIntervalSetter); ok {
+				setter.SetRetryInterval(c.restartInterval)
+			}
 
 			err = provider.Run(state)
 			closeProvider(l, name, provider)

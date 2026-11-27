@@ -528,6 +528,77 @@ func TestDefaultProvider(t *testing.T) {
 	})
 }
 
+func TestDynamicProviderReceivesRestartInterval(t *testing.T) {
+	const want = 45 * time.Second
+	got := make(chan time.Duration, 1)
+	providers := composable.NewProviderRegistry()
+	providers.MustAddDynamicProvider("docker_retry", func(_ *logger.Logger, _ *config.Config, _ bool) (composable.DynamicProvider, error) {
+		return &intervalProvider{got: got}, nil
+	})
+
+	cfg, err := config.NewConfigFrom(map[string]interface{}{
+		"agent.providers.restart_interval": want.String(),
+	})
+	require.NoError(t, err)
+	log, err := logger.New("", false)
+	require.NoError(t, err)
+	c, err := composable.NewWithProviders(log, cfg, false, providers)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- c.Run(ctx)
+	}()
+
+	select {
+	case <-ctx.Done():
+		t.Fatal("controller did not publish the initial variable state")
+	case <-c.Watch():
+	}
+
+	observeErr := make(chan error, 1)
+	go func() {
+		_, err := c.Observe(ctx, []string{"docker_retry.vars.key"})
+		observeErr <- err
+	}()
+
+	select {
+	case <-ctx.Done():
+		t.Fatal("provider was not given the configured restart interval")
+	case d := <-got:
+		assert.Equal(t, want, d)
+	}
+
+	cancel()
+	err = <-errCh
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
+	require.NoError(t, err)
+	err = <-observeErr
+	if errors.Is(err, context.Canceled) {
+		err = nil
+	}
+	require.NoError(t, err)
+}
+
+type intervalProvider struct {
+	got chan time.Duration
+}
+
+func (p *intervalProvider) SetRetryInterval(d time.Duration) {
+	p.got <- d
+}
+
+func (p *intervalProvider) Run(comm composable.DynamicProviderComm) error {
+	<-comm.Done()
+	return comm.Err()
+}
+
+var _ composable.RetryIntervalSetter = (*intervalProvider)(nil)
+
 type customFetchProvider struct{}
 
 func (c *customFetchProvider) Run(ctx context.Context, comm corecomp.ContextProviderComm) error {
