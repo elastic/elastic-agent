@@ -21,6 +21,7 @@ require (
 	github.com/aws/smithy-go v1.28.9
 	github.com/elastic/beats/v7 v7.0.0-alpha2.0.20261126075940-3a323f16630d
 	github.com/elastic/elastic-agent v0.0.0-00010101000000-000000000000
+	github.com/elastic/elastic-agent-client/v7 v7.20.0
 	github.com/elastic/mock-es v0.0.0-20260210135402-3276c233eeeb
 	github.com/elastic/opentelemetry-collector-components/connector/elasticapmconnector v0.81.0
 	github.com/elastic/opentelemetry-collector-components/connector/profilingmetricsconnector v0.81.0
@@ -113,6 +114,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
+	go.opentelemetry.io/collector/client v1.71.0
 	go.opentelemetry.io/collector/component v1.71.0
 	go.opentelemetry.io/collector/component/componentstatus v0.165.0
 	go.opentelemetry.io/collector/component/componenttest v0.165.0
@@ -141,6 +143,7 @@ require (
 	go.opentelemetry.io/collector/processor v1.71.0
 	go.opentelemetry.io/collector/processor/batchprocessor v0.165.0
 	go.opentelemetry.io/collector/processor/memorylimiterprocessor v0.165.0
+	go.opentelemetry.io/collector/processor/processortest v0.165.0
 	go.opentelemetry.io/collector/receiver v1.71.0
 	go.opentelemetry.io/collector/receiver/nopreceiver v0.165.0
 	go.opentelemetry.io/collector/receiver/otlpreceiver v0.165.0
@@ -330,7 +333,6 @@ require (
 	github.com/edsrzf/mmap-go v1.2.1-0.20241212181136-fad1cd13edbd // indirect
 	github.com/elastic/apm-data v1.23.0 // indirect
 	github.com/elastic/bayeux v1.0.5 // indirect
-	github.com/elastic/elastic-agent-client/v7 v7.20.0 // indirect
 	github.com/elastic/elastic-agent-libs v0.47.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.11.0 // indirect
 	github.com/elastic/entcollect v0.0.0-20261113091743-3520586d133a // indirect
@@ -693,7 +695,6 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.9.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/collector/client v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configauth v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configcompression v1.71.0 // indirect
 	go.opentelemetry.io/collector/config/configgrpc v1.71.0 // indirect
@@ -732,7 +733,6 @@ require (
 	go.opentelemetry.io/collector/pipeline/xpipeline v0.165.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper v0.165.0 // indirect
 	go.opentelemetry.io/collector/processor/processorhelper/xprocessorhelper v0.165.0 // indirect
-	go.opentelemetry.io/collector/processor/processortest v0.165.0 // indirect
 	go.opentelemetry.io/collector/processor/xprocessor v0.165.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper v0.165.0 // indirect
 	go.opentelemetry.io/collector/receiver/receiverhelper/xreceiverhelper v0.165.0 // indirect
