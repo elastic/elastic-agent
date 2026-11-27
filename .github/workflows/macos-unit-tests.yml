@@ -27,7 +27,9 @@ jobs:
         mage_target: ["test:unit", "test:unitEdot"]
     name: macos-unit-tests (${{ matrix.os }}, ${{ matrix.mage_target }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    # A cold Go cache on the macOS runners can push these jobs past 60 minutes.
+    # See https://github.com/elastic/observability-robots/issues/5374.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
         with:
