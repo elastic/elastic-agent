@@ -609,13 +609,14 @@ func PackageZip(spec PackageSpec) error {
 	w := zip.NewWriter(buf)
 	baseDir := spec.rootDir()
 
-	// Add files to zip (dirs before files so explicit entries take precedence).
-	for _, pkgFile := range dirsFirst(spec.Files) {
+	orderedFiles := dirsFirst(spec.Files)
+	entries := newArchiveEntries(baseDir, orderedFiles)
+	for _, pkgFile := range orderedFiles {
 		if pkgFile.Symlink {
 			// not supported on zip archives
 			continue
 		}
-		if err := addFileToZip(w, baseDir, pkgFile); err != nil {
+		if err := addFileToZip(w, baseDir, pkgFile, entries); err != nil {
 			p, _ := filepath.Abs(pkgFile.Source)
 			return fmt.Errorf("failed adding file=%+v to zip: %w", p, err)
 		}
@@ -709,12 +710,13 @@ func PackageTarGz(spec PackageSpec) error {
 	// future Docker-only component is also excluded without a code change.
 	excludedFromTar := componentFilesNotSupportingPackageType(spec.Components, pkgcommon.TarGz)
 
-	// Add files to tar (dirs before files so explicit entries take precedence).
-	for _, pkgFile := range dirsFirst(spec.Files) {
+	orderedFiles := dirsFirst(spec.Files)
+	entries := newArchiveEntries(baseDir, orderedFiles)
+	for _, pkgFile := range orderedFiles {
 		if pkgFile.Symlink {
 			continue
 		}
-		if err := addFileToTar(w, baseDir, pkgFile, excludedFromTar); err != nil {
+		if err := addFileToTar(w, baseDir, pkgFile, excludedFromTar, entries); err != nil {
 			return fmt.Errorf("failed adding file=%+v to tar: %w", pkgFile, err)
 		}
 	}
@@ -907,25 +909,26 @@ func addUIDGidEnvArgs(args []string) ([]string, error) {
 }
 
 // dirsFirst returns files with directory-source entries (paths ending in "/")
-// before regular-file entries, so explicit files always overwrite any
-// conflicting path laid down by a directory expansion.
+// before regular-file entries. Within each group files are ordered by target so
+// the order in which mappings are written does not depend on map iteration.
 func dirsFirst(files map[string]PackageFile) []PackageFile {
-	out := make([]PackageFile, 0, len(files))
+	var dirs, regular []PackageFile
 	for _, f := range files {
 		if strings.HasSuffix(f.Source, "/") {
-			out = append(out, f)
+			dirs = append(dirs, f)
+		} else {
+			regular = append(regular, f)
 		}
 	}
-	for _, f := range files {
-		if !strings.HasSuffix(f.Source, "/") {
-			out = append(out, f)
-		}
-	}
-	return out
+	byTarget := func(a, b PackageFile) int { return strings.Compare(a.Target, b.Target) }
+	slices.SortFunc(dirs, byTarget)
+	slices.SortFunc(regular, byTarget)
+	return append(dirs, regular...)
 }
 
 // addFileToZip adds a file (or directory) to a zip archive.
-func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
+// entries drops files already written or provided by an explicit mapping.
+func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile, entries *archiveEntries) error {
 	return filepath.Walk(pkgFile.Source, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
@@ -953,16 +956,15 @@ func addFileToZip(ar *zip.Writer, baseDir string, pkgFile PackageFile) error {
 			header.SetMode(0755)
 		}
 
-		if filepath.IsAbs(pkgFile.Target) {
-			baseDir = ""
-		}
-
 		relPath, err := filepath.Rel(pkgFile.Source, path)
 		if err != nil {
 			return err
 		}
 
-		header.Name = filepath.Join(baseDir, pkgFile.Target, relPath)
+		header.Name = archiveEntryName(baseDir, pkgFile, relPath)
+		if entries.skip(header.Name, relPath) {
+			return nil
+		}
 
 		if info.IsDir() {
 			header.Name += string(filepath.Separator)
@@ -1009,9 +1011,64 @@ func componentFilesNotSupportingPackageType(components []packaging.BinarySpec, p
 	return excluded
 }
 
+// archiveEntryName returns the archive entry name for the file found at
+// relPath (relative to the mapping source) of the given mapping.
+func archiveEntryName(baseDir string, pkgFile PackageFile, relPath string) string {
+	if filepath.IsAbs(pkgFile.Target) {
+		baseDir = ""
+	}
+	return filepath.Join(baseDir, pkgFile.Target, relPath)
+}
+
+// archiveEntries makes sure every entry name is written once to an archive,
+// as extractors such as Gradle's tarTree or `tar --keep-old-files` reject
+// duplicates. An explicit single-file mapping wins over the same file found
+// while walking a directory mapping. For any other repeated name the first
+// mapping in dirsFirst order wins: mappings with a trailing slash source come
+// before the others, then mappings are ordered by target.
+type archiveEntries struct {
+	explicit map[string]struct{}
+	written  map[string]struct{}
+}
+
+// newArchiveEntries records the entry names of the mappings in files whose
+// source is a single existing file.
+func newArchiveEntries(baseDir string, files []PackageFile) *archiveEntries {
+	e := &archiveEntries{
+		explicit: map[string]struct{}{},
+		written:  map[string]struct{}{},
+	}
+	for _, pkgFile := range files {
+		if pkgFile.Symlink || pkgFile.Source == "" {
+			continue
+		}
+		if info, err := os.Stat(pkgFile.Source); err != nil || info.IsDir() {
+			continue
+		}
+		e.explicit[archiveEntryName(baseDir, pkgFile, ".")] = struct{}{}
+	}
+	return e
+}
+
+// skip reports whether the entry called name, found at relPath while walking a
+// mapping, must not be written. Otherwise it records name as written. The root
+// of a mapping (relPath ".") is never replaced by an explicit mapping, so an
+// explicit mapping does not skip itself.
+func (e *archiveEntries) skip(name, relPath string) bool {
+	if _, ok := e.explicit[name]; ok && relPath != "." {
+		return true
+	}
+	if _, ok := e.written[name]; ok {
+		return true
+	}
+	e.written[name] = struct{}{}
+	return false
+}
+
 // addFileToTar adds a file (or directory) to a tar archive.
 // excludedFiles is a list of base filenames (not paths) to skip during the walk.
-func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile, excludedFiles []string) error {
+// entries drops files already written or provided by an explicit mapping.
+func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile, excludedFiles []string, entries *archiveEntries) error {
 	return filepath.WalkDir(pkgFile.Source, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if pkgFile.SkipOnMissing && os.IsNotExist(err) {
@@ -1053,16 +1110,15 @@ func addFileToTar(ar *tar.Writer, baseDir string, pkgFile PackageFile, excludedF
 			header.Mode = int64(0755)
 		}
 
-		if filepath.IsAbs(pkgFile.Target) {
-			baseDir = ""
-		}
-
 		relPath, err := filepath.Rel(pkgFile.Source, path)
 		if err != nil {
 			return err
 		}
 
-		header.Name = filepath.Join(baseDir, pkgFile.Target, relPath)
+		header.Name = archiveEntryName(baseDir, pkgFile, relPath)
+		if entries.skip(header.Name, relPath) {
+			return nil
+		}
 		if info.IsDir() {
 			header.Name += string(filepath.Separator)
 		}
