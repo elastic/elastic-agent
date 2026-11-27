@@ -19,6 +19,7 @@ import (
 	koanfmaps "github.com/knadh/koanf/maps"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/client"
+	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
 
 	"github.com/elastic/beats/v7/pkg/logp"
 
@@ -963,6 +964,10 @@ func getInputsForUnit(unit component.Unit, defaultDataStreamType string, comp *c
 		result = keepScheduledMonitors(result)
 	}
 
+	if strings.HasPrefix(comp.InputType, "synthetics/") {
+		result = useInputIDForMonitorsWithoutOrigin(result, unit.Config)
+	}
+
 	if comp.InputSpec != nil && comp.InputSpec.Spec.SingleReceiver && comp.InputType == "osquery" {
 		result = injectOsqueryConfig(result, unit)
 	}
@@ -988,6 +993,21 @@ func keepScheduledMonitors(inputs []receiverInput) []receiverInput {
 		return inputs
 	}
 	return scheduled
+}
+
+// useInputIDForMonitorsWithoutOrigin sets the input id as the monitor id for
+// monitors without an "origin" (created from the Fleet integration), as classic
+// heartbeat does in stdfields.UnnestStream.
+func useInputIDForMonitorsWithoutOrigin(inputs []receiverInput, cfg *proto.UnitExpectedConfig) []receiverInput {
+	inputID := cfg.GetId()
+	if inputID == "" || len(inputs) != 1 {
+		return inputs
+	}
+	if origin, _ := inputs[0].config["origin"].(string); origin != "" {
+		return inputs
+	}
+	inputs[0].config["id"] = inputID
+	return inputs
 }
 
 // stripDefaultProcessors removes per-input processor entries that exactly match
