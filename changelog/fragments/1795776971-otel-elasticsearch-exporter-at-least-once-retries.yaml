@@ -17,7 +17,8 @@ impact: |
   which can produce duplicate documents.
 
 action: |
-  To keep the previous behavior, set both `retry::retry_on_status` and `retry::retry_on_document_status` to `[429]`.
+  To restore the earlier status code defaults, set both `retry::retry_on_status` and `retry::retry_on_document_status` to `[429]`.
+  This doesn't stop retries on HTTP client timeouts, which are always retried.
   If you set `retry::retry_on_status` without `retry::retry_on_document_status`, also set
   `retry::retry_on_document_status` to the same list.
 
