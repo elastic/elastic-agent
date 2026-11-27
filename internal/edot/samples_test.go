@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/featuregate"
 	"go.opentelemetry.io/collector/otelcol"
 	"go.uber.org/zap"
@@ -51,6 +52,12 @@ func TestSamples(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestManagedOTLPTBSSample(t *testing.T) {
+	t.Setenv("ELASTIC_OTLP_ENDPOINT", "http://localhost:4318")
+	t.Setenv("ELASTIC_API_KEY", "test_api_key")
+	testSample(t, filepath.Join(".", "samples", "linux", "managed_otlp", "tbs_gateway.yml"))
+}
+
 func testSample(t *testing.T, configFile string) {
 	settings := edotOtelCol.NewSettings("test", []string{configFile}, edotOtelCol.WithComponents(components.Default()))
 	settings.LoggingOptions = []zap.Option{zap.WrapCore(func(zapcore.Core) zapcore.Core {
@@ -58,8 +65,8 @@ func testSample(t *testing.T, configFile string) {
 		return zapcore.NewNopCore()
 	})}
 	collector, err := otelcol.NewCollector(*settings)
-	assert.NoError(t, err)
-	assert.NotNil(t, collector)
-	assert.NoError(t, collector.DryRun(t.Context()))
+	require.NoError(t, err)
+	require.NotNil(t, collector)
+	require.NoError(t, collector.DryRun(t.Context()))
 	collector.Shutdown()
 }
