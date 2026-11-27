@@ -33,6 +33,7 @@ require (
 	github.com/elastic/opentelemetry-collector-components/processor/ratelimitprocessor v0.81.0
 	github.com/elastic/opentelemetry-collector-components/receiver/akamaisiemreceiver v0.1.0
 	github.com/elastic/opentelemetry-collector-components/receiver/elasticapmintakereceiver v0.81.0
+	github.com/elastic/opentelemetry-collector-components/receiver/prometheusremotewritev1receiver v0.81.0
 	github.com/elastic/opentelemetry-collector-components/receiver/prometheusscrapereceiver v0.78.0
 	github.com/gofrs/uuid/v5 v5.5.1
 	github.com/google/go-cmp v0.7.0

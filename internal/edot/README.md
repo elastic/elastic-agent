@@ -68,6 +68,7 @@ This section provides a summary of components included in the Elastic Distributi
 | [profiling](https://github.com/open-telemetry/opentelemetry-ebpf-profiler/blob/v0.0.202640/README.md) | v0.0.202640 |
 | [prometheusreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusreceiver/v0.165.1/receiver/prometheusreceiver/README.md) | v0.165.1 |
 | [prometheusremotewritereceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/prometheusremotewritereceiver/v0.165.1/receiver/prometheusremotewritereceiver/README.md) | v0.165.1 |
+| [prometheusremotewritev1receiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/prometheusremotewritev1receiver/v0.81.0/receiver/prometheusremotewritev1receiver/README.md) | v0.81.0 |
 | [prometheusscrapereceiver](https://github.com/elastic/opentelemetry-collector-components/blob/receiver/prometheusscrapereceiver/v0.78.0/receiver/prometheusscrapereceiver/README.md) | v0.78.0 |
 | [rabbitmqreceiver](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/rabbitmqreceiver/v0.165.1/receiver/rabbitmqreceiver/README.md) | v0.165.1 |
 | [receivercreator](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/receiver/receivercreator/v0.165.1/receiver/receivercreator/README.md) | v0.165.1 |
