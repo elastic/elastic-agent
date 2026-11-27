@@ -287,8 +287,10 @@ The {{es}} exporter uses the [{{es}} Bulk API](https://www.elastic.co/docs/api/d
 | `retry::max_retries` | `2` | Number of HTTP request retries. To turn off retries, set `retry::enabled` to `false` instead of setting `max_retries` to `0`. |
 | `retry::initial_interval` | `100ms` | Initial waiting time if an HTTP request failed. |
 | `retry::max_interval` | `1m` | Max waiting time if an HTTP request failed. |
-| `retry::retry_on_status` | `[429]` | Status codes that trigger request-level retries. To avoid duplicates, it defaults to `[429]`. |
-| `retry::retry_on_document_status` | `retry::retry_on_status` | Status codes that trigger retries for failed documents in a successful bulk HTTP response. If unset, uses `retry::retry_on_status`. |
+| `retry::retry_on_status` | `[400, 401, 403, 404, 409, 429, 500, 502, 503, 504]` | Status codes that trigger request-level retries. In versions earlier than 9.5.8 and 9.6.1, the default is `[429]`. |
+| `retry::retry_on_document_status` | `[429, 500, 502, 503, 504]` | Status codes that trigger retries for failed documents in a successful bulk HTTP response. In versions earlier than 9.5.8 and 9.6.1, it defaults to the value of `retry::retry_on_status`. |
+
+{applies_to}`stack: ga 9.5.8` The exporter defaults to at-least-once delivery: besides the status codes above, it retries requests that fail with a transport error or an HTTP client timeout. Timeouts are always retried. Retries can produce duplicate documents. To restore the previous defaults, set both `retry::retry_on_status` and `retry::retry_on_document_status` to `[429]`. If you set `retry::retry_on_status` and relied on `retry::retry_on_document_status` following it, set `retry::retry_on_document_status` to the same list.
 
 When Elastic Agent translates an Elasticsearch output for the OTel runtime, request-level retries include every `3xx` through `5xx` status except `413`, matching Beats Elasticsearch output behavior. Document-level retries include `429` and `5xx` statuses, so document-level authorization failures do not block unrelated documents.
 
