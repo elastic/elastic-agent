@@ -2,7 +2,7 @@
 navigation_title: Prometheus remote write v1 receiver
 description: The Prometheus remote write v1 receiver is an OpenTelemetry Collector component that receives metrics from Prometheus using the remote write 1.0 protocol.
 applies_to:
-  stack: ga 9.7
+  stack: ga 9.6
   serverless:
     observability: ga
 products:
@@ -36,7 +36,7 @@ remote_write:
   - url: "http://<collector-host>:9090/api/v1/write"
 ```
 
-Replace `<collector-host>` with the address where the EDOT Collector is running.
+Replace `<collector-host>` with the address where the collector is running.
 
 ## Configuration
 

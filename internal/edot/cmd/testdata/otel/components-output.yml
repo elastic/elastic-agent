@@ -66,7 +66,7 @@ receivers:
   - name: prometheusremotewritev1
     stability:
       logs: Undefined
-      metrics: Development
+      metrics: Beta
       traces: Undefined
   - name: zipkin
     stability:
