@@ -690,14 +690,14 @@ instrumentation:
   java:
     image: docker.elastic.co/observability/elastic-otel-javaagent:1.14.0
   nodejs:
-    image: docker.elastic.co/observability/elastic-otel-node:1.20.1
+    image: docker.elastic.co/observability/elastic-otel-node:1.20.2
   dotnet:
-    image: docker.elastic.co/observability/elastic-otel-dotnet:1.7.0
+    image: docker.elastic.co/observability/elastic-otel-dotnet:1.8.0
     env:
       # The operator does not load the EDOT .NET plugin by default; without it only upstream OpenTelemetry .NET behaviour applies.
       - name: OTEL_DOTNET_AUTO_PLUGINS
         value: "Elastic.OpenTelemetry.AutoInstrumentationPlugin, Elastic.OpenTelemetry.AutoInstrumentation"
   python:
-    image: docker.elastic.co/observability/elastic-otel-python:1.19.0
+    image: docker.elastic.co/observability/elastic-otel-python:1.19.1
   go:
-    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.24.0
+    image: ghcr.io/open-telemetry/opentelemetry-go-instrumentation/autoinstrumentation-go:v0.25.0
