@@ -159,6 +159,17 @@ func countSkipLogs(logs string) (info int, debug int) {
 	return info, debug
 }
 
+func TestSetRetryIntervalOverridesDefault(t *testing.T) {
+	provider := &dynamicProvider{connectRetry: connectRetryInterval}
+	require.Equal(t, connectRetryInterval, provider.retryInterval())
+
+	provider.SetRetryInterval(5 * time.Millisecond)
+	require.Equal(t, 5*time.Millisecond, provider.retryInterval())
+
+	provider.SetRetryInterval(0)
+	require.Equal(t, 5*time.Millisecond, provider.retryInterval())
+}
+
 func TestGenerateData(t *testing.T) {
 	container := &docker.Container{
 		ID:    "abc",

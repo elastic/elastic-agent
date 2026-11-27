@@ -13,7 +13,7 @@ kind: bug-fix
 
 # REQUIRED for all kinds
 # Change summary; a 80ish characters long description of the change.
-summary: Log a missing Docker daemon once instead of an error every 30 seconds
+summary: Log a missing Docker daemon once and retry on the configured restart interval
 
 # REQUIRED for breaking-change, deprecation, known-issue
 # Long description; in case the summary is not enough to describe the change

@@ -22,9 +22,10 @@ import (
 // ContainerPriority is the priority that container mappings are added to the provider.
 const ContainerPriority = 0
 
-// connectRetryInterval is how long Run waits before dialing Docker again after a
-// connect failure. It matches composable.defaultRetryInterval. The retry stays
-// inside Run so the controller does not log a provider crash every interval.
+// connectRetryInterval is the fallback wait between Docker dials when
+// agent.providers.restart_interval is unset. It matches the controller default.
+// The retry stays inside Run so the controller does not log a provider crash
+// every interval. The controller replaces this value through RetryIntervalSetter.
 const connectRetryInterval = 30 * time.Second
 
 // watcherFactory opens a Docker watcher. Tests replace it to simulate a missing daemon.
@@ -105,6 +106,13 @@ func (c *dynamicProvider) retryInterval() time.Duration {
 		return c.connectRetry
 	}
 	return connectRetryInterval
+}
+
+// SetRetryInterval applies agent.providers.restart_interval to later connect retries.
+func (c *dynamicProvider) SetRetryInterval(d time.Duration) {
+	if d > 0 {
+		c.connectRetry = d
+	}
 }
 
 func (c *dynamicProvider) watch(comm composable.DynamicProviderComm, watcher docker.Watcher, startListener bus.Listener, stopListener bus.Listener) error {
