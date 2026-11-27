@@ -3005,8 +3005,10 @@ agent.grpc:
 }
 
 // TestOtelElasticsearchStorageWithElasticsearchAuth verifies that the
-// elasticsearch_storage extension persists the cel input state in
-// Elasticsearch when authenticating through the elasticsearchauth extension.
+// elasticsearch_storage extension persists the cel input state through the
+// elasticsearchauth extension rather than the output's beatsauth extension.
+// The output points at mock-es and only elasticsearchauth points at the real
+// Elasticsearch, so the state can only reach it through elasticsearchauth.
 func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
 	info := define.Require(t, define.Requirements{
 		Group: integration.Default,
@@ -3022,8 +3024,10 @@ func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
 	esEndpoint, err := integration.GetESHost()
 	require.NoError(t, err, "error getting elasticsearch endpoint")
 	esApiKey := createESApiKey(t, info.ESClient)
+	decodedApiKey, err := getDecodedApiKey(esApiKey)
+	require.NoError(t, err)
 
-	// Unique input ID: it names the agentless-state-<id> index, so concurrent
+	// Unique stream ID: it names the agentless-state-<id> index, so concurrent
 	// runs against the same stack do not observe each other's state.
 	inputID := "cel-esauth-" + strings.ReplaceAll(uuid.Must(uuid.NewV4()).String(), "-", "")
 	stateIndex := "agentless-state-" + inputID
@@ -3049,81 +3053,76 @@ func TestOtelElasticsearchStorageWithElasticsearchAuth(t *testing.T) {
 	fixture, err := define.NewFixtureFromLocalBuild(t, define.Version())
 	require.NoError(t, err)
 
-	type otelConfigOptions struct {
-		ESEndpoint string
-		ESApiKey   string
-		InputID    string
-		PathHome   string
+	// The storage extension takes its endpoints from its authenticator, so if it used
+	// the output's beatsauth the state would be sent to mock-es instead.
+	mockESURL := integration.StartMockES(t, 0, 0, 0, 0).String()
+
+	type configOptions struct {
+		ESEndpoint       string
+		OutputEndpoint   string
+		ESApiKey         string
+		ESAuthEncodedKey string
+		InputID          string
 	}
 
-	otelConfigTemplate := `
+	// The agent generates the elasticsearch_storage extension for the cel input and has to
+	// point it at the elasticsearchauth extension of the policy instead of the output's beatsauth.
+	configTemplate := `
+agent.internal.runtime.filebeat.cel: otel
+agent.monitoring.enabled: false
+agent.grpc.port: 0
+inputs:
+  - type: cel
+    id: cel-esauth
+    use_output: default
+    streams:
+      - id: {{.InputID}}
+        data_stream:
+          dataset: cel_esauth
+        interval: 1s
+        resource.url: http://unused.invalid
+        state:
+          cursor:
+            sequence: 0
+        program: |
+          {
+            "events": [{
+              "message": "cel-state-test",
+              "sequence": state.cursor.sequence
+            }],
+            "cursor": {
+              "sequence": int(state.cursor.sequence) + 1
+            }
+          }
+outputs:
+  default:
+    type: elasticsearch
+    hosts: [{{.OutputEndpoint}}]
+    api_key: "{{.ESApiKey}}"
+    preset: latency
 extensions:
   elasticsearchauth/state:
     endpoints:
       - {{.ESEndpoint}}
-    api_key: {{.ESApiKey}}
-  elasticsearch_storage:
-    auth:
-      authenticator: elasticsearchauth/state
-receivers:
-  filebeatreceiver:
-    filebeat:
-      inputs:
-        - type: cel
-          id: {{.InputID}}
-          enabled: true
-          interval: 1s
-          resource.url: http://unused.invalid
-          state:
-            cursor:
-              sequence: 0
-          program: |
-            {
-              "events": [{
-                "message": "cel-state-test",
-                "sequence": state.cursor.sequence
-              }],
-              "cursor": {
-                "sequence": int(state.cursor.sequence) + 1
-              }
-            }
-    queue.mem.flush.timeout: 0s
-    setup.template.enabled: false
-    storage: elasticsearch_storage
-    path.home: {{.PathHome}}
-exporters:
-  debug:
-service:
-  extensions:
-    - elasticsearchauth/state
-    - elasticsearch_storage
-  pipelines:
-    logs:
-      receivers:
-        - filebeatreceiver
-      exporters:
-        - debug
-  telemetry:
-    metrics:
-      level: none
-agent.grpc.port: 0
+    api_key: {{.ESAuthEncodedKey}}
 `
-	var otelConfigBuffer bytes.Buffer
+	var configBuffer bytes.Buffer
 
 	ctx, cancel := testcontext.WithDeadline(t, t.Context(), time.Now().Add(5*time.Minute))
 	defer cancel()
 	require.NoError(t, fixture.Prepare(ctx))
 
 	require.NoError(t,
-		template.Must(template.New("otelConfig").Parse(otelConfigTemplate)).Execute(&otelConfigBuffer,
-			otelConfigOptions{
-				ESEndpoint: esEndpoint,
-				ESApiKey:   esApiKey.Encoded,
-				InputID:    inputID,
-				PathHome:   fixture.WorkDir(),
+		template.Must(template.New("config").Parse(configTemplate)).Execute(&configBuffer,
+			configOptions{
+				ESEndpoint:       esEndpoint,
+				OutputEndpoint:   mockESURL,
+				ESApiKey:         decodedApiKey,
+				ESAuthEncodedKey: esApiKey.Encoded,
+				InputID:          inputID,
 			}))
 
-	require.NoError(t, fixture.Configure(ctx, otelConfigBuffer.Bytes()))
+	require.NoError(t, fixture.Configure(ctx, configBuffer.Bytes()))
 
 	cmd, err := fixture.PrepareAgentCommand(ctx, nil)
 	require.NoError(t, err, "cannot prepare Elastic-Agent command")
@@ -3153,8 +3152,8 @@ agent.grpc.port: 0
 		return true
 	}, 1*time.Minute, 1*time.Second, "agent did not become healthy")
 
-	// Wait for the CEL input's incremented cursor to be persisted in
-	// Elasticsearch through the elasticsearchauth authenticator.
+	// Only elasticsearchauth/state points at this Elasticsearch, so finding the
+	// incremented cursor here proves the storage extension authenticated through it.
 	require.EventuallyWithT(t,
 		func(ct *assert.CollectT) {
 			findCtx, findCancel := context.WithTimeout(ctx, 10*time.Second)

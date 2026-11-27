@@ -13,6 +13,7 @@ import (
 	"hash/fnv"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -51,6 +52,13 @@ const (
 
 	// CollectorLogFileName is the base name of the collector subprocess's own log file.
 	CollectorLogFileName = "elastic-otel-collector"
+
+	// elasticsearchAuthExtensionType is the type of the extension Fleet adds to agentless policies to
+	// authenticate the Elasticsearch storage extension.
+	elasticsearchAuthExtensionType = "elasticsearchauth"
+	// elasticsearchStorageExtensionID is the ID of the storage extension the translator generates for the
+	// Elasticsearch state store.
+	elasticsearchStorageExtensionID = "elasticsearch_storage"
 
 	// elasticMonitoringReceiverName is the component type name for the elastic monitoring receiver.
 	elasticMonitoringReceiverName = "elasticmonitoringreceiver"
@@ -514,6 +522,12 @@ func (m *OTelManager) buildMergedConfig(
 		if err := mergeWithExtensions(overlay, cfgUpdate.collectorCfg); err != nil {
 			return nil, fmt.Errorf("failed to merge collector otel config: %w", err)
 		}
+
+		if componentOtelCfg != nil {
+			if err := useElasticsearchAuthForStorage(overlay, componentOtelCfg, cfgUpdate.collectorCfg, logger); err != nil {
+				return nil, fmt.Errorf("failed to configure the Elasticsearch storage authenticator: %w", err)
+			}
+		}
 	}
 
 	if err := injectDiagnosticsExtension(overlay); err != nil {
@@ -551,6 +565,46 @@ func (m *OTelManager) buildMergedConfig(
 		return nil, fmt.Errorf("failed to merge component otel config: %w", err)
 	}
 	return componentOtelCfg, nil
+}
+
+func useElasticsearchAuthForStorage(overlay, componentCfg, collectorCfg *confmap.Conf, logger *logp.Logger) error {
+	storageKey := "extensions::" + elasticsearchStorageExtensionID
+	if !componentCfg.IsSet(storageKey) {
+		return nil
+	}
+	authID := elasticsearchAuthExtensionID(collectorCfg, logger)
+	if authID == "" {
+		return nil
+	}
+	// The overlay is merged into the component config last, so this authenticator replaces beatsauth.
+	return mergeWithExtensions(overlay, confmap.NewFromStringMap(map[string]any{
+		storageKey + "::auth::authenticator": authID,
+		"service::extensions":                []any{authID},
+	}))
+}
+
+// elasticsearchAuthExtensionID returns the ID of the only elasticsearchauth extension in config, or an empty ID
+// if there is none or more than one.
+func elasticsearchAuthExtensionID(config *confmap.Conf, logger *logp.Logger) string {
+	extensions, _ := config.Get("extensions").(map[string]any)
+	var ids []string
+	for key := range extensions {
+		var id otelcomponent.ID
+		if err := id.UnmarshalText([]byte(key)); err == nil && id.Type().String() == elasticsearchAuthExtensionType {
+			ids = append(ids, key)
+		}
+	}
+	switch len(ids) {
+	case 0:
+		return ""
+	case 1:
+		return ids[0]
+	default:
+		slices.Sort(ids)
+		logger.Warnf("The collector config has more than one %s extension (%s), the Elasticsearch storage uses the output credentials",
+			elasticsearchAuthExtensionType, strings.Join(ids, ", "))
+		return ""
+	}
 }
 
 // seedOverlay copies the parts of the component config that the steps merging into the overlay read, so that
