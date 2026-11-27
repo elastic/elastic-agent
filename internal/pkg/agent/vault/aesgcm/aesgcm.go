@@ -57,7 +57,7 @@ func Encrypt(key, data []byte) ([]byte, error) {
 	}
 
 	// The first parameter is nonce in order to get the ciphertext as concatenation of nonce and encrypted data
-	ciphertext := aesGCM.Seal(nil, nil, data, nil)
+	ciphertext := aesGCM.Seal(nil, nil, data, nil) //nolint:gosec // G407: false positive, NewGCMWithRandomNonce generates the nonce and requires a nil one here
 
 	return ciphertext, nil
 }

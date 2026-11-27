@@ -810,13 +810,13 @@ func TestSaveLogs(t *testing.T) {
 
 	t.Run("broken zip writer is fatal", func(t *testing.T) {
 		// zip.NewWriter wraps the underlying writer in a bufio.Writer (4 KB buffer),
-		// so small writes never reach the broken writer — they sit in the bufio.
-		// The deflate compressor emits a compressed block every ~32 768 tokens; for
-		// truly incompressible data (LCG bytes, no back-references) each token is one
-		// literal byte, so a 40 KB incompressible file forces the compressor to emit a
-		// ~32 KB block during io.Copy, overflowing the bufio and surfacing the error
-		// inside saveLogs before it returns.
-		const dataSize = 40 * 1024
+		// and the deflate compressor buffers its input before emitting a block, so
+		// small writes never reach the broken writer. How much input it takes before
+		// the first write depends on the compress/flate implementation: about 18 KB
+		// of incompressible data with Go 1.26 and 64 KB with Go 1.27. 1 MB of
+		// incompressible data (LCG bytes, no back-references) is far above that, so
+		// the error surfaces during io.Copy inside saveLogs before it returns.
+		const dataSize = 1024 * 1024
 		data := make([]byte, dataSize)
 		v := uint32(0xdeadbeef)
 		for i := range data {
@@ -1244,6 +1244,35 @@ func TestRedactSSLKeyInInputs(t *testing.T) {
 	assert.Equal(t, redact.REDACTED, sliceSSL["certificate"])
 	require.Contains(t, sliceSSL, "key")
 	assert.Equal(t, redact.REDACTED, sliceSSL["key"])
+}
+
+func TestRedactKeepsSecretPaths(t *testing.T) {
+	// secret_paths lists where the secrets are in the policy, not the secrets
+	// themselves, so it must survive redaction even though its name contains
+	// "secret". The secrets it points to must still be redacted.
+	policy := map[string]any{
+		"secret_paths": []any{"inputs.0.custom_attr"},
+		"inputs": []any{
+			map[string]any{
+				"custom_attr":                         "secretValue",
+				redactionMarkerPrefix + "custom_attr": true,
+				"api_key":                             "secretKey",
+			},
+		},
+	}
+
+	var errOut bytes.Buffer
+	redact.Redact(policy, RedactOpts(&errOut)...)
+	assert.Emptyf(t, errOut.String(), "Unexpected errors written when redacting secrets")
+
+	assert.Equal(t, []any{"inputs.0.custom_attr"}, policy["secret_paths"])
+	inputs, ok := policy["inputs"].([]any)
+	require.Truef(t, ok, "expected inputs to be slice, detected: %T", policy["inputs"])
+	require.Len(t, inputs, 1)
+	input, ok := inputs[0].(map[string]any)
+	require.Truef(t, ok, "expected input to be object, detected: %T", inputs[0])
+	assert.Equal(t, redact.REDACTED, input["custom_attr"])
+	assert.Equal(t, redact.REDACTED, input["api_key"])
 }
 
 func TestRedactNameValuePair(t *testing.T) {
