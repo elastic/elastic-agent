@@ -2424,6 +2424,31 @@ func maybeOverrideRuntimeForComponent(logger *logger.Logger, runtimeCfg *compone
 	}
 }
 
+// stripPersistentQueueForProcess removes queue.persistent from the output units of process runtime components,
+// where it is not supported. The unit config is cloned because it may be shared through the config cache.
+func stripPersistentQueueForProcess(comp *component.Component) {
+	if comp.RuntimeManager != component.ProcessRuntimeManager {
+		return
+	}
+	for i := range comp.Units {
+		u := &comp.Units[i]
+		if u.Type != client.UnitTypeOutput || u.Config == nil || u.Config.Source == nil {
+			continue
+		}
+		queue := u.Config.Source.Fields["queue"].GetStructValue()
+		if queue == nil || queue.Fields["persistent"] == nil {
+			continue
+		}
+		cfg := gproto.Clone(u.Config).(*proto.UnitExpectedConfig)
+		queue = cfg.Source.Fields["queue"].GetStructValue()
+		delete(queue.Fields, "persistent")
+		if len(queue.Fields) == 0 {
+			delete(cfg.Source.Fields, "queue")
+		}
+		u.Config = cfg
+	}
+}
+
 func (c *Coordinator) isFleetServer() bool {
 	for _, s := range c.state.Components {
 		if s.Component.InputType == fleetServer {
@@ -2497,6 +2522,9 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to convert ast to map[string]interface{}: %w", err)
 	}
+	if err := translate.RejectReservedOutputKeys(cfg); err != nil {
+		return err
+	}
 	if renderedInputs != nil {
 		cfg["inputs"] = renderedInputs.Maps()
 	}
@@ -2513,6 +2541,7 @@ func (c *Coordinator) generateComponentModel() (err error) {
 	otelRuntimeModifier := func(comps []component.Component, cfg map[string]interface{}) ([]component.Component, error) {
 		for i := range comps {
 			maybeOverrideRuntimeForComponent(c.logger, c.currentCfg.Settings.Internal.Runtime, &comps[i])
+			stripPersistentQueueForProcess(&comps[i])
 		}
 		return comps, nil
 	}

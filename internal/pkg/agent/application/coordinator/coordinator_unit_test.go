@@ -26,9 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/elastic/elastic-agent-client/v7/pkg/proto"
+	"github.com/elastic/elastic-agent/internal/pkg/agent/application/paths/pathstest"
 	"github.com/elastic/elastic-agent/internal/pkg/agent/application/upgrade/ttl"
 	"github.com/elastic/elastic-agent/internal/pkg/fleetapi/acker"
 	"github.com/elastic/elastic-agent/internal/pkg/testutils"
@@ -399,10 +400,12 @@ func TestCoordinatorReportsUnhealthyUnits(t *testing.T) {
 	// Create a healthy component with healthy input and output units
 	inputKey := runtime.ComponentUnitKey{
 		UnitType: client.UnitTypeInput,
-		UnitID:   "input-unit-1"}
+		UnitID:   "input-unit-1",
+	}
 	outputKey := runtime.ComponentUnitKey{
 		UnitType: client.UnitTypeOutput,
-		UnitID:   "output-unit-1"}
+		UnitID:   "output-unit-1",
+	}
 	comp := runtime.ComponentComponentState{
 		Component: pkgcomponent.Component{ID: "test-component-1"},
 		State: runtime.ComponentState{
@@ -1490,7 +1493,6 @@ inputs:
 		}
 		assert.True(t, filestreamInOtel, "filestream input should be handled by the otel manager")
 	})
-
 }
 
 func TestCoordinatorManagesComponentWorkDirs(t *testing.T) {
@@ -1658,7 +1660,6 @@ inputs: []
 		coord.runLoopIteration(ctx)
 		assert.NoDirExists(t, workDirPath, "component working directory shouldn't exist anymore")
 	})
-
 }
 
 func TestCoordinatorReportsRuntimeManagerUpdateFailure(t *testing.T) {
@@ -2309,7 +2310,6 @@ func TestCoordinator_FleetServer_SkipsMigration(t *testing.T) {
 }
 
 func TestCoordinator_InitiatesMigration(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -2327,7 +2327,6 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 
 			_, err := w.Write(nil)
 			require.NoError(t, err)
-
 		}))
 	defer oldFleetServer.Close()
 
@@ -2356,7 +2355,7 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 
 	rawAgentConfigData, err := yaml.Marshal(rawAgentConfig)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0644))
+	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0o644))
 
 	// setup secret normally previously created by enroll
 	err = secret.CreateAgentSecret(ctx,
@@ -2440,7 +2439,6 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 	}`)
 			_, err := w.Write(body)
 			require.NoError(t, err)
-
 		}))
 	defer newFleetServer.Close()
 
@@ -2467,7 +2465,6 @@ func TestCoordinator_InitiatesMigration(t *testing.T) {
 }
 
 func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -2485,7 +2482,6 @@ func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
 
 			_, err := w.Write(nil)
 			require.NoError(t, err)
-
 		}))
 	defer oldFleetServer.Close()
 
@@ -2514,7 +2510,7 @@ func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
 
 	rawAgentConfigData, err := yaml.Marshal(rawAgentConfig)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0644))
+	require.NoError(t, os.WriteFile(agentConfigFile, rawAgentConfigData, 0o644))
 
 	// setup secret normally previously created by enroll
 	err = secret.CreateAgentSecret(ctx,
@@ -2598,7 +2594,6 @@ func TestCoordinator_InvalidComponentRevertsMigration(t *testing.T) {
 	}`)
 			_, err := w.Write(body)
 			require.NoError(t, err)
-
 		}))
 	defer newFleetServer.Close()
 
@@ -2720,7 +2715,7 @@ func TestComputeEnrollOptions(t *testing.T) {
 	rawAgentConfigData, err := yaml.Marshal(cfg)
 	require.NoError(t, err)
 
-	require.NoError(t, os.WriteFile(cfgPath, rawAgentConfigData, 0644))
+	require.NoError(t, os.WriteFile(cfgPath, rawAgentConfigData, 0o644))
 
 	store, err := storage.NewEncryptedDiskStore(t.Context(), storePath)
 	require.NoError(t, err)
@@ -3188,5 +3183,39 @@ func TestCoordinator_Restart(t *testing.T) {
 		err := coord.Restart(ctx, action)
 		require.ErrorIs(t, err, ErrContainerNotSupported)
 		assert.False(t, reexecMgr.called, "should not re-exec in a containerized environment")
+	})
+}
+
+func TestStripPersistentQueueForProcess(t *testing.T) {
+	newComp := func(runtime pkgcomponent.RuntimeManager, queue map[string]any) pkgcomponent.Component {
+		src, err := structpb.NewStruct(map[string]any{"type": "elasticsearch", "queue": queue})
+		require.NoError(t, err)
+		return pkgcomponent.Component{
+			RuntimeManager: runtime,
+			Units:          []pkgcomponent.Unit{{Type: client.UnitTypeOutput, Config: &proto.UnitExpectedConfig{Source: src}}},
+		}
+	}
+	persistent := map[string]any{"persistent": map[string]any{"file_storage": map[string]any{}}}
+
+	t.Run("process_removed_and_original_untouched", func(t *testing.T) {
+		comp := newComp(pkgcomponent.ProcessRuntimeManager, persistent)
+		orig := comp.Units[0].Config
+		stripPersistentQueueForProcess(&comp)
+		require.NotContains(t, comp.Units[0].Config.Source.Fields, "queue")
+		require.Contains(t, orig.Source.Fields, "queue")
+	})
+
+	t.Run("process_keeps_other_queue_settings", func(t *testing.T) {
+		comp := newComp(pkgcomponent.ProcessRuntimeManager, map[string]any{"mem": map[string]any{"events": 100}, "persistent": persistent["persistent"]})
+		stripPersistentQueueForProcess(&comp)
+		queue := comp.Units[0].Config.Source.Fields["queue"].GetStructValue()
+		require.Contains(t, queue.Fields, "mem")
+		require.NotContains(t, queue.Fields, "persistent")
+	})
+
+	t.Run("otel_untouched", func(t *testing.T) {
+		comp := newComp(pkgcomponent.OtelRuntimeManager, persistent)
+		stripPersistentQueueForProcess(&comp)
+		require.Contains(t, comp.Units[0].Config.Source.Fields, "queue")
 	})
 }
