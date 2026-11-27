@@ -235,7 +235,7 @@ The [tail-sampling processor](https://github.com/open-telemetry/opentelemetry-co
 
 Set `num_traces` higher than the peak number of new traces you expect during `decision_wait`, and leave headroom for traffic bursts and late spans. Before you deploy to production, test under representative load and check memory usage and early evictions.
 
-As of {{agent}} 9.7, the bundled EDOT Collector doesn't include the experimental upstream [Pebble tail-storage extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/tailstorage/pebbletailstorageextension), so the tail-sampling processor keeps pending traces in memory.
+{{agent}} doesn't include the experimental upstream [Pebble tail-storage extension](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/tailstorage/pebbletailstorageextension), so the tail-sampling processor keeps pending traces in memory.
 
 The `elasticapm` connector keeps its own metric aggregation state. The example leaves [`aggregation.directory`](https://github.com/elastic/opentelemetry-collector-components/tree/main/connector/elasticapmconnector#configuration) commented out because the path depends on your deployment. If you don't configure it, all aggregation state remains in memory and memory use can grow with throughput and metric cardinality. For high-throughput production workloads, uncomment the setting and provide a dedicated writable directory to store the state on disk.
 
