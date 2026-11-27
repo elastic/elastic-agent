@@ -29,6 +29,18 @@ func LoadElasticAgentPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
 	return loadPackageSpec(beatsDir, "elastic_agent_packaging")
 }
 
+// LoadElasticAgentEDRCorePackageSpec loads and returns the
+// elastic_agent_edr_core package spec from packages.yml under beatsDir.
+func LoadElasticAgentEDRCorePackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_edr_core")
+}
+
+// LoadElasticAgentEDRPackageSpec loads and returns the
+// elastic_agent_edr_packaging package spec from packages.yml under beatsDir.
+func LoadElasticAgentEDRPackageSpec(beatsDir string) ([]OSPackageArgs, error) {
+	return loadPackageSpec(beatsDir, "elastic_agent_edr_packaging")
+}
+
 // loadPackageSpec loads the named spec from packages.yml under beatsDir.
 func loadPackageSpec(beatsDir, specName string) ([]OSPackageArgs, error) {
 	pkgSpecFile := filepath.Join(beatsDir, packageSpecFile)

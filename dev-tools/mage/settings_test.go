@@ -1274,3 +1274,22 @@ func TestWithManifestInfo(t *testing.T) {
 		assert.Equal(t, origManifest, s.Packaging.Manifest)
 	})
 }
+
+func TestSettingsGetFlavors(t *testing.T) {
+	t.Run("defaults to basic", func(t *testing.T) {
+		s := DefaultSettings()
+		assert.Equal(t, []string{FlavorBasic}, s.GetFlavors())
+	})
+
+	t.Run("edr only", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Flavors = FlavorEDR
+		assert.Equal(t, []string{FlavorEDR}, s.GetFlavors())
+	})
+
+	t.Run("list with spaces", func(t *testing.T) {
+		s := DefaultSettings()
+		s.CrossBuild.Flavors = "basic, edr"
+		assert.Equal(t, []string{FlavorBasic, FlavorEDR}, s.GetFlavors())
+	})
+}

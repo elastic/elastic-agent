@@ -7,6 +7,8 @@ package info
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/elastic/elastic-agent/pkg/ecsmeta"
@@ -50,6 +52,7 @@ func NewECSMetadata(agent Agent, host hostinfo.Info) *ecsmeta.ECSMeta {
 				LogLevel:     agent.GetLogLevelRuntime(),
 				Unprivileged: agent.Unprivileged(),
 				FIPS:         release.FIPSDistribution(),
+				Flavor:       installedFlavor(),
 			},
 		},
 		Host: &ecsmeta.HostECSMeta{
@@ -89,4 +92,25 @@ func getFullOSName(os types.OSInfo) string {
 	}
 
 	return sb.String()
+}
+
+// defaultFlavor is the flavor reported when none was recorded at install time, for
+// example an installation that predates flavors.
+const defaultFlavor = "basic"
+
+// installedFlavor returns the flavor reported to Fleet. A build of a dedicated flavor
+// (such as edr) reports that flavor, otherwise it is the flavor recorded at install
+// time, falling back to the default flavor when none was recorded.
+func installedFlavor() string {
+	if builtFlavor := release.Flavor(); builtFlavor != "" {
+		return builtFlavor
+	}
+	content, err := os.ReadFile(filepath.Join(paths.Top(), paths.FlavorFileName))
+	if err != nil {
+		return defaultFlavor
+	}
+	if flavor := strings.TrimSpace(string(content)); flavor != "" {
+		return flavor
+	}
+	return defaultFlavor
 }

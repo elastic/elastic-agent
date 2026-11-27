@@ -23,6 +23,11 @@ var snapshot = ""
 // fips is a flag for marking a FIPS-capable build.
 var fips = "false"
 
+// flavor identifies a flavor that is built as its own distribution (e.g. "edr").
+// Empty for the standard distribution, where the flavor is selected at install time.
+// Stamped at build time via -ldflags.
+var flavor = ""
+
 // complete is an environment variable marking the image as complete.
 var complete = "ELASTIC_AGENT_COMPLETE"
 
@@ -85,6 +90,21 @@ func FIPSDistribution() bool {
 	return err == nil && f
 }
 
+// FlavorEDR is the flavor stamped into EDR builds.
+const FlavorEDR = "edr"
+
+// Flavor returns the flavor stamped at build time. It is empty for the standard
+// distribution, where the flavor is chosen when the agent is installed.
+func Flavor() string {
+	return flavor
+}
+
+// IsEDRFlavor reports whether this binary was built as the EDR
+// distribution.
+func IsEDRFlavor() bool {
+	return flavor == FlavorEDR
+}
+
 // VersionInfo is structure used by `version --yaml`.
 type VersionInfo struct {
 	Version          string    `yaml:"version"`
@@ -92,6 +112,7 @@ type VersionInfo struct {
 	BuildTime        time.Time `yaml:"build_time"`
 	Snapshot         bool      `yaml:"snapshot"`
 	FIPSDistribution bool      `yaml:"fips"`
+	Flavor           string    `yaml:"flavor,omitempty"`
 }
 
 // Info returns current version information.
@@ -102,6 +123,7 @@ func Info() VersionInfo {
 		BuildTime:        BuildTime(),
 		Snapshot:         Snapshot(),
 		FIPSDistribution: FIPSDistribution(),
+		Flavor:           Flavor(),
 	}
 }
 
@@ -117,6 +139,10 @@ func (v VersionInfo) String() string {
 	sb.WriteString(v.Commit)
 	if v.FIPSDistribution {
 		sb.WriteString(" fips-distribution: true")
+	}
+	if v.Flavor != "" {
+		sb.WriteString(" flavor: ")
+		sb.WriteString(v.Flavor)
 	}
 	sb.WriteString(" at ")
 	sb.WriteString(v.BuildTime.Format("2006-01-02 15:04:05 -0700 MST"))

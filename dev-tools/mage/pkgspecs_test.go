@@ -110,3 +110,28 @@ specs:
 		assert.Contains(t, err.Error(), "elastic_agent_packaging")
 	})
 }
+
+// TestRepositoryEDRPackageSpecs loads the EDR package specs of the repository the way the packaging
+// does. The archives of the EDR flavor must have the flavor in their root directory, the intermediate
+// core archives keep the standard one.
+func TestRepositoryEDRPackageSpecs(t *testing.T) {
+	repositoryRoot := filepath.Join("..", "..")
+
+	coreSpecs, err := LoadElasticAgentEDRCorePackageSpec(repositoryRoot)
+	require.NoError(t, err)
+	require.NotEmpty(t, coreSpecs)
+	for _, spec := range coreSpecs {
+		assert.False(t, spec.Spec.RootDirIncludesName, "the core archive of %s should not have the flavor in its root directory", spec.OS)
+	}
+
+	specs, err := LoadElasticAgentEDRPackageSpec(repositoryRoot)
+	require.NoError(t, err)
+	require.NotEmpty(t, specs)
+	for _, spec := range specs {
+		for _, packageType := range spec.Types {
+			if packageType == Zip || packageType == TarGz {
+				assert.True(t, spec.Spec.RootDirIncludesName, "the %s archive of %s should have the flavor in its root directory", packageType, spec.OS)
+			}
+		}
+	}
+}

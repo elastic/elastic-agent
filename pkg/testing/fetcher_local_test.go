@@ -116,3 +116,36 @@ func TestLocalFetcher(t *testing.T) {
 		assert.Equal(t, string(tc.wantHash), string(contentHash))
 	}
 }
+
+func TestLocalFetcher_Flavor(t *testing.T) {
+	pkgFormat := "targz"
+	if runtime.GOOS == "windows" {
+		pkgFormat = "zip"
+	}
+	suffix, err := GetPackageSuffix(runtime.GOOS, runtime.GOARCH, pkgFormat)
+	require.NoError(t, err)
+
+	dir := t.TempDir()
+	standard := fmt.Sprintf("elastic-agent-9.6.0-%s", suffix)
+	edr := fmt.Sprintf("elastic-agent-edr-9.6.0-%s", suffix)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, standard), []byte("standard"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, edr), []byte("edr"), 0o644))
+
+	t.Run("without a flavor the standard package is fetched", func(t *testing.T) {
+		result, err := LocalFetcher(dir).Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "9.6.0", pkgFormat)
+		require.NoError(t, err)
+		assert.Equal(t, standard, result.Name())
+	})
+
+	t.Run("with a flavor only the package of that flavor is fetched", func(t *testing.T) {
+		result, err := LocalFetcher(dir, WithLocalFlavor("edr")).Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "9.6.0", pkgFormat)
+		require.NoError(t, err)
+		assert.Equal(t, edr, result.Name())
+	})
+
+	t.Run("fails when the package of the flavor is missing", func(t *testing.T) {
+		require.NoError(t, os.Remove(filepath.Join(dir, edr)))
+		_, err := LocalFetcher(dir, WithLocalFlavor("edr")).Fetch(context.Background(), runtime.GOOS, runtime.GOARCH, "9.6.0", pkgFormat)
+		require.Error(t, err)
+	})
+}

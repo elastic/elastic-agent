@@ -878,7 +878,7 @@ func TestDownloadArtifact(t *testing.T) {
 
 			pathstest.SetDownloads(t, filepath.Join(t.TempDir(), "downloads"))
 
-			target, err := artifact.New("elastic-agent", false, targetVersion, "linux", "amd64")
+			target, err := artifact.New("elastic-agent", "", false, targetVersion, "linux", "amd64")
 			require.NoError(t, err)
 
 			settings := &artifact.Config{
@@ -1021,7 +1021,7 @@ func TestResolve(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			target, err := artifact.New("elastic-agent", false, tt.version, "linux", "amd64")
+			target, err := artifact.New("elastic-agent", "", false, tt.version, "linux", "amd64")
 			require.NoError(t, err)
 
 			fileName := target.FileName()
